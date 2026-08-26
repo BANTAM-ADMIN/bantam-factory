@@ -734,17 +734,17 @@ efficiency estimate.
 ## Evidence
 
 - [Promotion ledger](promotion-ledger.json)
-- [Usage attribution summary](../.bantam/experiments/terra-usage-attribution-smoke/summary.md)
-- [Image review packet summary](../.bantam/experiments/terra-image-review-packet-smoke/summary.md)
-- [Tool outcome protocol summary](../.bantam/experiments/terra-tool-outcome-smoke/summary.md)
-- [Complete-run audit smoke summary](../.bantam/experiments/terra-run-audit-smoke/summary.md)
-- [Causal tool-usage linkage summary](../.bantam/experiments/terra-tool-usage-link-smoke/summary.md)
-- [Pixel facts target summary](../.bantam/experiments/terra-pixel-facts-ab/summary.md)
-- [Pixel facts non-target summary](../.bantam/experiments/terra-pixel-facts-noncolor-ab/summary.md)
-- [Valid preview-vision summary](../.bantam/experiments/terra-preview-vision-ab-v2/summary.md)
-- [Invalid preview-vision pilot](../.bantam/experiments/terra-preview-vision-ab/summary.md)
-- [Main v2 summary](../.bantam/experiments/codex-creative-multimodal-v2/summary.md)
-- [Main v2 showcase](../.bantam/experiments/codex-creative-multimodal-v2/showcase/index.html)
-- [Main v2 manifest](../.bantam/experiments/codex-creative-multimodal-v2/manifest.json)
-- [Offline code regression summary](../.bantam/experiments/codex-offline-creative-code-regression/summary.md)
-- [Offline code regression showcase](../.bantam/experiments/codex-offline-creative-code-regression/showcase/index.html)
+- Usage attribution summary
+- Image review packet summary
+- Tool outcome protocol summary
+- Complete-run audit smoke summary
+- Causal tool-usage linkage summary
+- Pixel facts target summary
+- Pixel facts non-target summary
+- Valid preview-vision summary
+- Invalid preview-vision pilot
+- Main v2 summary
+- Main v2 showcase
+- Main v2 manifest
+- Offline code regression summary
+- Offline code regression showcase

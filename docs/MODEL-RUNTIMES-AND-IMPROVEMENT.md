@@ -1080,9 +1080,9 @@ therefore cannot outrank a strict pass.
 
 Current measured showcases are:
 
-[Local Qwen vs Codex Sol vs Codex Terra](../comparison/model-gauntlet/2026-07-25-local-sol-terra/report/index.html)
+Local Qwen vs Codex Sol vs Codex Terra
 
-[Sol/Terra/Luna/GPT-5.5 hard-role tournament](../.bantam/experiments/codex-hard-tournament-2026-07-25/showcase/index.html)
+Sol/Terra/Luna/GPT-5.5 hard-role tournament
 
 One round is useful integration evidence but is not order-balanced. Repeat and
 rotate arms before changing a routing policy. The hard-role tournament used two
@@ -1449,4 +1449,4 @@ paired behavioral experiment demonstrates lift without unacceptable regression.
 - [Self-improvement system](SELF-IMPROVEMENT.md)
 - [Principles](PRINCIPLES.md)
 - [Measured Local/Sol/Terra integration report](superpowers/reports/2026-07-25-local-codex-model-gauntlet.md)
-- [Local/Sol/Terra showcase](../comparison/model-gauntlet/2026-07-25-local-sol-terra/report/index.html)
+- Local/Sol/Terra showcase

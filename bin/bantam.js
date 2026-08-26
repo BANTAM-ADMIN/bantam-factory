@@ -698,6 +698,24 @@ if (cmd === "governor") {
   }
   process.exit(0);
 }
+if (cmd === "supervise") {
+  // The film archaeologist: the factory's byte-level audits, encoded. Reads a
+  // --save-run film (or the newest in .bantam/runs) and drafts findings with
+  // evidence attached — mechanism guesses matched against the jig catalog.
+  const { supervise, renderSupervisorReport } = await import("../src/supervisor/report.js");
+  let target = args._[1];
+  if (!target || args.latest) {
+    const dir = path.resolve(".bantam", "runs");
+    const cand = (fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => f.endsWith(".json")).sort();
+    if (!cand.length && !target) { console.error("no film given and no .bantam/runs/*.json found — run with --save-run first"); process.exit(2); }
+    target ??= path.join(dir, cand.at(-1));
+  }
+  const film = JSON.parse(fs.readFileSync(path.resolve(target), "utf8"));
+  const r = supervise(film);
+  console.log(renderSupervisorReport(r, { source: target }));
+  if (args.json) console.log(JSON.stringify(r, null, 1));
+  process.exit(r.findings.some((f) => f.severity === "high") ? 1 : 0);
+}
 if (cmd === "addons") {
   const { renderAddons } = await import("../src/addons.js");
   console.log(renderAddons());

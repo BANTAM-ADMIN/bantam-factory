@@ -68,6 +68,9 @@ network access is **off by default** and interactive runs ask you per fetch.
   with an append-only extension trajectory tuned for llama.cpp prefix reuse
 - `bin/` — CLI (`bantam.js`), fight arena, replay page generator,
   `judge-card.mjs` (instrument-manifest judge), `fight-concord.mjs`
+- `src/supervisor/` — `bantam supervise`: the film archaeologist that
+  drafts findings (with evidence) from a saved run — see
+  [docs/SUPERVISOR.md](docs/SUPERVISOR.md)
 - `test/` — 3,100+ tests; stations are tested at the seam, through the real
   dispatcher
 - `docs/` — the [System Handbook](docs/BANTAM-SYSTEM-HANDBOOK.md), the

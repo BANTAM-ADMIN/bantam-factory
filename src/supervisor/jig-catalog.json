@@ -1,0 +1,54 @@
+{
+ "schema": 1,
+ "note": "Named failure mechanisms with detection signatures and their countermeasures. Grown from real films; every entry cites the station/gate that exists because of it.",
+ "families": [
+  {
+   "id": "patch-thrash",
+   "mechanism": "repeated same-file patches inside a red span instead of re-pouring the function from its contract",
+   "signature": "replaces-per-path >= 4 within a span where the suite stayed red",
+   "countermeasure": { "kind": "steer", "name": "regenerate-from-formula", "metric": "repourSteers" }
+  },
+  {
+   "id": "retroactive-rewrite",
+   "mechanism": "earlier prompt bytes changed between builds (history rewriter), collapsing checkpoint-or-nothing prefix reuse to the head",
+   "signature": "cache_n collapse with large prompt_n mid-run; extensionPrefixBreaks > 0",
+   "countermeasure": { "kind": "gauge+fix", "name": "frozen renders + extension-invariant gauge", "metric": "extensionPrefixBreaks" }
+  },
+  {
+   "id": "contract-undercoverage",
+   "mechanism": "an enumerated contract implemented in full but tested in part; the untested entries hide the defect",
+   "signature": "contract-flagged task + small self-suite + sealed/holdout failure on a listed item",
+   "countermeasure": { "kind": "gate", "name": "contract_coverage", "metric": "contractEnumNotes" }
+  },
+  {
+   "id": "oracle-swap",
+   "mechanism": "truth channel drifts from the asserting suite to print-only probes; escalations sleep because nothing registers pass/fail",
+   "signature": "long probe-only stretches between verifications",
+   "countermeasure": { "kind": "steer", "name": "verify-cadence", "metric": "verifyCadenceSteers" }
+  },
+  {
+   "id": "acquisition-flail",
+   "mechanism": "environment lacks a dependency/network; the model burns turns on varied installers that all hit the same wall",
+   "signature": "multiple distinct install/download commands failing with network-unreachable errors",
+   "countermeasure": { "kind": "gauge", "name": "walled-garden", "metric": "walledGardenSteers" }
+  },
+  {
+   "id": "inverse-oscillation",
+   "mechanism": "byte-inverse edit pairs on one path; the run alternates between two already-tested states",
+   "signature": "a replace whose (old,new) is the inverse of an earlier landed replace, twice",
+   "countermeasure": { "kind": "hard-stop", "name": "inverse-edit", "metric": "inverseEditStops" }
+  },
+  {
+   "id": "ignored-advice",
+   "mechanism": "a station fired correctly but the following actions repeat the steered-against behavior; advice compiles stochastically",
+   "signature": "steer metric > 0 and the same pattern continues in later turns",
+   "countermeasure": { "kind": "escalate", "name": "promote the advisory to a gate (see contract_coverage precedent)", "metric": null }
+  },
+  {
+   "id": "transcription",
+   "mechanism": "values computed in probes then hand-transcribed as long literal tables; one slipped digit re-introduces the corruption",
+   "signature": "large literal tables written where the task documents a generating formula",
+   "countermeasure": { "kind": "steer", "name": "ship-the-generator", "metric": "shipGeneratorSteers" }
+  }
+ ]
+}

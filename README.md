@@ -25,13 +25,34 @@ to re-judge the whole board from artifacts.
 
 ## Quick start
 
+**Already have a model?** (a local llama.cpp/vLLM server, or an
+OpenAI-compatible API):
+
 ```bash
 git clone <this repo> && cd bantam
-./bin/run-dev.sh doctor            # checks readiness, tells you what's missing
-./bin/run-dev.sh                   # interactive REPL against your endpoint
-BANTAM_ENDPOINT=http://127.0.0.1:8085 node bin/bantam.js run \
-  --task "fix the failing test" --workspace ./myproject --autonomous
+node bin/bantam.js doctor                          # diagnoses; wires a found server
+node bin/bantam.js doctor --api-url http://HOST/v1 # or register any OpenAI-compatible API
+node bin/bantam.js                                 # interactive REPL
 ```
+
+**Starting from nothing but a GPU?** One command installs the add-ons
+(prebuilt llama.cpp ~50 MB + stock Apache-2.0 Qwen 3.8 27B, ~19 GB — sizes
+shown, consent asked, downloads resumable), scaffolds the certified launch
+profile, and starts the server:
+
+```bash
+node bin/bantam.js setup
+```
+
+Then, from any project directory:
+
+```bash
+node /path/to/bantam/bin/bantam.js run --task "fix the failing test" --autonomous
+```
+
+`bantam addons` lists everything optional — vision input, the MTP
+speculative-decoding sidecar, voice — with sizes and install commands.
+Nothing optional is ever bundled.
 
 The harness ships with **no model, no weights, no bundled inference server**.
 Optional add-ons (installed on request by `doctor --setup`, never vendored):

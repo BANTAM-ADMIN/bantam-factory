@@ -698,6 +698,11 @@ if (cmd === "governor") {
   }
   process.exit(0);
 }
+if (cmd === "addons") {
+  const { renderAddons } = await import("../src/addons.js");
+  console.log(renderAddons());
+  process.exit(0);
+}
 if (cmd === "doctor" || cmd === "setup") {
   const isHealthy = async (ep) => {
     try { return (await fetch(`${ep}/health`, { signal: AbortSignal.timeout(1500) })).ok; }
@@ -877,6 +882,27 @@ if (cmd === "doctor" || cmd === "setup") {
       else process.stderr.write(`  Wrote ${s.wrote.join(", ")}\n  → Run \`bantam doctor --launch\` to start it.\n`);
     }
     process.exit(r.ok ? 0 : 1);
+  }
+
+  // `--provision-extra vision|mtp`: optional companions from the same repo —
+  // vision (mmproj) and the MTP speculative-decoding sidecar. Small enough to
+  // be quick, optional enough to never be part of the default pull.
+  if (typeof args["provision-extra"] === "string") {
+    const { EXTRAS } = await import("../src/provision.js");
+    const which = String(args["provision-extra"]);
+    const extra = EXTRAS[which];
+    if (!extra) { console.error(`unknown extra "${which}" — have: ${Object.keys(EXTRAS).join(", ")}`); process.exit(2); }
+    const { resolveUrl, modelsDir: mdir, formatBytes: fb } = await import("../src/provision.js");
+    const dest = path.join(mdir(), extra.file);
+    if (fs.existsSync(dest) && fs.statSync(dest).size >= extra.bytes) {
+      process.stderr.write(`✔ already installed: ${dest}\n`); process.exit(0);
+    }
+    process.stderr.write(`${which}: ${extra.file} (${fb(extra.bytes)}) → ${dest}\n`);
+    if (setupTty && !args.yes && !(await confirmYN(`Download now? [Y/n] `, true))) process.exit(1);
+    fs.mkdirSync(mdir(), { recursive: true });
+    await downloadWithProgress(resolveUrl({ file: extra.file }), dest);
+    process.stderr.write(`\n✔ ${which} installed. The certified launch profile auto-detects it next start.\n`);
+    process.exit(0);
   }
 
   // `--setup`: the whole on-ramp in one command — diagnose, then (only what's

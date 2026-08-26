@@ -11,17 +11,27 @@ import path from "node:path";
 import os from "node:os";
 import { once } from "node:events";
 
-export const DEFAULT_REPO = "llmfan46/Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-GGUF";
-const MODEL_STEM = "Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved";
+// Launch default: the llama.cpp project's own conversions of the stock,
+// Apache-2.0 Qwen 3.8 27B (verified 2026-08-26: ungated, license apache-2.0).
+// The bench record in docs/fights was fought on these weights — anyone can
+// pull the same file and reproduce the cards.
+export const DEFAULT_REPO = "ggml-org/Qwen3.8-27B-GGUF";
+const MODEL_STEM = "Qwen3.8-27B";
 export const DEFAULT_QUANT = "Q4_K_M";
 
-// Approximate on-disk sizes (bytes) for the sanity/disk checks; the real size is
-// taken from Content-Length at download time.
+// Exact on-disk sizes (bytes) from HF Content-Length (2026-08-26) for the
+// disk checks; the live size is still taken from Content-Length at download.
 export const QUANTS = {
-  Q3_K_M: 14.1e9, Q3_K_L: 15.2e9,
-  Q4_K_S: 16.2e9, Q4_K_M: 17211797600, // exact, confirmed from HF Content-Range
-  Q5_K_S: 19.2e9, Q5_K_M: 19.7e9,
-  Q6_K: 22.8e9, Q8_0: 29e9,
+  Q4_K_M: 18973870432,   // ~19 GB — fits 24 GB VRAM with room for KV cache
+  Q8_0: 28595763552,     // ~29 GB — needs ~32 GB+ VRAM or CPU offload
+};
+
+// Optional companions in the same repo (installed only on request):
+//   vision (mmproj) enables screenshots/images; mtp enables speculative
+//   decoding (measured ~2x generation on supported builds).
+export const EXTRAS = {
+  vision: { file: `mmproj-${MODEL_STEM}-Q8_0.gguf`, bytes: 629247008 },
+  mtp: { file: `mtp-${MODEL_STEM}-Q8_0.gguf`, bytes: 3164006688 },
 };
 
 export function ggufName(quant = DEFAULT_QUANT) {

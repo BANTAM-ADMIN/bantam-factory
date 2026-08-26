@@ -589,3 +589,180 @@ the next station. And one lesson for the operator's own supervisor, now a
 standing pattern: bells arrive with bytes — bout scripts attach the failing
 test and diff to every MISS line, so no verdict is ever narrated ahead of
 its evidence.
+
+## Series 6 — ten tools, built and graded (2026-08-26)
+
+A different question than the sealed cards ask: not "can it hit a pinned
+contract" but "can it build something a person would actually use?" Ten
+briefs for real CLI tools — CSV reformatter with RFC-4180 quoting, duplicate
+finder, env-var documenter, histogram, retry wrapper, JSON differ, template
+renderer, log slicer, disk-usage reporter, JSON-schema validator — each
+asking for the tool AND its tests. Rubric and ~80 independent probes were
+written and hashed BEFORE any run (SEALED.sha256), so the grading could not
+drift toward whatever the model happened to produce.
+
+Result: 10/10 built, 76/76 sealed probes passed, 288 self-authored tests
+green, 200/200 on the rubric. 1,709 lines of tool and 2,899 lines of test in
+16.6 minutes of total wall clock (median 96s per tool, median 13 turns). An
+independent pass on features the probes deliberately skipped — histogram log
+scaling, size-threshold filtering, JSON type-change diffs, symlinks reported
+without being followed, "+K more" file elision, maximum/maxLength messages —
+came back 6/6. Every tool is pyflakes-clean with no bare excepts, no debug
+residue, and honest summaries; retry.py kills the process GROUP on timeout,
+which no brief asked for.
+
+The series doubled as the supervisor's validation set, and earned its keep
+by breaking it: `bantam supervise` drafted [high] oracle-swap on all ten
+healthy builds because the analyzer read only node's TAP counters and was
+blind to pytest summaries and to BANTAM's own "VERDICT: all N tests passed"
+observations; wall-concentration fired on 10/10, carrying no information.
+Both were fixed and gated (verdict-shape recognition; wall findings only
+when reprocessing dominates generation), after which the ten films draft
+nothing above `info` while the pre-fix timegrid film still draws its [high]
+retroactive-rewrite. Known gap, recorded: the supervisor reads PROCESS, not
+PRODUCT — a run can be procedurally spotless and still ship a defect, which
+is what sealed judges are for.
+
+---
+
+## The board becomes the product (2026-08-26)
+
+Two things were true of the fight board at the end of series 6: it was the
+best evidence the project had, and nobody outside this room could read it.
+The cards were filed correctly and rendered honestly, but the page opened on
+a wall of pills, the early bouts carried half a roster, and the ten builds —
+70 real programs written from empty directories — were compressed into a
+single summary card. This session turned the board into the thing it always
+should have been: the front door.
+
+### Every build is a card now
+
+`.bantam/series6/make-build-cards.py` explodes the build-off into ten filmed
+cards (`cardb1`…`cardb10`), one per brief, seven corners each. Card 31 keeps
+the whole-field matrix as the summary; the ten new cards are where you watch
+a single tool get built seven different ways at once.
+
+Each corner's reel is drawn from that harness's own recorded output, and the
+reels are explicitly NOT of equal quality — because the harnesses are not.
+BANTAM, BANTAM×SOL and both CLAUDE corners stamp every event, so their feeds
+carry real elapsed time reconstructed from `modelCalls[].startedAt` and the
+CLI's `timestamp` fields. CODEX, OPENCODE and HERMES print no timestamps at
+all: their lines are in recorded order, evenly spaced across the wall the
+stopwatch actually measured, and the first line of every such feed says so.
+A synthetic tick that reads like a stopwatch is a lie about the instrument,
+so the page refuses to let one pass unlabelled.
+
+Three HERMES corners have no reel at all (b4, b5, b9). That is not a bug: it
+prints only when it finishes, and those three were still working when the
+900-second window closed, so there was nothing to record. The lane says that
+in words rather than sitting silent and looking broken.
+
+### Filling the roster, without rewriting history
+
+Sixty-three corner-slots across the board had never been fought. The rule
+for filling them: **same brief, same materials, same sealed judge, from the
+card's own kit** — `.bantam/backfill/run-backfill.mjs` resolves each card to
+the series kit that produced it and reuses that kit's judge dialect (node
+holdout, stdout-truth, render-truth, or fight-judge-only for the cards that
+never had a sealed judge). `merge-backfill.mjs` is additive only: an arm that
+already has a corner is skipped, so a rerun can never overwrite a filed
+result, and every merged card gets a `provenance.backfill` line naming which
+corners arrived late and on what date.
+
+Three bouts could not be filled and say so on their own faces: cards 8, 8R
+and 11 were fought in workspaces generated at fight time and never preserved
+(the access log, the shipyard package). Without those exact bytes a new
+corner would be answering a different question, so the card carries a
+`partial field` note instead of a fabricated row. The three pre-judge cards
+(3B, 4, 5) were pulled from the board entirely — they predate sealed judging,
+carry no verdict of any kind, and a proof page has no business showing rows
+nobody ever graded. Their JSON stays in `docs/fights/` as history; only their
+event reels moved to `docs/fights/archive/`.
+
+### Three defects the work surfaced
+
+1. **`String.replace` spliced the page data.** The build transcripts contain
+   shell heredocs with `$'…'`. `String.prototype.replace` treats `$'` as
+   "everything after the match", so injecting the card JSON into the template
+   silently rewrote it mid-array and the page died with `Unexpected token`.
+   Every template substitution now goes through a function replacer. This
+   only appeared once real shell transcripts entered the corpus.
+
+2. **A sealed card rendered as unsealed.** Card 8R stores its truth as bare
+   strings (`"bantam": "exact"`) while every other card stores objects
+   (`{verdict: "EXACT"}`). The renderer read only the object form, so an
+   entire card's sealed results silently became "—" — and an earlier audit of
+   mine had counted that same card as a BANTAM *loss*. `sealedOf()` now
+   normalises both dialects and upper-cases the verdict.
+
+3. **Two instruments were sharing one column.** The final table's test column
+   was labelled "what the sealed judge counted" but was actually rendering
+   the *fight* judge's count of the corner's own suite. They are different
+   instruments and the difference is the entire point of sealing, so they are
+   now two columns — `sealed check` and `its own suite` — sourced separately.
+
+### The page
+
+Branding sits up top: a BANTAM wordmark and mark, one line of what it is, and
+a **tale of the tape** — filmed cards, corners fought, sealed judges, BANTAM's
+clean record, its median wall, and the same-weights ratio. Every one of those
+numbers is computed in the page from the same `DATA` the replays play; none is
+typed in. The same-weights cell pairs BANTAM against the fastest clean run of
+HERMES or OPENCODE *on the same brief*, because those two drive the identical
+27B weights and the gap between them is therefore harness, not model.
+
+The picker is split into the two kinds of card (bouts and the build-off), the
+final table only renders columns the card actually recorded, and the footer
+answers the three questions a first-time viewer has: what did I just watch,
+what is BANTAM, and why is it faster on the same weights — followed by the
+limits, stated on purpose.
+
+### Cards 32 and 33: rebuilding the two task shapes the board had lost
+
+Three bouts could not be backfilled because their workspaces were generated at
+fight time and thrown away — the access log behind cards 8/8R, the `shipyard`
+package behind card 11. Rather than leave two good task shapes on the board
+with permanent holes in their rosters, both were rebuilt from scratch as kits
+that are **scripts**, so they can never be lost again:
+
+- `.bantam/series7/card32` — `holdout/gen-log.py` (seed 80526) emits a 650-line
+  combined-format access log and refuses to exist if `top_ip` or `busiest_hour`
+  has a tie, because an ambiguous answer makes the judge unfalsifiable.
+- `.bantam/series7/card33` — `holdout/gen-pkg.py` emits the `shipyard` package:
+  17 modules, 34 callers of the deprecated `formatMoney`, in every shape the
+  brief names (named, aliased, namespace, barrel re-export, default-currency,
+  `.map` callback, dynamic `await import(...)`, and a re-export under another
+  name that must keep working).
+
+Both judges were **proven before use**, which is the only reason to trust
+either card. Card 32's judge re-derives the five answers with a strict regex
+over the log grammar — an implementation independent of anything a corner
+writes — and byte-compares the printed lines: a correct reference scores EXACT,
+an hour-off-by-one trap and an empty workspace are both refused. Card 33's
+judge has five legs (no `formatMoney` left, the deprecated module deleted, the
+provided suite green, all 34 callers still exported AND still returning
+byte-identical strings, no `src` module deleted) and was run against a correct
+reference plus four cheap wins: deleting a caller, leaving one reference,
+keeping the deprecated module, and deleting the module it could not fix. The
+control scored 5/5; every trap was refused with the right legs named.
+
+The caller-snapshot leg is the one that matters. "Migrate every caller" is easy
+to fake by deleting the callers you cannot fix, and a suite alone will not
+always catch it. `holdout/expected.json` pins what all 34 callers returned
+before the migration, and the judge re-runs every one of them afterwards.
+
+Card 32 came back seven-for-seven sealed EXACT, BANTAM fastest at 25.7s against
+56.9s (opencode) and 148.4s (hermes) on the identical weights. Cards 8, 8R and
+11 leave the board with a `superseded` note and keep their JSON as history.
+
+Card 33 came back the same way: seven corners, seven sealed EXACT, all 34
+callers intact in every one, provided suite green in every one. BANTAM 62.5s;
+on the identical weights opencode took 99.4s and hermes 168.8s. The migration
+is the kind of task that separates harnesses on *thoroughness* rather than
+speed — every corner had to find callers behind an aliased import, a namespace
+import, a barrel re-export, a `.map` callback, a dynamic `await import(...)`,
+and a re-export under another name — and every corner found all of them.
+
+With 33 filed, **every card on the board carries the full seven-corner roster**:
+25 bouts (6, 7, 7R, 12–33) and the ten build cards. Nothing was filled by
+assertion; the 40 corners that were missing were run.

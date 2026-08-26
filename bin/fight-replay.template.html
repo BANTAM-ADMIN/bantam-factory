@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__TITLE__</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
@@ -70,11 +72,86 @@
   .final .c{font-weight:600} .ex{color:var(--green)} .ms{color:var(--red)}
   .note{color:var(--dim);font-size:12px;margin-top:10px}
   @media (max-width:640px){ .corner{min-width:92px;font-size:16px} .ticker .who{min-width:76px} }
+
+  /* ---- masthead: a fight poster's tale of the tape ---- */
+  .mast{margin-bottom:20px}
+  .brandrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit}
+  .mark{width:34px;height:34px;flex:none;color:var(--amber);margin-bottom:2px}
+  .wordmark{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:27px;
+    letter-spacing:.22em;line-height:1;color:var(--ink);padding-left:2px}
+  .tagline{color:var(--dim);font-size:12px;letter-spacing:.02em;border-left:1px solid var(--line);padding-left:12px;flex:1 1 260px;min-width:0}
+  .brandrow .grow{flex:1}
+  .lic{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    border:1px solid var(--line);border-radius:99px;padding:4px 11px;white-space:nowrap}
+  .rules{height:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding-top:3px;margin:14px 0 13px}
+  .titlerow{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .titlerow h1{font-size:52px;line-height:.92}
+  .titlerow .eyebrow{margin:0 0 7px}
+  /* tale of the tape */
+  .tape{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:16px 0 4px}
+  .tape div{background:var(--panel);padding:9px 12px}
+  .tape .k{font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+  .tape .v{font-family:"Barlow Condensed",sans-serif;font-size:25px;font-weight:700;line-height:1;
+    color:var(--ink);font-variant-numeric:tabular-nums}
+  .tape .v small{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:400;color:var(--dim);letter-spacing:0}
+  .tape .hot .v{color:var(--amber)}
+  .claim{color:var(--dim);font-size:11.5px;margin:8px 0 0;max-width:92ch}
+  .claim b{color:var(--ink);font-weight:600}
+  /* picker, grouped into the two kinds of card */
+  .pickgroup{margin:14px 0 0}
+  .pickgroup > .gl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+  .pickgroup .picker{margin:0}
+  .lane .arts{font-size:10.5px;color:var(--dim);letter-spacing:.03em}
+  .final td.tst{font-variant-numeric:normal;color:var(--dim);font-size:11.5px}
+  @media (max-width:640px){ .titlerow h1{font-size:38px} .tagline{border:0;padding-left:0;flex-basis:100%} }
+
+  /* ---- footer: what this is, for someone who just watched a replay ---- */
+  .foot{margin-top:34px;border-top:1px solid var(--line);padding-top:22px}
+  .foot h3{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--amber);margin:0 0 9px;font-weight:600}
+  .foot .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:26px}
+  .foot p{margin:0 0 9px;color:var(--dim);max-width:62ch}
+  .foot b{color:var(--ink);font-weight:600}
+  .foot code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink);font-size:12px}
+  .foot ul{margin:0;padding-left:16px;color:var(--dim)} .foot li{margin-bottom:5px}
+  .foot .fine{margin-top:20px;font-size:11px;color:var(--dim);opacity:.8;max-width:96ch;border-top:1px solid var(--line);padding-top:12px}
+  .howto{color:var(--dim);font-size:11.5px;margin:0 0 14px;letter-spacing:.02em}
+  .howto b{color:var(--ink);font-weight:600}
 </style>
 <div class="wrap">
-  <div class="eyebrow">__EYEBROW__</div>
-  <h1>__H1__</h1>
-  <div class="picker" id="picker"></div>
+  <header class="mast">
+    <div class="brandrow">
+      <span class="brand">
+        <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" fill="currentColor">
+          <!-- a bantam cock: small bird, full comb, tail up -->
+          <path d="M61.0 56.4L61.7 55.3L62.4 54.1L63.1 53.0L63.7 51.8L64.3 50.7L64.9 49.5L65.5 48.4L66.1 47.3L66.5 46.1L66.5 45.0L66.4 43.8L66.4 42.6L66.4 41.4L66.4 40.2L66.4 39.1L66.4 37.9L66.5 36.7L66.5 35.6L66.5 34.4L66.6 33.3L66.7 32.1L66.8 31.0L66.9 29.8L67.0 28.7L67.2 27.5L67.3 26.4L67.5 25.2L67.7 24.1L67.9 22.9L68.2 21.8L68.5 20.7L68.7 19.5L69.1 18.4L69.4 17.3L69.8 16.1L70.1 15.0L70.6 13.9L71.0 12.8L71.5 11.7L72.0 10.5L72.5 9.4L73.0 8.3L73.6 7.2L74.1 5.9L74.1 5.9L72.9 6.5L71.8 7.2L70.7 7.9L69.7 8.7L68.7 9.5L67.7 10.4L66.8 11.3L65.8 12.2L65.0 13.2L64.1 14.2L63.3 15.2L62.4 16.3L61.7 17.4L60.9 18.5L60.2 19.6L59.5 20.7L58.8 21.9L58.1 23.0L57.5 24.2L56.9 25.4L56.3 26.6L55.7 27.8L55.2 29.0L54.7 30.2L54.2 31.5L53.7 32.7L53.2 33.9L52.8 35.2L52.3 36.4L51.9 37.7L51.5 38.9L51.1 40.2L50.7 41.4L50.4 42.7L50.0 43.9L50.1 45.2L50.4 46.5L50.6 47.8L51.0 49.1L51.3 50.4L51.7 51.7L52.1 53.0L52.6 54.3L53.0 55.6Z"/>
+          <path d="M60.1 57.9L61.1 57.3L62.1 56.7L63.1 56.0L64.0 55.4L64.9 54.7L65.9 54.1L66.8 53.4L67.6 52.8L68.4 52.0L68.8 51.1L69.2 50.1L69.7 49.2L70.1 48.3L70.5 47.4L71.0 46.4L71.4 45.5L71.9 44.6L72.4 43.7L72.8 42.8L73.3 41.9L73.8 41.1L74.3 40.2L74.8 39.3L75.4 38.5L75.9 37.6L76.5 36.8L77.0 35.9L77.6 35.1L78.2 34.3L78.8 33.5L79.4 32.6L80.1 31.9L80.7 31.1L81.4 30.3L82.1 29.5L82.8 28.8L83.5 28.0L84.3 27.3L85.1 26.6L85.8 25.9L86.7 25.1L87.5 24.4L88.3 23.7L89.2 22.9L89.2 22.9L88.0 22.9L86.9 23.0L85.8 23.2L84.7 23.5L83.6 23.8L82.5 24.1L81.4 24.5L80.3 24.9L79.3 25.3L78.2 25.8L77.2 26.3L76.2 26.8L75.1 27.4L74.1 28.0L73.2 28.6L72.2 29.2L71.2 29.8L70.3 30.5L69.3 31.2L68.4 31.9L67.5 32.6L66.6 33.3L65.7 34.1L64.8 34.8L64.0 35.6L63.1 36.4L62.3 37.2L61.4 38.0L60.6 38.8L59.8 39.6L59.0 40.4L58.2 41.2L57.4 42.1L56.7 42.9L55.9 43.7L55.5 44.8L55.2 45.9L55.0 47.1L54.7 48.2L54.5 49.4L54.3 50.5L54.2 51.7L54.1 52.9L53.9 54.1Z"/>
+          <path d="M58.6 58.5L59.5 58.5L60.5 58.4L61.4 58.3L62.3 58.2L63.2 58.1L64.1 57.9L65.0 57.8L65.8 57.6L66.6 57.4L67.2 56.9L67.9 56.3L68.5 55.8L69.1 55.3L69.7 54.8L70.4 54.3L71.0 53.8L71.6 53.3L72.3 52.8L72.9 52.3L73.5 51.8L74.2 51.4L74.8 50.9L75.5 50.4L76.1 50.0L76.8 49.5L77.5 49.1L78.2 48.7L78.9 48.3L79.5 47.9L80.2 47.5L81.0 47.1L81.7 46.7L82.4 46.3L83.1 46.0L83.9 45.6L84.6 45.3L85.4 45.0L86.2 44.7L86.9 44.4L87.7 44.1L88.5 43.8L89.3 43.5L90.2 43.2L91.0 42.9L91.0 42.9L90.2 42.5L89.3 42.3L88.4 42.1L87.6 41.9L86.7 41.8L85.8 41.7L84.9 41.6L84.0 41.5L83.1 41.5L82.2 41.5L81.3 41.5L80.4 41.6L79.5 41.6L78.6 41.7L77.7 41.8L76.8 41.9L75.9 42.1L75.0 42.2L74.1 42.4L73.2 42.6L72.3 42.8L71.4 43.0L70.5 43.2L69.6 43.5L68.8 43.7L67.9 44.0L67.0 44.2L66.2 44.5L65.3 44.8L64.5 45.1L63.6 45.4L62.8 45.7L61.9 46.0L61.1 46.3L60.3 46.7L59.6 47.3L59.0 48.0L58.5 48.7L57.9 49.5L57.4 50.2L56.9 51.0L56.4 51.8L55.9 52.6L55.4 53.5Z"/>
+          <path d="M58.8 41.4L59.0 40.2L59.2 39.0L59.4 37.7L59.6 36.5L59.8 35.3L60.1 34.1L60.4 32.9L60.6 31.7L60.9 30.6L61.3 29.4L61.6 28.2L62.0 27.0L62.3 25.9L62.7 24.7L63.2 23.5L63.6 22.4L64.1 21.3L64.6 20.1L65.1 19.0L65.6 17.9L66.2 16.8L66.7 15.7" stroke="var(--bg)" stroke-width="3.0" fill="none" stroke-linecap="round"/>
+          <path d="M63.9 45.2L64.6 44.4L65.2 43.5L65.8 42.6L66.4 41.8L67.1 40.9L67.7 40.1L68.4 39.2L69.1 38.4L69.8 37.6L70.4 36.8L71.2 36.0L71.9 35.2L72.6 34.4L73.4 33.6L74.1 32.9L74.9 32.1L75.7 31.4L76.5 30.7L77.3 30.0L78.1 29.3L79.0 28.7L79.8 28.0" stroke="var(--bg)" stroke-width="3.0" fill="none" stroke-linecap="round"/>
+          <path d="M3 29C7 26 11 24 15 22.5C16.5 21.8 18 21 19 19.5L20.5 6L25.5 13.5L29.5 3L34 12L38.5 5L41.5 17C44 19.5 45.5 23 46 27C46.5 31 45.5 35 44 38C50 42 55 47 58 54C61.5 61.5 61.5 69 58 73.5C54 78 48 79.5 42 78.5C34 77.5 27 72.5 24 65C21 57.5 21 48.5 24 42C25 39 26 36 26 34C23 33 20 32 17 31.5C11 31 6 30 3 29Z"/>
+          <path d="M17.5 31.5C21 33 22.5 37 21 41C19.5 45 15.8 44.6 14.8 40.8C13.8 37 15 32.8 17.5 31.5Z"/>
+          <path d="M40 76.5C39 82.5 36 82 37 89" stroke="currentColor" stroke-width="4.4" stroke-linecap="round" fill="none"/><path d="M29.5 93L37 89L45 92M37 89L38.5 95.5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M52 74.5C51 80.5 54 80 55 87" stroke="currentColor" stroke-width="4.4" stroke-linecap="round" fill="none"/><path d="M47.5 91L55 87L63 90M55 87L56.5 93.5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="27.5" cy="21" r="3" fill="var(--bg)"/>
+        </svg>
+        <span class="wordmark">BANTAM</span>
+      </span>
+      <span class="tagline">one small model, run locally, in a harness built to make it punch above its weight</span>
+      <span class="lic">Apache-2.0 · one local GPU</span>
+    </div>
+    <div class="rules"></div>
+    <div class="titlerow">
+      <h1>__H1__</h1>
+      <div class="eyebrow">__EYEBROW__</div>
+    </div>
+    <div class="tape" id="tape"></div>
+    <p class="claim" id="claim"></p>
+  </header>
+  <div id="pickers"></div>
   <p class="task" id="task"></p>
   <p class="repsband" id="repsband" hidden></p>
   <details class="trail" id="trail" hidden><summary>provenance — how this card was sealed and judged</summary><div id="trailbody"></div></details>
@@ -85,12 +162,51 @@
     <button class="spd" data-s="1">1×</button><button class="spd" data-s="4">4×</button><button class="spd" data-s="8" aria-pressed="true">8×</button><button class="spd" data-s="16">16×</button>
     <button id="snd" aria-pressed="false">🔇 sound</button>
   </div>
+  <p class="howto">press <b>play</b> to run the card on a virtual clock · click any <b>lane</b> to open that corner's full feed, line by line · drag the scrubber to any moment</p>
   <div class="lanes" id="lanes"></div>
   <div class="tickerbox"><h2>the line, live — workers' own words</h2><ul class="ticker" id="ticker"></ul></div>
   <div class="final" id="final"><h2>final — judged rerun + sealed truth</h2><div class="tw" id="finaltable"></div>
     <p class="note" id="buildnote" style="display:none"></p>
     <p class="note">Every row is auditable: full run artifacts, per-turn actions, and — where the card was sealed — a truth hashed before the bell. BANTAM, HERMES, and OPENCODE run the identical 27B weights: the seconds between them are harness.</p>
     <p style="margin:10px 0 0"><button id="again">↺ replay</button></p></div>
+  <footer class="foot">
+    <div class="cols">
+      <div>
+        <h3>what you just watched</h3>
+        <p>Every lane is a real agent that really ran, replayed from its own recorded output. Nothing here is
+        re-enacted: the wall clock is the stopwatch, the words are the worker's, and the verdict is whatever the
+        judge said when it read the files afterwards.</p>
+        <p>Where a card is <b>sealed</b>, the test that decides it was written and hashed <b>before</b> any corner
+        started, and no corner ever saw it.</p>
+      </div>
+      <div>
+        <h3>what BANTAM is</h3>
+        <p>A harness for <b>small models running on your own machine</b>. The model here is a 27B open-weights
+        model on one GPU — the same weights the HERMES and OPENCODE corners drive.</p>
+        <p>BANTAM gives it a constrained action protocol, a workspace it cannot wander out of, and a line of
+        <b>stations</b> — small jigs that catch a known failure the moment it starts, the way a factory catches a
+        defect at the station that makes it rather than at final inspection.</p>
+      </div>
+      <div>
+        <h3>why it is faster on the same weights</h3>
+        <ul>
+          <li>the prompt is built so the model's cache survives the turn instead of being rewritten</li>
+          <li>actions are schema-constrained, so a malformed step is impossible rather than retried</li>
+          <li>stations stop the loops that eat the clock: re-reading, re-patching, oscillating edits</li>
+          <li>the run records itself, so every claim on this page can be re-derived from bytes</li>
+        </ul>
+        <p style="margin-top:9px">Open source, Apache-2.0. A card is one command: <code>bantam fight "&lt;task&gt;"</code>.</p>
+      </div>
+    </div>
+    <p class="fine">Honest limits, stated on purpose: these are curated tasks, not a public leaderboard, and the
+    field is what one workstation can run — a 27B local model, two rival local harnesses on the identical weights,
+    and frontier agents through their own CLIs. Frontier corners answer over a network from far larger models;
+    they are here for calibration, not as a like-for-like weight class. Every card on this board carries the full roster,
+    and got there by being <b>run</b>: a corner is never fabricated. Three early bouts whose workspaces were generated at
+    fight time and not kept could not be completed honestly, so their briefs were rebuilt as reproducible kits and
+    refought in full (cards 32 and 33); the originals keep their records but leave the board. Where a corner hit the wall
+    or built nothing, the card says so instead of dropping the row.</p>
+  </footer>
 </div>
 <div class="overlay" id="overlay"></div>
 <div class="feed" id="feed" role="dialog" aria-label="corner feed">
@@ -112,7 +228,11 @@ const NAMES = {
   "opencode":["OPENCODE","same 27B · opencode"],
   "bantam-codex":["BANTAM×CODEX SOL","codex app-server as bantam's model · effort high"],
   "codex-sol":["CODEX CLI SOL","raw codex agent · default effort"],
-  "claude-sonnet":["CLAUDE CODE","sonnet"],
+  "claude-sonnet":["CLAUDE SONNET","sonnet · claude code CLI"],
+  "claude-opus":["CLAUDE OPUS","opus · claude code CLI"],
+  "claude-fable":["CLAUDE FABLE","fable · claude code CLI"],
+  "bridge-sol":["BANTAM\u00d7SOL","bantam harness \u00b7 gpt-5.6-sol"],
+  "codex-cli":["CODEX CLI SOL","raw codex agent \u00b7 effort xhigh"],
   "bantam-codexapi-spark":["BANTAM×SPARK","bantam over the bridge · spark:low"],
   "bantam-codexapi-luna":["BANTAM×LUNA","bantam over the bridge · luna:medium"],
   "bantam-codexapi-terra":["BANTAM×TERRA","bantam over the bridge · terra:medium"],
@@ -120,7 +240,7 @@ const NAMES = {
 };
 const disp = a => (NAMES[a] ?? [a.replace("bantam-codexapi-","").toUpperCase()])[0];
 const subOf = a => (NAMES[a] ?? [null,""])[1] ?? "";
-const colorOf = a => COLORS[a] || ({"bantam-codex":"#8ad4c2","codex-sol":"#6aa0e0","claude-sonnet":"#b98ad4"})[a] || `var(--${a.replace("bantam-codexapi-","")}, var(--dim))`;
+const colorOf = a => COLORS[a] || ({"bantam-codex":"#8ad4c2","codex-sol":"#6aa0e0","codex-cli":"#6aa0e0","claude-sonnet":"#b98ad4","claude-opus":"#a078c8","claude-fable":"#d49a6a","bridge-sol":"#b08ad4"})[a] || `var(--${a.replace("bantam-codexapi-","")}, var(--dim))`;
 let card=null, maxT=1, vclock=0, playing=false, speed=8, last=null, sound=false, actx=null, prevV=0;
 const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = id => document.getElementById(id);
@@ -129,11 +249,59 @@ function fmt(ms){ return (ms/1000).toFixed(1)+"s"; }
 function blip(good){ if(!sound||!actx) return; const o=actx.createOscillator(),g=actx.createGain();
   o.frequency.value=good?880:220; o.type="sine"; g.gain.setValueAtTime(0.035,actx.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.13); }
+// A corner counts as CLEAN only when the fight judge and the sealed judge both
+// say so. Anything a card left unjudged is counted as unjudged, never as a win.
+const isClean=(c)=>isGoodVerdict(c.verdict)&&(c.sealed==null||c.sealed==="EXACT");
+// Conventional median: on an EVEN count, average the two middle values. The
+// lower-middle shortcut used elsewhere on this page for small odd-n rep sets
+// systematically flatters whichever side you apply it to — on the 34 paired
+// briefs it read 39s vs 134s (3.4x) where the real median is 44s vs 137s
+// (3.1x). A headline claim gets the conservative arithmetic.
+const med=(xs)=>{const v=[...xs].sort((a,b)=>a-b); if(!v.length) return null;
+  const m=v.length>>1; return v.length%2 ? v[m] : (v[m-1]+v[m])/2;};
+function buildTape(){
+  const cards=DATA.cards;
+  let corners=0, sealedCards=0, fought=0, clean=0;
+  const wins=[], pairs=[];
+  for (const c of cards){
+    corners+=c.corners.length;
+    if (c.corners.some(x=>x.sealed!=null)) sealedCards++;
+    const b=c.corners.find(x=>x.arm==="bantam");
+    if (b && b.verdict!=null){ fought++; if(isClean(b)) { clean++; wins.push(b.wallMs/1000); } }
+    // same weights, same brief: bantam vs the best clean run of the OTHER two
+    // harnesses driving the identical local 27B.
+    const peers=c.corners.filter(x=>(x.arm==="hermes"||x.arm==="opencode")&&isClean(x));
+    if (b&&isClean(b)&&peers.length) pairs.push([b.wallMs/1000, Math.min(...peers.map(p=>p.wallMs/1000))]);
+  }
+  const mb=med(pairs.map(p=>p[0])), mp=med(pairs.map(p=>p[1]));
+  const cells=[
+    ["filmed cards", cards.length, ""],
+    ["corners fought", corners, ""],
+    ["sealed judges", sealedCards+"<small>/"+cards.length+"</small>", ""],
+    ["bantam clean", clean+"<small>/"+fought+"</small>", "hot"],
+    ["bantam median, all cards", (med(wins)??0).toFixed(0)+"<small>s</small>", "hot"],
+    ["vs same weights", (mp/mb).toFixed(1)+"<small>× faster</small>", "hot"],
+  ];
+  $("tape").innerHTML=cells.map(([k,v,cl])=>`<div class="${cl}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  $("claim").innerHTML=`Every number above is computed from the same recorded bytes these replays play — nothing is typed in by hand. `+
+    `<b>Clean</b> means every judge that ruled on the run passed it: the fight judge, plus the sealed judge hashed `+
+    `before the bell on the ${cards.filter(c=>c.corners.some(x=>x.sealed!=null)).length} of ${cards.length} cards that have one. `+
+    `<b>vs same weights</b> pairs BANTAM against the fastest clean run of HERMES or OPENCODE on the same brief — `+
+    `all three drive the identical local 27B, so the gap is harness, not model. On the ${pairs.length} briefs where both `+
+    `finished clean, BANTAM's median is ${mb.toFixed(0)}s against ${mp.toFixed(0)}s (that shared set is a harder slice than `+
+    `the all-cards median beside it) — and it is the faster of the two on `+
+    `<b>${pairs.filter(p=>p[0]<p[1]).length} of ${pairs.length}</b>. The ones it loses are on the board too.`;
+}
 function buildPicker(){
   if (DATA.cards.length<2) return;
-  $("picker").innerHTML = DATA.cards.map((c,i)=>{
-    const w=[...c.corners].filter(x=>isGoodVerdict(x.verdict)).sort((a,b)=>a.wallMs-b.wallMs)[0];
-    return `<button class="pick" data-i="${i}" style="--c:${w?colorOf(w.arm):"var(--dim)"}" aria-pressed="false"><span class="dot"></span>${esc(c.no)} · ${esc(c.label)}</button>`;
+  const groups=[["bouts — fix, repair, and survive a real codebase","bout"],["the build-off — ten tools, built from nothing","build"]];
+  $("pickers").innerHTML=groups.map(([label,kind])=>{
+    const items=DATA.cards.map((c,i)=>[c,i]).filter(([c])=>(c.kind??"bout")===kind);
+    if(!items.length) return "";
+    return `<div class="pickgroup"><div class="gl">${label} · ${items.length}</div><div class="picker">`+items.map(([c,i])=>{
+      const w=[...c.corners].filter(isClean).sort((a,b)=>a.wallMs-b.wallMs)[0];
+      return `<button class="pick" data-i="${i}" style="--c:${w?colorOf(w.arm):"var(--dim)"}" aria-pressed="false"><span class="dot"></span>${esc(c.no)} · ${esc(c.label)}</button>`;
+    }).join("")+`</div></div>`;
   }).join("");
   for (const b of document.querySelectorAll(".pick")) b.addEventListener("click",()=>loadCard(Number(b.dataset.i)));
 }
@@ -210,8 +378,26 @@ function render(){
   syncFeed();
   const fin=$("final");
   if(vclock>=maxT){ fin.style.display="block"; if(playing) toggle(false);
-    $("finaltable").innerHTML=`<table><thead><tr><th>corner</th><th>wall</th><th>judge</th><th>sealed</th><th>turns</th><th>input tokens</th><th>output tokens</th><th>cache tokens</th><th>prefix reuse</th></tr></thead><tbody>`+
-      [...card.corners].sort((a,b)=>{const ga=isGoodVerdict(a.verdict)?0:(a.verdict==="BENCH-FAULT"?2:1),gb=isGoodVerdict(b.verdict)?0:(b.verdict==="BENCH-FAULT"?2:1);return ga-gb||a.wallMs-b.wallMs;}).map(c=>`<tr><td class="c" style="color:${colorOf(c.arm)}">${esc(disp(c.arm))}</td><td>${fmt(c.wallMs)}</td><td>${c.verdict==="BENCH-FAULT"?"bench fault (unscored)":c.verdict??"—"}</td><td class="${c.sealed==="EXACT"?"ex":(c.sealed&&c.sealed!=="BENCH-FAULT")?"ms":""}">${c.sealed==="BENCH-FAULT"?"—":c.sealed??"—"}</td><td>${c.usage?.turns??"—"}</td>${c.usage&&c.usage.inputTokens==null&&c.usage.totalTokens!=null?`<td colspan="3">Σ ${c.usage.totalTokens.toLocaleString()} total (CLI reports one figure)</td>`:`<td>${c.usage?.inputTokens?.toLocaleString()??"—"}</td><td>${c.usage?.outputTokens?.toLocaleString()??"—"}</td><td>${c.usage?.cacheHitTokens?.toLocaleString()??"—"}</td>`}<td>${c.usage?.prefixReuse!=null?Math.round(c.usage.prefixReuse*100)+"%":"—"}</td></tr>`).join("")+"</tbody></table>";
+    // Columns are chosen by what the card actually recorded: a build card has
+    // probe counts and artifacts and no token telemetry; a bout card has the
+    // reverse. Rendering a column of em-dashes says nothing, so we don't.
+    const rows=[...card.corners].sort((a,b)=>{const ga=isClean(a)?0:(a.verdict==="BENCH-FAULT"?2:1),gb=isClean(b)?0:(b.verdict==="BENCH-FAULT"?2:1);return ga-gb||a.wallMs-b.wallMs;});
+    const COLS=[
+      {h:"corner", always:1, cell:c=>`<td class="c" style="color:${colorOf(c.arm)}">${esc(disp(c.arm))}</td>`},
+      {h:"wall",   always:1, cell:c=>`<td>${fmt(c.wallMs)}</td>`},
+      {h:"judge",  always:1, cell:c=>`<td>${c.verdict==="BENCH-FAULT"?"bench fault (unscored)":c.verdict??"—"}</td>`},
+      {h:"sealed", always:1, cell:c=>`<td class="${c.sealed==="EXACT"?"ex":(c.sealed&&c.sealed!=="BENCH-FAULT")?"ms":""}">${c.sealed==="BENCH-FAULT"?"—":c.sealed??"—"}</td>`},
+      {h:"sealed check", has:c=>c.sealedTests, cell:c=>`<td class="tst">${esc(c.sealedTests??"—")}</td>`},
+      {h:"its own suite", has:c=>c.ownTests, cell:c=>`<td class="tst">${esc(c.ownTests??"—")}</td>`},
+      {h:"files shipped", has:c=>c.artifacts, cell:c=>`<td>${c.artifacts??"—"}</td>`},
+      {h:"turns",  has:c=>c.usage?.turns!=null, cell:c=>`<td>${c.usage?.turns??"—"}</td>`},
+      {h:"input tokens",  has:c=>c.usage?.inputTokens!=null||c.usage?.totalTokens!=null, cell:c=>c.usage&&c.usage.inputTokens==null&&c.usage.totalTokens!=null?`<td>Σ ${c.usage.totalTokens.toLocaleString()}</td>`:`<td>${c.usage?.inputTokens?.toLocaleString()??"—"}</td>`},
+      {h:"output tokens", has:c=>c.usage?.outputTokens!=null, cell:c=>`<td>${c.usage?.outputTokens?.toLocaleString()??"—"}</td>`},
+      {h:"cache tokens",  has:c=>c.usage?.cacheHitTokens!=null, cell:c=>`<td>${c.usage?.cacheHitTokens?.toLocaleString()??"—"}</td>`},
+      {h:"prefix reuse",  has:c=>c.usage?.prefixReuse!=null, cell:c=>`<td>${c.usage?.prefixReuse!=null?Math.round(c.usage.prefixReuse*100)+"%":"—"}</td>`},
+    ].filter(col=>col.always||rows.some(col.has));
+    $("finaltable").innerHTML=`<table><thead><tr>${COLS.map(c=>`<th>${c.h}</th>`).join("")}</tr></thead><tbody>`+
+      rows.map(c=>`<tr>${COLS.map(col=>col.cell(c)).join("")}</tr>`).join("")+"</tbody></table>";
     const bn=$("buildnote");
     if(card.build){ bn.style.display="block"; bn.textContent=`fought on harness build ${card.build}`; } else bn.style.display="none";
   } else fin.style.display="none";
@@ -232,5 +418,5 @@ $("feedclose").addEventListener("click",closeFeed);
 $("overlay").addEventListener("click",closeFeed);
 addEventListener("keydown",e=>{ if(e.code==="Escape") closeFeed(); });
 addEventListener("keydown",e=>{ if(e.code==="Space"&&e.target.tagName!=="INPUT"&&e.target.tagName!=="BUTTON"){ e.preventDefault(); if(vclock>=maxT){vclock=0;prevV=0;} toggle(); } });
-buildPicker(); loadCard(DATA.initial ?? 0);
+buildTape(); buildPicker(); loadCard(DATA.initial ?? 0);
 </script>

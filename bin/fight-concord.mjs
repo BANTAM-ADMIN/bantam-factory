@@ -80,4 +80,23 @@ for (const no of nos) {
   }
 }
 console.log(`\nconcordance: ${checked} verdicts recomputed, ${drift} drift, ${uncheckable} uncheckable`);
+if (checked === 0) {
+  // Say this plainly rather than leaving a reader to infer it from a wall of
+  // UNCHECKABLE lines. Re-judging replays each corner's ARCHIVED workspace
+  // through the card's sealed instrument; those workspaces are hundreds of MB
+  // of run artifacts and are deliberately not in the repo. The board itself is
+  // still complete evidence — every wall, verdict, sealed truth, provenance
+  // note and per-turn transcript is recorded in docs/fights and replayable
+  // offline. What needs the kits is RE-DERIVING the verdicts, not reading them.
+  console.log(
+    "\nNothing was re-judged: this checkout has no fight kits or archived corner\n" +
+    "workspaces (.bantam/series*/), which are run artifacts, not source, and are\n" +
+    "not shipped. That is expected on a clone.\n\n" +
+    "  what you CAN audit here: docs/fights/*.json (walls, verdicts, usage),\n" +
+    "    *.truth.json (sealed verdicts), *.events.ndjson (each corner's own\n" +
+    "    recorded output), and fight-night.html, which replays all of it offline\n" +
+    "  what this command needs: the machine that ran the bout, or an archive of\n" +
+    "    its kits — see docs/fights/README.md",
+  );
+}
 process.exit(drift ? 1 : 0);

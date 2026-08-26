@@ -14,13 +14,21 @@ const F = path.join(here, "..", "docs", "fights");
 const LABELS = {
   "6": "roman numerals", "7": "the maze", "8": "log analyzer", "8r": "log analyzer, full field", "7r": "the maze, refought",
   "11": "shipyard surgery", "12": "meterbox", "13": "interval-set", "14": "orders ledger",
-  "15": "timegrid", "16": "jobqueue", "17": "argv-mini", "18": "slugline", "19": "rowquery", "20": "ledgerd", "21": "textwrap", "22": "token bucket", "23": "quiet line", "24": "ballast", "25": "seesaw", "26": "tableburn", "27": "falsefriend", "28": "waveplate", "29": "excision", "30": "inheritance", "31": "the toolbox",
+  "15": "timegrid", "16": "jobqueue", "17": "argv-mini", "18": "slugline", "19": "rowquery", "20": "ledgerd", "21": "textwrap", "22": "token bucket", "23": "quiet line", "24": "ballast", "25": "seesaw", "26": "tableburn", "27": "falsefriend", "28": "waveplate", "29": "excision", "30": "inheritance", "31": "the toolbox — all 70 builds", "32": "log analyzer, full field", "33": "shipyard migration, full field",
+  "b1": "build · csvfmt", "b2": "build · dupfind", "b3": "build · envdoc", "b4": "build · histo", "b5": "build · retry",
+  "b6": "build · jsondiff", "b7": "build · templater", "b8": "build · logwindow", "b9": "build · treesize", "b10": "build · schemacheck",
 };
 // Scrubbing (privacy) and clipping (display budget) are separate concerns.
 const scrub = (s) => String(s ?? "")
   .replace(/\/home\/[^\s"']+\//g, "…/")
   .replace(/https?:\/\/[\d.]+:\d+[^\s"']*/g, "the bridge");
 const clip = (s, n = 400) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+// Two dialects reached the files: {verdict:"EXACT"} and a bare "exact" string
+// (card 8R). Reading only the first silently rendered a sealed card unsealed.
+const sealedOf = (t) => {
+  const v = typeof t === "string" ? t : t?.verdict;
+  return v ? String(v).toUpperCase() : null;
+};
 function buildCard(no) {
   const post = JSON.parse(fs.readFileSync(path.join(F, `card${no}.json`), "utf8"));
   const truthPath = path.join(F, `card${no}.truth.json`);
@@ -59,6 +67,7 @@ function buildCard(no) {
   }
   return {
     no: `card ${no.toUpperCase()}`, label: LABELS[no] ?? "", task: scrub(post.task), reps,
+    kind: /^b\d/.test(no) ? "build" : "bout",
     // publish-the-trail (bench-protocol adoptable): the provenance strings —
     // sealed-pre-bell notes, judge-version history, bench-fault resolutions,
     // where a mined card's shape came from — ARE the bench's credibility.
@@ -66,7 +75,12 @@ function buildCard(no) {
     corners: post.corners.map((c) => ({
       arm: c.arm, wallMs: c.wallMs, exitCode: c.exitCode,
       verdict: post.verdicts?.[c.arm]?.outcome ?? null,
-      sealed: truth?.truthCheck?.[c.arm]?.verdict ?? null,
+      // Two different instruments, never conflated: the SEALED judge (hashed
+      // before the bell) and the corner's OWN test run (which it wrote itself).
+      sealedTests: (typeof truth?.truthCheck?.[c.arm] === "object" ? truth.truthCheck[c.arm].tests : null) ?? null,
+      ownTests: post.verdicts?.[c.arm]?.tests ?? null,
+      artifacts: Array.isArray(c.artifacts) ? c.artifacts.length : null,
+      sealed: sealedOf(truth?.truthCheck?.[c.arm]),
       usage: c.usage ? { turns: c.usage.turns ?? null, inputTokens: c.usage.inputTokens ?? null, outputTokens: c.usage.outputTokens ?? null, cacheHitTokens: c.usage.cacheHitTokens ?? null, totalTokens: c.usage.totalTokens ?? null, prefixReuse: c.usage.prefixReuse ?? null } : null,
     })),
     events: events.filter((e) => e.kind === "line" || e.kind === "status")
@@ -79,9 +93,13 @@ let cards, title, h1, eyebrow, initial = 0;
 if (mode === "--all") {
   const nos = fs.readdirSync(F).filter((f) => f.endsWith(".events.ndjson"))
     .map((f) => f.replace(/^card|\.events\.ndjson$/g, ""))
-    .sort((a, b) => (parseInt(a, 10) - parseInt(b, 10)) || a.localeCompare(b));
+    .sort((a, b) => { const k = (s) => s.startsWith("b") ? [1, parseInt(s.slice(1), 10), ""] : [0, parseInt(s, 10), s];
+      const [ka, na, sa] = k(a), [kb, nb, sb] = k(b);
+      return ka - kb || na - nb || sa.localeCompare(sb); });
   cards = nos.map(buildCard);
-  initial = Math.max(0, nos.indexOf("20"));
+  // Land on a build: seven agents, one empty directory, a tool at the end —
+  // the most legible thirty seconds on the board for someone arriving cold.
+  initial = Math.max(0, nos.indexOf("b1"));
   title = "Bantam Fight Night";
   h1 = 'Fight <span class="amp">Night</span>';
   eyebrow = `Season 1 · ${cards.length} filmed cards · pick one, press play — replayed from the recorded bytes`;
@@ -92,7 +110,11 @@ if (mode === "--all") {
   eyebrow = "Bantam Fight Night · a full run, replayed from its recorded bytes";
 }
 const tpl = fs.readFileSync(path.join(here, "fight-replay.template.html"), "utf8");
-const html = tpl.replace("__TITLE__", title).replace("__H1__", h1).replace("__EYEBROW__", eyebrow)
-  .replace("__DATA__", JSON.stringify({ cards, initial }).replace(/</g, "\\u003c"));
+// Replacement must go through a FUNCTION: a transcript containing $\u0027, $& or
+// $` would otherwise be spliced by String.replace's special patterns — the
+// build-off's shell logs carry exactly those, and it silently corrupted DATA.
+const data = JSON.stringify({ cards, initial }).replace(/</g, "\\u003c");
+const html = tpl.replace("__TITLE__", () => title).replace("__H1__", () => h1)
+  .replace("__EYEBROW__", () => eyebrow).replace("__DATA__", () => data);
 fs.writeFileSync(out, html);
 console.log(`replay: ${out} (${(html.length / 1048576).toFixed(2)}MB, ${cards.length} card(s), ${cards.reduce((n, c) => n + c.events.length, 0)} events)`);

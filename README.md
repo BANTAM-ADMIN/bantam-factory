@@ -16,12 +16,25 @@ observe → verify → repeat until done.
 ## Receipts, not benchmarks
 
 Open [`docs/fights/fight-night.html`](docs/fights/fight-night.html) — a fully
-self-contained replayable record of 25 sealed cards where a stock 27B in this
-harness fights the same tasks as codex CLI, Claude Code CLI (sonnet/opus/
-fable), and the same 27B weights in rival harnesses. Sealed holdout judges
-hashed before the bell, replication bands, provenance trails, judge errata
-kept on the record — including the misses. Run `node bin/fight-concord.mjs`
-to re-judge the whole board from artifacts.
+self-contained replayable record of **35 cards, 297 corners**, where a stock
+27B in this harness fights the same tasks as codex CLI, Claude Code CLI
+(sonnet/opus), and the same 27B weights in rival harnesses (hermes, opencode).
+Every card carries the full seven-corner roster. Twenty-five are bouts against
+a broken codebase; ten are the **build-off**, where each corner is handed an
+empty directory and 900 seconds to build a working tool plus its tests.
+
+Sealed holdout judges hashed before the bell, replication bands, provenance
+trails, judge errata kept on the record — including the misses. On the 34
+briefs where BANTAM and a same-weights rival both finished clean, BANTAM's
+median is 45s against 137s, and it is the faster of the two on 32 of 34; the
+two it loses are on the board.
+
+Everything needed to *read* that record ships here — walls, verdicts, sealed
+truths, provenance, and every corner's own recorded output, replayable offline
+with no model and no GPU. Re-*deriving* the verdicts (`node
+bin/fight-concord.mjs`) additionally needs each corner's archived workspace,
+which is hundreds of MB of run artifacts and is deliberately not in the repo;
+the command says so plainly rather than pretending.
 
 New here? **[Getting started](docs/GETTING-STARTED.md)** is the five-minute path.
 

@@ -8,6 +8,15 @@ and the Claude Code CLI corners (sonnet / opus / fable) all fight the same
 task from the same materials under the same judge. Open it in any browser,
 or share the file; it is also published as a live artifact.
 
+## Two kinds of card
+
+**Bouts** hand every corner the same broken or half-built codebase and ask it
+to fix, migrate, or survive it. **The build-off** (cards B1–B10) hands every
+corner an EMPTY directory and a brief, and asks for a working tool plus its
+tests inside 900 seconds — seventy real programs, ten per corner. Card 31 is
+the build-off's whole-field matrix; the ten B cards are where you watch one
+brief being built seven ways at once.
+
 ## How to read a card
 
 - **Lanes** replay each corner's bout from its recorded bytes — press play,
@@ -18,6 +27,10 @@ or share the file; it is also published as a live artifact.
 - **replication** line: per-arm medians over N reps, all sealed — walls in
   parentheses. Medians over marbles is the standard; single-rep numbers are
   labeled by their absence of a band.
+- **sealed check** vs **its own suite**: two different instruments, never
+  conflated. The first is the judge hashed before the bell that no corner ever
+  saw; the second is the corner's own test run, which it wrote itself and can
+  therefore make say anything.
 - **provenance** block: how the card was sealed and judged — kits are hashed
   pre-bell (`.bantam/series5/hashes.sealed`), judges are validated against
   independent implementations with traps demonstrated live, and judge errata
@@ -36,7 +49,34 @@ or share the file; it is also published as a live artifact.
    touched.
 3. **Fastest-correct wins.** Scoreboards rank sealed-correct results by
    wall; incorrect or unscored lanes sit below regardless of speed.
-4. **Verify the instrument.** `bin/fight-concord.mjs` re-runs sealed judges
+4. **A corner is never fabricated.** Missing corners on a filed card are run
+   with `bin/bench/run-backfill.mjs` — same brief, same materials, the card's
+   own judge — and merged additively, so a rerun can never overwrite a filed
+   result. Where a card's workspace was generated at fight time and not kept
+   (cards 8, 8R, 11), the roster stays partial and the card says so. Cards that
+   predate sealed judging (3B, 4, 5) were retired from the board: their JSON
+   stays as history, their reels moved to `archive/`, and a card without a reel
+   does not render.
+5. **Say what the instrument knows.** Reels for harnesses that stamp their
+   events carry real elapsed time; reels for harnesses that stamp nothing are
+   in recorded order spread across the measured wall, and say so in their first
+   line. A corner that printed nothing gets a line explaining why rather than a
+   silent lane.
+6. **A kit is a script, not a directory.** Cards 8, 8R and 11 lost their
+   rosters because their workspaces were generated inside a fight and never
+   kept. Series-7 kits (`.bantam/series7/`) ship the *generator* — `gen-log.py`,
+   `gen-pkg.py` — so the materials can be rebuilt byte-for-byte forever, and the
+   generator refuses to emit an ambiguous kit (card 32's log asserts that
+   `top_ip` and `busiest_hour` have unique maxima, because a tie makes the
+   judge unfalsifiable).
+7. **Prove the judge before the bell.** Every sealed judge is run against a
+   correct reference AND against the cheap wins it must refuse, and the traps
+   are recorded. Card 33's five legs were proven against four: deleting a
+   caller, leaving one reference behind, keeping the deprecated module, and
+   deleting the module the corner could not fix. The caller-snapshot leg
+   (`holdout/expected.json`, every caller's output pinned before the migration)
+   is what makes "migrate every caller" unfakeable.
+8. **Verify the instrument.** `bin/fight-concord.mjs` re-runs sealed judges
    over archived workspaces and diffs against the filed truth; page changes
    are browser-verified (every card rendered through every lane-finish to
    its final table) before publishing.
@@ -46,6 +86,8 @@ or share the file; it is also published as a live artifact.
 ```bash
 node bin/fight-replay.mjs --all docs/fights/fight-night.html   # rebuild page
 node bin/fight-concord.mjs                                      # concordance read
+node bin/bench/run-backfill.mjs 19 claude-opus                   # run a missing corner
+node bin/bench/merge-backfill.mjs 19                             # file it (additive)
 BANTAM_TEARDOWN_TIMING=1 bantam run ...                         # per-station teardown clock
 ```
 

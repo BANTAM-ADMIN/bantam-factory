@@ -23,7 +23,7 @@ Implemented and unit-tested:
   missing-path rejection with nearest-file suggestions, and incremental post-edit refresh —
   a successful write/replace/shell edit rereads only the changed JS/MJS files and atomically
   replaces the derived facts, or fails closed and keeps the stale-KB refusal (see
-  [`reports/2026-07-10-incremental-grounding.md`](superpowers/reports/2026-07-10-incremental-grounding.md)).
+  `reports/2026-07-10-incremental-grounding.md`).
 - `src/logic/tools.js`: tool registry with the `code`, `concept`, `map`, `sqlite`, `history`, and
   `view_image` tools, each verb-routed through the same `{name, description, answer(q)}` socket.
 - `src/logic/concept-search.js`: bounded deterministic behavior retrieval over named
@@ -33,7 +33,7 @@ Implemented and unit-tested:
   identical query on an unchanged workspace is replayed from cache (a repeated `map` query is not
   re-shelled), and in interactive mode a `query` counts toward the investigation budget so a
   query-only session is still forced to wrap up. See
-  [`reports/2026-07-11-map-steer-and-query-spiral.md`](superpowers/reports/2026-07-11-map-steer-and-query-spiral.md).
+  `reports/2026-07-11-map-steer-and-query-spiral.md`.
 
 Important measurement result:
 

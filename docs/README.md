@@ -16,7 +16,6 @@ suite, or any generated workflow.
 | See the benchmark, or share it | [Fight Night](fights/README.md) | The static replayable bench: rules, protocols, regeneration |
 | Choose local, Codex, or DeepSeek runtimes | [Model runtimes and improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md) | Current runtime guide; live catalogs and local registries remain authoritative |
 | Understand provider integration | [External API provider integration](EXTERNAL-API-PROVIDER-INTEGRATION.md) | Current provider boundary and repair history |
-| Run the project benchmark | [Terminal-Bench 2.1 curated subset](TERMINAL-BENCH-2.1-SUBSET.md) | Authoritative local 79-task scope; excluded tasks are not work items |
 | Understand the manufacturing thesis | [BANTAM as a factory](FACTORY-MODEL.md) | Evidence-derived design model |
 | Explore observations and possible next directions | [Discoveries and Directions](DISCOVERIES-AND-DIRECTIONS.md) | Review notebook; hypotheses are labeled |
 
@@ -48,23 +47,23 @@ suite, or any generated workflow.
 
 ## BANTAMFACTORY
 
-Start with the [factory index](BANTAMFACTORY/README.md), then use:
+Start with the factory index, then use:
 
-- [Architecture](BANTAMFACTORY/ARCHITECTURE.md) for implemented and proposed
+- Architecture for implemented and proposed
   layers;
-- [Operations](BANTAMFACTORY/OPERATIONS.md) for commands, travelers, floor,
+- Operations for commands, travelers, floor,
   yard, dispatch, schedule, audits, and authority boundaries;
-- [Blueprints](BANTAMFACTORY/BLUEPRINTS.md),
-  [workforce](BANTAMFACTORY/WORKFORCE.md), and
-  [station assets](BANTAMFACTORY/STATION-ASSETS.md) for executable contracts;
-- [Digital thread](BANTAMFACTORY/DIGITAL-THREAD.md),
-  [Predicate Cartridges](BANTAMFACTORY/PREDICATE-CARTRIDGES.md), and the
-  [Living Repository Twin](BANTAMFACTORY/LIVING-REPOSITORY-TWIN.md) for typed
+- Blueprints,
+  workforce, and
+  station assets for executable contracts;
+- Digital thread,
+  Predicate Cartridges, and the
+  Living Repository Twin for typed
   evidence and temporal knowledge;
-- [Closed production loop](BANTAMFACTORY/CLOSED-PRODUCTION-LOOP.md) and
-  [mutation authority](BANTAMFACTORY/MUTATION-AUTHORITY-CONTROL.md) for the
+- Closed production loop and
+  mutation authority for the
   separation of construction, independent evidence, approval, and apply;
-- [Current system through the factory lens](BANTAMFACTORY/CURRENT-SYSTEM.md)
+- Current system through the factory lens
   only as the explicitly labeled 2026-08-01 branch-point baseline.
 
 The factory folder mixes implemented mechanisms, lab-tier experiments, design

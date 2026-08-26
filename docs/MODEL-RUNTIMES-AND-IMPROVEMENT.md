@@ -19,7 +19,7 @@ build. It answers four practical questions:
 4. How do gauntlet and teacher evidence become a governed BANTAM improvement?
 
 For implementation details and the first measured Local/Sol/Terra result, see
-[the 2026-07-25 technical report](superpowers/reports/2026-07-25-local-codex-model-gauntlet.md).
+the 2026-07-25 technical report.
 
 ## The short version
 
@@ -77,7 +77,7 @@ fixtures—35 runs total, with no local-model calls.
   live catalog.
 
 See the
-[seven-model Codex tournament](superpowers/reports/2026-07-25-codex-model-tournament.md)
+seven-model Codex tournament
 for complete input/cache/output/reasoning telemetry, quality analysis, failure
 artifacts, limitations, and routing recommendations.
 
@@ -95,7 +95,7 @@ medium, and GPT-5.5 medium—16 runs total:
 That harder evidence is the basis for the current automatic roles: Terra medium
 is recommended, Luna medium is the speed option, Sol high is reserved for hard
 or high-assurance work, and GPT-5.5 remains manual/experimental. See the
-[hard-role tournament](superpowers/reports/2026-07-25-codex-hard-role-tournament.md).
+hard-role tournament.
 
 ### Measured Codex speed
 
@@ -715,7 +715,7 @@ The short interval reduced total reported input 7.0%, but increased cache-miss
 input 3.3%, reduced delivery savings from 49.9% to 38.6%, and increased task
 time 25.4%. Therefore periodic rebasing remains disabled by default; the
 automatic inefficient-delta rebase is the normal safety path. See the
-[delta-rebase evaluation](superpowers/reports/2026-07-26-codex-delta-rebase.md).
+delta-rebase evaluation.
 
 A separate live long-horizon study used a twelve-module adapter migration with
 public tests initially green and four hidden contract groups initially red.
@@ -1181,7 +1181,7 @@ The trio artifacts are suitable inputs for later comparative diagnosis. That
 next step remains a separate consent boundary: use `collaborate ... --yes` to
 ask Sol and Terra to derive cross-reviewed harness hypotheses, then use the
 governed self-improvement controller to build and test any selected hypothesis.
-See the [implementation and live proof](superpowers/reports/2026-07-25-parallel-trio-mode.md).
+See the implementation and live proof.
 For a task-oriented walkthrough, command reference, result-reading guide, and
 troubleshooting, use the dedicated [Trio Mode operator guide](TRIO-MODE.md).
 
@@ -1448,5 +1448,5 @@ paired behavioral experiment demonstrates lift without unacceptable regression.
 - [External API provider integration](EXTERNAL-API-PROVIDER-INTEGRATION.md)
 - [Self-improvement system](SELF-IMPROVEMENT.md)
 - [Principles](PRINCIPLES.md)
-- [Measured Local/Sol/Terra integration report](superpowers/reports/2026-07-25-local-codex-model-gauntlet.md)
+- Measured Local/Sol/Terra integration report
 - Local/Sol/Terra showcase

@@ -5,7 +5,7 @@ Local model and three Codex roles. It never starts automatically.
 
 For the complete implementation narrative, adversarial hardening history, live
 evidence, and present claims boundary, see the
-[Collaborative Team mode report](superpowers/reports/2026-07-26-collaborative-team-mode.md).
+Collaborative Team mode report.
 
 ```text
 Local, when reachable  repository scout       read-only
@@ -344,7 +344,7 @@ correctness win in this sample.
 The experiment also found and fixed ancestor-ignore baseline capture and
 implementation-shaped advisory response rejection. The measured Team numbers
 precede the latter efficiency fix. See the
-[full evaluation report](superpowers/reports/2026-07-26-solo-terra-v-team-keyed-task-pool.md).
+full evaluation report.
 
 ### Team v2 controlled follow-up
 
@@ -368,7 +368,7 @@ characters, Luna labels items `SATISFIED`/`GAP`/`UNKNOWN`, Sol prioritizes
 observed gaps, and Terra is explicitly required to preserve compliant files.
 The preservation-aware policy is covered deterministically but has not been
 assigned invented live savings. See the
-[Team v2 follow-up report](superpowers/reports/2026-07-26-team-v2-controlled-followup.md).
+Team v2 follow-up report.
 
 The subsequent exact adapter repeat measured the improvement: Team retained
 2/2 public and 4/4 hidden correctness while falling from 26 to 13 requests,

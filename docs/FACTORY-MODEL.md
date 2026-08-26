@@ -7,7 +7,7 @@ generate work rather than merely describe it.
 
 This document describes manufacturing lessons already grounded in BANTAM's
 implementation and recorded behavior. The experimental
-[BANTAMFACTORY architecture](BANTAMFACTORY/README.md) begins one level above it:
+BANTAMFACTORY architecture begins one level above it:
 compile an entire product contract into a routed graph of bounded stations with
 explicit inputs, outputs, gauges, containment, rework, and release authority.
 The existing BANTAM loop remains its control.
@@ -181,9 +181,9 @@ each would mean here, and the five worth trying first.
 ## Reading order
 
 - [PRINCIPLES](PRINCIPLES.md) — the working assumption and the discipline
-- [BANTAMFACTORY](BANTAMFACTORY/README.md) — the experimental architecture,
+- BANTAMFACTORY — the experimental architecture,
   current-system boundary, proof ladder, and realization plan
-- [Specification beats the gate](superpowers/reports/2026-07-30-specification-beats-the-gate.md)
+- Specification beats the gate
   — the cheapest station is usually a sentence
-- [keyed-task-pool: the oracle gap](superpowers/reports/2026-07-30-keyed-task-pool-oracle-gap.md)
+- keyed-task-pool: the oracle gap
   — the blind-gauge case in full

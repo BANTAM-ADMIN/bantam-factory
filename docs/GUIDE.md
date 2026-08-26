@@ -598,7 +598,7 @@ fix, and promote it only if measured. The full flow is documented in
 | Crash-safe checkpoint | `src/run-checkpoint.js` | On SIGTERM/SIGINT, flushes a `partial: true` artifact atomically so a killed run still says where it got to. |
 | Fixture runner | `src/fixture-runner.js` | The single repeatable fixture unit shared by `eval` and experiments: copy repo → run agent → scope-guard → contract-grade → capture artifact → append ledger. |
 | Experiments | `src/experiment*.js` | Versioned, seeded, balanced A/B between harness settings; Wilson intervals + pass@k; crash-safe manifest with strict resume. See the [README](../README.md#measured-experiments). |
-| Model gauntlet | `src/gauntlet.js`, `gauntlet/fixtures/` | Seven isolated public-green/hidden-red coding fixtures routed to Local or any live non-hidden Codex alias. Reuses the experiment engine, freezes the catalog, records complete usage and integrity telemetry, and supports transport fault injection. Every completed run emits a correctness-first N-model showcase; see the Local/Sol/Terra report and [hard Codex role tournament](superpowers/reports/2026-07-25-codex-hard-role-tournament.md). |
+| Model gauntlet | `src/gauntlet.js`, `gauntlet/fixtures/` | Seven isolated public-green/hidden-red coding fixtures routed to Local or any live non-hidden Codex alias. Reuses the experiment engine, freezes the catalog, records complete usage and integrity telemetry, and supports transport fault injection. Every completed run emits a correctness-first N-model showcase; see the Local/Sol/Terra report and hard Codex role tournament. |
 | Parallel trio session | `src/trio-session.js` | Freezes the live source once, materializes external Local/Sol/Terra workspaces, runs the normal BANTAM loop concurrently, streams tagged activity, persists comparable artifacts, and transactionally applies only an explicitly selected verified arm. |
 | Bottleneck analysis | `src/evidence-analysis.js` | Offline: ranks the harness's own friction counters to recommend the next structural investment — but only trusts evidence captured at the current harness git SHA. |
 
@@ -642,4 +642,4 @@ what the `eval`/`experiment`/`--verify` paths are for.
 - [`docs/SELF-IMPROVEMENT.md`](SELF-IMPROVEMENT.md) — the full self-improvement loop: record → witness → rewind → A/B → score → evidence-gated promotion.
 - [`docs/ROADMAP.md`](ROADMAP.md) — the product thesis and where it's headed.
 - [`docs/GROUNDING_TOOLS.md`](GROUNDING_TOOLS.md) — the symbolic-tool design in depth.
-- [`docs/superpowers/`](superpowers/README.md) — the measured upgrade program and results.
+- `docs/superpowers/` — the measured upgrade program and results.

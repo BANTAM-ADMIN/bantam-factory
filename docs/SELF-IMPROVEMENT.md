@@ -533,7 +533,7 @@ use `compare --dry-run` only to inspect an exploratory four-arm plan.
   session, every failure context not capability. The ten recorded-specimen mechanisms
   are now generalized into the completeness critic's five kinds and the kb-diff
   `missing-call` shape. Full write-up in
-  [`superpowers/reports/2026-07-17-swebench-verified-harness-round.md`](superpowers/reports/2026-07-17-swebench-verified-harness-round.md).
+  `superpowers/reports/2026-07-17-swebench-verified-harness-round.md`.
 - **The continuity done-gate (this session)** — the read-time advisory was ignored
   ~⅔ of the time and moved the pass rate not at all; the same fact as a **done-gate**
   flipped the decision and caught the half-fixed conflict the advisory missed
@@ -619,7 +619,7 @@ Qwen remains the default operating model.
 
 The full architecture, measured 2026-07-25 results, limitations, and next
 experiment are documented in
-[Local Qwen + Codex Sol/Terra integration and model gauntlet](superpowers/reports/2026-07-25-local-codex-model-gauntlet.md).
+Local Qwen + Codex Sol/Terra integration and model gauntlet.
 
 ---
 
@@ -630,5 +630,5 @@ experiment are documented in
 - [`GUIDE.md`](GUIDE.md) — how to run BANTAM and how the core harness works.
 - [`GROUNDING_TOOLS.md`](GROUNDING_TOOLS.md) — the Datalog KB and the symbolic tools
   the learning brain is built on.
-- [`superpowers/`](superpowers/README.md) — the measured upgrade program and its
+- `superpowers/` — the measured upgrade program and its
   reports (the reference-witness, structural-witness, escalation & showcase rounds).

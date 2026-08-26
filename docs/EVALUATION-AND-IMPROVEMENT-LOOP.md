@@ -75,7 +75,7 @@ remains explicit and exception-driven; BANTAM does not auto-route ordinary
 work into it.
 
 The full implementation and evidence narrative is preserved in the
-[Collaborative Team mode report](superpowers/reports/2026-07-26-collaborative-team-mode.md).
+Collaborative Team mode report.
 
 ## Questions the next phase must answer
 
@@ -374,7 +374,7 @@ recorded in
 ## First controlled sample
 
 The first solo Terra versus Team implementation sample is now recorded in
-[Solo Terra versus Team: keyed task-pool](superpowers/reports/2026-07-26-solo-terra-v-team-keyed-task-pool.md).
+Solo Terra versus Team: keyed task-pool.
 Both arms passed the supplied public and hidden suites, but solo alone passed
 an additional validation probe directly implied by the written task. Team
 reduced its primary's requests and input substantially, while the complete

@@ -665,7 +665,7 @@ efficient than a longer strict pass. In the repeated hard-role tournament,
 Terra and Sol both passed 4/4, but Terra used 38 turns and 1.05M input tokens
 versus Sol's 66 turns and 2.99M. Luna also passed 4/4 but used 62 turns. GPT-5.5
 failed the same hidden adapter boundary twice and finished 2/4. See the
-[full report](superpowers/reports/2026-07-25-codex-hard-role-tournament.md).
+full report.
 
 Observed hard-suite app-server output throughput was 47.25 tokens/second for
 Terra medium, 36.88 for Luna medium, and 32.92 for Sol high. Luna had the
@@ -949,7 +949,7 @@ Team never auto-fires, never launches Local, never merges concurrent edits, and
 never invokes self-improvement on its own. Its additional calls and tokens are
 appropriate for difficult high-value tasks, not routine defaults. The complete
 operator and evidence contract is in [Team Mode](TEAM-MODE.md). The
-[Collaborative Team implementation report](superpowers/reports/2026-07-26-collaborative-team-mode.md)
+Collaborative Team implementation report
 records the build history, adversarial finding, two live runs, regression
 coverage, and exact boundary between proven behavior and future evaluation.
 
@@ -1706,7 +1706,7 @@ The system should continue to preserve these invariants:
   efficiently inside a specialized harness, what the evidence establishes,
   where the capability envelope ends, and how the result directs BANTAM's
   local-model and self-improvement strategy.
-- [BANTAMFACTORY](BANTAMFACTORY/README.md) — the isolated experimental program
+- BANTAMFACTORY — the isolated experimental program
   for compiling broad product contracts into routed stations with local gauges,
   containment, rework, supervision, and an explicit proof ladder. It describes
   proposed architecture, not current production behavior.
@@ -1714,7 +1714,7 @@ The system should continue to preserve these invariants:
   current regression and Team baseline, the next solo-versus-Team evaluation
   matrix, grading and telemetry rules, proposed benchmark automation, and the
   evidence-gated path from observed trajectories to local-harness improvements.
-- [Codex delta/rebase evaluation](superpowers/reports/2026-07-26-codex-delta-rebase.md)
+- Codex delta/rebase evaluation
   — exact transport evidence and current policy.
 - [Principles](PRINCIPLES.md) — the design philosophy behind the harness.
 

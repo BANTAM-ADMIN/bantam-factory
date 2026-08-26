@@ -26,7 +26,7 @@ its gauge."**
 The framing is developed further in [BANTAM as a factory](FACTORY-MODEL.md),
 which maps stations, jigs, gauges and andon cords onto real components and
 draws out the poka-yoke hierarchy this harness already implements.
-The experimental [BANTAMFACTORY program](BANTAMFACTORY/README.md) asks the next
+The experimental BANTAMFACTORY program asks the next
 falsifiable question: can BANTAM compile a broad product contract into an
 executable route of independently contracted and inspected stations, and can
 that route outperform the unchanged agent loop on fresh work?
@@ -61,7 +61,7 @@ liability the moment it means "keep building harness forever."
   gauge or constraint is absent, you have a hunch, not a diagnosis.
 - **Prefer the cheapest station.** Writing a missing requirement into the task
   text matched a purpose-built done-gate at ~32% fewer turns
-  ([spec beats the gate](superpowers/reports/2026-07-30-specification-beats-the-gate.md)).
+  (spec beats the gate).
   Mechanisms are the expensive option; reach for them when the spec is one you do
   not control.
 - **A mechanism that never fires is not a mechanism.** Check engagement before

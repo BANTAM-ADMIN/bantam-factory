@@ -463,4 +463,4 @@ The verifier and final-diff review remain authoritative.
 For model authentication and runtime details, see
 [Model runtimes, gauntlets, and self-improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md).
 For the implementation and measured live proof, see
-[Parallel Local/Sol/Terra Trio Mode](superpowers/reports/2026-07-25-parallel-trio-mode.md).
+Parallel Local/Sol/Terra Trio Mode.

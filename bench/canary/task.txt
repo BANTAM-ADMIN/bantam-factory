@@ -1,0 +1,1 @@
+The test suite in this package is red. Find the defect, fix it with a minimal change, run npm test until green, then summarize the fix in one sentence.

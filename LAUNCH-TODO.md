@@ -7,6 +7,6 @@
       and set its URL in src/voice/providers/lithevoice/manifest.json + src/addons.js.
 - [ ] doctor --setup add-on flow: llama.cpp fetch+build+certified profile,
       HF model pull, voice bundle — as OPTIONAL installs.
-- [ ] Canary-as-CI wiring (runner exists in concept; operator paused earlier).
+- [x] Canary-as-CI: .github/workflows/ci.yml (suite on every push; live-model canary as a manual GPU job) + bin/bantam-canary.sh + bench/canary kit with contract tests. Runner built ready-not-run.
 - [x] Getting-started doc shipped (docs/GETTING-STARTED.md).
 - [ ] Re-run the bench once on a stock coding model for launch claims.

@@ -1,0 +1,30 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  suite:
+    # The full harness suite drives the real dispatcher with scripted models —
+    # no GPU needed. This is the merge gate.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node --test test/
+
+  canary:
+    # A live-model pulse check: one sealed task through the whole factory.
+    # Needs a self-hosted runner with a model serving BANTAM_ENDPOINT —
+    # trigger manually (workflow_dispatch) from a machine that has one.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: ./bin/bantam-canary.sh
+        env:
+          BANTAM_ENDPOINT: ${{ vars.BANTAM_ENDPOINT || 'http://127.0.0.1:8085' }}

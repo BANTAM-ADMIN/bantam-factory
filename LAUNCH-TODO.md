@@ -2,7 +2,12 @@
 - [x] LICENSE — Apache-2.0 committed, NOTICE + CONTRIBUTING (DCO) in place.
       TODO: amend copyright line ("The BANTAM Authors") with legal name/entity
       if desired; run a BANTAM trademark search.
-- [ ] Name COLLISION check ("BANTAM", "LitheVoice") — free: GitHub/npm/PyPI/web search before going public. Trademark REGISTRATION deliberately deferred (operator call, 2026-08-26): common-law rights accrue from use; register later if/when it matters.
+- [x] Name COLLISION check (2026-08-26): LitheVoice fully clear (0 GitHub hits, PyPI free).
+      BANTAM: AI/agent space empty; notable neighbors = Pratt-parsing demo (351★, educational),
+      a PHP C2 tool (282★, search-result adjacency only), Bantam Tools (CNC hardware company —
+      different industry). Bare `bantam` taken on npm (dead CSS lib) + PyPI (web utils) → use a
+      scope/variant for packages. VERDICT: no blocker; rename-before-launch is the free moment
+      if the neighbors ever matter. Trademark REGISTRATION deferred (operator call).
 - [ ] Publish the LitheVoice repo (clean extraction ready at ../LITHEVOICE_LAUNCH)
       and set its URL in src/voice/providers/lithevoice/manifest.json + src/addons.js.
 - [ ] doctor --setup add-on flow: llama.cpp fetch+build+certified profile,

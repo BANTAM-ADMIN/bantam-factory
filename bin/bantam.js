@@ -6069,6 +6069,9 @@ bantam models add <name> --script /path/to/launch.sh [--endpoint URL] [--vision]
                                   register a llama.cpp model so the startup picker can launch it (run bare for prompts)
 bantam models remove <name>       unregister a model    ·    bantam models path   print the registry file
 bantam setup [--yes]               one command: install llama-server, download the model, scaffold, launch (= doctor --setup)
+bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding, voice) with sizes — nothing optional is bundled
+bantam supervise [film.json] [--json]
+                                  read a saved run back and draft findings with evidence (see docs/SUPERVISOR.md)
 bantam doctor --api-url URL [--api-key KEY] [--model NAME] [--api-dialect llamacpp|vllm]  use an existing OpenAI-compatible server (validates + saves it)
 bantam doctor [--launch] [--json]  check setup (Node, model server, GPU, GGUF, registry) and scaffold a start script
 bantam doctor --install-llama [--yes] [--vulkan]  download a prebuilt llama-server (GPU=Vulkan / CPU) — no build

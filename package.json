@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A bantamweight local-model coding agent. Grammar-constrained, verifiable actions.",
+  "license": "Apache-2.0",
   "bin": {
     "bantam": "bin/bantam.js"
   },

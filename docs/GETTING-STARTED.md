@@ -34,6 +34,7 @@ Any llama.cpp / vLLM / LM Studio server, or an OpenAI-compatible API:
 
 ```bash
 git clone <repo> bantam && cd bantam
+npm ci                                        # two small deps; BANTAM won't start without them
 node bin/bantam.js doctor                     # finds a running local server
 # — or —
 node bin/bantam.js doctor --api-url http://HOST:PORT/v1 --api-key KEY
@@ -45,6 +46,7 @@ grammar-constrained output (the thing BANTAM relies on). Green check → go.
 ## Path B — you have a GPU and nothing else
 
 ```bash
+npm ci                # if you haven't already
 node bin/bantam.js setup
 ```
 

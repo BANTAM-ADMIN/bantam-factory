@@ -14,7 +14,7 @@ const F = path.join(here, "..", "docs", "fights");
 const LABELS = {
   "6": "roman numerals", "7": "the maze", "8": "log analyzer", "8r": "log analyzer, full field", "7r": "the maze, refought",
   "11": "shipyard surgery", "12": "meterbox", "13": "interval-set", "14": "orders ledger",
-  "15": "timegrid", "16": "jobqueue", "17": "argv-mini", "18": "slugline", "19": "rowquery", "20": "ledgerd", "21": "textwrap", "22": "token bucket", "23": "quiet line", "24": "ballast", "25": "seesaw", "26": "tableburn", "27": "falsefriend", "28": "waveplate", "29": "excision", "30": "inheritance",
+  "15": "timegrid", "16": "jobqueue", "17": "argv-mini", "18": "slugline", "19": "rowquery", "20": "ledgerd", "21": "textwrap", "22": "token bucket", "23": "quiet line", "24": "ballast", "25": "seesaw", "26": "tableburn", "27": "falsefriend", "28": "waveplate", "29": "excision", "30": "inheritance", "31": "the toolbox",
 };
 // Scrubbing (privacy) and clipping (display budget) are separate concerns.
 const scrub = (s) => String(s ?? "")

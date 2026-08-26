@@ -13,6 +13,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      # acorn/acorn-walk are imported by src/agent.js's static import chain, so a
+      # checkout without them fails 186 tests AND `bantam --help`. Verified on a
+      # pristine clone, 2026-08-26.
+      - run: npm ci
       - run: node --test test/
 
   canary:
@@ -25,6 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      - run: npm ci
       - run: ./bin/bantam-canary.sh
         env:
           BANTAM_ENDPOINT: ${{ vars.BANTAM_ENDPOINT || 'http://127.0.0.1:8085' }}

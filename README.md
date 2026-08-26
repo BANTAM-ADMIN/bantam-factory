@@ -32,6 +32,7 @@ OpenAI-compatible API):
 
 ```bash
 git clone <this repo> && cd bantam
+npm ci                                             # two small deps (acorn); required
 node bin/bantam.js doctor                          # diagnoses; wires a found server
 node bin/bantam.js doctor --api-url http://HOST/v1 # or register any OpenAI-compatible API
 node bin/bantam.js                                 # interactive REPL

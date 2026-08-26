@@ -23,6 +23,8 @@ hashed before the bell, replication bands, provenance trails, judge errata
 kept on the record — including the misses. Run `node bin/fight-concord.mjs`
 to re-judge the whole board from artifacts.
 
+New here? **[Getting started](docs/GETTING-STARTED.md)** is the five-minute path.
+
 ## Quick start
 
 **Already have a model?** (a local llama.cpp/vLLM server, or an
@@ -72,6 +74,11 @@ network access is **off by default** and interactive runs ask you per fetch.
   [operator guide](docs/GUIDE.md), [the interactive experience &
   network-consent model](docs/INTERACTIVE-EXPERIENCE.md), and
   [the factory doctrine](docs/FACTORY-MODEL.md)
+
+## License
+
+Apache-2.0 (see `LICENSE`). Contributions welcome under a simple DCO
+sign-off — see `CONTRIBUTING.md`. The BANTAM name is reserved.
 
 ## Status
 

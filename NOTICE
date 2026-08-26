@@ -1,0 +1,8 @@
+BANTAM
+Copyright 2026 The BANTAM Authors
+
+This product includes software developed as part of the BANTAM project.
+
+BANTAM is a model harness. It ships no model weights. The default model its
+optional installer fetches (Qwen 3.8 27B, ggml-org GGUF conversion) is a
+third-party work licensed under Apache-2.0 by its respective authors.

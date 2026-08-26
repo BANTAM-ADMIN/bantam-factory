@@ -8,6 +8,7 @@ suite, or any generated workflow.
 
 | Need | Document | Status |
 | --- | --- | --- |
+| Get running in five minutes | [Getting started](GETTING-STARTED.md) | New-user path: both on-ramps, first task, day-one tips |
 | Understand the whole harness | [BANTAM System Handbook](BANTAM-SYSTEM-HANDBOOK.md) | Current behavior guide; numerical proof sections are dated |
 | Install and operate it | [Guide](GUIDE.md) | Current operator guide |
 | Watch it work, and grant/deny network | [The interactive experience](INTERACTIVE-EXPERIENCE.md) | Current: feed vs films, station-note visibility, network consent |

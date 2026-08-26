@@ -1,0 +1,7 @@
+{
+  "name": "copy-constraint-lab",
+  "task": "Read launch-memo.md and resolve its stakeholder tensions into launch-copy.json. Required keys: headline, subhead, body, cta, proofPoints (exactly 3 strings), riskNote, audience, and rationale. Constraints: headline exactly 5 words; subhead 8-12 words; body 55-70 words in exactly 3 sentences; CTA exactly 2 words; riskNote 12-20 words and candidly names offline limitations; rationale 35-55 words and explains how the copy balances wonder with precision. Never use the words revolutionary, seamless, magical, disrupt, AI-powered, or future. Do not invent statistics, testimonials, certifications, or availability dates. Do not modify the memo, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 16,
+  "editable": ["launch-copy.json"]
+}

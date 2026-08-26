@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "name": "content-sensitive-edit-progress",
+  "description": "Test whether reporting byte-identical edit actions as no-change prevents false progress without reducing repair correctness.",
+  "fixtures": [
+    "async-request-coalescing",
+    "stateful-cache-bug"
+  ],
+  "rounds": 2,
+  "seeds": [73402, 73502],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_NOOP_EDIT_GUARD": "0",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_NOOP_EDIT_GUARD": "1",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    }
+  ]
+}

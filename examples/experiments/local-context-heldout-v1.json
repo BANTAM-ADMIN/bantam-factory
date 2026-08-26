@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "name": "Local Qwen context generalization heldout v1",
+  "description": "Fresh-seed A/B on three fixtures excluded from the adapter/keyed repair loop. The current controller is compared with only the newly added derived-failure, lifecycle-contract, and failure-focus logic disabled. Primary outcome is hidden-contract correctness; context-flight-recorder findings and turns/requests are diagnostic secondary outcomes.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/retry-consolidation-haystack"
+  ],
+  "rounds": 1,
+  "seeds": [81311],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "current-context",
+      "description": "Local 27B through the current BANTAM controller and context logic.",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "logic-off-control",
+      "description": "Same controller and seed with the three recently repaired context interpretation layers disabled.",
+      "env": {
+        "BANTAM_DERIVED_FAILURE_CONTEXT": "0",
+        "BANTAM_LIFECYCLE_CONTRACT_LOGIC": "0",
+        "BANTAM_TEST_FOCUS": "0"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

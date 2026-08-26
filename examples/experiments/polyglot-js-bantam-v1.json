@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "name": "polyglot js bantam v1",
+  "description": "Aider polyglot-benchmark JavaScript exercises converted to BANTAM fixtures (35 of 49 survived reference-solution validation). Visible suite carries ~60% of cases; ~40% are held out as the hidden contract to blunt training-set contamination. Local Qwen 3.8, champion configuration, 1 seed.",
+  "fixtures": [
+    "benches/polyglot-js/fixtures/affine-cipher",
+    "benches/polyglot-js/fixtures/alphametics",
+    "benches/polyglot-js/fixtures/beer-song",
+    "benches/polyglot-js/fixtures/book-store",
+    "benches/polyglot-js/fixtures/bottle-song",
+    "benches/polyglot-js/fixtures/bowling",
+    "benches/polyglot-js/fixtures/complex-numbers",
+    "benches/polyglot-js/fixtures/connect",
+    "benches/polyglot-js/fixtures/go-counting",
+    "benches/polyglot-js/fixtures/house",
+    "benches/polyglot-js/fixtures/killer-sudoku-helper",
+    "benches/polyglot-js/fixtures/list-ops",
+    "benches/polyglot-js/fixtures/meetup",
+    "benches/polyglot-js/fixtures/ocr-numbers",
+    "benches/polyglot-js/fixtures/phone-number",
+    "benches/polyglot-js/fixtures/pig-latin",
+    "benches/polyglot-js/fixtures/poker",
+    "benches/polyglot-js/fixtures/queen-attack",
+    "benches/polyglot-js/fixtures/rational-numbers",
+    "benches/polyglot-js/fixtures/react",
+    "benches/polyglot-js/fixtures/rectangles",
+    "benches/polyglot-js/fixtures/resistor-color-trio",
+    "benches/polyglot-js/fixtures/rest-api",
+    "benches/polyglot-js/fixtures/say",
+    "benches/polyglot-js/fixtures/scale-generator",
+    "benches/polyglot-js/fixtures/space-age",
+    "benches/polyglot-js/fixtures/state-of-tic-tac-toe",
+    "benches/polyglot-js/fixtures/sum-of-multiples",
+    "benches/polyglot-js/fixtures/tournament",
+    "benches/polyglot-js/fixtures/transpose",
+    "benches/polyglot-js/fixtures/triangle",
+    "benches/polyglot-js/fixtures/twelve-days",
+    "benches/polyglot-js/fixtures/two-bucket",
+    "benches/polyglot-js/fixtures/variable-length-quantity",
+    "benches/polyglot-js/fixtures/wordy"
+  ],
+  "rounds": 1,
+  "seeds": [
+    20260814
+  ],
+  "passAtK": [
+    1
+  ],
+  "arms": [
+    {
+      "name": "qwen38-rebuild",
+      "description": "Local 27B, champion configuration",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

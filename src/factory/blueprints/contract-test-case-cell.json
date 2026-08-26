@@ -1,0 +1,672 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-blueprint",
+  "id": "contract-test-case-cell",
+  "version": 1,
+  "title": "Contract to inspected test-scenario assembly line",
+  "taskFamily": "contract-test-case-assembly",
+  "routeId": "contract-test-case-cell",
+  "authority": [
+    "contract.read",
+    "test-obligation.read"
+  ],
+  "stations": [
+    {
+      "id": "intake",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-intake",
+        "version": 1,
+        "title": "Contract card intake",
+        "purpose": "Admit one bounded contract and its public edge catalog.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.contract-edge-intake/v1"
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "contract",
+            "artifactType": "bantam.contract-packet/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "contract.admit"
+        ],
+        "authority": [
+          "contract.read"
+        ],
+        "gauge": {
+          "id": "contract-edge-intake",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "intake",
+          "icon": "station",
+          "color": "blue"
+        },
+        "standardWork": {
+          "operation": "Clamp one contract card into the selection jig",
+          "instructions": [
+            "Bind the exact contract text and public edge catalog."
+          ],
+          "fixtures": [
+            "Closed catalog",
+            "Content-addressed contract packet"
+          ],
+          "prohibited": [
+            "Do not add candidate answers.",
+            "Do not expose the held-out expected set."
+          ],
+          "releaseCriteria": [
+            "The packet is structurally valid and every catalog identifier is unique."
+          ]
+        }
+      }
+    },
+    {
+      "id": "enumerate",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-enumerator",
+        "version": 1,
+        "title": "Contract edge enumerator",
+        "purpose": "Select every applicable edge identifier without changing product material.",
+        "worker": {
+          "kind": "model",
+          "adapter": "bantam.factory.contract-edge-enumerator/v1"
+        },
+        "inputs": [
+          {
+            "name": "contract",
+            "artifactType": "bantam.contract-packet/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "response",
+            "artifactType": "bantam.contract-edge-response/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "model.semantic-work"
+        ],
+        "authority": [
+          "contract.read"
+        ],
+        "gauge": {
+          "id": "contract-edge-response-shape",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "production",
+          "icon": "chicken",
+          "color": "amber"
+        },
+        "standardWork": {
+          "operation": "Peck the applicable edge buttons",
+          "instructions": [
+            "Read the bounded contract.",
+            "Choose every applicable identifier from the supplied catalog.",
+            "Return only the constrained selection object."
+          ],
+          "fixtures": [
+            "Finite identifier catalog",
+            "GBNF output die",
+            "No workspace or mutation tools"
+          ],
+          "prohibited": [
+            "Do not invent identifiers.",
+            "Do not explain the answer.",
+            "Do not infer a hidden gauge."
+          ],
+          "releaseCriteria": [
+            "The response has the exact schema, known unique identifiers, and no extra fields."
+          ]
+        }
+      },
+      "taskFamily": "contract-edge-enumeration"
+    },
+    {
+      "id": "edge-inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-inspection",
+        "version": 1,
+        "title": "Independent contract edge gauge",
+        "purpose": "Compare the selected identifiers with the held-out expected set.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.contract-edge-inspection/v1"
+        },
+        "inputs": [
+          {
+            "name": "response",
+            "artifactType": "bantam.contract-edge-response/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "response",
+            "artifactType": "bantam.contract-edge-response/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "quality.contract-edges"
+        ],
+        "authority": [
+          "contract.read"
+        ],
+        "gauge": {
+          "id": "contract-edge-exact-set",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "quality",
+          "icon": "station",
+          "color": "green"
+        },
+        "standardWork": {
+          "operation": "Press the exact-set wicket",
+          "instructions": [
+            "Parse the exact upstream response.",
+            "Compare it with the held-out expected identifier set."
+          ],
+          "fixtures": [
+            "Independent expected-set gauge",
+            "Order-insensitive exact comparison"
+          ],
+          "prohibited": [
+            "Do not repair or reinterpret a selection.",
+            "Do not disclose expected identifiers upstream."
+          ],
+          "releaseCriteria": [
+            "No required edge is missing and no inapplicable edge is selected."
+          ]
+        }
+      }
+    },
+    {
+      "id": "plan",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-test-plan-skeleton",
+        "version": 1,
+        "title": "Test-plan skeleton press",
+        "purpose": "Turn each released contract edge into one typed test obligation.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.contract-test-plan/v1"
+        },
+        "inputs": [
+          {
+            "name": "contract",
+            "artifactType": "bantam.contract-packet/v1",
+            "required": true
+          },
+          {
+            "name": "response",
+            "artifactType": "bantam.contract-edge-response/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "plan",
+            "artifactType": "bantam.contract-test-plan/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "test-plan.assemble"
+        ],
+        "authority": [
+          "contract.read"
+        ],
+        "gauge": {
+          "id": "contract-test-plan-shape",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "assembly",
+          "icon": "press",
+          "color": "blue"
+        },
+        "standardWork": {
+          "operation": "Stamp one test obligation for every released edge",
+          "instructions": [
+            "Read only released contract and edge-response material.",
+            "Emit obligations in canonical edge-id order.",
+            "Copy the public catalog description exactly."
+          ],
+          "fixtures": [
+            "Deterministic plan builder",
+            "Canonical ordering",
+            "Typed plan schema"
+          ],
+          "prohibited": [
+            "Do not invent another obligation.",
+            "Do not omit a selected edge.",
+            "Do not call a model."
+          ],
+          "releaseCriteria": [
+            "Every selected edge appears exactly once and all digests match the input material."
+          ]
+        }
+      }
+    },
+    {
+      "id": "plan-inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-test-plan-inspection",
+        "version": 1,
+        "title": "Independent test-plan coverage gauge",
+        "purpose": "Compare the assembled test plan with the held-out required plan.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.contract-test-plan-inspection/v1"
+        },
+        "inputs": [
+          {
+            "name": "plan",
+            "artifactType": "bantam.contract-test-plan/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "plan",
+            "artifactType": "bantam.contract-test-plan/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "quality.test-plan"
+        ],
+        "authority": [
+          "contract.read"
+        ],
+        "gauge": {
+          "id": "contract-test-plan-exact-coverage",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "quality",
+          "icon": "station",
+          "color": "green"
+        },
+        "standardWork": {
+          "operation": "Press the exact-coverage wicket",
+          "instructions": [
+            "Validate the complete typed plan.",
+            "Compare it with a plan independently derived from held-out expected edges."
+          ],
+          "fixtures": [
+            "Independent expected-plan builder",
+            "Canonical byte comparison"
+          ],
+          "prohibited": [
+            "Do not repair the plan.",
+            "Do not accept partial coverage."
+          ],
+          "releaseCriteria": [
+            "The plan is byte-equivalent to the independently derived expected plan."
+          ]
+        }
+      }
+    },
+    {
+      "id": "obligation",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-obligation-feeder",
+        "version": 1,
+        "title": "Single released obligation feeder",
+        "purpose": "Extract exactly one named obligation from an independently released test plan and clamp its public scenario rack.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.test-obligation-feeder/v1"
+        },
+        "inputs": [
+          {
+            "name": "plan",
+            "artifactType": "bantam.contract-test-plan/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "obligation",
+            "artifactType": "bantam.test-obligation/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "test-obligation.feed"
+        ],
+        "authority": [
+          "test-obligation.read"
+        ],
+        "gauge": {
+          "id": "test-obligation-feeder",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "material",
+          "icon": "feeder",
+          "color": "blue"
+        },
+        "standardWork": {
+          "operation": "Kit one released obligation for one scenario machine",
+          "instructions": [
+            "Select exactly the configured edge obligation from the released plan.",
+            "Attach only the finite public scenario rack."
+          ],
+          "fixtures": [
+            "Exact edge-id locator",
+            "One-obligation limit",
+            "Closed scenario rack"
+          ],
+          "prohibited": [
+            "Do not feed the entire plan.",
+            "Do not expose the contract.",
+            "Do not expose the held-out expected scenario."
+          ],
+          "releaseCriteria": [
+            "Exactly one plan obligation is present and the scenario rack has unique identifiers."
+          ]
+        }
+      }
+    },
+    {
+      "id": "select",
+      "taskFamily": "test-scenario-selection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-scenario-selector",
+        "version": 1,
+        "title": "Test scenario selector",
+        "purpose": "Choose the one public scenario that satisfies the bounded obligation.",
+        "worker": {
+          "kind": "model",
+          "adapter": "bantam.factory.test-scenario-selector/v1"
+        },
+        "inputs": [
+          {
+            "name": "obligation",
+            "artifactType": "bantam.test-obligation/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "selection",
+            "artifactType": "bantam.test-scenario-selection/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "model.semantic-work"
+        ],
+        "authority": [
+          "test-obligation.read"
+        ],
+        "gauge": {
+          "id": "test-scenario-selection-shape",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "production",
+          "icon": "chicken",
+          "color": "amber"
+        },
+        "standardWork": {
+          "operation": "Peck one scenario button for one obligation",
+          "instructions": [
+            "Read only the supplied obligation.",
+            "Choose exactly one scenario identifier from the public rack.",
+            "Return only the constrained selection object."
+          ],
+          "fixtures": [
+            "Finite scenario rack",
+            "Literal-ID GBNF die",
+            "No workspace, contract, plan, shell, or mutation tools"
+          ],
+          "prohibited": [
+            "Do not invent a scenario.",
+            "Do not select multiple scenarios.",
+            "Do not explain the choice."
+          ],
+          "releaseCriteria": [
+            "The response has the exact schema and one known scenario identifier."
+          ]
+        }
+      }
+    },
+    {
+      "id": "scenario-inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-scenario-inspection",
+        "version": 1,
+        "title": "Independent scenario gauge",
+        "purpose": "Compare the selected scenario with the held-out required scenario.",
+        "worker": {
+          "kind": "tool",
+          "adapter": "bantam.factory.test-scenario-inspection/v1"
+        },
+        "inputs": [
+          {
+            "name": "selection",
+            "artifactType": "bantam.test-scenario-selection/v1",
+            "required": true
+          }
+        ],
+        "outputs": [
+          {
+            "name": "selection",
+            "artifactType": "bantam.test-scenario-selection/v1",
+            "required": true
+          }
+        ],
+        "capabilities": [
+          "quality.test-scenario"
+        ],
+        "authority": [
+          "test-obligation.read"
+        ],
+        "gauge": {
+          "id": "test-scenario-exact",
+          "version": 1,
+          "independent": true
+        },
+        "dispositions": [
+          "blocked",
+          "contained",
+          "infrastructure",
+          "released"
+        ],
+        "presentation": {
+          "group": "quality",
+          "icon": "station",
+          "color": "green"
+        },
+        "standardWork": {
+          "operation": "Press the exact-scenario wicket",
+          "instructions": [
+            "Parse the exact upstream selection.",
+            "Compare it with the held-out expected scenario identifier."
+          ],
+          "fixtures": [
+            "Independent expected-scenario gauge"
+          ],
+          "prohibited": [
+            "Do not repair a selection.",
+            "Do not disclose the expected identifier upstream."
+          ],
+          "releaseCriteria": [
+            "The selected scenario exactly equals the held-out required scenario."
+          ]
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "intake",
+      "out": "contract",
+      "to": "enumerate",
+      "in": "contract"
+    },
+    {
+      "from": "enumerate",
+      "out": "response",
+      "to": "edge-inspection",
+      "in": "response"
+    },
+    {
+      "from": "intake",
+      "out": "contract",
+      "to": "plan",
+      "in": "contract"
+    },
+    {
+      "from": "edge-inspection",
+      "out": "response",
+      "to": "plan",
+      "in": "response"
+    },
+    {
+      "from": "plan",
+      "out": "plan",
+      "to": "plan-inspection",
+      "in": "plan"
+    },
+    {
+      "from": "plan-inspection",
+      "out": "plan",
+      "to": "obligation",
+      "in": "plan"
+    },
+    {
+      "from": "obligation",
+      "out": "obligation",
+      "to": "select",
+      "in": "obligation"
+    },
+    {
+      "from": "select",
+      "out": "selection",
+      "to": "scenario-inspection",
+      "in": "selection"
+    }
+  ],
+  "layout": {
+    "direction": "left-to-right",
+    "stations": [
+      {
+        "id": "intake",
+        "x": 0,
+        "y": 1
+      },
+      {
+        "id": "enumerate",
+        "x": 1,
+        "y": 1
+      },
+      {
+        "id": "edge-inspection",
+        "x": 2,
+        "y": 1
+      },
+      {
+        "id": "plan",
+        "x": 3,
+        "y": 1
+      },
+      {
+        "id": "plan-inspection",
+        "x": 4,
+        "y": 1
+      },
+      {
+        "id": "obligation",
+        "x": 5,
+        "y": 1
+      },
+      {
+        "id": "select",
+        "x": 6,
+        "y": 1
+      },
+      {
+        "id": "scenario-inspection",
+        "x": 7,
+        "y": 1
+      }
+    ]
+  }
+}

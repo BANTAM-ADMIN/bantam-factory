@@ -1,0 +1,6 @@
+{"cfg": "unified", "label": "1. worker warms slot 0", "slot": 0, "prompt_tokens": 8552, "cache_n": 0, "prompt_n": 8552, "reuse_pct": 0.0, "prompt_ms": 3718.1, "wall_ms": 4171.9}
+{"cfg": "unified", "label": "2. worker repeats (control: is it warm?)", "slot": 0, "prompt_tokens": 8552, "cache_n": 8548, "prompt_n": 4, "reuse_pct": 100.0, "prompt_ms": 50.0, "wall_ms": 378.9}
+{"cfg": "unified", "label": "3. attendant works on slot 1", "slot": 1, "prompt_tokens": 3800, "cache_n": 0, "prompt_n": 3800, "reuse_pct": 0.0, "prompt_ms": 1664.8, "wall_ms": 2334.7}
+{"cfg": "unified", "label": "4. worker returns to slot 0  <-- THE TEST", "slot": 0, "prompt_tokens": 8552, "cache_n": 0, "prompt_n": 8552, "reuse_pct": 0.0, "prompt_ms": 3533.3, "wall_ms": 4138.7}
+{"cfg": "unified", "label": "5. attendant repeats on slot 1", "slot": 1, "prompt_tokens": 3800, "cache_n": 0, "prompt_n": 3800, "reuse_pct": 0.0, "prompt_ms": 1740.8, "wall_ms": 2034.6}
+{"cfg": "unified", "label": "6. worker returns again", "slot": 0, "prompt_tokens": 8552, "cache_n": 0, "prompt_n": 8552, "reuse_pct": 0.0, "prompt_ms": 3537.6, "wall_ms": 3866.6}

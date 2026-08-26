@@ -1,0 +1,7 @@
+{
+  "name": "range-parser",
+  "task": "Fix src/parse-ranges.js. parseRanges(text) parses a comma-separated list whose items are either a signed integer or an inclusive range. A range is two signed integers separated by a hyphen, and either endpoint may itself be negative — so `-1--3` is the range from -1 to -3, and the separating hyphen must be distinguished from a sign. Whitespace around items and around the separating hyphen is allowed. Descending ranges expand downward. Return globally de-duplicated values in first-appearance order. Empty input returns []; malformed tokens, empty comma segments, and unsafe integers throw TypeError. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["src"]
+}

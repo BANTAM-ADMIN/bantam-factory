@@ -1,0 +1,5 @@
+# gate-aliases.txt — desk-maintained coverage links for the guard-naming sweep.
+# Format: <gate> <token>   (rest of line after '#' is the justification)
+# An alias asserts the gate IS covered by tests that never write its name;
+# the sweep counts the token as a naming hit. Every line needs a why.
+immutable_file immutable-edit-gate  # covered behaviorally: test/immutable-edit-gate.test.js exercises the gate through the agent path without naming immutable_file

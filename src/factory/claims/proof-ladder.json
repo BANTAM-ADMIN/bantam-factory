@@ -1,0 +1,650 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-proof-ladder",
+  "id": "bantamfactory-proof-ladder",
+  "version": 1,
+  "title": "BANTAMFACTORY claim ladder C0-C6",
+  "source": "docs/BANTAMFACTORY/PROOF-PROGRAM.md",
+  "suites": [
+    {
+      "id": "traveler",
+      "files": [
+        "test/factory-core.test.js"
+      ]
+    },
+    {
+      "id": "containment",
+      "files": [
+        "test/factory-lifecycle-cell.test.js",
+        "test/factory-line-controller.test.js"
+      ]
+    },
+    {
+      "id": "blueprint",
+      "files": [
+        "test/factory-blueprint.test.js"
+      ]
+    },
+    {
+      "id": "telemetry",
+      "files": [
+        "test/factory-telemetry.test.js"
+      ]
+    }
+  ],
+  "instruments": [
+    {
+      "id": "contract-edge-gauge",
+      "measures": "Whether the station-local exact-set gauge rejects a wrong selection instead of passing anything shaped like an answer.",
+      "source": [
+        "src/factory/contract-edge-cell.js"
+      ],
+      "control": [
+        "test/factory-contract-edge-negative-control.test.js"
+      ]
+    },
+    {
+      "id": "cohort-report",
+      "measures": "Whether a cohort report headline changes when the underlying cohort result changes (FABLE.md defect D3: the headlines are hard-coded string literals).",
+      "source": [
+        "src/factory/codex-exocortex-cohort-report.js",
+        "src/factory/codex-mutation-cohort-report.js"
+      ],
+      "control": [
+        "test/factory-cohort-report-negative-control.test.js"
+      ]
+    }
+  ],
+  "rungs": [
+    {
+      "id": "C0",
+      "title": "Observability parity",
+      "claim": "An unchanged BANTAM run can be represented as a factory job and route without changing its behavior.",
+      "requires": [
+        {
+          "id": "identical-trees",
+          "statement": "Starting and final workspace trees are identical between the instrumented and control run.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c0-parity.json",
+            "pointer": "workspace.identicalTrees",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "request-delta",
+          "statement": "Model requests are identical, or the instrumentation delta is explicitly measured.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c0-parity.json",
+            "pointer": "model.requestDelta",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "trajectory-parity",
+          "statement": "Action trajectory and terminal disposition are identical.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c0-parity.json",
+            "pointer": "trajectory.identical",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "event-reconstruction",
+          "statement": "The complete station and event sequence reconstructs from the traveler.",
+          "witness": {
+            "kind": "suite",
+            "suite": "traveler"
+          }
+        },
+        {
+          "id": "overhead-bound",
+          "statement": "The telemetry note path performs zero durable-sync operations per observed event, measured by counting fsyncs during the live loop window; wall-clock ratios are recorded as non-witness context because they are load-dependent on a shared machine.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c0-parity.json",
+            "pointer": "overhead.noteFsyncsPerEvent",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "independent-audit",
+          "statement": "An independent auditor validates the traveler without trusting the writer.",
+          "witness": {
+            "kind": "suite",
+            "suite": "traveler"
+          }
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "title": "Failure localization",
+      "claim": "Factory instrumentation identifies the station that created and the station that detected a defect earlier and more accurately than the baseline run summary.",
+      "requires": [
+        {
+          "id": "defect-corpus",
+          "statement": "Planted and naturally observed defects with known loci are retained as a corpus.",
+          "witness": {
+            "kind": "artifact",
+            "path": ".bantam/factory-claims/evidence/c1-defect-corpus.json",
+            "minBytes": 1
+          }
+        },
+        {
+          "id": "locus-scoring",
+          "statement": "Creation and detection classification is scored against independent labels.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c1-localization.json",
+            "pointer": "scored.accuracy",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "downstream-invalidation",
+          "statement": "Downstream invalidation is computed correctly for each located defect.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c1-localization.json",
+            "pointer": "invalidation.correct",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "no-grader-leakage",
+          "statement": "No hidden grader material reached a worker or route planner.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c1-localization.json",
+            "pointer": "leakage.detected",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "false-locus-rate",
+          "statement": "The false-locus rate is reported, not omitted.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c1-localization.json",
+            "pointer": "falseLocus.rate",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "baseline-comparison",
+          "statement": "The baseline run summary's own localization was scored, so 'more accurate than baseline' is a comparison rather than an assertion.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c1-localization.json",
+            "pointer": "comparison.baselineScored",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "title": "Local containment",
+      "claim": "A station-local gauge prevents a known defect from traveling downstream.",
+      "requires": [
+        {
+          "id": "control-escape",
+          "statement": "A control route permits the defect to escape downstream.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c2-containment.json",
+            "pointer": "plantedDefect.escapedControlRoute",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "treatment-stop",
+          "statement": "The treatment gauge engages on the same defect.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c2-containment.json",
+            "pointer": "plantedDefect.stoppedByGauge",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "no-downstream-consumption",
+          "statement": "Suspect output is not consumed by any downstream station.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c2-containment.json",
+            "pointer": "plantedDefect.downstreamConsumers",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "clean-negative-control",
+          "statement": "A clean negative control passes without a false stop.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c2-containment.json",
+            "pointer": "cleanControl.falseStops",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "truthful-disposition",
+          "statement": "The rework or blocked disposition recorded is truthful.",
+          "witness": {
+            "kind": "suite",
+            "suite": "containment"
+          }
+        },
+        {
+          "id": "prevention-cost",
+          "statement": "The total cost of prevention is recorded, including false stops on clean work.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c2-containment-cost.json",
+            "pointer": "prevention.totalCost",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "title": "Reliable station execution",
+      "claim": "A bounded work order has materially higher first-pass reliability than the equivalent operation embedded in a monolithic run.",
+      "requires": [
+        {
+          "id": "matched-model",
+          "statement": "No article in the cohort ran a mismatched model or reasoning effort between arms.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "design.modelMismatch",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "equivalent-obligation",
+          "statement": "Both arms received equivalent source bytes and the same product obligation.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "obligation.equivalent",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "order-balanced-samples",
+          "statement": "Samples are repeated and order-balanced across arms.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "design.orderBalanced",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "sample-size",
+          "statement": "At least twenty matched articles per arm, so a single lucky sample cannot carry the claim.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "design.articlesPerArm",
+            "satisfies": {
+              "op": ">=",
+              "value": 20
+            }
+          },
+          "ladderAuthored": true
+        },
+        {
+          "id": "independent-gauge",
+          "statement": "The station gauge is independent of any worker assertion.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "gauge.independent",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "fresh-tasks",
+          "statement": "Tasks were not used to design the station or its gauge.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "design.freshTasks",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "gauge-negative-control",
+          "statement": "The station gauge is shown to fail on a known-bad product, so a pass means something.",
+          "witness": {
+            "kind": "instrument",
+            "instrument": "contract-edge-gauge"
+          }
+        },
+        {
+          "id": "yield-intervals",
+          "statement": "First-pass yield and false-stop confidence intervals are reported.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "pointer": "results.firstPassYield.ciLow",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "difference-established",
+          "statement": "The station's first-pass yield advantage is actually established: the two arms' 95% intervals do not overlap. Eight obligations about evidence QUALITY could all be met by a cohort that measured no difference at all.",
+          "witness": {
+            "kind": "preregistered-cohort",
+            "path": ".bantam/factory-claims/evidence/c3-station-cohort.json",
+            "verdict": "accepted"
+          }
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "title": "Route composition",
+      "claim": "Multiple released station outputs compose into a correct final product.",
+      "requires": [
+        {
+          "id": "three-stations",
+          "statement": "At least three semantically meaningful stations participate in one route.",
+          "witness": {
+            "kind": "artifact",
+            "path": "src/factory/blueprints/contract-test-case-cell.json",
+            "minBytes": 2000
+          }
+        },
+        {
+          "id": "interface-records",
+          "statement": "Interface revisions and consumption records are explicit and typed.",
+          "witness": {
+            "kind": "suite",
+            "suite": "blueprint"
+          }
+        },
+        {
+          "id": "integration-verification",
+          "statement": "Integration and hidden product verification both run.",
+          "witness": {
+            "kind": "suite",
+            "suite": "blueprint"
+          }
+        },
+        {
+          "id": "interface-defect-controls",
+          "statement": "A defect is injected at each interface in separate controls.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c4-interface-controls.json",
+            "pointer": "interfaces.uncovered",
+            "satisfies": {
+              "op": "==",
+              "value": 0
+            }
+          }
+        },
+        {
+          "id": "composed-containment",
+          "statement": "Containment and rework behave correctly once stations are composed.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c4-interface-controls.json",
+            "pointer": "containment.correct",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "no-silent-delegation",
+          "statement": "No station was issued the whole job: every station kit carried exactly one of the job's obligations, measured over the issued material rather than asserted.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/live-decomposition.json",
+            "pointer": "delegation.noStationReceivedTheWholeJob",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "title": "Factory advantage",
+      "claim": "For a bounded task class, a factory route improves production relative to ordinary BANTAM and native execution.",
+      "requires": [
+        {
+          "id": "named-dimension",
+          "statement": "The improved dimension is named before the run, not selected after it.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "preregistered.dimension",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "correctness-first",
+          "statement": "Correctness and evidence validity are reported before any efficiency figure.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "results.correctness.factory",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "replicated",
+          "statement": "At least ten matched articles per arm.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "design.articlesPerArm",
+            "satisfies": {
+              "op": ">=",
+              "value": 10
+            }
+          },
+          "ladderAuthored": true
+        },
+        {
+          "id": "bounded-traffic",
+          "statement": "Total model traffic stayed inside the budget preregistered for the named dimension.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "results.trafficWithinBudget",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "report-negative-control",
+          "statement": "The report that renders the advantage figure is shown to render a different figure when the cohort result differs.",
+          "witness": {
+            "kind": "instrument",
+            "instrument": "cohort-report"
+          }
+        },
+        {
+          "id": "independent-scorer",
+          "statement": "The arm scorer is not the arm designer.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "design.scoredBy",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "all-arms-present",
+          "statement": "All three arms named in the claim ran: native, ordinary BANTAM, and the factory route.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "arms.count",
+            "satisfies": {
+              "op": ">=",
+              "value": 3
+            }
+          },
+          "ladderAuthored": true
+        },
+        {
+          "id": "improvement-established",
+          "statement": "The named dimension actually improved: the factory arm beats both controls on it and the intervals do not overlap. The other six obligations are about method, and a cohort that measured no improvement at all satisfies every one of them.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c5-advantage.json",
+            "pointer": "results.improvementEstablished",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "title": "Transfer and compounding",
+      "claim": "A proven station or route transfers to fresh jobs and reduces the new process engineering required.",
+      "requires": [
+        {
+          "id": "held-out-jobs",
+          "statement": "Held-out repositories or task variants are used, never the design fixtures.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "heldOut.articles",
+            "satisfies": {
+              "op": ">=",
+              "value": 5
+            }
+          },
+          "ladderAuthored": true
+        },
+        {
+          "id": "unchanged-station",
+          "statement": "The station definition and gauge bytes are unchanged from the qualifying run.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "station.refUnchanged",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        },
+        {
+          "id": "changeover-measured",
+          "statement": "Changeover work is measured, not assumed to be zero.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "changeover.minutes",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "rebuild-comparison",
+          "statement": "The result is compared against rebuilding the process from scratch.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "rebuild.minutes",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "envelope-failures",
+          "statement": "Failures outside the demonstrated capability envelope are stated explicitly.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "envelope.failures",
+            "satisfies": {
+              "op": "exists"
+            }
+          }
+        },
+        {
+          "id": "engineering-actually-reduced",
+          "statement": "Changeover work was less than rebuilding the process from scratch. Measuring both and reporting them is not the same as the reduction existing, and a transfer that cost MORE than a rebuild satisfies every other obligation on this rung.",
+          "witness": {
+            "kind": "measurement",
+            "path": ".bantam/factory-claims/evidence/c6-transfer.json",
+            "pointer": "results.engineeringReduced",
+            "satisfies": {
+              "op": "is-true"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

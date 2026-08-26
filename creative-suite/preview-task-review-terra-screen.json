@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "terra-preview-task-review-screen",
+  "description": "Small earned follow-up to exact-turn engagement replay: generic screenshot narration versus task-aware visible-contract review on the Moonroot full task. Promotion is out of scope; inspect post-review edits, repeat previews, strict correctness, and cost.",
+  "fixtures": [
+    "creative-suite/fixtures/image-to-web"
+  ],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-generic-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

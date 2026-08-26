@@ -1,0 +1,5 @@
+{
+  "diffusion_config": { "canvas_length": 256, "max_denoising_steps": 32 },
+  "purpose": "Experimental effort profile; pass the nested object to vLLM --diffusion-config.",
+  "qualification": "Unqualified. Normal adaptive denoising is the operational default."
+}

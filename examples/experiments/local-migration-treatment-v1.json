@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "name": "Local Qwen migration treatment v1",
+  "description": "Paired fresh-seed migration replay used once as control and once with BANTAM_WRITE_BATCH=1. Hidden contracts and full trajectory evidence remain authoritative.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration",
+    "gauntlet/fixtures/adapter-migration-explicit"
+  ],
+  "rounds": 3,
+  "seeds": [81201, 81202, 81203],
+  "passAtK": [1, 3],
+  "arms": [
+    {
+      "name": "local-qwen",
+      "description": "Local 27B through the full BANTAM controller",
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

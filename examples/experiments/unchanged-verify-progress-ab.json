@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "unchanged-verify-progress-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. HYPOTHESIS: making the anti-spiral gate reachable (BANTAM_UNCHANGED_VERIFY_PROGRESS=0) reduces turns burned in the recorded read->test spiral on keyed-task-pool. PRIMARY METRIC: turns to termination (the spiral cost 26 of 40 turns in round-03; baseline was 40/33/40). SECONDARY: progressGateRejections and progressGateTerminations must become non-zero in the candidate arm -- if they stay 0 the fix did not engage and nothing else is interpretable; plus reachedDone and pass. HARM METRIC, pre-registered because this is the specific risk of the change: a gate that now fires during legitimate edit->verify->inspect cycles would show up as FEWER edits or as a candidate arm that terminates early WITHOUT reaching done. Report it whichever way it falls. This is well-powered unlike the lexical A/B: the spiral reproduced 3/3, so the triggering condition is always present. FALSIFIED IF: turns do not drop, or the gate fires but the arm ends worse.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "control",
+      "description": "Current behaviour: any verify rerun credits progress",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_UNCHANGED_VERIFY_PROGRESS": "1" }
+    },
+    {
+      "name": "candidate",
+      "description": "Unchanged verify reruns earn no progress credit",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_UNCHANGED_VERIFY_PROGRESS": "0" }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-cognitive-actuation-recipe",
+  "id": "three-peck-service-upgrade",
+  "version": 1,
+  "title": "Three-peck service upgrade",
+  "task": "Move one service chassis through configuration, dependency rewiring, and function hardening without giving a cognitive worker workspace-write authority.",
+  "steps": [
+    {
+      "id": "configure-port",
+      "actuator": "json-pointer-set@1",
+      "targetPath": "package.json",
+      "parameters": {
+        "pointer": "/service/port",
+        "value-json": "8080"
+      },
+      "verification": "node --test test/config.test.js"
+    },
+    {
+      "id": "rewire-service",
+      "actuator": "esm-import-rewrite@1",
+      "targetPath": "src/service.js",
+      "parameters": {
+        "from": "./legacy-math.js",
+        "to": "./math.js",
+        "expected-count": 1
+      },
+      "verification": "node --test test/import.test.js"
+    },
+    {
+      "id": "harden-calculation",
+      "actuator": "exported-function-body@1",
+      "targetPath": "src/math.js",
+      "parameters": {
+        "export-name": "twice",
+        "replacement-body": "  if (typeof value !== \"number\" || !Number.isFinite(value)) throw new TypeError(\"finite number required\");\n  return value * 2;"
+      },
+      "verification": "node --test test/function.test.js"
+    }
+  ],
+  "finalVerification": "node --test test/*.test.js"
+}

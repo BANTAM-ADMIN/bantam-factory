@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "name": "moonroot-replay-usage-accounting-smoke",
+  "description": "One-sample engineering smoke for provider-reported per-arm usage and latency reconciliation; not promotion evidence.",
+  "artifact": "../../.bantam/experiments/terra-visual-completion-audit-ab-v2/runs/terra-control/round-01/image-to-web-run-2026-07-29T17-26-09-575Z-723e69.json",
+  "turn": 4,
+  "samples": 1,
+  "remedy": "[visual-alt-coverage] The saved view_image evidence has explicit Moon and Birds sections, but the authored alt text names neither. Before authoring more files, recheck that alt against the image observation and correct it with one concise, accurate distinctive sky element if it is genuinely visible.",
+  "expectation": {
+    "verbs": ["replace", "patch"],
+    "paths": ["index.html"],
+    "contentAny": ["moon", "bird"],
+    "contentAll": ["alt="],
+    "forbidAny": ["invented"],
+    "requireOldInPrompt": true
+  }
+}

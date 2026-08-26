@@ -1,0 +1,50 @@
+[
+  {
+    "id": "absent-returns-null",
+    "description": "Query a key that was never inserted and assert the returned value is exactly null."
+  },
+  {
+    "id": "absent-throws",
+    "description": "Query a key that was never inserted and assert the operation throws an exception."
+  },
+  {
+    "id": "trim-before-interpretation",
+    "description": "Surround a valid input with leading and trailing whitespace and assert it behaves like the unpadded input."
+  },
+  {
+    "id": "whitespace-is-significant",
+    "description": "Add leading or trailing whitespace and assert it changes the interpreted value."
+  },
+  {
+    "id": "mixed-case-same-key",
+    "description": "Insert with one letter case, query with another, and assert both address the same key."
+  },
+  {
+    "id": "mixed-case-distinct-key",
+    "description": "Insert spellings that differ only by letter case and assert they remain separate keys."
+  },
+  {
+    "id": "signed-token-accepted",
+    "description": "Provide otherwise valid positive and negative tokens with explicit signs and assert both are accepted."
+  },
+  {
+    "id": "signed-token-rejected",
+    "description": "Provide a token with an explicit sign and assert it is rejected as malformed."
+  },
+  {
+    "id": "descending-direction-preserved",
+    "description": "Provide a range whose first endpoint is greater and assert output proceeds downward through both endpoints."
+  },
+  {
+    "id": "descending-range-rejected",
+    "description": "Provide a range whose first endpoint is greater and assert the range is rejected."
+  },
+  {
+    "id": "duplicate-first-position",
+    "description": "Repeat a result later in the input and assert only its first occurrence remains in first-occurrence order."
+  },
+  {
+    "id": "duplicate-last-position",
+    "description": "Repeat a result later in the input and assert the last occurrence determines its output position."
+  }
+]

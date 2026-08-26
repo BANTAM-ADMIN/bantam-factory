@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "name": "Codex hard-role tournament 2026-07-25",
+  "description": "Two rotated rounds over BANTAM's longest cross-file normalization migration and an adversarial asynchronous keyed-work-pool task. Correctness is ranked before strictness, turns, time, and cache-miss input.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 2,
+  "passAtK": [1, 2],
+  "arms": [
+    {
+      "name": "sol-high",
+      "description": "Hard/high-assurance role",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      }
+    },
+    {
+      "name": "terra-medium",
+      "description": "Everyday balanced role",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "luna-medium",
+      "description": "Fast compact role",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-luna",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "gpt-5-5-medium",
+      "description": "Experimental efficiency control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "qwen38 hard tier sweep v1",
+  "description": "Qwen 3.8 rebuild (champion configuration) across the eight gauntlet families it has not yet seen, including keyed-task-pool-strong (the hard-contract fixture that blocked gpt-5.5 automatic promotion) and retry-consolidation-haystack (context discipline under distractors). Characterization extension of docs/superpowers/reports/2026-08-14-qwen38-characterization-plan.md.",
+  "fixtures": [
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/retry-consolidation",
+    "gauntlet/fixtures/retry-consolidation-haystack",
+    "gauntlet/fixtures/adapter-migration-explicit",
+    "gauntlet/fixtures/keyed-task-pool-strong"
+  ],
+  "rounds": 2,
+  "seeds": [20260814, 20260815],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "qwen38-rebuild",
+      "description": "New 27B, default rebuild trajectory, auto think",
+      "env": { "BANTAM_PROMPT_TRAJECTORY": "rebuild" },
+      "model": { "runtime": "local" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

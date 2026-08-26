@@ -1,0 +1,20 @@
+{
+  "jobs": [
+    {
+      "id": "census-manifest",
+      "status": "done",
+      "exitCode": 0,
+      "startedAt": "2026-08-18T08:51:16.636Z",
+      "endedAt": "2026-08-18T08:52:07.609Z",
+      "durationMs": 50973
+    },
+    {
+      "id": "guard-fossils",
+      "status": "failed",
+      "exitCode": 1,
+      "startedAt": "2026-08-18T08:52:07.609Z",
+      "endedAt": "2026-08-18T08:52:07.691Z",
+      "durationMs": 82
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "name": "specification-vs-gate-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. The generalisation A/B failed its engagement check for an informative reason: channel-filter's task stated 'rejects everything else with TypeError' outright, adapter-migration's normalizeTags clause does not, and the model then wrote strict code 6/6 with NO gate. That suggests type_contract may be compensating for UNDER-SPECIFIED TASK TEXT rather than a model capability gap. HYPOTHESIS: one clause in the task is as effective as the gate, and far cheaper. DESIGN: identical repo, identical starting code, identical hidden grader; the ONLY difference between the two fixtures is whether each contract clause states the rejection requirement. The gate is OFF in both arms so specification is the sole variable. PRIMARY METRIC: hidden-contract pass rate. FALSIFIED IF: the under-specified arm passes as often as the explicit one, which would mean the phrasing is not the lever and the earlier 6/6 was ordinary variance on an easy fixture. CONSEQUENCE IF CONFIRMED: the honest remedy for this defect class is to write the requirement, not to gate for it, and the type-contract report must say so.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/channel-filter-explicit"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    { "name": "gate-off", "description": "type_contract off; task phrasing is the only variable", "model": { "runtime": "local" }, "env": { "BANTAM_TYPE_CONTRACT_GATE": "0" } }
+  ]
+}

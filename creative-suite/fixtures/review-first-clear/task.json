@@ -1,0 +1,8 @@
+{
+  "name": "review-first-clear",
+  "repoBase": "../occluded-theme-controls/repo",
+  "task": "Perform a rendered visual acceptance check of the existing Signal Garden browser page. Begin by running BANTAM preview before reading or editing any source. The source and public tests were already reviewed; do not change the implementation unless that first rendered evidence identifies a concrete visible defect. The exact visible headline \"Signal Garden\", CTA \"Join the Night Walk\", and theme controls \"Night\" and \"Dawn\" must be clearly visible and unobscured at 1280x800. If the render identifies a defect, make the smallest source repair, run npm test, and preview the repaired page again. Keep the page self-contained and offline. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 12,
+  "editable": ["index.html", "styles.css", "app.js"]
+}

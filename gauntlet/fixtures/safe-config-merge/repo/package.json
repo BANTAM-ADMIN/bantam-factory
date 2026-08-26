@@ -1,0 +1,1 @@
+{"name":"gauntlet-safe-config-merge","private":true,"type":"module","scripts":{"test":"node --test"}}

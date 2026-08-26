@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "name": "spec-vs-gate-adapter-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. The decisive test for the type_contract gate. On channel-filter, adding one rejection clause to the task took the SAME code from 0/3 to 3/3 with the gate off -- suggesting the defect is a specification artifact, not a capability limit. This asks whether that holds on adapter-migration, the fixture the gate was built from and where it has replicated evidence (4/9 armed vs 0/15 off, p=0.012). Three arms, identical repo, starting code and hidden grader: (1) the real under-specified task with the gate off, the 0/15 baseline; (2) the same task with the gate armed, the measured 44% remedy; (3) the task with the rejection clause written into the normalizeTags and normalizeHeaders contracts, gate OFF. PRIMARY METRIC: hidden-contract pass rate. HYPOTHESIS: arm 3 >= arm 2, i.e. writing the requirement is at least as effective as gating for it, and costs no turns. CONSEQUENCE IF CONFIRMED: type_contract should be documented as a fallback for specs you do not control, not as the primary remedy, and the report must say so. FALSIFIED IF: arm 3 does no better than arm 1, which would mean adapter-migration's defect is NOT merely under-specification and the gate is doing independent work.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "underspec-gate-off",
+      "description": "real task, gate off (baseline)",
+      "model": {
+        "runtime": "local"
+      },
+      "env": {
+        "BANTAM_TYPE_CONTRACT_GATE": "0",
+        "BANTAM_FIXTURE_HINT": "adapter-migration"
+      }
+    },
+    {
+      "name": "underspec-gate-on",
+      "description": "real task, gate armed",
+      "model": {
+        "runtime": "local"
+      },
+      "env": {
+        "BANTAM_TYPE_CONTRACT_GATE": "1",
+        "BANTAM_FIXTURE_HINT": "adapter-migration"
+      }
+    }
+  ]
+}

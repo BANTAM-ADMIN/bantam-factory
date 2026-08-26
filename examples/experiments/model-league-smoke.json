@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "name": "BANTAM local-teacher league smoke",
+  "description": "One fresh isolated task through local BANTAM, BANTAM-constrained Codex, native Codex, and native Claude Code. Native arms require explicit --yes.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 1,
+  "seeds": [81101],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "local-qwen",
+      "description": "Local 27B through the full BANTAM controller",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "bantam-terra",
+      "description": "Terra reasoning through BANTAM's constrained action and proof loop",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "native-codex",
+      "description": "Independent native Codex CLI control",
+      "model": {
+        "runtime": "native-codex",
+        "name": "terra",
+        "effort": "medium",
+        "bypassSandbox": true
+      }
+    },
+    {
+      "name": "claude-sonnet",
+      "description": "Independent Claude Code Sonnet control",
+      "model": {
+        "runtime": "native-claude",
+        "name": "sonnet",
+        "effort": "high",
+        "permissionMode": "acceptEdits"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

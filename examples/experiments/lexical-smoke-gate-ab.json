@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "lexical-smoke-gate-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. HYPOTHESIS: the lexical_smoke done-gate causes the model to correct the case-insensitive narrowing in parseEnabled that it ships in 3/3 baseline runs. PRIMARY METRIC: whether each arm's FINAL tree still contains a lexical-smoke finding, re-checked mechanically post hoc via lexicalSmokeWorkspace. NOT pass rate: adapter-migration fails 3 of its 4 hidden tests on an unrelated missing-TypeError family, so pass rate cannot move here and reporting it as the outcome would mislead. SECONDARY: turns to done, lexicalSmokeRejections, and whether a bounce converted into a corrected comparison or was re-done'd unchanged. FALSIFIED IF: the candidate arm still ships the narrowing, or bounces without correcting it.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "control",
+      "description": "Current default: advisory lexical-contract audit only",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "0" }
+    },
+    {
+      "name": "candidate",
+      "description": "Advisory audit plus the lexical_smoke done-gate",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "1" }
+    }
+  ]
+}

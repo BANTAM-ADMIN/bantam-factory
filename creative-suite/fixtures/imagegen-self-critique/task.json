@@ -1,0 +1,8 @@
+{
+  "name": "imagegen-self-critique",
+  "task": "Read art-brief.md. Use BANTAM's generate_image query tool once with --variants=2 to create exactly two distinct campaign images. Then inspect both generated PNGs with view_image, compare visible evidence rather than filenames, and write selection.json with: generatedFiles (both workspace-relative paths), chosenFile, rejectedFile, chosenEvidence (array of at least 3 concrete visible observations), rejectedEvidence (array of at least 2 concrete visible observations), briefCoverage {chosen, missing}, and finalAltText (25-45 words). Do not create images by writing base64 or drawing placeholders. Do not modify the brief, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 22,
+  "contractTimeoutMs": 60000,
+  "editable": ["assets/generated", "selection.json"]
+}

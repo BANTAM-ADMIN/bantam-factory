@@ -1,0 +1,236 @@
+<title>__TITLE__</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --bg:#0d0f12; --panel:#14171c; --panel2:#191d23; --line:#262b33; --ink:#e8e4da; --dim:#8b9099;
+    --amber:#e8a33d; --green:#7ec07a; --red:#d46a6a; --bantam:#e8a33d; --hermes:#7ec07a; --opencode:#d48a9c;
+    --luna:#7aa7d4; --terra:#66bfae; --sol:#b08ad4; --spark:#c9c06a; --codex:#b08ad4; --claude:#d49a6a; --hermes-agent:#7ec07a;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.5;margin:0;padding:26px 18px 60px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:44px;letter-spacing:.5px;margin:0;text-wrap:balance}
+  h1 .amp{color:var(--amber)}
+  .eyebrow{font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+  .picker{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 14px}
+  .pick{font:inherit;font-size:12px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:4px 13px;cursor:pointer}
+  .pick:hover{border-color:var(--amber)} .pick:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .pick[aria-pressed="true"]{border-color:var(--amber);color:var(--amber);background:var(--panel2)}
+  .pick .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--c);vertical-align:baseline}
+  .task{color:var(--dim);margin:6px 0 16px;max-width:76ch;white-space:pre-wrap}
+  .repsband{color:var(--dim);font-size:11.5px;margin:-8px 0 14px;letter-spacing:.02em}
+  .trail{margin:-6px 0 14px;font-size:11.5px;color:var(--dim);max-width:100ch}
+  .trail summary{cursor:pointer;letter-spacing:.03em;opacity:.85}
+  .trail summary:hover{opacity:1}
+  .trail div{margin-top:6px;line-height:1.5;white-space:pre-wrap}
+  .trail p{margin:0 0 8px}
+  .repsband b{color:var(--ink,#d8d4cc);font-weight:600}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:16px}
+  button{font:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 14px;cursor:pointer}
+  button:hover{border-color:var(--amber)} button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+  .clock{font-weight:600;color:var(--amber);min-width:72px;text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{flex:1;min-width:160px;accent-color:var(--amber)}
+  .lanes{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+  .lane{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;cursor:pointer}
+  .lane:hover{border-color:var(--c)}
+  .lane .hint{font-size:10.5px;color:var(--dim);letter-spacing:.08em;margin-left:auto}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(6,8,10,.72);z-index:9}
+  .feed{position:fixed;top:4vh;bottom:4vh;left:50%;transform:translateX(-50%);width:min(880px,94vw);background:var(--panel);border:1px solid var(--c,var(--line));border-radius:10px;z-index:10;display:none;flex-direction:column}
+  .feed header{display:flex;gap:12px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .feed header .corner{font-size:22px}
+  .feed header .x{margin-left:auto;font-size:14px}
+  .feedlist{list-style:none;margin:0;padding:10px 16px;overflow-y:auto;flex:1}
+  .feedlist li{display:flex;gap:12px;padding:2px 0;border-bottom:1px dotted var(--panel2)}
+  .feedlist .t{color:var(--dim);min-width:56px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .feedlist .x2{white-space:pre-wrap;word-break:break-word}
+  .feedlist li.future{opacity:.32}
+  .feedlist li.think .x2{color:var(--dim);font-style:italic}
+  .lane .top{display:flex;gap:10px;align-items:baseline}
+  .corner{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.06em;color:var(--c);min-width:170px}
+  .corner small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10px;letter-spacing:.03em;color:var(--dim)}
+  .wall{font-variant-numeric:tabular-nums;color:var(--dim);min-width:64px}
+  .chip{font-size:11px;letter-spacing:.08em;padding:2px 9px;border-radius:99px;border:1px solid;display:none}
+  .chip.win{color:var(--green);border-color:var(--green)} .chip.fail{color:var(--red);border-color:var(--red)} .chip.bf{color:var(--dim);border-color:var(--dim)}
+  .bar{height:7px;background:var(--panel2);border-radius:4px;margin:8px 0 6px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--c);border-radius:4px}
+  .status{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.5em}
+  .tickerbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:18px}
+  .tickerbox h2, .final h2{font-family:"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin:0 0 8px;font-weight:600}
+  .ticker{list-style:none;margin:0;padding:0;min-height:13.5em;max-height:15em;overflow-y:auto}
+  .ticker li{display:flex;gap:10px;padding:1.5px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ticker .t{color:var(--dim);min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .ticker .who{color:var(--c);min-width:132px;font-weight:600}
+  .ticker .think{color:var(--dim);font-style:italic}
+  .final{display:none;background:var(--panel);border:1px solid var(--amber);border-radius:8px;padding:14px 16px}
+  .final table{border-collapse:collapse;width:100%}
+  .final .tw{overflow-x:auto}
+  .final th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:left;padding:4px 10px 6px;border-bottom:1px solid var(--line)}
+  .final td{padding:5px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .final .c{font-weight:600} .ex{color:var(--green)} .ms{color:var(--red)}
+  .note{color:var(--dim);font-size:12px;margin-top:10px}
+  @media (max-width:640px){ .corner{min-width:92px;font-size:16px} .ticker .who{min-width:76px} }
+</style>
+<div class="wrap">
+  <div class="eyebrow">__EYEBROW__</div>
+  <h1>__H1__</h1>
+  <div class="picker" id="picker"></div>
+  <p class="task" id="task"></p>
+  <p class="repsband" id="repsband" hidden></p>
+  <details class="trail" id="trail" hidden><summary>provenance — how this card was sealed and judged</summary><div id="trailbody"></div></details>
+  <div class="controls">
+    <button id="play" aria-pressed="false">▶ play</button>
+    <span class="clock" id="clock">0.0s</span>
+    <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="scrub the replay">
+    <button class="spd" data-s="1">1×</button><button class="spd" data-s="4">4×</button><button class="spd" data-s="8" aria-pressed="true">8×</button><button class="spd" data-s="16">16×</button>
+    <button id="snd" aria-pressed="false">🔇 sound</button>
+  </div>
+  <div class="lanes" id="lanes"></div>
+  <div class="tickerbox"><h2>the line, live — workers' own words</h2><ul class="ticker" id="ticker"></ul></div>
+  <div class="final" id="final"><h2>final — judged rerun + sealed truth</h2><div class="tw" id="finaltable"></div>
+    <p class="note" id="buildnote" style="display:none"></p>
+    <p class="note">Every row is auditable: full run artifacts, per-turn actions, and — where the card was sealed — a truth hashed before the bell. BANTAM, HERMES, and OPENCODE run the identical 27B weights: the seconds between them are harness.</p>
+    <p style="margin:10px 0 0"><button id="again">↺ replay</button></p></div>
+</div>
+<div class="overlay" id="overlay"></div>
+<div class="feed" id="feed" role="dialog" aria-label="corner feed">
+  <header><span class="corner" id="feedname"></span><span class="wall" id="feedwall"></span><span class="chip" id="feedchip" style="display:inline-block"></span><button class="x" id="feedclose">✕ close</button></header>
+  <ul class="feedlist" id="feedlist"></ul>
+</div>
+<script>
+const DATA = __DATA__;
+// Verdict vocabularies grew with the seasons: WIN/FAIL (fight judge) and
+// EXACT/MISS (sealed judges) both appear; BENCH-FAULT is neither a win nor a
+// loss — the rig, not the model, failed (rendered neutral).
+const isGoodVerdict=(v)=>v==="WIN"||v==="EXACT";
+const chipClass=(c)=>c.verdict==="BENCH-FAULT"?"bf":(isGoodVerdict(c.verdict)&&(c.sealed==null||c.sealed==="EXACT")?"win":"fail");
+const chipText=(c)=>c.verdict==="BENCH-FAULT"?"bench fault — our rig, not the model · unscored":(c.sealed?`${c.verdict} · sealed ${c.sealed}`:(c.verdict??"—"));
+const COLORS = {bantam:"var(--bantam)",hermes:"var(--hermes)",opencode:"var(--opencode)"};
+const NAMES = {
+  "bantam":["BANTAM","local 27B · this harness"],
+  "hermes":["HERMES","same 27B · hermes-agent"],
+  "opencode":["OPENCODE","same 27B · opencode"],
+  "bantam-codex":["BANTAM×CODEX SOL","codex app-server as bantam's model · effort high"],
+  "codex-sol":["CODEX CLI SOL","raw codex agent · default effort"],
+  "claude-sonnet":["CLAUDE CODE","sonnet"],
+  "bantam-codexapi-spark":["BANTAM×SPARK","bantam over the bridge · spark:low"],
+  "bantam-codexapi-luna":["BANTAM×LUNA","bantam over the bridge · luna:medium"],
+  "bantam-codexapi-terra":["BANTAM×TERRA","bantam over the bridge · terra:medium"],
+  "bantam-codexapi-sol":["BANTAM×SOL","bantam over the bridge · sol:high"],
+};
+const disp = a => (NAMES[a] ?? [a.replace("bantam-codexapi-","").toUpperCase()])[0];
+const subOf = a => (NAMES[a] ?? [null,""])[1] ?? "";
+const colorOf = a => COLORS[a] || ({"bantam-codex":"#8ad4c2","codex-sol":"#6aa0e0","claude-sonnet":"#b98ad4"})[a] || `var(--${a.replace("bantam-codexapi-","")}, var(--dim))`;
+let card=null, maxT=1, vclock=0, playing=false, speed=8, last=null, sound=false, actx=null, prevV=0;
+const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function fmt(ms){ return (ms/1000).toFixed(1)+"s"; }
+function blip(good){ if(!sound||!actx) return; const o=actx.createOscillator(),g=actx.createGain();
+  o.frequency.value=good?880:220; o.type="sine"; g.gain.setValueAtTime(0.035,actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.12); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+0.13); }
+function buildPicker(){
+  if (DATA.cards.length<2) return;
+  $("picker").innerHTML = DATA.cards.map((c,i)=>{
+    const w=[...c.corners].filter(x=>isGoodVerdict(x.verdict)).sort((a,b)=>a.wallMs-b.wallMs)[0];
+    return `<button class="pick" data-i="${i}" style="--c:${w?colorOf(w.arm):"var(--dim)"}" aria-pressed="false"><span class="dot"></span>${esc(c.no)} · ${esc(c.label)}</button>`;
+  }).join("");
+  for (const b of document.querySelectorAll(".pick")) b.addEventListener("click",()=>loadCard(Number(b.dataset.i)));
+}
+function loadCard(i){
+  card=DATA.cards[i]; maxT=Math.max(...card.corners.map(c=>c.wallMs)); vclock=0; prevV=0;
+  if (playing) toggle(false);
+  for (const b of document.querySelectorAll(".pick")) b.setAttribute("aria-pressed",String(Number(b.dataset.i)===i));
+  $("task").textContent=card.task;
+  const rb=$("repsband");
+  if (card.reps && card.reps.length){
+    rb.hidden=false;
+    rb.innerHTML="replication · "+card.reps.slice(0,4).map(r=>
+      `<b>${esc(disp(r.arm))}</b> median ${r.medianS.toFixed(1)}s over ${r.n} (${r.walls.map(w=>w.toFixed(0)).join("/")}${r.allSealed?", all sealed EXACT":""})`).join(" · ")
+      +(card.reps.length>4?` · +${card.reps.length-4} more arms in card.reps.json`:"");
+  } else { rb.hidden=true; rb.innerHTML=""; }
+  const tr=$("trail");
+  if (card.trail && card.trail.length){
+    tr.hidden=false; tr.open=false;
+    $("trailbody").innerHTML=card.trail.map(t=>`<p>${esc(t)}</p>`).join("");
+  } else { tr.hidden=true; $("trailbody").innerHTML=""; }
+  const order=["bantam","hermes","opencode"];
+  card.corners.sort((x,y)=>{const a=order.indexOf(x.arm),b=order.indexOf(y.arm);return (a<0?9:a)-(b<0?9:b)||x.wallMs-y.wallMs;});
+  $("lanes").innerHTML=card.corners.map(c=>
+    `<div class="lane" data-arm="${c.arm}" style="--c:${colorOf(c.arm)}" title="open ${esc(disp(c.arm))}'s full feed"><div class="top"><span class="corner">${esc(disp(c.arm))}<small>${esc(subOf(c.arm))}</small></span>`+
+    `<span class="wall" id="w-${c.arm}">0.0s</span><span class="chip" id="chip-${c.arm}"></span>`+
+    `<span class="hint">▤ feed</span></div><div class="bar"><i id="bar-${c.arm}"></i></div><div class="status" id="st-${c.arm}"></div></div>`).join("");
+  for (const el of document.querySelectorAll(".lane")) el.addEventListener("click",()=>openFeed(el.dataset.arm));
+  closeFeed();
+  if (rm) vclock=maxT;
+  render();
+}
+let feedArm=null, feedMark=0;
+function openFeed(arm){
+  feedArm=arm; feedMark=0;
+  const c=card.corners.find(x=>x.arm===arm);
+  const fe=$("feed"); fe.style.setProperty("--c",colorOf(arm)); fe.style.display="flex"; $("overlay").style.display="block";
+  $("feedname").innerHTML=`${esc(disp(arm))}<small>${esc(subOf(arm))}</small>`; $("feedname").style.color=colorOf(arm);
+  $("feedwall").textContent=fmt(c.wallMs);
+  $("feedchip").className="chip "+chipClass(c);
+  $("feedchip").textContent=chipText(c);
+  $("feedlist").innerHTML=card.events.filter(e=>e.arm===arm).map(e=>
+    `<li data-t="${e.t}" class="${e.x.startsWith("🤔")?"think ":""}future"><span class="t">${fmt(e.t)}</span><span class="x2">${esc(e.x)}</span></li>`).join("");
+  syncFeed();
+}
+function closeFeed(){ feedArm=null; $("feed").style.display="none"; $("overlay").style.display="none"; }
+function syncFeed(){
+  if(!feedArm) return;
+  const items=$("feedlist").children;
+  if(feedMark>items.length) feedMark=0;
+  if(feedMark>0 && Number(items[feedMark-1].dataset.t)>vclock) feedMark=0;  // scrubbed backward: rescan
+  if(feedMark===0) for (const li of items) li.classList.add("future");
+  while(feedMark<items.length && Number(items[feedMark].dataset.t)<=vclock){ items[feedMark].classList.remove("future"); feedMark++; }
+}
+function render(){
+  $("clock").textContent=fmt(vclock);
+  $("scrub").value=Math.round(1000*vclock/maxT);
+  for (const c of card.corners){
+    const done=vclock>=c.wallMs, t=Math.min(vclock,c.wallMs);
+    $("bar-"+c.arm).style.width=(100*t/maxT)+"%";
+    $("w-"+c.arm).textContent=fmt(t);
+    const lines=card.events.filter(e=>e.arm===c.arm&&e.t<=vclock);
+    $("st-"+c.arm).textContent=done?`finished — ${fmt(c.wallMs)}`:(lines.length?lines[lines.length-1].x:"");
+    const chip=$("chip-"+c.arm);
+    if(done){ chip.style.display="inline-block";
+      chip.className="chip "+chipClass(c);
+      chip.textContent=chipText(c);
+      if(c.wallMs>prevV&&c.wallMs<=vclock) blip(chipClass(c)!=="fail");
+    } else chip.style.display="none";
+  }
+  const tk=$("ticker"); const stick=tk.scrollTop+tk.clientHeight>=tk.scrollHeight-24;
+  tk.innerHTML=card.events.filter(e=>e.t<=vclock).slice(-200).map(e=>
+    `<li style="--c:${colorOf(e.arm)}"><span class="t">${fmt(e.t)}</span><span class="who">${esc(disp(e.arm))}</span><span class="${e.x.startsWith("🤔")?"think":""}">${esc(e.x)}</span></li>`).join("");
+  if (stick) tk.scrollTop=tk.scrollHeight;
+  syncFeed();
+  const fin=$("final");
+  if(vclock>=maxT){ fin.style.display="block"; if(playing) toggle(false);
+    $("finaltable").innerHTML=`<table><thead><tr><th>corner</th><th>wall</th><th>judge</th><th>sealed</th><th>turns</th><th>input tokens</th><th>output tokens</th><th>cache tokens</th><th>prefix reuse</th></tr></thead><tbody>`+
+      [...card.corners].sort((a,b)=>{const ga=isGoodVerdict(a.verdict)?0:(a.verdict==="BENCH-FAULT"?2:1),gb=isGoodVerdict(b.verdict)?0:(b.verdict==="BENCH-FAULT"?2:1);return ga-gb||a.wallMs-b.wallMs;}).map(c=>`<tr><td class="c" style="color:${colorOf(c.arm)}">${esc(disp(c.arm))}</td><td>${fmt(c.wallMs)}</td><td>${c.verdict==="BENCH-FAULT"?"bench fault (unscored)":c.verdict??"—"}</td><td class="${c.sealed==="EXACT"?"ex":(c.sealed&&c.sealed!=="BENCH-FAULT")?"ms":""}">${c.sealed==="BENCH-FAULT"?"—":c.sealed??"—"}</td><td>${c.usage?.turns??"—"}</td>${c.usage&&c.usage.inputTokens==null&&c.usage.totalTokens!=null?`<td colspan="3">Σ ${c.usage.totalTokens.toLocaleString()} total (CLI reports one figure)</td>`:`<td>${c.usage?.inputTokens?.toLocaleString()??"—"}</td><td>${c.usage?.outputTokens?.toLocaleString()??"—"}</td><td>${c.usage?.cacheHitTokens?.toLocaleString()??"—"}</td>`}<td>${c.usage?.prefixReuse!=null?Math.round(c.usage.prefixReuse*100)+"%":"—"}</td></tr>`).join("")+"</tbody></table>";
+    const bn=$("buildnote");
+    if(card.build){ bn.style.display="block"; bn.textContent=`fought on harness build ${card.build}`; } else bn.style.display="none";
+  } else fin.style.display="none";
+  prevV=vclock;
+}
+function frame(ts){ if(!playing) return; if(last!=null) vclock=Math.min(maxT,vclock+(ts-last)*speed); last=ts; render();
+  if(vclock<maxT) requestAnimationFrame(frame); else toggle(false); }
+function toggle(on){ playing=on??!playing; $("play").textContent=playing?"⏸ pause":"▶ play";
+  $("play").setAttribute("aria-pressed",String(playing)); last=null; if(playing) requestAnimationFrame(frame); }
+$("play").addEventListener("click",()=>{ if(vclock>=maxT) {vclock=0; prevV=0;} toggle(); });
+$("again").addEventListener("click",()=>{ vclock=0; prevV=0; toggle(true); });
+$("scrub").addEventListener("input",e=>{ vclock=maxT*e.target.value/1000; prevV=vclock; render(); });
+for (const b of document.querySelectorAll(".spd")) b.addEventListener("click",()=>{ speed=Number(b.dataset.s);
+  for (const x of document.querySelectorAll(".spd")) x.setAttribute("aria-pressed",String(x===b)); });
+$("snd").addEventListener("click",e=>{ sound=!sound; if(sound&&!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch{sound=false;} }
+  e.target.textContent=sound?"🔊 sound":"🔇 sound"; e.target.setAttribute("aria-pressed",String(sound)); });
+$("feedclose").addEventListener("click",closeFeed);
+$("overlay").addEventListener("click",closeFeed);
+addEventListener("keydown",e=>{ if(e.code==="Escape") closeFeed(); });
+addEventListener("keydown",e=>{ if(e.code==="Space"&&e.target.tagName!=="INPUT"&&e.target.tagName!=="BUTTON"){ e.preventDefault(); if(vclock>=maxT){vclock=0;prevV=0;} toggle(); } });
+buildPicker(); loadCard(DATA.initial ?? 0);
+</script>

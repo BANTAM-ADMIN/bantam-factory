@@ -1,0 +1,8 @@
+{
+  "name": "image-alt-repair",
+  "repoBase": "../image-to-web/repo",
+  "task": "Inspect assets/moonroot-campaign.png with view_image, then repair the provided one-page campaign without redesigning it. Preserve the existing responsive center-right composition and offline behavior. Restore the required exact headline \"A Rooftop After Dark\" and ensure the supplied hero artwork has a concise alt description grounded in the distinctive visible foreground and sky details. Keep the existing CTA \"Reserve a Moonbed\", Night/Dawn controls, click and N/D keyboard behavior, aria-pressed updates, and reduced-motion CSS. Run the tests and BANTAM preview. Do not modify the image, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 16,
+  "editable": ["index.html", "styles.css", "app.js"]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "name": "repeat-mask",
+  "description": "HISTORICAL RECORD ONLY: the one-turn repeat escape-mask control was retired. Its former values remain in the arm descriptions for provenance but are no longer passed to runs. Do not use this as an active A/B.",
+  "fixtures": [
+    "stateful-cache-bug"
+  ],
+  "rounds": 2,
+  "seeds": [46021, 46022],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "description": "Historical control was BANTAM_REPEAT_MASK=0 (retired; not passed).",
+      "env": {}
+    },
+    {
+      "name": "candidate",
+      "description": "Historical treatment was BANTAM_REPEAT_MASK=1 (retired; not passed).",
+      "env": {}
+    }
+  ]
+}

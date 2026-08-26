@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "type contract gate under extension A/B v1",
+  "description": "Preregistered follow-up to the 2026-08-12 breadth sweep's channel-filter flag: does the existing type_contract done-gate recover the extension trajectory's strictness-clause early-dones? Plan and decision rule: docs/superpowers/reports/2026-08-12-type-contract-extension-preregistration.md. ttl-cache is the no-harm control.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/channel-filter-explicit",
+    "gauntlet/fixtures/ttl-cache"
+  ],
+  "rounds": 3,
+  "seeds": [20260825, 20260826, 20260827],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "typegate-off",
+      "description": "Control: current defaults, type-contract gate off",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "typegate-on",
+      "description": "Treatment: BANTAM_TYPE_CONTRACT_GATE=1",
+      "env": {
+        "BANTAM_TYPE_CONTRACT_GATE": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

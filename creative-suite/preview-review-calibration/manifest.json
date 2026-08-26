@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "preview-task-review-calibration",
+  "viewport": "1280x800",
+  "cases": [
+    {
+      "id": "missing-required-toggle",
+      "entry": "cases/missing-required-toggle.html",
+      "expected": "repair",
+      "task": "Build the Signal Garden campaign. The visible page must include headline \"Signal Garden\", CTA \"Join the Night Walk\", and clearly visible toggle labels \"Night\" and \"Dawn\"."
+    },
+    {
+      "id": "clipped-required-headline",
+      "entry": "cases/clipped-required-headline.html",
+      "expected": "repair",
+      "task": "Build a campaign whose complete visible headline is exactly \"Signal Garden\" and whose CTA is \"Join the Night Walk\". Primary content must not be clipped."
+    },
+    {
+      "id": "occluded-required-cta",
+      "entry": "cases/occluded-required-cta.html",
+      "expected": "repair",
+      "task": "Build the Signal Garden campaign with a clearly visible and readable CTA labeled exactly \"Join the Night Walk\". No major element may obscure the CTA."
+    },
+    {
+      "id": "unreadable-required-caption",
+      "entry": "cases/unreadable-required-caption.html",
+      "expected": "repair",
+      "task": "Build the Signal Garden campaign. The required visible event caption \"Friday · 8 PM · North Roof\" must be readable against its background."
+    },
+    {
+      "id": "intentional-whitespace",
+      "entry": "cases/intentional-whitespace.html",
+      "expected": "clear",
+      "task": "Build a restrained editorial campaign with visible headline \"Signal Garden\" and CTA \"Join the Night Walk\". Generous intentional whitespace is allowed; do not add decorative content merely to fill space."
+    },
+    {
+      "id": "source-only-aria-state",
+      "entry": "cases/source-only-aria-state.html",
+      "expected": "clear",
+      "task": "Build the Signal Garden campaign with visible Night and Dawn controls. In source and interaction behavior, the selected control must update aria-pressed. Screenshot review must judge only what pixels can establish."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "codex-run-scoped-thread-breadth",
+  "description": "One paired Sol/high sweep across all hidden-contract gauntlet fixtures for the run-scoped Codex thread candidate.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy"
+  ],
+  "rounds": 1,
+  "seeds": [75701],
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-ephemeral",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "ephemeral"
+      }
+    },
+    {
+      "name": "sol-run-thread",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run"
+      }
+    }
+  ]
+}

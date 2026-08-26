@@ -1,0 +1,7 @@
+{
+  "name": "declarative-a11y-state",
+  "task": "Fix the Night/Dawn theme toggle in index.html and app.js. It must start in Night mode, switch modes when clicked, and keep aria-pressed synchronized with the current mode. Screen readers must receive the correct initial aria-pressed state before any interaction. Preserve the existing labels and data-theme values. Run the tests before finishing.",
+  "verify": "npm test",
+  "maxTurns": 12,
+  "editable": ["index.html", "app.js"]
+}

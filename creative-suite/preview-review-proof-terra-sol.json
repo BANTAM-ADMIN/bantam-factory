@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "name": "preview-review-proof-terra-sol",
+  "description": "Review-first causal screen of DOM-only, generic screenshot, and task-aware screenshot evidence on the same calibrated occlusion, replicated with Terra and Sol. Task-aware REPAIR is now bound into trusted preview proof; malformed output remains non-blocking.",
+  "fixtures": ["creative-suite/fixtures/review-first-occlusion"],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-generic-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "sol-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    },
+    {
+      "name": "sol-generic-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    },
+    {
+      "name": "sol-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    }
+  ]
+}

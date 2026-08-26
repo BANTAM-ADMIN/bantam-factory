@@ -1,0 +1,7 @@
+{
+  "name": "image-to-web",
+  "task": "Inspect assets/moonroot-campaign.png with view_image, then build an accessible responsive one-page campaign in index.html, styles.css, and app.js. Use the supplied image as the hero artwork and preserve its center-right copy-safe region by placing hero copy there without obscuring the moon or birds. Required exact interface copy: headline \"A Rooftop After Dark\", CTA \"Reserve a Moonbed\", and toggle labels \"Night\" and \"Dawn\". The toggle must switch a data-theme value between night and dawn, update aria-pressed, and work by click plus the N and D keys. Include reduced-motion CSS and a concise image alt description grounded in visible facts. The page must be self-contained and usable offline: do not load fonts, scripts, styles, or other resources from external URLs or CDNs. Run BANTAM preview after implementation. Do not modify the image, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 28,
+  "editable": ["index.html", "styles.css", "app.js"]
+}

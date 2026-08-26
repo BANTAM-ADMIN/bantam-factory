@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "task coverage gate A/B v1",
+  "description": "Preregistered coverage-gate comparison on universally quantified multi-module fixtures. Plan and decision rule: docs/superpowers/reports/2026-08-12-task-coverage-gate-preregistration.md. Primary endpoints: broad-fixture strict lift of at least 2 runs AND attributable gate engagement; dependency-scheduler is the no-scope control where the gate must never evaluate.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration",
+    "gauntlet/fixtures/adapter-migration-explicit",
+    "gauntlet/fixtures/dependency-scheduler"
+  ],
+  "rounds": 3,
+  "seeds": [20260820, 20260821, 20260822],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "coverage-off",
+      "description": "Control: current defaults, gate off",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "coverage-on",
+      "description": "Treatment: task_coverage done-gate enabled",
+      "env": {
+        "BANTAM_TASK_COVERAGE": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

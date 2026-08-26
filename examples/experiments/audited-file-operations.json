@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "audited-file-operations",
+  "description": "Test whether task-scoped delete_file and move_file preserve Qwen reliability while moving named file lifecycle changes onto the audited executor surface.",
+  "fixtures": [
+    "delete-obsolete-module",
+    "move-config-module",
+    "retire-and-relocate-files",
+    "off-by-one-slice"
+  ],
+  "rounds": 2,
+  "seeds": [73601, 73602],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_FILE_OPS": "0",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_FILE_OPS": "auto",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    }
+  ]
+}

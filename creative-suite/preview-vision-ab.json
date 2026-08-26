@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "name": "terra-preview-vision-ab",
+  "description": "Matched A/B: deterministic Chromium preview evidence alone versus the same evidence plus one Codex screenshot-vision turn.",
+  "fixtures": [
+    "creative-suite/fixtures/image-to-web",
+    "creative-suite/fixtures/creative-code-constellation"
+  ],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-visual-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

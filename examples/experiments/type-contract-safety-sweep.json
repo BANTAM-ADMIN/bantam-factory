@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "type-contract-safety-sweep",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. The remaining promotion gap: does arming type_contract HARM the fixtures it should never touch? The blast-radius scan says 6 of 7 built-in fixtures name no accepted type and so produce no contracts, but 'does not activate' is not the same as 'costs nothing'. PRIMARY METRIC: per-fixture pass rate, armed vs off, across all seven fixtures. A regression on any of the six non-triggering fixtures falsifies the safety claim outright. SECONDARY: turns on those six, which should be unchanged -- the gate still spawns one subprocess per done attempt even when it returns no findings, and that cost should be shown to be negligible rather than assumed. EXPECTED: identical outcomes on the six, and the adapter-migration effect already measured. FALSIFIED IF: any non-triggering fixture passes armed-off but fails armed, or typeContractRejections is non-zero on a fixture whose task names no accepted type.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy",
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 1,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "gate-off",
+      "description": "type_contract off (current default)",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_TYPE_CONTRACT_GATE": "0" }
+    },
+    {
+      "name": "gate-on",
+      "description": "type_contract armed",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_TYPE_CONTRACT_GATE": "1" }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "name": "Codex model tournament 2026-07-25",
+  "description": "All seven live non-hidden Codex subscription models run inside the same BANTAM harness at the shared medium reasoning level on all five built-in hidden-contract fixtures. The local model is deliberately excluded.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy"
+  ],
+  "rounds": 1,
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "sol-medium",
+      "description": "GPT-5.6 Sol at the shared medium reasoning control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "terra-medium",
+      "description": "GPT-5.6 Terra at the shared medium reasoning control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "luna-medium",
+      "description": "GPT-5.6 Luna at the shared medium reasoning control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-luna",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "gpt-5-5-medium",
+      "description": "GPT-5.5 at the shared medium reasoning control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "gpt-5-4-medium",
+      "description": "Deprecated GPT-5.4 control at the shared medium reasoning level",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.4",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "gpt-5-4-mini-medium",
+      "description": "Deprecated GPT-5.4 Mini control at the shared medium reasoning level",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.4-mini",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "spark-medium",
+      "description": "GPT-5.3 Codex Spark at the shared medium reasoning control",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.3-codex-spark",
+        "effort": "medium"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

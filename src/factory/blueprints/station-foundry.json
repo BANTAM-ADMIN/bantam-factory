@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-blueprint",
+  "id": "station-foundry",
+  "version": 1,
+  "title": "BANTAM Station Foundry",
+  "taskFamily": "station-manufacturing",
+  "routeId": "station-foundry",
+  "authority": [],
+  "stations": [
+    {
+      "id": "intake",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "station-change-order-intake",
+        "version": 1,
+        "title": "Change order receiving",
+        "purpose": "Clamp one immutable station change order into the foundry jig.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.station-change-order-intake/v1" },
+        "inputs": [],
+        "outputs": [{ "name": "order", "artifactType": "bantam.station-change-order/v1", "required": true }],
+        "capabilities": ["station.order.admit"],
+        "authority": [],
+        "gauge": { "id": "station-change-order-binding", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "foundry", "icon": "clipboard", "color": "blue" },
+        "standardWork": {
+          "operation": "Clamp the content-addressed change order",
+          "instructions": ["Validate the exact order envelope.", "Bind the order reference to the traveler."],
+          "fixtures": ["Strict change-order schema", "Content-addressing die"],
+          "prohibited": ["Do not repair an invalid order.", "Do not grant runtime authority."],
+          "releaseCriteria": ["The admitted order exactly matches its traveler input revision."]
+        }
+      }
+    },
+    {
+      "id": "form",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "station-asset-form",
+        "version": 1,
+        "title": "Station asset forming press",
+        "purpose": "Form a strict, content-addressed station asset from the admitted order.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.station-asset-form/v1" },
+        "inputs": [{ "name": "order", "artifactType": "bantam.station-change-order/v1", "required": true }],
+        "outputs": [{ "name": "station", "artifactType": "bantam.station-asset/v2", "required": true }],
+        "capabilities": ["station.asset.form"],
+        "authority": [],
+        "gauge": { "id": "station-form-die", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released", "rework"],
+        "presentation": { "group": "foundry", "icon": "press", "color": "amber" },
+        "standardWork": {
+          "operation": "Press the station design through the schema die",
+          "instructions": ["Normalize the requested station.", "Stamp its immutable station reference.", "Check every manufacturing die."],
+          "fixtures": ["Station schema v2", "Typed material ports", "Independent gauge wicket", "Standard-work fixture"],
+          "prohibited": ["Do not add undeclared capabilities.", "Do not widen authority.", "Do not release a failed die."],
+          "releaseCriteria": ["The candidate is strict, content-addressed, bounded, independently gauged, and documented."]
+        }
+      }
+    },
+    {
+      "id": "inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "station-asset-inspection",
+        "version": 1,
+        "title": "Independent station inspection",
+        "purpose": "Reproduce the station from the original order and compare exact product bytes.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.station-asset-inspection/v1" },
+        "inputs": [{ "name": "station", "artifactType": "bantam.station-asset/v2", "required": true }],
+        "outputs": [{ "name": "record", "artifactType": "bantam.station-manufacturing-record/v1", "required": true }],
+        "capabilities": ["quality.station.asset"],
+        "authority": [],
+        "gauge": { "id": "station-independent-reproduction", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "quality", "icon": "gauge", "color": "green" },
+        "standardWork": {
+          "operation": "Rebuild and compare the manufactured station",
+          "instructions": ["Reproduce the asset from the immutable order.", "Compare canonical bytes and references.", "Emit the manufacturing record."],
+          "fixtures": ["Original order", "Independent station compiler", "Exact canonical comparison"],
+          "prohibited": ["Do not inspect using mutable intermediate state.", "Do not repair the candidate."],
+          "releaseCriteria": ["Independent reproduction is byte-identical and every manufacturing die passes."]
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "from": "intake", "out": "order", "to": "form", "in": "order" },
+    { "from": "form", "out": "station", "to": "inspection", "in": "station" }
+  ],
+  "layout": {
+    "direction": "left-to-right",
+    "stations": [
+      { "id": "intake", "x": 0, "y": 1 },
+      { "id": "form", "x": 1, "y": 1 },
+      { "id": "inspection", "x": 2, "y": 1 }
+    ]
+  }
+}

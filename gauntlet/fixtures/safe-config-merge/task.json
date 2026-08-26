@@ -1,0 +1,7 @@
+{
+  "name": "safe-config-merge",
+  "task": "Fix src/merge-config.js. mergeConfig(base, override) must return a new recursively merged plain object without mutating either input. Plain-object branches merge recursively; arrays and all non-plain values replace. Ignore the dangerous keys __proto__, prototype, and constructor at every depth so Object.prototype cannot be polluted. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["src"]
+}

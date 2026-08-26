@@ -1,0 +1,7 @@
+{
+  "name": "ttl-cache",
+  "task": "Fix src/ttl-cache.js. createTtlCache({ now }) must use the injected clock. set(key, value, ttlMs) accepts only finite ttlMs >= 0; invalid TTL throws TypeError. Entries expire when now() is greater than or equal to their deadline, including ttlMs 0. get returns undefined for expired/missing entries and removes expired entries; has follows the same rule. set returns the cache so calls can be chained. delete removes an entry and returns true when it removed one; clear removes everything. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["src"]
+}

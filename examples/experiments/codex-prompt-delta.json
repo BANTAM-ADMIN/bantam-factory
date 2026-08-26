@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "name": "codex-prompt-delta",
+  "description": "Compare fresh/full prompts, run-scoped/full prompts, and run-scoped exact base-relative prompt deltas with the same Sol/high task.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 3,
+  "seeds": [75801, 75802, 75803],
+  "passAtK": [1, 2, 3],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-ephemeral-full",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "ephemeral",
+        "BANTAM_CODEX_PROMPT_MODE": "full"
+      }
+    },
+    {
+      "name": "sol-run-full",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "full"
+      }
+    },
+    {
+      "name": "sol-run-delta",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta"
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "bantam",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "A bantamweight local-model coding agent. Grammar-constrained, verifiable actions.",
+  "bin": {
+    "bantam": "bin/bantam.js"
+  },
+  "scripts": {
+    "start": "node bin/bantam.js",
+    "eval": "node bin/bantam.js eval",
+    "factory:fact-demo": "node examples/factory/fact-fabric-demo.mjs",
+    "factory:fact-bench": "node scripts/fact-fabric-benchmark.mjs",
+    "factory:health-demo": "node examples/factory/workforce-health-control-demo.mjs",
+    "factory:health-bench": "node scripts/workforce-fact-control-benchmark.mjs",
+    "factory:health-specimen": "node scripts/workforce-health-yard-specimen.mjs",
+    "factory:semantic-authority": "node scripts/semantic-authority-control-lab.mjs",
+    "factory:semantic-sensor": "node scripts/semantic-sensor-disagreement-lab.mjs",
+    "factory:semantic-qualify": "node scripts/semantic-sensor-qualification-lab.mjs",
+    "factory:semantic-link": "node scripts/diffusiongemma-incremental-semantic-kit.mjs",
+    "factory:semantic-specimen": "node scripts/semantic-authority-yard-specimen.mjs",
+    "factory:semantic-codex-ab": "node scripts/codex-semantic-authority-ab.mjs",
+    "factory:station-foundry": "node scripts/station-foundry-lab.mjs",
+    "factory:semantic-rack": "node scripts/build-semantic-qualification-rack.mjs",
+    "factory:semantic-cohort": "node scripts/semantic-reviewed-qualification-cohort.mjs",
+    "factory:cartridge-lab": "node scripts/repository-cartridge-lab.mjs",
+    "factory:twin-recall": "node scripts/repository-twin-recall-lab.mjs",
+    "factory:intelligence-cell": "node scripts/repository-intelligence-cell-lab.mjs",
+    "factory:governance-cell": "node scripts/repository-governance-cell-lab.mjs",
+    "factory:exocortex": "node scripts/repository-exocortex-lab.mjs",
+    "factory:closed-loop": "node scripts/repository-closed-loop-lab.mjs",
+    "factory:cognitive-capital": "node scripts/repository-cognitive-capital-bench.mjs",
+    "factory:delta-sensor": "node scripts/repository-delta-sensor-bench.mjs",
+    "factory:codex-exocortex-cohort": "node scripts/codex-repository-exocortex-cohort.mjs",
+    "factory:codex-exocortex-report": "node scripts/render-codex-exocortex-cohort.mjs",
+    "factory:codex-mutation-cohort": "node scripts/codex-exocortex-mutation-cohort.mjs",
+    "factory:codex-mutation-report": "node scripts/render-codex-mutation-cohort.mjs",
+    "factory:cognitive-actuation-foundry": "node scripts/cognitive-actuation-foundry-lab.mjs",
+    "factory:cognitive-actuation-report": "node scripts/render-cognitive-actuation-foundry.mjs",
+    "factory:diffusiongemma-output-foundry": "node scripts/diffusiongemma-output-foundry.mjs",
+    "factory:diffusiongemma-mutation-mill": "node scripts/diffusiongemma-mutation-mill.mjs",
+    "factory:diffusiongemma-prefix-swarm": "node scripts/diffusiongemma-prefix-swarm-lab.mjs",
+    "factory:diffusiongemma-denoising": "node scripts/diffusiongemma-denoising-effort-lab.mjs",
+    "factory:diffusiongemma-recovery": "node scripts/diffusiongemma-recovery-cell.mjs",
+    "factory:diffusiongemma-anchor-holdout": "node scripts/diffusiongemma-anchor-holdout.mjs",
+    "factory:diffusiongemma-die-convergence": "node scripts/diffusiongemma-die-convergence-lab.mjs",
+    "factory:cognitive-wind-tunnel": "node scripts/cognitive-process-wind-tunnel.mjs",
+    "factory:process-compiler-shadow": "node scripts/process-compiler-shadow-lab.mjs",
+    "test": "node --test --test-concurrency=8 test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "acorn": "^8.17.0",
+    "acorn-walk": "^8.3.5"
+  }
+}

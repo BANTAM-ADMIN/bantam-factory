@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "name": "probe demand gate ab v1",
+  "description": "Preregistered A/B for the probe-demand done gate: does moving the named-requirements fact into a bounded done-bounce that demands one executed inline probe convert the holdout-caught completion misses? Plan and ordered rule: docs/superpowers/reports/2026-08-15-probe-demand-gate-preregistration.md.",
+  "fixtures": [
+    "benches/polyglot-js/fixtures/list-ops",
+    "benches/polyglot-js/fixtures/phone-number",
+    "benches/polyglot-js/fixtures/state-of-tic-tac-toe",
+    "benches/polyglot-js/fixtures/variable-length-quantity",
+    "benches/polyglot-js/fixtures/wordy",
+    "benches/polyglot-js/fixtures/say",
+    "benches/polyglot-js/fixtures/tournament",
+    "benches/polyglot-js/fixtures/triangle",
+    "gauntlet/fixtures/channel-filter"
+  ],
+  "rounds": 2,
+  "seeds": [
+    20260815,
+    20260816
+  ],
+  "passAtK": [
+    1
+  ],
+  "arms": [
+    {
+      "name": "control",
+      "description": "Default local config (generic completion audit)",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "probe-demand",
+      "description": "Done gate demanding one inline probe of named bounds",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild",
+        "BANTAM_PROBE_DEMAND": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

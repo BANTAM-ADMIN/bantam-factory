@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "local extension breadth sweep v1",
+  "description": "Regression monitoring for the 2026-08-12 trajectory default flip, not a new decision experiment: the flip was decided on four fixtures (docs/superpowers/reports/2026-08-12-extension-trajectory-results.md); this sweep runs the fixtures that decision never measured, both trajectories, two seeds. A fixture where extension trails rebuild by two strict runs is a flag to revisit the default for that task family.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/keyed-task-pool-strong",
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-consolidation"
+  ],
+  "rounds": 2,
+  "seeds": [20260815, 20260816],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "local-rebuild",
+      "description": "Rebuild trajectory (forced; former local default)",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "local-extension",
+      "description": "Extension trajectory (current local default, forced for symmetry)",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "extension"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

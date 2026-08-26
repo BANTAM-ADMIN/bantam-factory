@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#10172b"/>
+  <rect x="70" y="70" width="1060" height="660" rx="32" fill="#17223d" stroke="#37d6c0" stroke-width="5"/>
+  <rect x="1035" y="70" width="95" height="660" fill="#ed4e87"/>
+  <g fill="#37d6c0">
+    <rect x="115" y="147" width="34" height="34" transform="rotate(45 132 164)"/>
+    <rect x="175" y="147" width="34" height="34" transform="rotate(45 192 164)"/>
+    <rect x="235" y="147" width="34" height="34" transform="rotate(45 252 164)"/>
+  </g>
+  <g font-family="DejaVu Sans, sans-serif" fill="#f6f1df">
+    <text x="115" y="290" font-size="82" font-weight="700" letter-spacing="4">NIGHT FERRY</text>
+    <text x="115" y="380" font-size="42" fill="#37d6c0" font-weight="700">ROUTE Q7</text>
+    <text x="115" y="465" font-size="47">DEPARTS 23:40</text>
+    <text x="115" y="535" font-size="47">PIER 4</text>
+    <text x="115" y="640" font-size="32" fill="#bdc8dd">WEATHER: LIGHT FOG</text>
+  </g>
+  <circle cx="930" cy="310" r="92" fill="none" stroke="#f6f1df" stroke-width="12"/>
+  <path d="M930 240 L930 310 L985 345" fill="none" stroke="#f6f1df" stroke-width="12" stroke-linecap="round"/>
+</svg>
+

@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "Local context determinism sentinel v1",
+  "description": "Same-seed byte-identity sentinel for evaluator context. The fixture does not engage the disabled scheduler/failure-focus mechanisms, so both arms must receive identical prompts and choose identical actions until a real mechanism changes context. This specifically verifies removal of TAP timing and disposable workspace-path volatility.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter"
+  ],
+  "rounds": 1,
+  "seeds": [81312],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "current-context",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "logic-off-control",
+      "env": {
+        "BANTAM_DERIVED_FAILURE_CONTEXT": "0",
+        "BANTAM_LIFECYCLE_CONTRACT_LOGIC": "0",
+        "BANTAM_TEST_FOCUS": "0"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

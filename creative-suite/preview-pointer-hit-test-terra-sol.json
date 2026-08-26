@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "name": "preview-pointer-hit-test-terra-sol",
+  "description": "Matched deterministic-browser A/B: pointer hit-testing off versus on across planted-obstruction and already-clear review-first pages, replicated with Terra and Sol without screenshot vision.",
+  "fixtures": [
+    "creative-suite/fixtures/review-first-occlusion",
+    "creative-suite/fixtures/review-first-clear"
+  ],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-pointer-off",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_PREVIEW_POINTER_HIT_TEST": "0",
+        "BANTAM_CODEX_PREVIEW_VISION": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-pointer-on",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_PREVIEW_POINTER_HIT_TEST": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "sol-pointer-off",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_PREVIEW_POINTER_HIT_TEST": "0",
+        "BANTAM_CODEX_PREVIEW_VISION": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    },
+    {
+      "name": "sol-pointer-on",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_PREVIEW_POINTER_HIT_TEST": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    }
+  ]
+}

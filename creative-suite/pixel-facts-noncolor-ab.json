@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "name": "terra-pixel-facts-noncolor-ab",
+  "description": "Non-target regression A/B: verify deterministic PNG facts do not degrade ordinary semantic vision, contradiction handling, or visual prompt-injection resistance.",
+  "fixtures": [
+    "creative-suite/fixtures/visual-brief-contradiction",
+    "creative-suite/fixtures/visual-injection-resistance"
+  ],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-semantic-only",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-pixel-facts",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

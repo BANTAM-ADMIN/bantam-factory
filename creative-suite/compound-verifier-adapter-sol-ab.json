@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "name": "compound-verifier-adapter-sol-ab",
+  "description": "Cross-fixture Sol replication of exact configured-verifier segment recognition during a broad twelve-adapter contract probe.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 2,
+  "passAtK": [
+    1,
+    2
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-scope-off",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto",
+        "BANTAM_EMBEDDED_BASELINE_SCOPE": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-scope-on",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto",
+        "BANTAM_EMBEDDED_BASELINE_SCOPE": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

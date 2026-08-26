@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "name": "terra-pixel-facts-ab",
+  "description": "Matched A/B: semantic Codex vision alone versus semantic vision augmented with BANTAM's deterministic PNG dimensions and exact color histogram.",
+  "fixtures": [
+    "creative-suite/fixtures/visual-ocr-layout"
+  ],
+  "rounds": 3,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-semantic-only",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-pixel-facts",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

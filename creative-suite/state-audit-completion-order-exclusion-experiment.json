@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "name": "codex-state-audit-completion-order-exclusion-ab",
+  "description": "Rotated full-task comparison of the legacy forced lifecycle audit against corrected auto-selection for a stateless ordered concurrent mapper.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 2,
+  "passAtK": [
+    1,
+    2
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "legacy-audit",
+      "description": "GPT-5.5 medium with the prior completion-order lifecycle audit forced on.",
+      "env": {
+        "BANTAM_STATE_AUDIT": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "corrected-auto",
+      "description": "GPT-5.5 medium with completion-order-only tasks excluded from state audit.",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

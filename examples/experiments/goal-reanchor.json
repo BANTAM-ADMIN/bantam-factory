@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "name": "goal-reanchor",
+  "description": "Does re-injecting the objective in the cache-safe volatile slot after a few turns improve requirement coverage (contract-pass) on long multi-requirement tasks, without regressing visible pass or inflating turns?",
+  "fixtures": ["generate-orbit-operations", "heldout-config-merge", "repair-order-multifile", "stateful-cache-bug"],
+  "rounds": 2,
+  "seeds": [74101, 74102],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    { "name": "baseline",  "env": { "BANTAM_GOAL_REANCHOR": "0", "BANTAM_TEST_TIMEOUT_MS": "30000" } },
+    { "name": "candidate", "env": { "BANTAM_GOAL_REANCHOR": "1", "BANTAM_TEST_TIMEOUT_MS": "30000" } }
+  ]
+}

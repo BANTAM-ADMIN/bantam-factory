@@ -1,0 +1,7 @@
+{
+  "name": "ordered-map",
+  "task": "Fix src/ordered-map.js. Implement orderedMap(values, worker, { concurrency }): run at most concurrency workers at once, preserve input order in the returned array regardless of completion order, support empty input, and reject invalid concurrency (non-integer or less than 1) with TypeError. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["src"]
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "terra-image-review-packet-smoke",
+  "description": "Live end-to-end proof that two Codex-generated variants receive a durable hashed manifest and an offline-renderable contact sheet without regressing self-critique.",
+  "fixtures": [
+    "creative-suite/fixtures/imagegen-self-critique"
+  ],
+  "rounds": 1,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": true,
+  "arms": [
+    {
+      "name": "terra-medium",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_IMAGE": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

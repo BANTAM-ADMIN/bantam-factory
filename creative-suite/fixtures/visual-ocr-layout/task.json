@@ -1,0 +1,7 @@
+{
+  "name": "visual-ocr-layout",
+  "task": "Inspect assets/dispatch-card.png with BANTAM's view_image query tool. Do not guess from filenames. Write deliverable.json containing exactly these keys: title, routeCode, departure, pier, weather, diamondCount, clockLocation, accentColors (an array of two lowercase hex colors), and layoutSummary. For routeCode, departure, pier, and weather, record only the value after its visible label (for example, omit the word ROUTE). Keep title and weather value casing as shown. Use the deterministic exact-pixel facts returned by view_image to identify the cyan and pink accent hex values rather than estimating colors. layoutSummary must be one concise sentence describing the major left/right arrangement. Do not modify the image, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["deliverable.json"]
+}

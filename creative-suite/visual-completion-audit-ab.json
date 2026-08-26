@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "terra-visual-completion-audit-ab",
+  "description": "Balanced same-model test of a task-grounded post-green visual alt audit derived from an exact failing Terra replay.",
+  "fixtures": [
+    "creative-suite/fixtures/image-to-web"
+  ],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-control",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1",
+        "BANTAM_VISUAL_COMPLETION_AUDIT": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-visual-audit",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1",
+        "BANTAM_VISUAL_COMPLETION_AUDIT": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

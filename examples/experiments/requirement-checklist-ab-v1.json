@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "name": "requirement checklist ab v1",
+  "description": "Preregistered A/B for the requirement-checklist completion audit: does quoting the task's own named bounds/rejections in the post-green hint convert holdout-caught misses? Plan and ordered rule: docs/superpowers/reports/2026-08-15-requirement-checklist-preregistration.md.",
+  "fixtures": [
+    "benches/polyglot-js/fixtures/list-ops",
+    "benches/polyglot-js/fixtures/phone-number",
+    "benches/polyglot-js/fixtures/state-of-tic-tac-toe",
+    "benches/polyglot-js/fixtures/variable-length-quantity",
+    "benches/polyglot-js/fixtures/wordy",
+    "benches/polyglot-js/fixtures/say",
+    "benches/polyglot-js/fixtures/tournament",
+    "benches/polyglot-js/fixtures/triangle",
+    "gauntlet/fixtures/channel-filter"
+  ],
+  "rounds": 2,
+  "seeds": [
+    20260815,
+    20260816
+  ],
+  "passAtK": [
+    1
+  ],
+  "arms": [
+    {
+      "name": "control",
+      "description": "Generic completion audit (today's default)",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "checklist",
+      "description": "Audit + task-quoted requirement checklist",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild",
+        "BANTAM_REQUIREMENT_CHECKLIST": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "name": "atomic-patch-action",
+  "description": "Compare serialized replace actions with the opt-in atomic multi-file patch action.",
+  "fixtures": [
+    "rename-across-files",
+    "multi-file-discount",
+    "repair-order-multifile",
+    "stateful-cache-bug"
+  ],
+  "rounds": 2,
+  "seeds": [73101, 73102],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_PATCH_ACTION": "0"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_PATCH_ACTION": "1"
+      }
+    }
+  ]
+}

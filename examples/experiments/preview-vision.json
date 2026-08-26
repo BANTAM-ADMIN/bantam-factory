@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "preview-vision",
+  "description": "Does seeing help? Three web tasks whose visible suites always pass (verify true) and whose real grading is behavioral contract graders measuring the RENDERED page (geometry, computed colors, error-free load). Arms: no preview at all; blind preview (runtime errors + blank-page check, no vision); full preview with the vision model describing a screenshot. All arms get grounding so the only variable is eyes. Judge on contract pass rate, autoPreviews, turns.",
+  "fixtures": [
+    "web-broken-page",
+    "web-layout-cards",
+    "web-dark-theme"
+  ],
+  "rounds": 2,
+  "seeds": [46021, 46022],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "description": "No preview surface at all — today's blind-build behavior.",
+      "env": { "BANTAM_GROUND": "1", "BANTAM_NO_PREVIEW": "1" }
+    },
+    {
+      "name": "blind",
+      "description": "Preview + auto-preview, but no vision: errors, failed loads, blank-page check only.",
+      "env": { "BANTAM_GROUND": "1", "BANTAM_NO_VISION": "1" }
+    },
+    {
+      "name": "vision",
+      "description": "Full preview: errors plus the vision model's description of the screenshot.",
+      "env": { "BANTAM_GROUND": "1" }
+    }
+  ]
+}

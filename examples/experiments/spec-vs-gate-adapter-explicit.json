@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "spec-vs-gate-adapter-explicit",
+  "description": "PRE-REGISTERED 2026-07-30. Companion to spec-vs-gate-adapter-ab: the SAME repo, starting code and hidden grader, with the rejection requirement written into the normalizeTags and normalizeHeaders clauses, and the type_contract gate OFF. Compared against that spec's two arms to ask whether writing the requirement matches or beats gating for it.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration-explicit"
+  ],
+  "rounds": 3,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "explicit-gate-off",
+      "description": "rejection clause written into the task, gate off",
+      "model": {
+        "runtime": "local"
+      },
+      "env": {
+        "BANTAM_TYPE_CONTRACT_GATE": "0"
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "name": "preview-review-clear-terra-sol",
+  "description": "Non-target cost and false-intervention screen: DOM-only versus task-aware screenshot review on an already-correct rendered page, replicated with Terra and Sol.",
+  "fixtures": ["creative-suite/fixtures/review-first-clear"],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "sol-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    },
+    {
+      "name": "sol-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-sol","effort":"high","timeoutMs":600000}
+    }
+  ]
+}

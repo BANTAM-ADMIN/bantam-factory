@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "preview-vision-hard",
+  "description": "The fair fight for eyes: three web tasks with likely first-shot failure (dynamic stopwatch state, modal centering, numeric-vs-lexicographic sort) whose graders OPERATE the rendered page under virtual time. Preview reports now include the measured-geometry digest, so the blind arm gets the grader's kind of eyes; vision adds a screenshot description on top. Judge on contract pass rate, autoPreviews, turns.",
+  "fixtures": [
+    "web-stopwatch",
+    "web-modal-center",
+    "web-table-sort"
+  ],
+  "rounds": 2,
+  "seeds": [46021, 46022],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "description": "No preview surface at all.",
+      "env": { "BANTAM_GROUND": "1", "BANTAM_NO_PREVIEW": "1" }
+    },
+    {
+      "name": "blind",
+      "description": "Preview with errors + measured geometry digest; no vision.",
+      "env": { "BANTAM_GROUND": "1", "BANTAM_NO_VISION": "1" }
+    },
+    {
+      "name": "vision",
+      "description": "Errors + geometry digest + vision screenshot description.",
+      "env": { "BANTAM_GROUND": "1" }
+    }
+  ]
+}

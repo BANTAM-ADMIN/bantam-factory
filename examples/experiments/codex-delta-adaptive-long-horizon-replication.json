@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "name": "codex-delta-adaptive-long-horizon-replication",
+  "description": "Independent two-round replication of the continuous-delta versus 20% adaptive-rebase comparison, with terminal-rebase telemetry enabled.",
+  "fixtures": ["gauntlet/fixtures/adapter-migration"],
+  "rounds": 2,
+  "seeds": [77003, 77004],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-delta-continuous",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta",
+        "BANTAM_CODEX_REBASE_MIN_SAVINGS": "0"
+      }
+    },
+    {
+      "name": "sol-delta-adaptive-20",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta",
+        "BANTAM_CODEX_REBASE_MIN_SAVINGS": "0.2"
+      }
+    }
+  ]
+}

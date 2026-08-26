@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "bantam-replay-coverage",
+  "failures": [
+    {
+      "artifactSha256": "445fc8b5c0be75626d6fa2a4121579df1d882d0ab58372522f65fff4deb14da9",
+      "mechanism": "autonomous implementation response rejection",
+      "evidence": [
+        "test/agent.test.js",
+        "src/agent.js"
+      ],
+      "note": "The historical range-parser model found the remaining bug in its terminal response. The current guard rejects that response, forces an edit turn, and has a deterministic green-tree regression."
+    },
+    {
+      "artifactSha256": "1418f46668f967883275a71799d9cd18a478b0d54b5397d2e5ba3d4d127d4fec",
+      "mechanism": "default keyed-Promise lifecycle state audit",
+      "evidence": [
+        "test/state-audit-agent.test.js",
+        "test/state-audit-policy.test.js",
+        "docs/superpowers/reports/2026-07-29-state-audit-inline-proof-credit.md",
+        ".bantam/experiments/2026-07-29T20-50-33-200Z-keyed-state-audit-terra-sol"
+      ],
+      "note": "The historical implementation failed queued/running exact-Promise coalescence and settlement lifecycle behavior. The current default audit is selected by this exact task contract, requires focused lifecycle proof, and has deterministic plus native Terra/Sol strict-pass evidence."
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-blueprint",
+  "id": "test-scenario-cell",
+  "version": 1,
+  "title": "Single-obligation scenario selection cell",
+  "taskFamily": "contract-test-case-assembly",
+  "routeId": "test-scenario-cell",
+  "authority": ["test-obligation.read"],
+  "stations": [
+    {
+      "id": "intake",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-obligation-intake",
+        "version": 1,
+        "title": "Single obligation feeder",
+        "purpose": "Clamp exactly one released test obligation and its public scenario rack.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.test-obligation-intake/v1" },
+        "inputs": [],
+        "outputs": [{ "name": "obligation", "artifactType": "bantam.test-obligation/v1", "required": true }],
+        "capabilities": ["test-obligation.admit"],
+        "authority": ["test-obligation.read"],
+        "gauge": { "id": "test-obligation-intake", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "intake", "icon": "feeder", "color": "blue" },
+        "standardWork": {
+          "operation": "Feed one obligation into one scenario jig",
+          "instructions": ["Bind one edge obligation and a finite public scenario rack."],
+          "fixtures": ["One-obligation limit", "Closed scenario catalog", "Content-addressed packet"],
+          "prohibited": ["Do not include the whole contract.", "Do not include another obligation.", "Do not expose the held-out expected scenario."],
+          "releaseCriteria": ["The packet contains exactly one obligation and unique scenario identifiers."]
+        }
+      }
+    },
+    {
+      "id": "select",
+      "taskFamily": "test-scenario-selection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-scenario-selector",
+        "version": 1,
+        "title": "Test scenario selector",
+        "purpose": "Choose the one public scenario that satisfies the bounded obligation.",
+        "worker": { "kind": "model", "adapter": "bantam.factory.test-scenario-selector/v1" },
+        "inputs": [{ "name": "obligation", "artifactType": "bantam.test-obligation/v1", "required": true }],
+        "outputs": [{ "name": "selection", "artifactType": "bantam.test-scenario-selection/v1", "required": true }],
+        "capabilities": ["model.semantic-work"],
+        "authority": ["test-obligation.read"],
+        "gauge": { "id": "test-scenario-selection-shape", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "production", "icon": "chicken", "color": "amber" },
+        "standardWork": {
+          "operation": "Peck one scenario button for one obligation",
+          "instructions": ["Read only the supplied obligation.", "Choose exactly one scenario identifier from the public rack.", "Return only the constrained selection object."],
+          "fixtures": ["Finite scenario rack", "Literal-ID GBNF die", "No workspace, contract, plan, shell, or mutation tools"],
+          "prohibited": ["Do not invent a scenario.", "Do not select multiple scenarios.", "Do not explain the choice."],
+          "releaseCriteria": ["The response has the exact schema and one known scenario identifier."]
+        }
+      }
+    },
+    {
+      "id": "inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "test-scenario-inspection",
+        "version": 1,
+        "title": "Independent scenario gauge",
+        "purpose": "Compare the selected scenario with the held-out required scenario.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.test-scenario-inspection/v1" },
+        "inputs": [{ "name": "selection", "artifactType": "bantam.test-scenario-selection/v1", "required": true }],
+        "outputs": [{ "name": "selection", "artifactType": "bantam.test-scenario-selection/v1", "required": true }],
+        "capabilities": ["quality.test-scenario"],
+        "authority": ["test-obligation.read"],
+        "gauge": { "id": "test-scenario-exact", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "quality", "icon": "station", "color": "green" },
+        "standardWork": {
+          "operation": "Press the exact-scenario wicket",
+          "instructions": ["Parse the exact upstream selection.", "Compare it with the held-out expected scenario identifier."],
+          "fixtures": ["Independent expected-scenario gauge"],
+          "prohibited": ["Do not repair a selection.", "Do not disclose the expected identifier upstream."],
+          "releaseCriteria": ["The selected scenario exactly equals the held-out required scenario."]
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "from": "intake", "out": "obligation", "to": "select", "in": "obligation" },
+    { "from": "select", "out": "selection", "to": "inspection", "in": "selection" }
+  ],
+  "layout": {
+    "direction": "left-to-right",
+    "stations": [
+      { "id": "intake", "x": 0, "y": 1 },
+      { "id": "select", "x": 1, "y": 1 },
+      { "id": "inspection", "x": 2, "y": 1 }
+    ]
+  }
+}

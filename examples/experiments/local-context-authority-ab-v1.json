@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "name": "Local Qwen context authority AB v1",
+  "description": "Matched same-seed A/B of two final-prompt authority fixes found in full API logs: preserve trusted controller annotations when source reads are slimmed, and retire a stale private working checkpoint after a newer trusted green verification.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/retry-consolidation-haystack"
+  ],
+  "rounds": 1,
+  "seeds": [81311],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "control",
+      "description": "Current BANTAM prompt replay and checkpoint authority behavior.",
+      "env": {
+        "BANTAM_PRESERVE_SLIMMED_CONTROL": "0",
+        "BANTAM_RETIRE_VERIFIED_CHECKPOINT": "0"
+      },
+      "model": { "runtime": "local" }
+    },
+    {
+      "name": "authority-treatment",
+      "description": "Preserve controller evidence through read slimming and retire checkpoints superseded by a trusted PASS.",
+      "env": {
+        "BANTAM_PRESERVE_SLIMMED_CONTROL": "1",
+        "BANTAM_RETIRE_VERIFIED_CHECKPOINT": "1"
+      },
+      "model": { "runtime": "local" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

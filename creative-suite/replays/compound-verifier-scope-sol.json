@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "name": "compound-verifier-scope-sol",
+  "description": "Exact-turn Sol replay of a redundant verifier caused by falsely classifying an exact npm test segment inside a successful lifecycle probe as non-comparable.",
+  "artifact": "../../.bantam/experiments/2026-07-30T01-45-24-713Z-fresh-hard-discovery-terra-sol/runs/sol-default/round-01/keyed-task-pool-run-2026-07-30T01-48-20-654Z-aefb29.json",
+  "turn": 7,
+  "samples": 3,
+  "remedy": "[scope] The exact baseline verifier `npm test` ran as a standalone segment inside the preceding compound lifecycle check. Its 2/2 test counts are comparable; do not rerun it solely to establish scope comparability. The implementation has no later edits and both the focused lifecycle probe and configured verifier are green. Emit `done` with a concise factual verified summary.",
+  "expectation": {
+    "verbs": [
+      "done"
+    ],
+    "contentAll": [
+      "test"
+    ],
+    "forbidAny": [
+      "unverified",
+      "need to run"
+    ]
+  }
+}

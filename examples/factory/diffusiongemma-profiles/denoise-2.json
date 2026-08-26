@@ -1,0 +1,5 @@
+{
+  "diffusion_config": { "canvas_length": 256, "max_denoising_steps": 2 },
+  "purpose": "Unrun destructive-edge profile; pass the nested object to vLLM --diffusion-config.",
+  "qualification": "Not run after the four-pass profile failed decisively."
+}

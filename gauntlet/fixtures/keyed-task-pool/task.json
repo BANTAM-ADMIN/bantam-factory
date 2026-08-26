@@ -1,0 +1,7 @@
+{
+  "name": "keyed-task-pool",
+  "task": "Implement src/keyed-task-pool.js and src/run-plan.js. KeyedTaskPool accepts { concurrency = 2 }, rejects invalid concurrency with RangeError, and exposes run(key, task) plus onIdle(). run requires a non-empty string key and function task, runs at most concurrency unique tasks at once, starts unique queued keys FIFO, and coalesces an already queued or running key by returning the exact same Promise without invoking the later task. Keep the key coalesced until settlement, then allow reuse. Preserve values and rejection identity, handle synchronous throws without leaking capacity, and resolve every pending onIdle waiter only when both running and queued work are empty. runPlan validates its entire { key, payload } array and worker before starting work, uses KeyedTaskPool, lets the first duplicate payload win, returns one fulfilled/rejected result per input step in input order, preserves reason identity, and never mutates inputs. Preserve asynchronous rejection semantics: a task failure is observed through the returned Promise, not as a synchronous throw from run. Use only Node standard library. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 40,
+  "editable": ["src"]
+}

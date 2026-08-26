@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "name": "codex-lexical-contract-audit-ab",
+  "description": "Rotated full-task causal trial of the task-grounded lexical-language audit on the recurring GPT-5.5 adapter-migration failure mode.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 2,
+  "passAtK": [
+    1,
+    2
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "control",
+      "description": "GPT-5.5 medium with the established general completion audit.",
+      "env": {
+        "BANTAM_LEXICAL_CONTRACT_AUDIT": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "treatment",
+      "description": "GPT-5.5 medium with the additional task-grounded lexical-language audit.",
+      "env": {
+        "BANTAM_LEXICAL_CONTRACT_AUDIT": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

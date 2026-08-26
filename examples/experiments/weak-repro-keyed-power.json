@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "name": "weak-repro-keyed-ab",
+  "description": "POWER COHORT for the weak-repro hypothesis. Identical to the first cohort (see git history) but 6 rounds per fixture instead of 3. The first cohort gave 2/3 vs 1/3 -- directionally consistent, Fisher p=1.0, underpowered. Pooling this with it gives n=9 per arm. PRIMARY METRIC unchanged: hidden-contract pass rate, keyed-task-pool-strong vs keyed-task-pool, where the ONLY difference is a public suite strengthened from the task own stated invariants. FALSIFIED IF the strengthened arm does no better at n=9.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/keyed-task-pool-strong"
+  ],
+  "rounds": 6,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "local",
+      "description": "local 27B; the public repro strength is the only variable",
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ]
+}

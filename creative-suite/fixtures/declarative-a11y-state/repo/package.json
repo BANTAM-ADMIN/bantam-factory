@@ -1,0 +1,7 @@
+{
+  "name": "declarative-a11y-state-fixture",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/public.test.cjs"
+  }
+}

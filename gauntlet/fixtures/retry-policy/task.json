@@ -1,0 +1,7 @@
+{
+  "name": "retry-policy",
+  "task": "Fix src/retry.js. retry(operation, options) calls an async operation with a 1-based attempt number. options.attempts is a positive integer total-attempt limit. Return the first success. On failure, call shouldRetry(error, attempt); stop immediately if false or at the limit. Before another attempt await delay(attempt, error). Preserve and throw the final original error. Invalid attempts throws TypeError. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 14,
+  "editable": ["src"]
+}

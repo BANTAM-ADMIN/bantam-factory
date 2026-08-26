@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<title>BANTAM</title>
+<style>
+  :root{
+    --bg:#0b0e12; --panel:#121722; --panel2:#0e131c; --line:#232c3a;
+    --ink:#dce6ea; --muted:#8b98a6; --faint:#5b6675;
+    --comb:#e8553f; --plume:#e0a83c; --beak:#5ac8d2; --good:#57c878; --bad:#e5564b;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:
+      radial-gradient(1100px 480px at 50% -12%, #14202b 0%, transparent 60%), var(--bg);
+    color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;min-height:100dvh}
+  a{color:var(--beak)}
+  /* header */
+  header{position:sticky;top:0;z-index:5;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    background:linear-gradient(180deg,rgba(11,14,18,.96),rgba(11,14,18,.82));backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .mark{width:26px;height:26px;flex:none}
+  .word{font-weight:800;letter-spacing:.16em;font-size:18px;
+    background:linear-gradient(92deg,var(--plume),var(--beak));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .state{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+  .state.idle .dot{background:var(--faint)}
+  .state.busy .dot{background:var(--plume);animation:pulse 1s ease-in-out infinite}
+  .state.ok .dot{background:var(--good)} .state.err .dot{background:var(--bad)}
+  @keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+  .meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .meta b{color:var(--muted);font-weight:500}
+  .meta .k{color:var(--beak)}
+  /* stream */
+  main{flex:1;overflow-y:auto;padding:14px 12px 4px;-webkit-overflow-scrolling:touch}
+  .wrap{max-width:820px;margin:0 auto}
+  .hint{color:var(--faint);font-family:var(--mono);font-size:12.5px;text-align:center;margin:18vh 0;padding:0 20px;text-wrap:balance}
+  .turn{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+    margin:16px 4px 6px;display:flex;align-items:center;gap:8px}
+  .turn::after{content:"";flex:1;height:1px;background:var(--line)}
+  .row{display:flex;gap:9px;padding:5px 8px;border-radius:8px;align-items:flex-start;font-family:var(--mono);font-size:13px}
+  .row .ic{flex:none;width:17px;text-align:center;opacity:.9}
+  .row .tx{min-width:0;word-break:break-word}
+  .row .tx .p{color:var(--beak)}
+  .row.reason{color:var(--muted);font-style:italic;font-family:var(--sans);font-size:13px}
+  .row.reason .ic{font-style:normal}
+  .row.act .verb{color:var(--plume)}
+  .row.note{color:var(--muted)} .row.note .ic{color:var(--plume)}
+  .row.diag{color:var(--beak)} .row.warn{color:var(--comb)}
+  pre.obs{margin:2px 0 6px 34px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);
+    border-left:2px solid var(--line);border-radius:7px;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    white-space:pre-wrap;word-break:break-word;max-height:8.5em;overflow:hidden;position:relative;cursor:pointer}
+  pre.obs.open{max-height:none}
+  pre.obs.clip::after{content:"tap to expand";position:absolute;right:8px;bottom:4px;font-size:10px;color:var(--faint);
+    background:var(--panel2);padding:0 4px}
+  pre.obs .ok{color:var(--good)} pre.obs .no{color:var(--bad)}
+  .banner{margin:14px 4px 6px;padding:12px 14px;border-radius:10px;font-family:var(--mono);font-size:13px;
+    display:flex;gap:10px;align-items:center;border:1px solid var(--line)}
+  .banner.pass{background:rgba(87,200,120,.08);border-color:rgba(87,200,120,.4);color:var(--good)}
+  .banner.done{background:rgba(90,200,210,.07);border-color:rgba(90,200,210,.35);color:var(--beak)}
+  .banner.fail{background:rgba(229,86,75,.08);border-color:rgba(229,86,75,.4);color:var(--bad)}
+  .answer{margin:8px 4px;padding:12px 15px;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid var(--beak);border-radius:11px;font-family:var(--sans);font-size:14.5px;line-height:1.55;
+    color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .summary{margin:1px 4px 6px 34px;font-family:var(--sans);font-size:13px;color:var(--muted)}
+  .foot{margin:8px 6px;font-family:var(--mono);font-size:11.5px;color:var(--faint);text-align:center}
+  .banner .big{font-weight:700;letter-spacing:.06em}
+  .banner .sub{color:var(--muted);margin-left:auto;font-size:11.5px}
+  /* composer */
+  footer{position:sticky;bottom:0;padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);
+    background:linear-gradient(0deg,var(--bg) 60%,rgba(11,14,18,.7));border-top:1px solid var(--line)}
+  .composer{max-width:820px;margin:0 auto}
+  .crow{display:flex;gap:8px;align-items:flex-end}
+  textarea{flex:1;min-width:0;resize:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:14px;padding:13px 14px;font-family:var(--sans);font-size:16px;line-height:1.45;min-height:50px;max-height:34vh}
+  textarea:focus{outline:none;border-color:var(--beak);box-shadow:0 0 0 1px var(--beak)}
+  textarea::placeholder{color:var(--faint)}
+  .setrow{display:flex;gap:8px;align-items:center}
+  .setrow input{flex:1}
+  .setrow input.turns{flex:none;width:74px;text-align:center}
+  .setlabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:2px 2px -2px}
+  button{flex:none;border:0;border-radius:11px;padding:12px 18px;font-family:var(--sans);font-weight:650;font-size:15px;
+    cursor:pointer;color:#0b0e12;background:linear-gradient(180deg,var(--plume),#cf9930)}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.5}
+  button.stop{background:linear-gradient(180deg,var(--comb),#c9432f);color:#fff}
+  /* folder picker */
+  .dirbtn{background:none;border:0;padding:0;margin:0;font:inherit;color:var(--faint);cursor:pointer;
+    display:inline-flex;align-items:center;gap:5px;border-bottom:1px dotted var(--faint)}
+  .dirbtn .chev{color:var(--beak);font-size:9px}
+  .dirbtn:active{opacity:.6}
+  .sheet-overlay{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:none;align-items:flex-end;backdrop-filter:blur(2px)}
+  .sheet-overlay.open{display:flex}
+  .sheet{width:100%;max-width:820px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:16px 16px 0 0;max-height:82dvh;display:flex;flex-direction:column;box-shadow:0 -20px 60px -20px #000}
+  .sheet-head{padding:15px 16px 11px;border-bottom:1px solid var(--line)}
+  .sheet-head .t{font-weight:700;font-size:15px}
+  .sheet-head .crumb{margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--muted);word-break:break-all}
+  .sheet-list{overflow-y:auto;flex:1;padding:6px 8px;-webkit-overflow-scrolling:touch}
+  .entry{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:0;
+    color:var(--ink);font:inherit;font-size:14.5px;padding:11px 10px;border-radius:9px;cursor:pointer;min-height:46px}
+  .entry:active{background:var(--panel2)}
+  .entry .fi{flex:none;width:20px;text-align:center}
+  .entry .fn{min-width:0;word-break:break-word}
+  .sheet-empty{color:var(--faint);font-family:var(--mono);font-size:12px;padding:18px;text-align:center}
+  .sheet-foot{padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+  .sheet-foot .manual{display:flex;gap:8px}
+  .sheet-foot input{flex:1;min-width:0;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:9px;padding:10px 11px;font-family:var(--mono);font-size:13px}
+  .sheet-foot input:focus{outline:none;border-color:var(--beak)}
+  .sheet-foot .row2{display:flex;gap:8px}
+  .sheet-foot .ghost{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  @media (min-width:560px){ .meta{gap:6px 20px} }
+  @media (prefers-reduced-motion:reduce){ *{animation:none !important} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M9 17 C9 11 13 8 17.5 8 C22 8 24.5 11.2 24.5 15.5 C24.5 20.5 20.5 24 15.5 24 C11 24 9 21 9 17 Z" fill="var(--plume)"/>
+      <path d="M11.6 8.6 C11 5.4 13.8 5.8 14.4 8 C15 4.9 17.7 5.3 18.2 8.1 C19.3 6 21.8 6.9 20.7 9.6 C18 10.7 13.2 10.4 11.6 8.6 Z" fill="var(--comb)"/>
+      <path d="M24 14 L31 15.2 L24 17.6 Z" fill="var(--beak)"/>
+      <path d="M23.4 17.3 C25 20.9 21.8 21.4 21.9 18.7 C22 17.9 22.6 17.3 23.4 17.3 Z" fill="var(--comb)"/>
+      <circle cx="17" cy="14.2" r="1.6" fill="var(--bg)"/>
+    </svg>
+    <span class="word">BANTAM</span>
+    <span class="state idle" id="state"><span class="dot"></span><span id="stateTx">idle</span></span>
+  </div>
+  <div class="meta" id="meta">
+    <span><b class="k">model</b> <b id="mModel">—</b></span>
+    <button class="dirbtn" id="dirBtn"><b class="k">dir</b> <b id="mDir">—</b> <span class="chev">▾</span></button>
+    <span><b class="k">kb</b> <b id="mKb">—</b></span>
+  </div>
+</header>
+
+<main id="main"><div class="wrap" id="stream">
+  <div class="hint" id="hint">Type a task below and BANTAM will work it turn by turn — reading, editing, running, verifying — live.</div>
+</div></main>
+
+<footer><div class="composer">
+  <div class="crow">
+    <textarea id="task" rows="1" placeholder="Ask BANTAM to do something…" autocomplete="off"></textarea>
+    <button id="go">Run</button>
+  </div>
+</div></footer>
+
+<div class="sheet-overlay" id="picker">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div class="t">Working folder</div>
+      <div class="crumb" id="crumb">—</div>
+    </div>
+    <div class="sheet-list" id="entries"></div>
+    <div class="sheet-foot">
+      <div class="manual">
+        <input id="manualPath" placeholder="/path/to/project or ~/dir" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="ghost" id="goPath" style="width:auto;padding-left:16px;padding-right:16px">Go</button>
+      </div>
+      <div class="setlabel">verify command · max turns</div>
+      <div class="setrow">
+        <input id="verifyCmd" placeholder="verify command (e.g. npm test) — optional" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <input class="turns" id="turnsCmd" type="number" min="1" value="30" title="max turns">
+      </div>
+      <div class="row2">
+        <button class="ghost" id="pickCancel" style="flex:1">Cancel</button>
+        <button id="pickUse" style="flex:2">Use this folder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const stream = $("stream"), main = $("main");
+let running = false, ctrl = null, curTurn = -1;
+
+const ICON = { read_file:"▤", inspect:"⌕", search:"⌕", replace:"✎", edit_lines:"✎", write_file:"✎", write_batch:"✎",
+  patch:"✎", delete_file:"✕", move_file:"→", shell:"❯", query:"◇", done:"✓" };
+const esc = (s)=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function setState(cls, tx){ const s=$("state"); s.className="state "+cls; $("stateTx").textContent=tx; }
+function atBottom(){ return main.scrollHeight - main.scrollTop - main.clientHeight < 80; }
+function add(el){ const stick=atBottom(); stream.appendChild(el); if(stick) main.scrollTop=main.scrollHeight; }
+
+function actionText(a){
+  if(!a) return "";
+  if(a.p) return `<span class="verb">${esc(a.a)}</span> <span class="p">${esc(a.p)}</span>`;
+  if(a.c) return `<span class="verb">shell</span> ${esc(String(a.c).slice(0,160))}`;
+  if(a.q) return `<span class="verb">${esc(a.a)}</span> ${esc(String(a.q).slice(0,120))}`;
+  return `<span class="verb">${esc(a.a||"")}</span>`;
+}
+function obsEl(text){
+  const pre=document.createElement("pre"); pre.className="obs";
+  pre.innerHTML=esc(text).replace(/\b(ok|pass(?:ed)?|PASS)\b/g,'<span class="ok">$1</span>')
+    .replace(/\b(not ok|fail(?:ed)?|FAIL|Error)\b/g,'<span class="no">$1</span>');
+  requestAnimationFrame(()=>{ if(pre.scrollHeight>pre.clientHeight+4) pre.classList.add("clip"); });
+  pre.onclick=()=>{ pre.classList.toggle("open"); if(pre.classList.contains("open")) pre.classList.remove("clip");
+    else if(pre.scrollHeight>pre.clientHeight+4) pre.classList.add("clip"); };
+  return pre;
+}
+function row(cls, ic, html){ const d=document.createElement("div"); d.className="row "+cls;
+  d.innerHTML=`<span class="ic">${ic}</span><span class="tx">${html}</span>`; return d; }
+
+function render(e){
+  if(e.t==="turn_start"){ if(e.turn!==curTurn){ curTurn=e.turn;
+      const t=document.createElement("div"); t.className="turn"; t.textContent="turn "+e.turn; add(t);} return; }
+  if(e.t==="reasoning" && e.text){ add(row("reason","🤔",esc(e.text))); return; }
+  if(e.t==="action"){ add(row("act", ICON[e.action?.a]||"·", actionText(e.action)));
+    if(e.obs) add(obsEl(e.obs)); return; }
+  if(e.t==="answer"){ const d=document.createElement("div"); d.className="answer"; d.textContent=e.text||""; add(d); return; }
+  if(e.t==="summary" && e.text){ const d=document.createElement("div"); d.className="summary"; d.textContent="— "+e.text; add(d); return; }
+  if(e.t==="observation" && e.obs){ add(obsEl(e.obs)); return; }
+  if(e.t==="auto_verify"){ add(row("note","↻",`auto-verify — <b>${esc(e.verdict||"")}</b>`)); return; }
+  if(e.t==="test_diagnosis"||e.t==="teacher_diagnosis"){ add(row("diag","🔬",`${e.t==="teacher_diagnosis"?"teacher":"stuck-test"} diagnosis${e.test?": "+esc(e.test):""}`)); return; }
+  if(e.t==="done_rejected"){ add(row("warn","⛔",`done bounced <b>${esc(e.gate||"")}</b>`)); return; }
+  if(e.t==="activity" && e.label){ setState("busy", e.label+"…"); return; }
+}
+
+function banner(res){
+  const secs = res.durationMs? (res.durationMs/1000).toFixed(1)+"s":"";
+  const meta = `${res.turns||0} turn${res.turns===1?"":"s"} · ${secs}`;
+  // A conversational answer isn't a pass/fail — just a quiet footer under the reply.
+  if(res.status==="answered"){ const f=document.createElement("div"); f.className="foot"; f.textContent="answered · "+meta; add(f); return; }
+  const d=document.createElement("div");
+  let cls, label;
+  if(res.status==="pass"){ cls="pass"; label="✓ verified"; }
+  else if(res.pass){ cls="done"; label="✓ done"; }
+  else { cls="fail"; label="✕ "+esc(res.status||"unfinished"); }
+  d.className="banner "+cls;
+  d.innerHTML=`<span class="big">${label}</span><span class="sub">${meta}</span>`;
+  add(d);
+}
+
+async function run(){
+  const task=$("task").value.trim(); if(!task||running) return;
+  $("task").value=""; $("task").style.height="";   // send clears the composer, like a chat
+  running=true; curTurn=-1; $("hint")?.remove();
+  const go=$("go"); go.textContent="Stop"; go.classList.add("stop");
+  setState("busy","working");
+  const t=document.createElement("div"); t.className="turn"; t.textContent="▸ "+task.slice(0,80); add(t);
+  ctrl=new AbortController();
+  try{
+    const r=await fetch("/api/run?t="+encodeURIComponent(TOKEN),{method:"POST",
+      headers:{"content-type":"application/json"},signal:ctrl.signal,
+      body:JSON.stringify({task,verify:$("verifyCmd").value.trim()||null,maxTurns:+$("turnsCmd").value||30})});
+    if(!r.ok){ add(row("warn","!",esc((await r.text())||("HTTP "+r.status)))); throw 0; }
+    const rd=r.body.getReader(), dec=new TextDecoder(); let buf="";
+    for(;;){ const {value,done}=await rd.read(); if(done) break; buf+=dec.decode(value,{stream:true});
+      let i; while((i=buf.indexOf("\n"))>=0){ const line=buf.slice(0,i).trim(); buf=buf.slice(i+1);
+        if(!line) continue; let e; try{e=JSON.parse(line)}catch{continue}
+        if(e.t==="result"){ banner(e); setState(e.pass?"ok":"err", e.pass?"done":"failed"); }
+        else render(e); } }
+  }catch(err){ if(ctrl.signal.aborted) setState("idle","stopped"); else setState("err","error"); }
+  finally{ running=false; ctrl=null; go.textContent="Run"; go.classList.remove("stop");
+    if($("state").className.includes("busy")) setState("idle","idle"); }
+}
+$("go").onclick=()=>{ if(running){ ctrl?.abort(); } else run(); };
+const ta=$("task");
+ta.addEventListener("input",()=>{ ta.style.height="auto"; ta.style.height=Math.min(ta.scrollHeight,window.innerHeight*.34)+"px"; });
+// Enter sends (and clears); Shift+Enter inserts a newline for multi-line tasks.
+ta.addEventListener("keydown",(e)=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); run(); }});
+
+// ── folder picker ──
+let pickDir=null;
+function mkEntry(icon,name,onclick,cls){ const b=document.createElement("button"); b.className="entry"+(cls?" "+cls:"");
+  b.innerHTML=`<span class="fi">${icon}</span><span class="fn">${esc(name)}</span>`; b.onclick=onclick; return b; }
+async function navigate(dir){
+  const el=$("entries"); el.innerHTML='<div class="sheet-empty">loading…</div>';
+  const q = dir? "&dir="+encodeURIComponent(dir):"";
+  try{
+    const d=await (await fetch("/api/ls?t="+encodeURIComponent(TOKEN)+q)).json();
+    if(d.error){ el.innerHTML=`<div class="sheet-empty">${esc(d.error)}</div>`; if(d.dir){$("crumb").textContent=d.dir;} return; }
+    pickDir=d.dir; $("crumb").textContent=d.dir; $("manualPath").value=d.dir;
+    el.innerHTML="";
+    if(d.parent) el.appendChild(mkEntry("↑","..",()=>navigate(d.parent),"up"));
+    for(const e of d.entries) el.appendChild(mkEntry("📁",e.name,()=>navigate(e.path)));
+    if(!d.entries.length && !d.parent) el.innerHTML='<div class="sheet-empty">no sub-folders here</div>';
+  }catch{ el.innerHTML='<div class="sheet-empty">could not read folder</div>'; }
+}
+function openPicker(){ $("picker").classList.add("open"); navigate(null); }
+function closePicker(){ $("picker").classList.remove("open"); }
+async function useFolder(){
+  if(!pickDir) return;
+  try{
+    const d=await (await fetch("/api/workspace?t="+encodeURIComponent(TOKEN),{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify({dir:pickDir})})).json();
+    if(!d.ok){ $("crumb").textContent="⚠ "+(d.error||"could not set folder"); return; }
+    $("mDir").textContent=d.workspace; $("mKb").textContent=d.kb? `${d.kb.files} files · ${d.kb.depends} edges`:"—";
+    closePicker();
+  }catch{ $("crumb").textContent="⚠ request failed"; }
+}
+$("dirBtn").onclick=openPicker;
+$("pickCancel").onclick=closePicker;
+$("pickUse").onclick=useFolder;
+$("goPath").onclick=()=>navigate($("manualPath").value.trim()||null);
+$("manualPath").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); navigate($("manualPath").value.trim()||null); }});
+$("picker").addEventListener("click",(e)=>{ if(e.target===$("picker")) closePicker(); });
+
+async function status(){
+  try{ const r=await fetch("/api/status?t="+encodeURIComponent(TOKEN)); if(!r.ok) return; const s=await r.json();
+    $("mModel").textContent=s.model||"—"; $("mDir").textContent=s.workspace||"—";
+    $("mKb").textContent=s.kb? `${s.kb.files} files · ${s.kb.depends} edges`:"—";
+    if(s.verify && !$("verifyCmd").value) $("verifyCmd").value=s.verify;   // pre-fill from the launch --verify
+  }catch(e){}
+}
+status();
+</script>
+</body>
+</html>

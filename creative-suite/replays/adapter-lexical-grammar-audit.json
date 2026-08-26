@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "name": "adapter-lexical-grammar-audit",
+  "description": "Exact-turn test of a completion-audit reminder that accepted lexical grammars are not canonical serializers.",
+  "artifact": "../../.bantam/experiments/codex-hard-tournament-2026-07-25/runs/gpt-5-5-medium/round-01/adapter-migration-run-2026-07-26T05-10-42-639Z-839bc0.json",
+  "turn": 15,
+  "samples": 3,
+  "remedy": "[lexical-contract-audit] The task names accepted string languages. Treat them as languages, not canonical serializers: \"trimmed\" means surrounding whitespace remains valid, \"case-insensitive\" means mixed case remains valid, and an \"unsigned decimal-integer string\" includes leading-zero forms such as \"007\" unless canonical form is explicitly required. Compare the current accepting regexes and parsers against those named valid spellings now; correct any narrowed boundary, then rerun verification.",
+  "expectation": {
+    "verbs": [
+      "replace",
+      "edit_lines",
+      "patch",
+      "write_file"
+    ],
+    "paths": [
+      "src/adapters/count.js"
+    ],
+    "contentAny": [
+      "/^\\d+$/",
+      "^\\d+$"
+    ],
+    "forbidAny": [
+      "[1-9]"
+    ]
+  }
+}

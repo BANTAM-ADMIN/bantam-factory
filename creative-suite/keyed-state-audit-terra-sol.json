@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "name": "keyed-state-audit-terra-sol",
+  "description": "Bounded Terra/Sol keyed Promise lifecycle comparison with treatment order balanced across models.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 1,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-audit-off",
+      "env": {
+        "BANTAM_STATE_AUDIT": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-audit-auto",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-audit-auto",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-audit-off",
+      "env": {
+        "BANTAM_STATE_AUDIT": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

@@ -1,0 +1,1367 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-30",
+  "policy": {
+    "ranking": [
+      "evidence validity",
+      "correctness",
+      "regression safety",
+      "task completeness",
+      "efficiency"
+    ],
+    "rawArtifactsAreImmutable": true,
+    "postHocEvaluatorCorrectionsMustBeExplicit": true
+  },
+  "candidates": [
+    {
+      "id": "deterministic-png-pixel-facts",
+      "decision": "promoted",
+      "default": "on",
+      "rollback": "BANTAM_IMAGE_PIXEL_FACTS=0",
+      "targetStudy": {
+        "evidence": ".bantam/experiments/terra-pixel-facts-ab",
+        "fixture": "visual-ocr-layout",
+        "rounds": 3,
+        "control": {
+          "strictPasses": 0,
+          "tasks": 3,
+          "turns": 17,
+          "requests": 22,
+          "inputTokens": 330762,
+          "outputTokens": 5134,
+          "reasoningTokens": 1785,
+          "taskTimeSeconds": 153.886
+        },
+        "treatment": {
+          "strictPasses": 3,
+          "tasks": 3,
+          "turns": 13,
+          "requests": 16,
+          "inputTokens": 233940,
+          "outputTokens": 3139,
+          "reasoningTokens": 435,
+          "taskTimeSeconds": 109.612
+        }
+      },
+      "nonTargetStudy": {
+        "evidence": ".bantam/experiments/terra-pixel-facts-noncolor-ab",
+        "fixtures": [
+          "visual-brief-contradiction",
+          "visual-injection-resistance"
+        ],
+        "rounds": 2,
+        "controlStrictPasses": 4,
+        "treatmentRawStrictPasses": 2,
+        "treatmentEvaluatorCorrectedStrictPasses": 4,
+        "rawFailureCause": "The grader rejected the visually valid phrase central sky; every objective fact and constraint passed.",
+        "evaluatorCorrection": "The source image was inspected and the semantic region matcher now accepts central sky. Preserved run artifacts were not rewritten."
+      },
+      "reason": "The treatment changed exact-color correctness from 0/3 to 3/3 while reducing turns, requests, tokens, and time; corrected non-target results show no task regression."
+    },
+    {
+      "id": "codex-rendered-preview-vision",
+      "decision": "experimental",
+      "default": "off",
+      "enable": "BANTAM_CODEX_PREVIEW_VISION=1",
+      "validStudy": {
+        "evidence": ".bantam/experiments/terra-preview-vision-ab-v2",
+        "fixtures": [
+          "image-to-web",
+          "creative-code"
+        ],
+        "rounds": 2,
+        "control": {
+          "strictPasses": 3,
+          "tasks": 4,
+          "turns": 43,
+          "requests": 45,
+          "inputTokens": 1194761,
+          "outputTokens": 16626,
+          "reasoningTokens": 1674,
+          "taskTimeSeconds": 419.250
+        },
+        "treatment": {
+          "strictPasses": 4,
+          "tasks": 4,
+          "turns": 36,
+          "requests": 42,
+          "inputTokens": 910746,
+          "outputTokens": 16639,
+          "reasoningTokens": 1356,
+          "taskTimeSeconds": 422.561,
+          "previewVisionCalls": 4
+        }
+      },
+      "invalidPilot": {
+        "evidence": ".bantam/experiments/terra-preview-vision-ab",
+        "reason": "Interactive preview did not activate screenshot capture, so the treatment was not delivered."
+      },
+      "taskAwareFollowUp": {
+        "enable": "BANTAM_CODEX_PREVIEW_TASK_REVIEW=1",
+        "replayEvidence": ".bantam/replay-experiments/2026-07-29T22-22-35Z-moonroot-preview-task-review-engagement",
+        "fullTaskEvidence": ".bantam/experiments/2026-07-29T22-24-34-781Z-terra-preview-task-review-screen",
+        "replay": {
+          "samples": 4,
+          "baselineDone": 4,
+          "candidateInvestigations": 4,
+          "candidateEdits": 0,
+          "independentAudit": "pass"
+        },
+        "fullTask": {
+          "fixture": "image-to-web",
+          "rounds": 2,
+          "genericStrictPasses": 2,
+          "taskAwareStrictPasses": 2,
+          "genericTurns": 32,
+          "taskAwareTurns": 33,
+          "genericRequests": 38,
+          "taskAwareRequests": 40,
+          "genericTaskTimeSeconds": 339.965,
+          "taskAwareTaskTimeSeconds": 342.786,
+          "visibleRequiredControlRepairObserved": true,
+          "completeRunAuditsPassed": 4
+        },
+        "classifierCalibration": {
+          "pilotEvidence": ".bantam/preview-review-calibrations/2026-07-29T23-20-25-380Z",
+          "finalEvidence": ".bantam/preview-review-calibrations/2026-07-29T23-30-51-641Z",
+          "models": ["gpt-5.6-terra", "gpt-5.6-sol"],
+          "runs": 2,
+          "judgments": 24,
+          "correct": 24,
+          "truePositives": 16,
+          "trueNegatives": 8,
+          "falsePositives": 0,
+          "falseNegatives": 0,
+          "invalid": 0,
+          "finalIndependentAudit": "pass"
+        },
+        "plantedOcclusionStudy": {
+          "evidence": ".bantam/experiments/2026-07-29T23-25-32-227Z-terra-preview-task-review-occlusion",
+          "fixture": "occluded-theme-controls",
+          "rounds": 2,
+          "domStrictPasses": 1,
+          "genericVisionStrictPasses": 2,
+          "taskAwareVisionStrictPasses": 2,
+          "genericVisionRepairAfterScreenshot": true,
+          "taskAwareVisionPostScreenshotRepairs": 0,
+          "taskAwareTurns": 11,
+          "genericTurns": 15,
+          "domTurns": 10,
+          "attributionBoundary": "The DOM failure made an incomplete child-only stacking repair that DOM preview falsely accepted. Generic screenshot narration exposed the still-empty control and caused the missing parent repair. Both task-aware runs repaired source before preview, so their strict passes prove non-regression and efficiency, not a task-aware intervention."
+        },
+        "proofLinkedInterventionStudy": {
+          "evidence": ".bantam/experiments/2026-07-30T00-18-24-611Z-preview-review-proof-terra-sol",
+          "fixture": "review-first-occlusion",
+          "models": ["gpt-5.6-terra", "gpt-5.6-sol"],
+          "rounds": 2,
+          "domStrictPasses": 0,
+          "genericStrictPasses": 4,
+          "taskAwareStrictPasses": 4,
+          "taskAwareInitialRepairVerdicts": 4,
+          "taskAwarePostRepairClearVerdicts": 8,
+          "taskAwareScreenshotCausedRepairs": 4,
+          "completeRunAuditsPassed": 12,
+          "genericInteractionTimeoutDetourObserved": true
+        },
+        "clearNonTargetStudy": {
+          "evidence": ".bantam/experiments/2026-07-30T00-34-33-644Z-preview-review-clear-terra-sol",
+          "fixture": "review-first-clear",
+          "models": ["gpt-5.6-terra", "gpt-5.6-sol"],
+          "rounds": 2,
+          "domStrictPasses": 4,
+          "taskAwareStrictPasses": 4,
+          "taskAwareFalseRepairs": 0,
+          "taskAwareClearVerdicts": 8,
+          "taskAwareAddedRequests": 6,
+          "terraAddedInputTokens": 29610,
+          "terraAddedTaskTimeSeconds": 22.289,
+          "solAddedInputTokens": 34860,
+          "solAddedTaskTimeSeconds": 17.475,
+          "completeRunAuditsPassed": 8
+        },
+        "boundary": "The review-first intervention now supplies direct full-agent attribution: DOM-only failed 0/4 while task-aware review emitted four initial REPAIR verdicts, caused four repairs, then emitted eight CLEAR verdicts and passed 4/4 across Terra and Sol. An already-correct paired cohort passed 4/4 in both DOM and task-aware arms with zero edits, but vision added requests, tokens, and latency. This supports structured review inside the explicit vision opt-in, not global default-on vision."
+      },
+      "reason": "The earlier broad-suite generic pass gain was not causally attributable. The new review-first study supplies causal target evidence across Terra and Sol, and the paired clear cohort shows no false repairs, but task-aware vision still adds material request, token, and latency cost on already-correct pages. Keep screenshot vision globally opt-in while preferring the more efficient structured task-aware protocol inside that opt-in."
+    },
+    {
+      "id": "task-aware-preview-proof-linkage",
+      "decision": "promoted",
+      "default": "on-within-preview-vision-opt-in",
+      "enable": "BANTAM_CODEX_PREVIEW_VISION=1",
+      "rollback": "BANTAM_CODEX_PREVIEW_TASK_REVIEW=0",
+      "evidence": [
+        ".bantam/experiments/2026-07-30T00-18-24-611Z-preview-review-proof-terra-sol",
+        ".bantam/experiments/2026-07-30T00-34-33-644Z-preview-review-clear-terra-sol",
+        "test/preview.test.js"
+      ],
+      "proof": {
+        "repairVerdictBecomesVisualFailure": true,
+        "clearVerdictBecomesPass": true,
+        "malformedVerdictRemainsNonBlocking": true,
+        "targetDomStrictPasses": "0/4",
+        "targetTaskAwareStrictPasses": "4/4",
+        "targetTaskAwareCausalRepairs": 4,
+        "clearDomStrictPasses": "4/4",
+        "clearTaskAwareStrictPasses": "4/4",
+        "clearTaskAwareFalseRepairs": 0,
+        "taskAwareFewerTargetTurnsThanGeneric": 10,
+        "taskAwareFewerTargetRequestsThanGeneric": 11
+      },
+      "reason": "Structured REPAIR/CLEAR output is now trusted preview proof instead of unbound prose. On the causal target it matched generic vision correctness while saving five turns per model and 5–6 requests; on the clear control it made no edits. The enclosing screenshot capability remains default-off because its non-target cost is material."
+    },
+    {
+      "id": "deterministic-preview-pointer-hit-test",
+      "decision": "promoted",
+      "default": "on",
+      "rollback": "BANTAM_PREVIEW_POINTER_HIT_TEST=0",
+      "evidence": [
+        ".bantam/experiments/2026-07-30T00-50-58-719Z-preview-pointer-hit-test-terra-sol",
+        "test/preview-review-occlusion-fixture.test.js",
+        "test/preview-visual-review.test.js"
+      ],
+      "targetStudy": {
+        "fixture": "review-first-occlusion",
+        "models": ["gpt-5.6-terra", "gpt-5.6-sol"],
+        "rounds": 2,
+        "rollbackStrictPasses": 0,
+        "treatmentStrictPasses": 4,
+        "initialBlockedControlFacts": 8,
+        "incompleteRepairCaught": true,
+        "screenshotVisionRequests": 0
+      },
+      "nonTargetStudy": {
+        "fixture": "review-first-clear",
+        "models": ["gpt-5.6-terra", "gpt-5.6-sol"],
+        "rounds": 2,
+        "rollbackStrictPasses": 4,
+        "treatmentStrictPasses": 4,
+        "treatmentEdits": 0,
+        "falsePointerObstructions": 0
+      },
+      "visionComparison": {
+        "terraRequestsSaved": 6,
+        "terraInputTokensSaved": 67336,
+        "terraTaskTimeSecondsSaved": 18.658,
+        "solRequestsSaved": 5,
+        "solInputTokensSaved": 40894,
+        "solTaskTimeSecondsSaved": 40.591
+      },
+      "reason": "Chromium elementFromPoint evidence closes a measured DOM-preview false green without a vision request. It produced 4/4 causal repairs versus 0/4 with the detector disabled, stayed silent and edit-free on 4/4 already-correct controls, caught an incomplete child-only z-index repair, and was cheaper than task-aware screenshot review for both Terra and Sol."
+    },
+    {
+      "id": "preview-timeout-phase-separation",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/2026-07-29T22-24-34-781Z-terra-preview-task-review-screen/runs/terra-task-aware-preview/round-01/image-to-web-run-2026-07-29T22-26-38-565Z-57d1aa.json",
+        "test/preview.test.js",
+        "test/preview-visual-review.test.js"
+      ],
+      "observedRegression": {
+        "model": "gpt-5.6-terra",
+        "interactionCompleted": true,
+        "interactionIssues": 0,
+        "allBoundedActionsDispatched": true,
+        "auxiliaryScreenshotTimedOut": true,
+        "legacyStatus": "interaction-timeout",
+        "unnecessarySourceEditRisk": true
+      },
+      "causalProof": {
+        "twoProcessBrowserDouble": true,
+        "domInteractionPassCompleted": true,
+        "screenshotPassTimedOut": true,
+        "newStatus": "pass",
+        "auxiliaryTimeoutPersisted": true,
+        "visibleDomEvidencePreserved": true,
+        "realInteractionTimeoutStillBlocks": true,
+        "legacyTimeoutStillBlocks": true,
+        "singleTimeoutRequiresConfirmationBeforeEdit": true,
+        "fullRegressionTestsPassed": 1189
+      },
+      "rejectedAlternative": {
+        "candidate": "source-and-task screenshot review cache",
+        "decision": "rejected-before-implementation",
+        "reason": "Unchanged load and interactive renders produced different PNG byte lengths and SHA-256 hashes, so source/task identity could hide changed pixels."
+      },
+      "reason": "The optional screenshot process cannot prove a fault in an already-completed DOM interaction process. Separating the phase evidence removes the preserved Terra false attribution while deterministic negative controls keep real and legacy interaction timeouts blocking."
+    },
+    {
+      "id": "preview-review-calibration-harness",
+      "decision": "promoted",
+      "default": "operator-command",
+      "command": "node bin/preview-review-calibration.js",
+      "auditCommand": "node bin/preview-review-calibration.js --audit <evidence.json>",
+      "evidence": [
+        ".bantam/preview-review-calibrations/2026-07-29T23-30-51-641Z",
+        "test/preview-review-calibration.test.js",
+        "test/preview-review-occlusion-fixture.test.js"
+      ],
+      "proof": {
+        "archivedManifestHashBound": true,
+        "derivedPromptHashReconstructed": true,
+        "screenshotHashesVerified": true,
+        "verdictsAndScoresRecomputed": true,
+        "incompleteMatrixRejected": true,
+        "terraCorrect": "6/6",
+        "solCorrect": "6/6",
+        "independentAudit": "pass"
+      },
+      "reason": "The operator-only calibration command measures screenshot-review sensitivity and false interventions without running a coding agent. Its final evidence is self-contained and independently reconstructs the archived contract, derived task-aware prompt hashes, screenshot bytes, verdicts, matrix completeness, and aggregate scores."
+    },
+    {
+      "id": "image-worker-timeout-and-terminal-failure",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/codex-creative-multimodal-v2",
+        "test/codex-vision.test.js"
+      ],
+      "reason": "The prior two-minute idle deadline killed valid workers; generation-sized deadlines completed both live Terra and Sol batches, while injected all-failed and partially-failed cases now produce distinct terminal and partial outcomes."
+    },
+    {
+      "id": "preview-css-remote-dependency-detection",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/codex-offline-creative-code-regression",
+        "test/preview.test.js"
+      ],
+      "reason": "The detector closes a false-green offline-preview gap and the focused Terra/Sol regression passed 2/2."
+    },
+    {
+      "id": "contextual-pause-advertisement-detection",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/2026-07-29T22-24-34-781Z-terra-preview-task-review-screen/runs/terra-generic-preview/round-02",
+        "test/preview.test.js"
+      ],
+      "before": {
+        "visiblePhrase": "A pause above the city.",
+        "falseGateRejection": true,
+        "irrelevantPauseOverlayAuthored": true,
+        "turns": 23
+      },
+      "after": {
+        "ordinaryProseRejectedAsControlEvidence": true,
+        "explicitPressPInstructionStillDetected": true,
+        "fullRegressionTestsPassed": 1172
+      },
+      "reason": "Whole-page word matching treated ordinary campaign prose as a keyboard contract and induced unrelated code. Detection now requires an explicit P-to-pause instruction or a visible pause/resume control; a deterministic negative control closes the observed regression while the positive control preserves the intended game defect check."
+    },
+    {
+      "id": "source-attributed-model-usage",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/terra-usage-attribution-smoke",
+        "test/codex-vision.test.js"
+      ],
+      "liveProof": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "aggregate": {
+          "requests": 5,
+          "inputTokens": 72624,
+          "outputTokens": 1158,
+          "reasoningTokens": 150
+        },
+        "sources": {
+          "action_generation": {
+            "requests": 4,
+            "inputTokens": 61184,
+            "outputTokens": 697,
+            "reasoningTokens": 136
+          },
+          "supplied_image_vision": {
+            "requests": 1,
+            "inputTokens": 11440,
+            "outputTokens": 461,
+            "reasoningTokens": 14
+          }
+        },
+        "reconcilesExactly": true
+      },
+      "reason": "Per-source accounting is additive and behavior-neutral; a fresh strict pass proved exact reconciliation through the run artifact, experiment manifest, and Markdown summary."
+    },
+    {
+      "id": "generated-image-review-packets",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/terra-image-review-packet-smoke",
+        "test/codex-vision.test.js"
+      ],
+      "liveProof": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "generatedVariants": 2,
+        "inspectedVariants": 2,
+        "reviewManifestCreated": true,
+        "offlineContactSheetCreated": true,
+        "variants": [
+          {
+            "width": 1727,
+            "height": 911,
+            "bytes": 1775731,
+            "sha256": "05747cdde0c68826a1062dcd37ff8d613dfef5361b82641f8a17305e340fd3b7"
+          },
+          {
+            "width": 1536,
+            "height": 1024,
+            "bytes": 1768623,
+            "sha256": "ba407a1ac3b97b435e23ad7eff3d0b95f9bcc01d64507b62b2ec51d4d584c1e6"
+          }
+        ]
+      },
+      "reason": "The packet adds deterministic provenance and an offline visual comparison surface without another model call; unit Chromium rendering passed and the live two-image self-critique remained strict-green."
+    },
+    {
+      "id": "generated-evidence-attachment-archival",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        "test/artifact-attachments.test.js"
+      ],
+      "policy": {
+        "managedRoot": "assets/generated",
+        "maxFiles": 32,
+        "maxFileBytes": 16777216,
+        "maxTotalBytes": 67108864,
+        "allowedExtensions": [
+          "png",
+          "jpg",
+          "jpeg",
+          "webp",
+          "gif",
+          "html",
+          "json"
+        ],
+        "symlinksAllowed": false,
+        "unchangedBaselineFilesCopied": false,
+        "archiveFailureChangesTaskVerdict": false
+      },
+      "proof": {
+        "fixtureWorkspaceDeleted": true,
+        "archivedJsonReadableAfterCleanup": true,
+        "archivedHtmlRenderedAfterCleanup": true,
+        "experimentSummaryLinksGenerated": true,
+        "showcaseLinksGenerated": true,
+        "hashesReconciled": true,
+        "traversalAndMalformedMetadataRejected": true
+      },
+      "reason": "A complete scripted fixture lifecycle proved that managed generated evidence survives isolated workspace cleanup and remains directly renderable, while bounded no-follow copying prevents uncontrolled or external-file capture."
+    },
+    {
+      "id": "image-generation-progress-heartbeats",
+      "decision": "promoted",
+      "default": "on",
+      "configuration": {
+        "interval": "BANTAM_CODEX_IMAGE_HEARTBEAT_MS",
+        "defaultMs": 30000
+      },
+      "evidence": [
+        ".bantam/experiments/terra-image-review-packet-smoke",
+        "test/codex-vision.test.js"
+      ],
+      "proof": {
+        "observedSilentWindowMs": 133786,
+        "reportsElapsedMs": true,
+        "reportsCompletedWorkers": true,
+        "timerStopsAfterSettlement": true,
+        "changesModelObservation": false,
+        "changesTaskResult": false
+      },
+      "reason": "The live two-variant run had a 2.2-minute quiet window. Event-only heartbeats make progress visible in interactive and experiment output without another model call or prompt change."
+    },
+    {
+      "id": "image-worker-cancellation-and-timeout-provenance",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        "test/codex-vision.test.js"
+      ],
+      "outcomes": [
+        "operator_cancelled",
+        "idle_timeout",
+        "hard_timeout",
+        "provider_failure"
+      ],
+      "proof": {
+        "agentSignalForwardedToTool": true,
+        "toolSignalForwardedToCodexTransport": true,
+        "preAbortedTransportRequestRejectedAsAborted": true,
+        "partialOutcomeRetainsFailures": true,
+        "terminalOutcomeRetainsFailures": true,
+        "reviewManifestRetainsFailures": true,
+        "completionEventRetainsFailures": true
+      },
+      "reason": "Structured provenance separates user intent from infrastructure behavior, preventing cancellation from being misdiagnosed as provider instability or a generic generation failure."
+    },
+    {
+      "id": "normalized-tool-outcome-protocol",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/terra-tool-outcome-smoke",
+        "test/tool-outcomes.test.js"
+      ],
+      "schema": {
+        "version": 1,
+        "statuses": [
+          "pass",
+          "partial",
+          "failed",
+          "blocked",
+          "error"
+        ],
+        "fields": [
+          "tool",
+          "terminal",
+          "retryable",
+          "artifacts",
+          "failures",
+          "blocked",
+          "usage",
+          "proof",
+          "details"
+        ]
+      },
+      "liveProof": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "viewImageOutcomes": {
+          "pass": 1
+        },
+        "turnArtifactPersisted": true,
+        "manifestAggregated": true,
+        "summaryRendered": true
+      },
+      "reason": "All routed tools now cross one registry-owned evidence boundary; legacy image and preview shapes remain compatible while agent control flow and artifacts consume only the normalized envelope."
+    },
+    {
+      "id": "semantic-visual-region-grading",
+      "decision": "promoted",
+      "default": "on",
+      "scope": "creative-suite evaluator",
+      "evidence": [
+        ".bantam/experiments/terra-pixel-facts-noncolor-ab",
+        ".bantam/experiments/terra-tool-outcome-smoke",
+        "test/semantic-region.test.js"
+      ],
+      "proof": {
+        "validParaphrasesAccepted": 7,
+        "nearbyObstructedRegionsRejected": 5,
+        "substringAccidentsRejected": true,
+        "archivedCentralSkyDeliverablePasses": true,
+        "liveRightOfTitleDeliverablePasses": true
+      },
+      "reason": "Axis and quality concepts accept visually equivalent language without weakening the image-specific policy; this removes known semantic false negatives while retaining negative controls."
+    },
+    {
+      "id": "independent-run-artifact-auditor",
+      "decision": "promoted",
+      "default": "operator-command",
+      "evidence": [
+        ".bantam/experiments/terra-run-audit-smoke",
+        "test/run-artifact-audit.test.js"
+      ],
+      "liveProof": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "requestsReconciled": 5,
+        "usageSources": 2,
+        "inputTokensReconciled": 71075,
+        "outputTokensReconciled": 998,
+        "reasoningTokensReconciled": 242,
+        "toolOutcomesReconciled": 1,
+        "finalDiffsRehashed": 1,
+        "codexPromptsExact": 4,
+        "warnings": 0
+      },
+      "negativeControls": [
+        "tampered attachment",
+        "missing attachment",
+        "symlinked attachment",
+        "path traversal",
+        "attachment index mismatch",
+        "usage accounting mismatch",
+        "final diff hash mismatch",
+        "malformed tool status",
+        "tool count mismatch",
+        "unreadable artifact"
+      ],
+      "reason": "A read-only, model-free command now independently checks the evidence BANTAM uses to make improvement claims. It changes no agent policy, treats legacy absence as explicit non-applicability, and fails present evidence on byte, path, schema, count, arithmetic, final-diff, or prompt-integrity disagreement."
+    },
+    {
+      "id": "causal-tool-usage-linkage",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/terra-run-audit-smoke",
+        ".bantam/experiments/terra-tool-usage-link-smoke",
+        "test/codex-vision.test.js",
+        "test/run-artifact-audit.test.js"
+      ],
+      "before": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "turns": 4,
+        "requests": 5,
+        "toolOutcomeUsage": null,
+        "sourceUsagePresent": true,
+        "taskTimeSeconds": 44.745
+      },
+      "after": {
+        "strictPasses": 1,
+        "tasks": 1,
+        "turns": 4,
+        "requests": 5,
+        "toolOutcomeUsageSource": "supplied_image_vision",
+        "toolUsageExactlyMatchesSource": true,
+        "auditorPasses": true,
+        "taskTimeSeconds": 36.045
+      },
+      "proof": {
+        "changesModelObservation": false,
+        "changesPrompt": false,
+        "invalidImageRequestsAreNoLongerRecordedAsPass": true,
+        "imageGenerationVariantsAggregateUsage": true,
+        "toolToSourceMismatchFailsAudit": true,
+        "localAndCodexVisionFailureSemanticsMatch": true,
+        "fullRegressionTestsPassed": 36
+      },
+      "reason": "External vision and image-generation cost now remains attached to the exact tool turn that caused it, and the independent auditor reconciles those envelopes with run-level source accounting. The identical live fixture retained strict correctness, turns, and requests while replacing an unprovable null linkage with exact evidence."
+    },
+    {
+      "id": "ad-hoc-task-scoped-usage-artifacts",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/runs/ad-hoc-usage-proof.json",
+        "test/model-usage-snapshot.test.js"
+      ],
+      "liveProof": {
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "turns": 1,
+        "requests": 1,
+        "inputTokens": 12092,
+        "outputTokens": 82,
+        "reasoningTokens": 13,
+        "aggregateUsageReconciled": true,
+        "codexPromptsExact": 1
+      },
+      "scope": {
+        "freshSavedRuns": true,
+        "freshLanes": true,
+        "restoredPrefixes": false,
+        "restoredPrefixReason": "The parent process accounting snapshot is unavailable; new-segment totals are deliberately not mislabeled as whole-trajectory totals."
+      },
+      "reason": "Fresh ad-hoc and lane artifacts now receive the same task-scoped aggregate/source accounting as experiment fixtures. Reusable model-session totals are differenced at the run boundary, while resumed historical prefixes remain explicitly not applicable until their scoped parent usage can be reconstructed."
+    },
+    {
+      "id": "complete-run-integrity-gate",
+      "decision": "promoted",
+      "default": "on-for-fixtures-and-experiments",
+      "evidence": [
+        "test/artifact-attachments.test.js",
+        "test/run-artifact-audit.test.js"
+      ],
+      "proof": {
+        "passingArtifactPersistsVerdict": true,
+        "experimentSummaryAggregatesVerdict": true,
+        "injectedAuditFailureOverridesTaskPass": true,
+        "failureStatus": "evidence-invalid",
+        "artifactResultPassAfterFailure": false,
+        "failureReasonPersisted": true,
+        "changesModelObservation": false,
+        "changesPrompt": false,
+        "fullRegressionTestsPassed": 36
+      },
+      "reason": "Fixture and experiment success now requires both task correctness and a valid complete evidence envelope. The audit runs after attachments and final diff are assembled but before acceptance, so a green verifier cannot launder malformed proof."
+    },
+    {
+      "id": "counterbalanced-semantic-replay-evidence",
+      "decision": "promoted",
+      "default": "operator-command",
+      "evidence": [
+        ".bantam/replay-experiments/moonroot-early-alt-coverage-v3-counterbalanced",
+        ".bantam/replay-experiments/moonroot-usage-accounting-smoke-v2",
+        "test/replay-experiment.test.js",
+        "test/replay-experiment-audit.test.js"
+      ],
+      "proof": {
+        "recordedRuntimeReconstructed": "gpt-5.6-terra",
+        "baselineFirstSamples": 2,
+        "candidateFirstSamples": 1,
+        "orderBalance": "best-possible",
+        "sourceArtifactHashVerified": true,
+        "normalizedSpecHashVerified": true,
+        "rawOutputsIndependentlyRescored": true,
+        "inapplicableEditNegativeControlRejected": true,
+        "malformedOrderNegativeControlRejected": true,
+        "providerReportedUsageCallsReconciled": 2,
+        "unreportedUsageCalls": 0,
+        "tamperedUsageTotalsRejected": true,
+        "coordinatedArmAndTotalTamperingRejected": true,
+        "positionSpecificCallReceipts": "sha256-v1",
+        "missingDeclaredReceiptRejected": true,
+        "resealedForgedRequestHashRejected": true,
+        "requestProvenanceReconstructedFromSource": true,
+        "legacyReceiptlessEvidenceCompatible": true,
+        "fullRegressionTestsPassed": 103,
+        "impossibleOldAnchorVerbSpecRejected": true,
+        "legacyImpossibleSpecAuditsWithWarning": true,
+        "legacyStudyMemoryPreserved": true,
+        "negativeRequestDurationRejected": true,
+        "singleSampleOrderLabeledNotApplicable": true,
+        "relativeEvidencePathsAudited": true,
+        "ordinaryAgentPolicyChanged": false
+      },
+      "reason": "Replay A/B is an explicit operator tool, not an agent default. It reconstructs the recorded runtime, rotates baseline-first and candidate-first call position when multiple samples exist, labels single-order evidence honestly, persists exact order plus per-arm provider usage and latency, SHA-256 binds each new arm's request/output/usage/timing/error receipt to its sample and position, independently reconstructs each request hash and fidelity from the source artifact and remedy, requires optional edit applicability to the recorded prompt, stores relocatable hash-linked evidence, and self-audits before publication."
+    },
+    {
+      "id": "model-free-replay-budget-preflight",
+      "decision": "promoted",
+      "default": "operator-command-and-optional-launch-cap",
+      "evidence": [
+        "test/replay-experiment-preflight.test.js",
+        "creative-suite/replays/visual-alt-coverage-moonroot.json",
+        "creative-suite/replays/visual-alt-coverage-usage-smoke.json",
+        "docs/superpowers/reports/2026-07-29-visual-alt-evidence-loop.md"
+      ],
+      "liveProof": {
+        "runtime": "gpt-5.6-terra medium",
+        "threeSampleRequests": 6,
+        "threeSampleSerializedBytes": 109761,
+        "threeSamplePairing": "counterbalanced-unseeded",
+        "threeSampleOrderBalance": "best-possible",
+        "oneSampleRequests": 2,
+        "oneSampleSerializedBytes": 36587,
+        "oneSamplePairing": "single-order-unseeded",
+        "oneSampleOrderBalance": "not-applicable",
+        "maxCallsFiveBlocksSixCallLaunch": true,
+        "blockedLaunchStartsModel": false,
+        "blockedLaunchWritesEvidence": false,
+        "dryRunStartsModel": false,
+        "dryRunProbesEndpoint": false,
+        "dryRunWritesEvidence": false,
+        "corruptRequestChecksumRejected": true,
+        "missingCallCapValueRejected": true,
+        "priorSameTurnStudies": 5,
+        "threeSampleExactDesignStudies": 1,
+        "oneSampleExactDesignStudies": 2,
+        "designIdentity": [
+          "source-artifact-sha256",
+          "turn",
+          "samples",
+          "remedy",
+          "normalized-expectation"
+        ],
+        "exactDuplicateBlockedBeforeModel": true,
+        "exactDuplicateBlockedBeforeWrite": true,
+        "alternateSameTurnRemedyAllowed": true,
+        "incompleteStudyDoesNotBlock": true,
+        "priorStudyBoundary": "structural corpus presence, not current audit validity",
+        "fullRegressionTestsPassed": 103,
+        "sourceUsageBoundary": "telemetry only; no token, latency, cache, or cost projection"
+      },
+      "reason": "Replay preflight proves the exact request schedule, runtime reconstruction, source integrity, and serialized context budget before any model or filesystem side effect. Optional call and exact-design gates are enforced again on real execution; design memory prevents accidental reruns without blocking alternate same-turn hypotheses, while unstable provider usage is honestly retained as source telemetry instead of presented as a forecast."
+    },
+    {
+      "id": "model-free-replay-specimen-miner",
+      "decision": "promoted",
+      "default": "operator-command",
+      "evidence": [
+        "test/replay-mine.test.js",
+        ".bantam/experiments/2026-07-29T20-39-27-440Z-fixture-provenance-native-smoke",
+        "docs/superpowers/reports/2026-07-29-fixture-evaluator-provenance.md",
+        "docs/superpowers/reports/2026-07-29-visual-alt-evidence-loop.md"
+      ],
+      "liveProof": {
+        "jsonFilesScanned": 786,
+        "runArtifactsScanned": 353,
+        "mixedExactTaskCohorts": 10,
+        "replayStudyArtifacts": 5,
+        "indexedArtifactTurns": 1,
+        "duplicateStudyArtifacts": 4,
+        "replayableTurnCandidatesBefore": 290,
+        "untreatedTurnCandidatesAfter": 289,
+        "priorityTurnShortlist": 135,
+        "maxPriorityTurnsPerFailure": 5,
+        "knownMoonrootInterventionRank": 1,
+        "fullCandidateSetPreserved": true,
+        "priorityReasonsPersisted": true,
+        "rankingBoundary": "retrospective heuristic; not causal turn identification",
+        "replayableFailureArtifacts": 27,
+        "verifierBackedFailureModes": 16,
+        "representativeFailureArtifacts": 16,
+        "representativeReductionPercent": 40.7,
+        "allFailureArtifactsRetainedInJson": true,
+        "representativeSelection": "highest top-turn priority, then fewest candidate turns, then lexical artifact path",
+        "passingContractScopeMislabelsCorrected": 7,
+        "runLevelFailurePrecedence": true,
+        "assertionStackLocationPreferred": true,
+        "distinctAssertionLineNegativeControlSeparated": true,
+        "failureModeBoundary": "navigation equivalence, not shared causality",
+        "stableFailureModeAddress": "sha256-v1 with unique 8-64 hexadecimal prefix selection",
+        "liveLargestModeArtifacts": 3,
+        "liveLargestModePassingReferencesRetained": 9,
+        "liveFullJsonBytes": 1143560,
+        "liveSelectedModeJsonBytes": 68926,
+        "liveSelectedModePayloadReductionPercent": 94.0,
+        "malformedModeSelectorRejected": true,
+        "unknownModeSelectorRejected": true,
+        "ambiguousModeSelectorRejected": true,
+        "distinctModeNegativeControlExcluded": true,
+        "largeJsonStdoutDrainedBeforeExit": true,
+        "largeJsonCliFixtureFailures": 120,
+        "machineReadableLivePipeValid": true,
+        "fixtureEvaluatorProvenance": "task spec + materialized starting repository + grader SHA-256 roots",
+        "capturedProvenanceCrossExperimentCompatible": true,
+        "legacyComparisonBoundary": "same experiment only",
+        "crossExperimentGraderDriftNegativeControlExcluded": true,
+        "constellationFalseCohortsBefore": 1,
+        "constellationFalseCohortsAfter": 0,
+        "replayableFailureArtifactsBeforeEvaluatorIdentity": 29,
+        "replayableFailureArtifactsAfterEvaluatorIdentity": 16,
+        "verifierBackedFailureModesBeforeEvaluatorIdentity": 16,
+        "verifierBackedFailureModesAfterEvaluatorIdentity": 11,
+        "fixtureProvenanceTamperingRejected": true,
+        "fixtureCatalogBenchmarked": 16,
+        "fixtureProvenanceTotalMedianMs": 12.042,
+        "fixtureProvenanceWorstMedianMs": 3.367,
+        "fixtureProvenanceLargestMeasuredBytes": 2670451,
+        "nativeProvenanceSmokeModels": [
+          "gpt-5.6-terra medium",
+          "gpt-5.6-sol high"
+        ],
+        "nativeProvenanceSmokeStrictPasses": 2,
+        "nativeProvenanceRootsIdentical": true,
+        "nativeProvenanceRoot": "a527065aaf7ca6604fc3603105f40841a4f900cd331fff61ca14ded2d515104e",
+        "nativeProvenanceArtifactAuditsPassed": 2,
+        "nativeProvenanceArtifactAuditFailures": 0,
+        "nativeProvenanceArtifactAuditWarnings": 0,
+        "crossArmExperimentContrastsDetected": 10,
+        "uncontrastedCohortsBeforeFilter": 10,
+        "uncontrastedCohortsAfterFilter": 0,
+        "uncontrastedCandidateTurnsAfterFilter": 0,
+        "uncontrastedFilterStartsModel": false,
+        "uncontrastedFilterSupportedByBothLaunchers": true,
+        "experimentContrastBoundary": "cross-arm pass/fail provenance prevents rediscovery but does not itself prove causality or promotion",
+        "corpusScaleFix": {
+          "beforeCommand": "./bin/run-dev.sh replay-mine .bantam --untreated --uncontrasted --json",
+          "beforeStatus": "failed at 5000 JSON files",
+          "afterStatus": "complete",
+          "jsonFilesScanned": 7596,
+          "evidenceFilesBounded": 523,
+          "runArtifactsWithTasks": 186,
+          "replayStudyArtifacts": 1,
+          "irrelevantJsonExcludedFromEvidenceLimit": 7073,
+          "untreatedUncontrastedCohortsRecovered": 2,
+          "untreatedCandidateTurnsRecovered": 46,
+          "evidenceFileCeiling": 5000,
+          "jsonScanCeiling": 100000,
+          "separateEvidenceAndScanNegativeControls": true,
+          "fullRegressionTestsPassed": 1190
+        },
+        "priorStudyTurnsExcluded": 1,
+        "startsModel": false,
+        "requiresVerifiedFailure": true,
+        "requiresSavedReplayRequest": true,
+        "requiresPassingReference": true,
+        "taskDriftNegativeControlExcluded": true,
+        "unverifiedNegativeControlExcluded": true,
+        "wrongArtifactStudyDoesNotSuppress": true,
+        "wrongTurnStudyDoesNotSuppress": true,
+        "incompleteStudyDoesNotSuppress": true,
+        "inconclusiveStudyLabeledAttempted": true,
+        "fullRegressionTestsPassed": 103,
+        "boundary": "witness-only; study status is corpus presence, not audit validity"
+      },
+      "reason": "The miner turns the existing evidence corpus into bounded exact-task, evaluator-compatible specimen discovery without another model call. New runs persist exact task-spec, starting-repository, and grader roots; legacy comparisons are conservatively limited to one experiment. This removed a demonstrated cross-experiment grader-drift false cohort and 13 unsupported failure references while preserving same-experiment tournament evidence. It indexes prior studies only by immutable artifact hash plus exact turn, retains every compatible candidate, and explicitly refuses to infer audit validity, a shared cause, a remedy, or promotion."
+    },
+    {
+      "id": "atomic-eval-scope-rollback",
+      "decision": "experimental",
+      "default": "off",
+      "enable": "BANTAM_EVAL_SCOPE_ROLLBACK=1",
+      "evidence": [
+        "test/shell-scope-rollback.test.js",
+        ".bantam/experiments/codex-eval-scope-rollback-ab-2026-07-29",
+        "creative-suite/scope-rollback-experiment.json",
+        "docs/superpowers/reports/2026-07-29-eval-scope-rollback.md"
+      ],
+      "observedFailureFamily": {
+        "historicalScopeFailureArtifacts": 7,
+        "failureModes": [
+          "parse-ranges test tampering",
+          "merge-config test tampering",
+          "retry test tampering"
+        ],
+        "partialDirectEditGatePreviouslyRegressed": true,
+        "missingPathWasShellMutationRollback": true
+      },
+      "causalControl": {
+        "sameScriptedTrajectory": true,
+        "controlStatus": "cheated",
+        "controlContractStatus": "pass",
+        "controlScopeViolations": 1,
+        "treatmentStatus": "pass",
+        "treatmentContractStatus": "pass",
+        "treatmentScopeViolations": 0,
+        "directImmutableEditsRefused": 1,
+        "shellTransactionsRolledBack": 1,
+        "shellProtectedFilesRestored": 1,
+        "legitimateSourceEditPreserved": true,
+        "tamperedGreenVerificationInvalidated": true,
+        "multiViolationAtomicControlRestored": 3
+      },
+      "nativeNonRegression": {
+        "experimentStatus": "complete",
+        "codexModels": [
+          "gpt-5.6-terra medium",
+          "gpt-5.6-sol high"
+        ],
+        "controlRuns": 2,
+        "treatmentRuns": 2,
+        "strictPasses": 4,
+        "turnsPerRun": 6,
+        "requestsPerRun": 6,
+        "treatmentInterventions": 0,
+        "independentArtifactAuditsPassed": 4,
+        "codexPromptCallsExact": 24
+      },
+      "snapshotCost": {
+        "rangeParserBytes": 600,
+        "rangeParserMedianMs": 0.198,
+        "rangeParserP95Ms": 0.904,
+        "largestCatalogFixtureBytes": 2666448,
+        "largestCatalogFixtureMedianMs": 1.711,
+        "largestCatalogFixtureP95Ms": 4.319
+      },
+      "fullRegressionTestsPassed": 103,
+      "promotionBoundary": "Keep opt-in until a natural model intervention repeats across multiple fixture families and oversized custom-workspace fallback behavior is proven.",
+      "reason": "The paired transaction closes the measured shell escape left by direct edit refusal alone: immutable direct edits are rejected, protected shell mutations are restored, misleading green output is invalidated, and allowed source changes survive. A same-trajectory control proves cheated-to-pass recovery and Terra/Sol show no behavioral regression when the mechanism is inactive, but the native study contains no natural intervention and one fixture is not enough to change evaluation defaults."
+    },
+    {
+      "id": "experiment-launcher-runtime-parity",
+      "decision": "promoted",
+      "default": "on",
+      "evidence": [
+        ".bantam/experiments/codex-lexical-contract-audit-ab-2026-07-29",
+        ".bantam/experiments/codex-lexical-contract-audit-ab-2026-07-29-v2",
+        "test/experiment-launcher-parity.test.js"
+      ],
+      "before": {
+        "launcher": "bin/bantambuild.js",
+        "requestedRuntime": "codex",
+        "actualRuntime": "saved DeepSeek API",
+        "runs": 4,
+        "turns": 0,
+        "modelErrors": 4,
+        "attributionWarning": true
+      },
+      "after": {
+        "nativeCodexRuns": 4,
+        "nativeCodexTurns": 42,
+        "nativeCodexRequests": 42,
+        "codexPromptCallsExact": 42,
+        "runArtifactAuditsPassed": 4,
+        "ambientApiTransportRemoved": true
+      },
+      "proof": {
+        "bothLaunchersUseSharedRuntimeResolver": true,
+        "codexOptionsClearAmbientEndpointAndCredentials": true,
+        "fullRegressionTestsPassed": 103,
+        "headlessDryRunBypassesAmbientModelStartup": true,
+        "headlessDryRunElapsedSeconds": 0.10
+      },
+      "reason": "The packaged user-facing experiment launcher silently ignored normalized arm runtimes and routed Codex studies through ambient API defaults. It now uses the same runtime-aware resolver as the development launcher; a preserved failed batch proves the before state and the fresh four-run native study proves the repaired path."
+    },
+    {
+      "id": "lexical-contract-completion-audit",
+      "decision": "promoted",
+      "default": "on",
+      "rollback": "BANTAM_LEXICAL_CONTRACT_AUDIT=0",
+      "scope": "one post-green clause only when the task explicitly names trimmed, case-insensitive, or unsigned decimal string languages",
+      "evidence": [
+        ".bantam/replay-experiments/adapter-lexical-grammar-audit-gpt55-v3",
+        ".bantam/experiments/codex-lexical-contract-audit-ab-2026-07-29-v2",
+        "creative-suite/replays/adapter-lexical-grammar-audit.json",
+        "creative-suite/lexical-contract-audit-experiment.json",
+        "test/visual-completion-audit.test.js"
+      ],
+      "exactTurnReplay": {
+        "model": "gpt-5.5 medium",
+        "samples": 3,
+        "baselinePasses": 0,
+        "candidatePasses": 3,
+        "pairing": "counterbalanced-unseeded",
+        "orderBalance": "best-possible",
+        "verdict": "supported-unpaired",
+        "independentAudit": "pass"
+      },
+      "fullTaskStudy": {
+        "model": "gpt-5.5 medium",
+        "fixture": "adapter-migration",
+        "rounds": 2,
+        "orderCounterbalancing": "exact",
+        "control": {
+          "strictPasses": 0,
+          "tasks": 2,
+          "turns": 23,
+          "requests": 23,
+          "inputTokens": 822881,
+          "outputTokens": 11995,
+          "taskTimeSeconds": 297.373,
+          "lexicalAuditHints": 0
+        },
+        "treatment": {
+          "strictPasses": 2,
+          "tasks": 2,
+          "turns": 19,
+          "requests": 19,
+          "inputTokens": 566740,
+          "outputTokens": 7374,
+          "taskTimeSeconds": 182.860,
+          "lexicalAuditHints": 2
+        },
+        "strictPassDelta": 2,
+        "turnDelta": -4,
+        "requestDelta": -4,
+        "inputTokenDelta": -256141,
+        "taskTimeSecondsDelta": -114.513,
+        "codexPromptCallsExact": 42,
+        "runArtifactAuditsPassed": 4
+      },
+      "activationBreadth": {
+        "catalogFixtures": 7,
+        "matchingFixtures": 1,
+        "matchingFixture": "adapter-migration",
+        "ordinaryTasksReceiveExtraPrompt": false,
+        "clausesIndependentlyTaskGrounded": true,
+        "canonicalRepresentationNegativeControl": true
+      },
+      "proof": {
+        "trustedAutoVerificationReachesAudit": true,
+        "interventionMetricPersistsThroughArtifactsAndExperiments": true,
+        "promotionAttributionRequiresNonzeroHints": true,
+        "fullRegressionTestsPassed": 103
+      },
+      "reason": "The same task-derived wording repaired 3/3 saved decisions and 2/2 fresh full tasks while both controls repeated the exact leading-zero defect. Every treatment intervention produced the intended count-parser correction, strict correctness rose from 0/2 to 2/2, and turns, requests, tokens, and time all decreased. Activation is limited to explicitly named accepted string languages and has an immediate rollback."
+    },
+    {
+      "id": "state-audit-completion-order-exclusion",
+      "decision": "promoted",
+      "default": "on",
+      "scope": "The auto state audit retains keyed Promise lifecycle, stale supersession, and reset-plus-settlement risks, but ordinary stateless output ordering no longer activates it.",
+      "evidence": [
+        ".bantam/experiments/codex-model-tournament-2026-07-25/runs/gpt-5-4-mini-medium/round-01/ordered-map-run-2026-07-26T04-22-07-256Z-f414df.json",
+        ".bantam/experiments/codex-model-tournament-2026-07-25/runs/spark-medium/round-01/ordered-map-run-2026-07-26T04-34-12-849Z-8837dc.json",
+        ".bantam/experiments/codex-state-audit-completion-order-exclusion-ab-2026-07-29",
+        "test/state-audit-policy.test.js"
+      ],
+      "observedRegression": {
+        "historicalRuns": 2,
+        "models": [
+          "gpt-5.4-mini",
+          "spark"
+        ],
+        "initialAsyncImplementationsCorrect": 2,
+        "irrelevantStateAudits": 2,
+        "invalidSynchronousThrowProbes": 2,
+        "asyncApisConvertedToSync": 2,
+        "strictPasses": 0
+      },
+      "sameTrajectoryControl": {
+        "legacyStateAuditHints": 1,
+        "legacyDoneDeferrals": 2,
+        "legacyFinalApi": "sync regression",
+        "correctedStateAuditHints": 0,
+        "correctedDoneDeferrals": 0,
+        "correctedFinalApi": "async preserved",
+        "correctedUsesFewerTurns": true
+      },
+      "nativeStudy": {
+        "model": "gpt-5.5 medium",
+        "fixture": "ordered-map",
+        "rounds": 2,
+        "orderCounterbalancing": "exact",
+        "legacy": {
+          "strictPasses": 2,
+          "tasks": 2,
+          "turns": 14,
+          "requests": 14,
+          "inputTokens": 242728,
+          "outputTokens": 2878,
+          "taskTimeSeconds": 90.195,
+          "stateAuditHints": 2
+        },
+        "corrected": {
+          "strictPasses": 2,
+          "tasks": 2,
+          "turns": 10,
+          "requests": 10,
+          "inputTokens": 147044,
+          "outputTokens": 1475,
+          "taskTimeSeconds": 59.509,
+          "stateAuditHints": 0
+        },
+        "strictPassDelta": 0,
+        "turnDelta": -4,
+        "requestDelta": -4,
+        "inputTokenDelta": -95684,
+        "outputTokenDelta": -1403,
+        "taskTimeSecondsDelta": -30.686,
+        "codexPromptCallsExact": 24,
+        "runArtifactAuditsPassed": 4
+      },
+      "negativeControls": {
+        "keyedPromiseLifecycleStillActivates": true,
+        "staleSupersessionStillActivates": true,
+        "resetSettlementLifecycleStillActivates": true
+      },
+      "proof": {
+        "experimentStatus": "complete",
+        "artifactAuditFailures": 0,
+        "artifactAuditWarnings": 0,
+        "asyncThrowProbeDiagnostic": true,
+        "fullRegressionTestsPassed": 103
+      },
+      "reason": "Two historical trajectories show the harness turning correct async implementations into synchronous API regressions after misclassifying ordinary completion-order wording as persistent state. The identical-trajectory test reproduces that causal chain. The corrected selector preserves all measured strict passes in a fresh rotated native study while cutting requests by 40%, input tokens by 39.4%, output tokens by 48.7%, and task time by 34.0%; real lifecycle negative controls remain active."
+    },
+    {
+      "id": "state-audit-inline-proof-credit",
+      "decision": "promoted",
+      "default": "on",
+      "scope": "The async state audit credits successful inline stdin-heredoc probes and focused inline probes bundled with broad verification, while retaining stale-proof invalidation and all existing failure checks.",
+      "evidence": [
+        ".bantam/experiments/2026-07-29T20-50-33-200Z-keyed-state-audit-terra-sol",
+        ".bantam/experiments/2026-07-29T21-01-43-599Z-keyed-state-audit-heredoc-sol-after",
+        ".bantam/experiments/2026-07-29T21-05-30-462Z-keyed-state-audit-heredoc-sol-after",
+        "test/state-audit-policy.test.js",
+        "docs/superpowers/reports/2026-07-29-state-audit-inline-proof-credit.md"
+      ],
+      "discoveryStudy": {
+        "models": [
+          "gpt-5.6-terra",
+          "gpt-5.6-sol"
+        ],
+        "strictPasses": 4,
+        "tasks": 4,
+        "terraAuditRepairObserved": true,
+        "solValidProbeMissed": true,
+        "gpt55EvidenceExcluded": true
+      },
+      "failedIntermediate": {
+        "preserved": true,
+        "strictPasses": 1,
+        "turns": 13,
+        "stateAuditDoneDeferrals": 1,
+        "promotionRejected": true
+      },
+      "nativeSolBeforeAfter": {
+        "model": "gpt-5.6-sol",
+        "fixture": "keyed-task-pool",
+        "beforeStrictPasses": 1,
+        "afterStrictPasses": 1,
+        "beforeTurns": 11,
+        "afterTurns": 8,
+        "beforeInputTokens": 334824,
+        "afterInputTokens": 186118,
+        "beforeOutputTokens": 5083,
+        "afterOutputTokens": 3737,
+        "beforeTaskTimeSeconds": 127.692,
+        "afterTaskTimeSeconds": 92.534,
+        "beforeDoneDeferrals": 2,
+        "afterDoneDeferrals": 0,
+        "artifactAuditsPassed": 1,
+        "artifactAuditFailures": 0,
+        "artifactAuditWarnings": 0,
+        "attributionBoundary": "Independent native trajectories confirm non-regression and observed efficiency; the scripted identical trajectory supplies causal gate attribution."
+      },
+      "proof": {
+        "heredocSuccessCredited": true,
+        "heredocFailureRejected": true,
+        "ordinaryStdinRejected": true,
+        "bundledProbeEngagesAudit": true,
+        "laterEditInvalidatesProof": true,
+        "fullRegressionTestsPassed": 1168
+      },
+      "reason": "The complete fix closes two measured recognition gaps without weakening proof validity. A same-trajectory scripted run removes both redundant deferrals, negative controls remain closed, the full suite is green, and a fresh GPT-5.6 Sol task retained strict correctness while moving from 11 to 8 turns and from two audit deferrals to zero. The failed 13-turn partial fix is preserved as negative evidence."
+    },
+    {
+      "id": "visual-alt-coverage-advisory",
+      "decision": "experimental",
+      "default": "off",
+      "enable": "BANTAM_VISUAL_ALT_COVERAGE=1",
+      "evidence": [
+        ".bantam/experiments/terra-visual-alt-coverage-causal-ab",
+        ".bantam/replay-experiments/moonroot-early-alt-coverage-v2",
+        ".bantam/replay-experiments/moonroot-early-alt-coverage-v3-counterbalanced",
+        "test/visual-alt-coverage.test.js"
+      ],
+      "fullTaskStudy": {
+        "rounds": 3,
+        "control": {
+          "strictPasses": 3,
+          "tasks": 3
+        },
+        "treatment": {
+          "strictPasses": 3,
+          "tasks": 3,
+          "hints": 0,
+          "revisions": 0
+        }
+      },
+      "strictReplayStudy": {
+        "model": "gpt-5.6-terra",
+        "samples": 3,
+        "baselinePasses": 0,
+        "candidatePasses": 3,
+        "pairing": "counterbalanced-unseeded",
+        "orderBalance": "best-possible",
+        "verdict": "supported-unpaired",
+        "independentAudit": "pass"
+      },
+      "reason": "The narrow hint reliably repaired one saved omission under strict counterbalanced replay, but this remains one unseeded decision and the fresh full-task study produced zero interventions because Terra repaired the alt unaided. That boundary is not promotion-grade for ordinary users, so the advisory remains explicitly opt-in."
+    },
+    {
+      "id": "terminal-only-landing-grace",
+      "decision": "rejected",
+      "default": "absent",
+      "implementationRemoved": true,
+      "evidence": [
+        ".bantam/experiments/2026-07-30T01-30-16-613Z-terminal-landing-grace-terra-sol"
+      ],
+      "study": {
+        "models": [
+          "gpt-5.6-terra",
+          "gpt-5.6-sol"
+        ],
+        "rounds": 2,
+        "matchedWorkTraces": 8,
+        "controlStrictPasses": 4,
+        "treatmentStrictPasses": 4,
+        "controlReachedDone": 0,
+        "treatmentReachedDone": 4,
+        "treatmentInterventions": 4,
+        "extraRequests": 4,
+        "terraAggregateInputTokenDelta": 30764,
+        "terraAggregateTaskTimeSecondsDelta": 3.331,
+        "solAggregateInputTokenDelta": 32310,
+        "solAggregateTaskTimeSecondsDelta": 3.825,
+        "runArtifactAuditsPassed": 8
+      },
+      "reason": "The verifier-gated done-only call changed only the ceremonial reachedDone field. Both controls and treatments repaired the same source bytes and passed strict evaluation 4/4, while every treatment paid one additional Codex request plus tokens and latency. BANTAM already preserves and accepts a verified green tree at the turn boundary, so the candidate was removed rather than shipped as an opt-in cost."
+    },
+    {
+      "id": "replay-declared-current-coverage",
+      "decision": "promoted",
+      "default": "explicit-filter",
+      "enable": "replay-mine --coverage FILE --uncovered",
+      "scope": "Model-free replay specimen navigation can exclude operator-declared current safeguards by exact failing-artifact SHA-256 while retaining named evidence and a non-causality boundary.",
+      "evidence": [
+        "creative-suite/replay-coverage.json",
+        "test/replay-mine.test.js",
+        "src/replay-mine.js"
+      ],
+      "liveCorpus": {
+        "beforeFailures": 2,
+        "beforeCandidateTurns": 46,
+        "declaredCoveredFailures": 2,
+        "afterFailures": 0,
+        "afterCandidateTurns": 0,
+        "coveredMechanisms": [
+          "autonomous implementation response rejection",
+          "default keyed-Promise lifecycle state audit"
+        ]
+      },
+      "proof": {
+        "canonicalRegressionTestsPassed": 1191,
+        "focusedTestsPassed": 10,
+        "slimFocusedTestsPassed": 10,
+        "bothLaunchersModelFree": true,
+        "ordinaryOutputBackwardCompatible": true,
+        "malformedRegistryFailsClosed": true
+      },
+      "reason": "The prior untreated label described missing replay artifacts, not missing current safeguards, and therefore resurfaced range-parser and keyed-Promise trajectories already closed by deterministic guards. Exact SHA-pinned declarations make that distinction auditable without guessing from task text or changing default mining. The current corpus has no remaining untreated, uncontrasted, declared-uncovered failure; this is a navigation result, not a claim that no future failures exist."
+    },
+    {
+      "id": "compound-baseline-verifier-recognition",
+      "decision": "promoted",
+      "default": "on",
+      "rollback": "BANTAM_EMBEDDED_BASELINE_SCOPE=0",
+      "scope": "Credit exact baseline test counts when the baseline is one simple command appearing as a complete token-identical segment of a broader shell probe.",
+      "evidence": [
+        ".bantam/experiments/2026-07-30T01-45-24-713Z-fresh-hard-discovery-terra-sol",
+        ".bantam/replay-experiments/2026-07-30T02-05-59Z-compound-verifier-scope-sol",
+        ".bantam/experiments/2026-07-30T02-10-20-600Z-compound-verifier-scope-sol-ab",
+        "test/shell-lex.test.js",
+        "test/agent.test.js"
+      ],
+      "discovery": {
+        "models": [
+          "gpt-5.6-terra",
+          "gpt-5.6-sol"
+        ],
+        "strictPasses": 8,
+        "tasks": 8,
+        "naturalFalseWarningModel": "gpt-5.6-sol"
+      },
+      "exactReplay": {
+        "model": "gpt-5.6-sol",
+        "samples": 3,
+        "baselinePasses": 1,
+        "candidatePasses": 3,
+        "verdict": "partial-lift",
+        "independentAudit": "pass"
+      },
+      "fullTaskStudy": {
+        "model": "gpt-5.6-sol",
+        "rounds": 2,
+        "counterbalancing": "exact",
+        "controlStrictPasses": 2,
+        "treatmentStrictPasses": 2,
+        "controlTurns": 28,
+        "treatmentTurns": 16,
+        "controlScopeMismatchNotices": 3,
+        "treatmentScopeMismatchNotices": 0,
+        "treatmentEmbeddedBaselineRecognitions": 2,
+        "requestDelta": -12,
+        "inputTokenDelta": -724663,
+        "outputTokenDelta": -6850,
+        "reasoningTokenDelta": -3439,
+        "taskTimeSecondsDelta": -154.544,
+        "completionAuditDelta": 0,
+        "stateAuditDelta": 0,
+        "runArtifactAuditsPassed": 4
+      },
+      "crossFixtureReplication": {
+        "evidence": ".bantam/experiments/2026-07-30T02-29-18-679Z-compound-verifier-adapter-sol-ab",
+        "fixture": "adapter-migration",
+        "model": "gpt-5.6-sol",
+        "rounds": 2,
+        "controlStrictPasses": 2,
+        "treatmentStrictPasses": 2,
+        "controlScopeMismatchNotices": 0,
+        "treatmentEmbeddedBaselineRecognitions": 1,
+        "inactiveRuns": 3,
+        "completionAuditDelta": 0,
+        "lexicalContractAuditDelta": 0,
+        "runArtifactAuditsPassed": 4,
+        "aggregateEfficiencyAttributable": false,
+        "reason": "Only one treatment generated a compound verifier; neither control generated that action shape. The aggregate one-request treatment difference came from an unrelated extra repair and is not a causal mechanism cost."
+      },
+      "proof": {
+        "canonicalRegressionTestsPassed": 1196,
+        "substringsRejected": true,
+        "addedArgumentsRejected": true,
+        "compoundBaselinesRejected": true
+      },
+      "reason": "The old guard made an objectively false claim when the exact baseline verifier ran inside a broader probe. The narrow recognizer fired once in each treatment and never emitted a mismatch; both counterbalanced controls reproduced the false warning. Strict correctness and audit coverage stayed 2/2 in both arms while treatment removed 12 model calls and substantial tokens and latency. Exact replay was only partial evidence, so promotion rests on the replicated full-task intervention plus deterministic boundary tests."
+    }
+  ]
+}

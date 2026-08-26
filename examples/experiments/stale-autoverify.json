@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "name": "stale-autoverify-promotion",
+  "description": "Does the stale-turn auto-verify (BANTAM_AUTOVERIFY_STALE_TURNS) regress baseline reliability? Candidate=on(8) vs reference=off(0). Its targeted benefit was measured separately on swb3-migreduce (first-done 35.3->25.0 turns); this experiment is the no-regression gate for promotion.",
+  "fixtures": ["implement-fizzbuzz", "python-roman"],
+  "rounds": 2,
+  "seeds": [80181, 80182],
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "arms": [
+    { "name": "reference", "env": { "BANTAM_AUTOVERIFY_STALE_TURNS": "0" } },
+    { "name": "candidate", "env": { "BANTAM_AUTOVERIFY_STALE_TURNS": "8" } }
+  ]
+}

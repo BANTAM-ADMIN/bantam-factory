@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "name": "weak-repro-keyed-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. keyed-task-pool fails 9/15 on the local 27B, always as an async deadlock ('Promise resolution is still pending'). Not a spec gap (the task states the lifecycle contract), not an inert mechanism (the async state audit fires 14/15 and the model engages 2-14 times). A turn-level counterfactual injecting the hidden grader's exact error moved the model 3/6 re-done to 0/6 and 6/6 to `node --test` -- it reran its ONLY oracle, the public suite, which passes. DIAGNOSIS: oracle gap. The public suite is 6 assertions against the grader's 25 and runs everything at concurrency 1 with a single key, so it cannot observe queue drain, FIFO across keys, capacity release on a synchronous throw, or onIdle with queued work -- exactly the failing hidden tests. HYPOTHESIS: strengthening the public repro FROM THE TASK'S STATED INVARIANTS (not from the grader) raises the hidden pass rate, because the model can finally see its own bug. keyed-task-pool-strong is identical in task text, starting stubs and hidden grader; only the public test file differs, and its four added tests were validated green against a correct pool and red against the stubs. PRIMARY METRIC: hidden-contract pass rate. FALSIFIED IF: the strengthened arm does no better, which would mean the failure survives a working oracle and is a reasoning limit after all.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/keyed-task-pool-strong"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    { "name": "local", "description": "local 27B; the public repro strength is the only variable", "model": { "runtime": "local" } }
+  ]
+}

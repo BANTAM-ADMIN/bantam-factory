@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-blueprint",
+  "id": "semantic-sensor-qualification-cell",
+  "version": 1,
+  "title": "Semantic Sensor Qualification Cell",
+  "taskFamily": "semantic-matrix-inspection",
+  "routeId": "semantic-sensor-qualification-cell",
+  "authority": ["workspace.read"],
+  "stations": [
+    {
+      "id": "intake",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "semantic-qualification-intake",
+        "version": 1,
+        "title": "Qualification material intake",
+        "purpose": "Admit immutable semantic articles and a separately reviewed exact decision rack.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.semantic-qualification-intake/v1" },
+        "inputs": [],
+        "outputs": [
+          { "name": "matrix", "artifactType": "bantam.semantic-matrix/v1", "required": true },
+          { "name": "reviewed-rack", "artifactType": "bantam.semantic-reviewed-rack/v1", "required": true }
+        ],
+        "capabilities": ["semantic.qualification.admit"],
+        "authority": ["workspace.read"],
+        "gauge": { "id": "semantic-qualification-material-binding", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "intake", "icon": "rack", "color": "blue" },
+        "standardWork": {
+          "operation": "Clamp immutable model articles beside the reviewed coupon rack",
+          "instructions": ["Validate every semantic object.", "Validate and bind the reviewed rack identity."],
+          "fixtures": ["Content-addressed model articles", "Closed six-lane reviewed rack"],
+          "prohibited": ["Do not infer truth from model agreement.", "Do not discard unmatched reviewed material."],
+          "releaseCriteria": ["Every input validates and its exact identity is recorded."]
+        }
+      }
+    },
+    {
+      "id": "gauge",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "semantic-reviewed-gauge",
+        "version": 1,
+        "title": "Reviewed semantic decision gauge",
+        "purpose": "Compare an immutable semantic matrix with an independently reviewed positive and negative decision rack.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.semantic-reviewed-gauge/v1" },
+        "inputs": [
+          { "name": "matrix", "artifactType": "bantam.semantic-matrix/v1", "required": true },
+          { "name": "reviewed-rack", "artifactType": "bantam.semantic-reviewed-rack/v1", "required": true }
+        ],
+        "outputs": [{ "name": "evidence", "artifactType": "bantam.semantic-qualification-evidence/v1", "required": true }],
+        "capabilities": ["quality.semantic-matrix"],
+        "authority": ["workspace.read"],
+        "gauge": { "id": "semantic-reviewed-exactness", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released", "rework"],
+        "presentation": { "group": "quality", "icon": "gauge", "color": "green" },
+        "standardWork": {
+          "operation": "Press each semantic decision through the reviewed truth wicket",
+          "instructions": ["Join only byte-identical source units.", "Score explicit positive and negative lane decisions.", "Emit precision, recall, false positives, and false negatives."],
+          "fixtures": ["Immutable semantic matrix", "Independently reviewed decision rack", "Exact source identity join"],
+          "prohibited": ["Do not treat model agreement as reviewed truth.", "Do not silently discard unmatched review material.", "Do not mutate source files."],
+          "releaseCriteria": ["Every reviewed decision is matched exactly and the qualification policy dies pass."]
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "from": "intake", "out": "matrix", "to": "gauge", "in": "matrix" },
+    { "from": "intake", "out": "reviewed-rack", "to": "gauge", "in": "reviewed-rack" }
+  ],
+  "layout": {
+    "direction": "left-to-right",
+    "stations": [
+      { "id": "intake", "x": 0, "y": 1 },
+      { "id": "gauge", "x": 1, "y": 1 }
+    ]
+  }
+}

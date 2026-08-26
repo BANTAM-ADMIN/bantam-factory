@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "codex-delta-adaptive-completion-guard",
+  "description": "Validate that adaptive low-savings rebasing stays suppressed during the post-green completion audit.",
+  "fixtures": ["gauntlet/fixtures/adapter-migration"],
+  "rounds": 1,
+  "seeds": [77005],
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": true,
+  "arms": [
+    {
+      "name": "sol-delta-adaptive-guarded",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta",
+        "BANTAM_CODEX_REBASE_MIN_SAVINGS": "0.2"
+      }
+    }
+  ]
+}

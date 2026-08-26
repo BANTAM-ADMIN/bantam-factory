@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "both-gates-endtoend-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. The end-to-end test the two turn-level counterfactuals cannot supply. HYPOTHESIS: arming lexical_smoke + type_contract together lets adapter-migration reach a green hidden contract, which it has never done (0/9 across every recorded run). Rationale: the gates address hidden test 1 (parseEnabled case-insensitivity, ~50% incidence) and test 2 (container-type coercion, 6/6 incidence) plus part of test 4; test 3 already passed in all six lexical-smoke-gate-ab runs. PRIMARY METRIC: hidden-contract pass rate. SECONDARY: turns, and lexicalSmokeRejections + typeContractRejections. ENGAGEMENT CHECK, pre-registered: typeContractRejections must be non-zero in the candidate arm -- the defect it targets occurred 6/6, so a zero here means the gate did not engage and the pass rate is not attributable to it, exactly as happened in unchanged-verify-progress-ab. HARM METRIC: turns spent and any run that terminates WITHOUT reaching done. FALSIFIED IF: the gates fire but the contract stays red, which would mean the remaining defects (normalizeCoordinates numeric coercion, test 3) dominate.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "control",
+      "description": "Both gates off (current default)",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "0", "BANTAM_TYPE_CONTRACT_GATE": "0" }
+    },
+    {
+      "name": "candidate",
+      "description": "lexical_smoke + type_contract armed",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "1", "BANTAM_TYPE_CONTRACT_GATE": "1" }
+    }
+  ]
+}

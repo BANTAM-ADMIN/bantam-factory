@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "name": "terra-preview-task-review-occlusion",
+  "description": "Planted-defect causal screen: DOM evidence alone versus generic screenshot narration versus task-aware screenshot review when required controls exist in text and geometry but are visually occluded.",
+  "fixtures": ["creative-suite/fixtures/occluded-theme-controls"],
+  "rounds": 2,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-dom-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "0",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-generic-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "0"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    },
+    {
+      "name": "terra-task-aware-preview",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_PREVIEW_VISION": "1",
+        "BANTAM_CODEX_PREVIEW_TASK_REVIEW": "1"
+      },
+      "model": {"runtime":"codex","name":"gpt-5.6-terra","effort":"medium","timeoutMs":600000}
+    }
+  ]
+}

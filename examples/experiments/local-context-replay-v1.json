@@ -1,0 +1,14 @@
+{
+  "name": "Local Qwen context recovery replay v1",
+  "description": "Exact fresh-seed replay of the bare adapter migration failure after prompt-residency and patch-recovery fixes.",
+  "rounds": 1,
+  "seeds": [81202],
+  "arms": [
+    {
+      "name": "local-qwen",
+      "description": "Local 27B through the full BANTAM controller",
+      "model": { "runtime": "local" }
+    }
+  ],
+  "fixtures": ["gauntlet/fixtures/adapter-migration"]
+}

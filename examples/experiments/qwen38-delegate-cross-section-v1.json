@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "name": "qwen38 delegate cross section v1",
+  "description": "Delegate cross-section on the discriminative fixtures: codex sol/terra/luna through BANTAM's constrained loop plus native Claude Code, one round, full logs retained. Comparison anchors for the Qwen 3.8 characterization. Plan: docs/superpowers/reports/2026-08-14-qwen38-characterization-plan.md.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration",
+    "gauntlet/fixtures/channel-filter"
+  ],
+  "rounds": 1,
+  "seeds": [20260812],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "bantam-sol",
+      "description": "GPT-5.6 Sol (effort high) through BANTAM's constrained action loop",
+      "model": { "runtime": "codex", "name": "gpt-5.6-sol", "effort": "high" }
+    },
+    {
+      "name": "bantam-terra",
+      "description": "GPT-5.6 Terra (effort medium) through BANTAM's constrained action loop",
+      "model": { "runtime": "codex", "name": "gpt-5.6-terra", "effort": "medium" }
+    },
+    {
+      "name": "bantam-luna",
+      "description": "GPT-5.6 Luna (effort medium) through BANTAM's constrained action loop",
+      "model": { "runtime": "codex", "name": "gpt-5.6-luna", "effort": "medium" }
+    },
+    {
+      "name": "claude-code",
+      "description": "Native Claude Code (sonnet) with its complete JSONL event stream retained",
+      "model": { "runtime": "native-claude", "name": "sonnet", "effort": "high", "permissionMode": "acceptEdits" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

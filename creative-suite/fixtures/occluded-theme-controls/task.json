@@ -1,0 +1,7 @@
+{
+  "name": "occluded-theme-controls",
+  "task": "Audit and repair the existing Signal Garden campaign. Preserve the exact visible headline \"Signal Garden\", CTA \"Join the Night Walk\", and toggle labels \"Night\" and \"Dawn\". The theme controls must be clearly visible, unobscured, and usable by pointer; clicking them must switch data-theme and aria-pressed. Keep the page self-contained and offline. Run npm test and BANTAM preview after the repair. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 20,
+  "editable": ["index.html", "styles.css", "app.js"]
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "repeat-escape-event-cohort",
+  "description": "HISTORICAL RECORD ONLY: this cohort measured the retired repeat escape-mask control. Former settings remain in arm descriptions for provenance but are no longer passed to runs. Do not use this as an active A/B.",
+  "fixtures": [
+    "async-request-coalescing",
+    "stateful-cache-bug",
+    "create-missing-adapter",
+    "off-by-one-slice"
+  ],
+  "rounds": 2,
+  "seeds": [73302, 73402],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "description": "Historical control: BANTAM_REPEAT_MASK=0, with BANTAM_OUTCOME_CYCLE_GUARD=0 and BANTAM_TEST_TIMEOUT_MS=30000 (not passed).",
+      "env": {}
+    },
+    {
+      "name": "candidate",
+      "description": "Historical treatment: BANTAM_REPEAT_MASK=1, with BANTAM_OUTCOME_CYCLE_GUARD=0 and BANTAM_TEST_TIMEOUT_MS=30000 (not passed).",
+      "env": {}
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "name": "Native Codex isolated bypass probe",
+  "description": "One disposable fixture proving native Codex can edit, verify, and pass BANTAM's hidden grader on a host where the Codex bwrap helper is unavailable.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 1,
+  "seeds": [81111],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "native-codex",
+      "description": "Native Codex control in BANTAM's disposable candidate with explicit sandbox bypass",
+      "model": {
+        "runtime": "native-codex",
+        "name": "terra",
+        "effort": "medium",
+        "bypassSandbox": true
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

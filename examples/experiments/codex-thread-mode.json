@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "name": "codex-run-scoped-thread",
+  "description": "Compare fresh per-completion Codex threads with one native thread scoped to each authoritative BANTAM run.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 3,
+  "seeds": [75601, 75602, 75603],
+  "passAtK": [1, 2, 3],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-ephemeral",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "ephemeral"
+      }
+    },
+    {
+      "name": "sol-run-thread",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run"
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "name": "terra-visual-alt-coverage-causal-ab",
+  "description": "Balanced causal repair test: both arms receive the same incomplete starter alt and broken public headline; only treatment receives an evidence-grounded early alt-coverage hint.",
+  "fixtures": [
+    "creative-suite/fixtures/image-alt-repair"
+  ],
+  "rounds": 3,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-control",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1",
+        "BANTAM_VISUAL_COMPLETION_AUDIT": "0",
+        "BANTAM_VISUAL_ALT_COVERAGE": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-alt-coverage",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1",
+        "BANTAM_VISUAL_COMPLETION_AUDIT": "0",
+        "BANTAM_VISUAL_ALT_COVERAGE": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "visual-brief-contradiction",
+  "task": "The written notes in brief.md may be stale. Inspect assets/moonroot-campaign.png with view_image and treat the image as authoritative for visible facts. Write campaign.json with: visualFacts {people, paperBirds, gardenerLocation, moonLocation, copySafeRegion}; corrections (an array naming every stale claim and its correction); headline (3-6 words); body (35-55 words); cta (exactly 2 words); and placement {region, rationale}. people and paperBirds must be integer counts; all other visualFacts values are concise strings. The copy should feel quietly magical and practical. Do not use the words future, green, or grow in headline/body/cta. Do not modify the brief, image, tests, or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 18,
+  "editable": ["campaign.json"]
+}

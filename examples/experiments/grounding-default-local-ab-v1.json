@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "name": "grounding default local ab v1",
+  "description": "Does the code KB (grounding) earn its keep for local runs? Its opt-in default cites a 28s build cost that remeasured at 2.5-3.6s on this tree (2026-08-16), and `bantam exec` already defaults it ON while fixture runs default it off. Primary: strict passes. Guard: wall time per run within +15%.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 2,
+  "seeds": [
+    20260816,
+    20260817
+  ],
+  "passAtK": [
+    1
+  ],
+  "arms": [
+    {
+      "name": "ground-off",
+      "description": "Current fixture default: no code KB",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild",
+        "BANTAM_GROUND": "0"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "ground-on",
+      "description": "Code KB built; query tool answers defines/symbols/flow",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild",
+        "BANTAM_GROUND": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

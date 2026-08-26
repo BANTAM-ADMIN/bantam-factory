@@ -1,0 +1,5 @@
+{
+  "diffusion_config": { "canvas_length": 256, "max_denoising_steps": 7 },
+  "purpose": "Experimental low-effort worker profile; pass the nested object to vLLM --diffusion-config.",
+  "qualification": "Unqualified until a station-specific accepted-throughput cohort passes."
+}

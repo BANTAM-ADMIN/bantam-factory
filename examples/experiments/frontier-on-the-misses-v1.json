@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "frontier on the misses v1",
+  "description": "Claude Opus and Claude Fable on the day's two miss fixtures: channel-filter (Claude Sonnet failed the coercion trap 0/2) and keyed-task-pool (Qwen 3.8 dropped seed 2 on a strictness overshoot). Anchors for the 2026-08-14 characterization; n=1 per cell.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 1,
+  "seeds": [20260815],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "claude-opus",
+      "description": "Native Claude Code, Opus, complete event stream retained",
+      "model": { "runtime": "native-claude", "name": "opus", "effort": "high", "permissionMode": "acceptEdits" }
+    },
+    {
+      "name": "claude-fable",
+      "description": "Native Claude Code, Fable, complete event stream retained",
+      "model": { "runtime": "native-claude", "name": "fable", "effort": "high", "permissionMode": "acceptEdits" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

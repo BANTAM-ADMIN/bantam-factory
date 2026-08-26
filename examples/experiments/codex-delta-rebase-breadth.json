@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "name": "codex-delta-rebase-breadth",
+  "description": "Compare continuous exact prompt deltas with fresh-thread canonical checkpoints every three Codex calls across all hidden-contract fixtures.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy"
+  ],
+  "rounds": 1,
+  "seeds": [76001],
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-delta-continuous",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta",
+        "BANTAM_CODEX_REBASE_EVERY": "0"
+      }
+    },
+    {
+      "name": "sol-delta-rebase-3",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta",
+        "BANTAM_CODEX_REBASE_EVERY": "3"
+      }
+    }
+  ]
+}

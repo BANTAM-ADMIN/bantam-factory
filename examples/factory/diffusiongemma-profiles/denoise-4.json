@@ -1,0 +1,5 @@
+{
+  "diffusion_config": { "canvas_length": 256, "max_denoising_steps": 4 },
+  "purpose": "Destructive edge profile retained for reproduction; pass the nested object to vLLM --diffusion-config.",
+  "qualification": "Rejected: 6.8% yield and 2.12 accepted decisions/s in the measured mixed cohort."
+}

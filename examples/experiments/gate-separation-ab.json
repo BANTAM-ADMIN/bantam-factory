@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "gate-separation-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. Separates the two gates armed together in both-gates-endtoend-ab (control 0/3, both 2/3) and supplies a second cohort. HYPOTHESIS: type_contract carries most of the effect -- its defect occurred 6/6 in recorded runs while lexical_smoke fired in only 1 of 3 candidate runs, consistent with ~50% incidence. PRIMARY METRIC: hidden-contract pass rate per arm. ENGAGEMENT CHECK: typeContractRejections must be non-zero in the type-only and both arms; a zero makes that arm's pass rate unattributable, as happened in unchanged-verify-progress-ab. SECONDARY: turns, to price each gate separately against control's fail-fast 9/8/10. FALSIFIED IF: type-only performs no better than control, which would mean the both-arm result came from lexical_smoke or from variance. NOTE: pooled with the earlier cohort this yields n=6 for control and both, which is still short of the repeated-seeded-cohort bar for promotion.",
+  "fixtures": [
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "control",
+      "description": "Both gates off",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "0", "BANTAM_TYPE_CONTRACT_GATE": "0" }
+    },
+    {
+      "name": "type-only",
+      "description": "type_contract alone",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "0", "BANTAM_TYPE_CONTRACT_GATE": "1" }
+    },
+    {
+      "name": "lexical-only",
+      "description": "lexical_smoke alone",
+      "model": { "runtime": "local" },
+      "env": { "BANTAM_LEXICAL_SMOKE_GATE": "1", "BANTAM_TYPE_CONTRACT_GATE": "0" }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "name": "Heldout context teacher league v1",
+  "description": "Matched full-log teacher cohort on the three fixtures used by local-context-heldout-v1. Compares a frontier Codex model inside BANTAM's controller with independent native Codex and Claude Code controls. Local Qwen results are retained in the companion experiment rather than rerun.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/retry-consolidation-haystack"
+  ],
+  "rounds": 1,
+  "seeds": [81311],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "bantam-terra",
+      "description": "GPT-5.6 Terra reasoning through BANTAM's constrained action and evidence loop.",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium"
+      }
+    },
+    {
+      "name": "native-codex",
+      "description": "Independent native Codex CLI control with its complete JSONL event stream retained.",
+      "model": {
+        "runtime": "native-codex",
+        "name": "terra",
+        "effort": "medium",
+        "bypassSandbox": true
+      }
+    },
+    {
+      "name": "claude-sonnet",
+      "description": "Independent Claude Code Sonnet control with its complete JSONL event stream retained.",
+      "model": {
+        "runtime": "native-claude",
+        "name": "sonnet",
+        "effort": "high",
+        "permissionMode": "acceptEdits"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Local Qwen keyed lifecycle context replay v1",
+  "description": "Exact-seed replay of the strong keyed lifecycle task after Promise-publication ordering, visible-test timing, and invalid-probe context fixes.",
+  "rounds": 1,
+  "seeds": [81105],
+  "arms": [
+    {
+      "name": "local-qwen",
+      "description": "Local 27B through the full BANTAM controller",
+      "model": { "runtime": "local" }
+    }
+  ],
+  "fixtures": ["gauntlet/fixtures/keyed-task-pool-strong"]
+}

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "fixture-provenance-native-smoke",
+  "description": "Bounded native smoke proving identical fixture provenance across Terra and Sol run artifacts.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map"
+  ],
+  "rounds": 1,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-medium",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-high",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

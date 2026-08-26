@@ -1,0 +1,14 @@
+{
+  "title": "NIGHT FERRY",
+  "routeCode": "Q7",
+  "departure": "23:40",
+  "pier": "4",
+  "weather": "LIGHT FOG",
+  "diamondCount": 3,
+  "clockLocation": "right of the title",
+  "accentColors": [
+    "#37d6c0",
+    "#ed4e87"
+  ],
+  "layoutSummary": "Text and turquoise diamonds occupy the left side, while a clock sits on the right beside a pink vertical bar."
+}

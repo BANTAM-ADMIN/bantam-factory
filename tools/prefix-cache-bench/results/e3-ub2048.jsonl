@@ -1,0 +1,4 @@
+{"label": "identical resend", "prompt_tokens": 7522, "cache_n": 7518, "prompt_n": 4, "reuse_pct": 99.9, "prompt_ms": 47.8, "prompt_tok_s": 83.7, "gen_tok_s": 75.4, "wall_ms": 395.4}
+{"label": "panel edited (newest user message)", "prompt_tokens": 7522, "cache_n": 6029, "prompt_n": 1493, "reuse_pct": 80.2, "prompt_ms": 721.3, "prompt_tok_s": 2069.7, "gen_tok_s": 70.9, "wall_ms": 1090.2}
+{"label": "history edited (turn 2, mid-convo)", "prompt_tokens": 7522, "cache_n": 0, "prompt_n": 7522, "reuse_pct": 0.0, "prompt_ms": 3139.2, "prompt_tok_s": 2396.2, "gen_tok_s": 66.2, "wall_ms": 3886.6}
+{"label": "both edited", "prompt_tokens": 7522, "cache_n": 0, "prompt_n": 7522, "reuse_pct": 0.0, "prompt_ms": 3168.0, "prompt_tok_s": 2374.4, "gen_tok_s": 71.4, "wall_ms": 3879.6}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "name": "auto-thinking-budget-2048",
+  "description": "Test whether a 2048-token auto-thinking cap preserves hard-task correctness while reducing local interactive latency.",
+  "fixtures": [
+    "async-request-coalescing",
+    "reasoning-expr-eval",
+    "create-missing-adapter",
+    "stateful-cache-bug"
+  ],
+  "rounds": 2,
+  "seeds": [73301, 73302],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_THINK_N_PREDICT": "4096"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_THINK_N_PREDICT": "2048"
+      }
+    }
+  ]
+}

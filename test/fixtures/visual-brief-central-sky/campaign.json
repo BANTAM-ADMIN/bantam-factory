@@ -1,0 +1,22 @@
+{
+  "visualFacts": {
+    "people": 1,
+    "paperBirds": 3,
+    "gardenerLocation": "left foreground by greenhouse",
+    "moonLocation": "upper-right sky",
+    "copySafeRegion": "central sky"
+  },
+  "corrections": [
+    "Two gardeners → one gardener",
+    "Four paper birds → three paper birds",
+    "Moon in the upper-left → crescent moon in the upper-right",
+    "Copy in the lower-left → copy in the central sky"
+  ],
+  "headline": "Moonroot After Dark",
+  "body": "Moonroot helps city gardeners keep small spaces cared for after sunset. Practical seedlings, simple guidance, and reliable supplies arrive when the work is quiet. Make a rooftop corner feel tended, luminous, and ready for tomorrow’s first light.",
+  "cta": "Find Moonroot",
+  "placement": {
+    "region": "central sky",
+    "rationale": "The open navy sky offers clear contrast while keeping the gardener, greenhouse, birds, and moon unobscured."
+  }
+}

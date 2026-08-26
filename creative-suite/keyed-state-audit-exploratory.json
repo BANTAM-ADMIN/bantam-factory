@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "name": "keyed-state-audit-exploratory",
+  "description": "Bounded same-model exploratory comparison of no state audit versus the default keyed Promise lifecycle audit.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 1,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "audit-off",
+      "env": {
+        "BANTAM_STATE_AUDIT": "0"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "audit-auto",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.5",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

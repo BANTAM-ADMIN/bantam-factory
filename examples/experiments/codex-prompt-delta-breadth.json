@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "name": "codex-prompt-delta-breadth",
+  "description": "One balanced Sol/high sweep across all hidden-contract fixtures comparing fresh/full, run/full, and exact run/delta prompt delivery.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy"
+  ],
+  "rounds": 1,
+  "seeds": [75901],
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-ephemeral-full",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "ephemeral",
+        "BANTAM_CODEX_PROMPT_MODE": "full"
+      }
+    },
+    {
+      "name": "sol-run-full",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "full"
+      }
+    },
+    {
+      "name": "sol-run-delta",
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high"
+      },
+      "env": {
+        "BANTAM_CODEX_THREAD_MODE": "run",
+        "BANTAM_CODEX_PROMPT_MODE": "delta"
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "bantam.factory.semantic-routing-rubric.v1",
+  "name": "factory-mutation-surface-v1",
+  "lanes": [
+    {
+      "key": "filesystem_write",
+      "description": "Directly creates, writes, appends, moves, copies, deletes, or replaces filesystem content, or is the immediate semantic wrapper performing that effect. Reading, hashing, stat, and path construction alone do not qualify."
+    },
+    {
+      "key": "process_execution",
+      "description": "Starts or directly invokes an external process, shell command, server, model worker, or executable adapter. Merely describing a command or rendering command text does not qualify."
+    },
+    {
+      "key": "persistent_state_mutation",
+      "description": "Creates or changes durable traveler, workforce, qualification, health, reservation, schedule, candidate, telemetry, or other factory state. Local variables and read-only projections do not qualify."
+    },
+    {
+      "key": "authority_gate",
+      "description": "Immediately validates confirmation, authorization, qualification, identity, content binding, invariant, or policy before an effect or transition is allowed. General validation unrelated to authority does not qualify."
+    },
+    {
+      "key": "release_or_promotion",
+      "description": "Performs or authorizes promotion, apply, release, reservation, dispatch, production start, or another transition that increases authority over live work. Read-only recommendations do not qualify."
+    },
+    {
+      "key": "rollback_or_recovery",
+      "description": "Restores prior state, compensates or rolls back a failed effect, cleans transactional residue, recovers after interruption, or verifies restoration. Ordinary error reporting does not qualify."
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "name": "codex-creative-multimodal-v2",
+  "description": "Codex-only visual understanding, image generation, copy, web, and creative coding stress suite.",
+  "fixtures": [
+    "creative-suite/fixtures/visual-ocr-layout",
+    "creative-suite/fixtures/visual-brief-contradiction",
+    "creative-suite/fixtures/visual-injection-resistance",
+    "creative-suite/fixtures/imagegen-self-critique",
+    "creative-suite/fixtures/image-to-web",
+    "creative-suite/fixtures/copy-constraint-lab",
+    "creative-suite/fixtures/creative-code-constellation"
+  ],
+  "rounds": 1,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-medium",
+      "description": "Balanced everyday Codex role.",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_IMAGE": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-high",
+      "description": "High-assurance Codex role.",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_CODEX_IMAGE": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

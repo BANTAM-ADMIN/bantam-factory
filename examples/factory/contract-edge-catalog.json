@@ -1,0 +1,50 @@
+[
+  {
+    "id": "empty-input",
+    "description": "The contract explicitly defines behavior when the input collection or string is empty."
+  },
+  {
+    "id": "signed-values",
+    "description": "The contract explicitly permits or rejects numeric values with plus or minus signs."
+  },
+  {
+    "id": "ascending-range",
+    "description": "The contract explicitly defines an inclusive range whose first endpoint is below its second."
+  },
+  {
+    "id": "descending-range",
+    "description": "The contract explicitly defines a range whose first endpoint is above its second."
+  },
+  {
+    "id": "surrounding-whitespace",
+    "description": "The contract explicitly defines whitespace around values, separators, or fields."
+  },
+  {
+    "id": "deduplicate-first",
+    "description": "The contract requires duplicate results to be removed while preserving first appearance."
+  },
+  {
+    "id": "malformed-segment",
+    "description": "The contract explicitly requires malformed, missing, or empty segments to be rejected."
+  },
+  {
+    "id": "unsafe-integer",
+    "description": "The contract explicitly rejects integers outside the language's safe integer domain."
+  },
+  {
+    "id": "case-insensitive",
+    "description": "The contract explicitly compares or keys textual values without regard to letter case."
+  },
+  {
+    "id": "stable-order",
+    "description": "The contract requires output to retain a defined input or insertion order."
+  },
+  {
+    "id": "missing-key",
+    "description": "The contract explicitly defines behavior when a requested key does not exist."
+  },
+  {
+    "id": "concurrent-call",
+    "description": "The contract explicitly defines behavior for overlapping or concurrent operations."
+  }
+]

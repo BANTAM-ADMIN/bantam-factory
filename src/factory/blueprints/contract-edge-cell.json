@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "kind": "bantam.factory-blueprint",
+  "id": "contract-edge-cell",
+  "version": 1,
+  "title": "Contract edge enumeration cell",
+  "taskFamily": "contract-edge-enumeration",
+  "routeId": "contract-edge-cell",
+  "authority": ["contract.read"],
+  "stations": [
+    {
+      "id": "intake",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-intake",
+        "version": 1,
+        "title": "Contract card intake",
+        "purpose": "Admit one bounded contract and its public edge catalog.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.contract-edge-intake/v1" },
+        "inputs": [],
+        "outputs": [{ "name": "contract", "artifactType": "bantam.contract-packet/v1", "required": true }],
+        "capabilities": ["contract.admit"],
+        "authority": ["contract.read"],
+        "gauge": { "id": "contract-edge-intake", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "intake", "icon": "station", "color": "blue" },
+        "standardWork": {
+          "operation": "Clamp one contract card into the selection jig",
+          "instructions": ["Bind the exact contract text and public edge catalog."],
+          "fixtures": ["Closed catalog", "Content-addressed contract packet"],
+          "prohibited": ["Do not add candidate answers.", "Do not expose the held-out expected set."],
+          "releaseCriteria": ["The packet is structurally valid and every catalog identifier is unique."]
+        }
+      }
+    },
+    {
+      "id": "enumerate",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-enumerator",
+        "version": 1,
+        "title": "Contract edge enumerator",
+        "purpose": "Select every applicable edge identifier without changing product material.",
+        "worker": { "kind": "model", "adapter": "bantam.factory.contract-edge-enumerator/v1" },
+        "inputs": [{ "name": "contract", "artifactType": "bantam.contract-packet/v1", "required": true }],
+        "outputs": [{ "name": "response", "artifactType": "bantam.contract-edge-response/v1", "required": true }],
+        "capabilities": ["model.semantic-work"],
+        "authority": ["contract.read"],
+        "gauge": { "id": "contract-edge-response-shape", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "production", "icon": "chicken", "color": "amber" },
+        "standardWork": {
+          "operation": "Peck the applicable edge buttons",
+          "instructions": ["Read the bounded contract.", "Choose every applicable identifier from the supplied catalog.", "Return only the constrained selection object."],
+          "fixtures": ["Finite identifier catalog", "GBNF output die", "No workspace or mutation tools"],
+          "prohibited": ["Do not invent identifiers.", "Do not explain the answer.", "Do not infer a hidden gauge."],
+          "releaseCriteria": ["The response has the exact schema, known unique identifiers, and no extra fields."]
+        }
+      }
+    },
+    {
+      "id": "inspection",
+      "asset": {
+        "schema": 2,
+        "kind": "bantam.factory-station",
+        "id": "contract-edge-inspection",
+        "version": 1,
+        "title": "Independent contract edge gauge",
+        "purpose": "Compare the selected identifiers with the held-out expected set.",
+        "worker": { "kind": "tool", "adapter": "bantam.factory.contract-edge-inspection/v1" },
+        "inputs": [{ "name": "response", "artifactType": "bantam.contract-edge-response/v1", "required": true }],
+        "outputs": [{ "name": "response", "artifactType": "bantam.contract-edge-response/v1", "required": true }],
+        "capabilities": ["quality.contract-edges"],
+        "authority": ["contract.read"],
+        "gauge": { "id": "contract-edge-exact-set", "version": 1, "independent": true },
+        "dispositions": ["blocked", "contained", "infrastructure", "released"],
+        "presentation": { "group": "quality", "icon": "station", "color": "green" },
+        "standardWork": {
+          "operation": "Press the exact-set wicket",
+          "instructions": ["Parse the exact upstream response.", "Compare it with the held-out expected identifier set."],
+          "fixtures": ["Independent expected-set gauge", "Order-insensitive exact comparison"],
+          "prohibited": ["Do not repair or reinterpret a selection.", "Do not disclose expected identifiers upstream."],
+          "releaseCriteria": ["No required edge is missing and no inapplicable edge is selected."]
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "from": "intake", "out": "contract", "to": "enumerate", "in": "contract" },
+    { "from": "enumerate", "out": "response", "to": "inspection", "in": "response" }
+  ],
+  "layout": {
+    "direction": "left-to-right",
+    "stations": [
+      { "id": "intake", "x": 0, "y": 1 },
+      { "id": "enumerate", "x": 1, "y": 1 },
+      { "id": "inspection", "x": 2, "y": 1 }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "creative frontend cross v1",
+  "description": "Creative-suite cross-section: constrained copywriting (copy-constraint-lab), front-end state/a11y repair (declarative-a11y-state, occluded-theme-controls), and a 30-turn browser-artwork build (creative-code-constellation). Arms: local Qwen 3.8 rebuild, native Claude Opus, BANTAM-governed Terra. Extends the 2026-08-14 characterization into non-backend task families; n=1 per cell.",
+  "fixtures": [
+    "creative-suite/fixtures/copy-constraint-lab",
+    "creative-suite/fixtures/declarative-a11y-state",
+    "creative-suite/fixtures/occluded-theme-controls",
+    "creative-suite/fixtures/creative-code-constellation"
+  ],
+  "rounds": 1,
+  "seeds": [20260814],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "qwen38-rebuild",
+      "description": "Local 27B, champion configuration",
+      "env": { "BANTAM_PROMPT_TRAJECTORY": "rebuild" },
+      "model": { "runtime": "local" }
+    },
+    {
+      "name": "claude-opus",
+      "description": "Native Claude Code, Opus",
+      "model": { "runtime": "native-claude", "name": "opus", "effort": "high", "permissionMode": "acceptEdits" }
+    },
+    {
+      "name": "bantam-terra",
+      "description": "GPT-5.6 Terra through BANTAM's constrained loop",
+      "model": { "runtime": "codex", "name": "gpt-5.6-terra", "effort": "medium" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

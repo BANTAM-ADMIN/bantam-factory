@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "name": "qwen38 base family ab v1",
+  "description": "Qwen 3.8 27B Q5_K_XL characterization on the base fixture family, rebuild vs extension. Exact mirror of local-extension-trajectory-ab-v1 (fixtures, seeds, harness settings) for direct comparison against the 2026-08-12 Qwen 3.6 evidence. Plan: docs/superpowers/reports/2026-08-14-qwen38-characterization-plan.md.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/retry-policy",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "seeds": [20260812, 20260813, 20260814],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "qwen38-rebuild",
+      "description": "New 27B, default rebuild trajectory",
+      "env": { "BANTAM_PROMPT_TRAJECTORY": "rebuild" },
+      "model": { "runtime": "local" }
+    },
+    {
+      "name": "qwen38-extension",
+      "description": "New 27B, opt-in extension trajectory",
+      "env": { "BANTAM_PROMPT_TRAJECTORY": "extension" },
+      "model": { "runtime": "local" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

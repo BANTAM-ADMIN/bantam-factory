@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "name": "compact strictness routing decision v1",
+  "description": "Preregistered routing decision for the compact-strictness family: rebuild vs extension vs extension-plus-typegate at n=10 per arm. Ordered decision rule (typegate default-on / no change / revert local default): docs/superpowers/reports/2026-08-12-strictness-routing-preregistration.md.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/channel-filter-explicit"
+  ],
+  "rounds": 5,
+  "seeds": [20260830, 20260831, 20260832, 20260833, 20260834],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "rebuild",
+      "description": "Former local default trajectory",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "extension",
+      "description": "Current local default trajectory",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "extension"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "extension-typegate",
+      "description": "Extension plus BANTAM_TYPE_CONTRACT_GATE=1",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "extension",
+        "BANTAM_TYPE_CONTRACT_GATE": "1"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

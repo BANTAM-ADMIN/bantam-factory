@@ -1,0 +1,7 @@
+{
+  "name": "creative-code-constellation",
+  "task": "Build an accessible browser artwork called Constellation Typewriter using index.html, styles.css, app.js, and src/constellation.js. Typing printable characters creates one deterministic star per Unicode code point; Backspace removes the last star; Escape clears all stars; an Export button downloads the current state as JSON. In src/constellation.js export normalizeText, charToStar, createConstellation, removeLast, and serializeConstellation. normalizeText(value) must use Array.from(String(value)), keep printable non-control code points, and cap at 40 characters. charToStar(char,index) returns {id:`star-${index}`,glyph:char,x,y,size} where code=char.codePointAt(0), x=(code*17+index*29)%101, y=(code*31+index*13)%101, size=2+(code%4). createConstellation maps normalized text. removeLast returns the normalized text without its final code point. serializeConstellation returns JSON for {version:1,text,stars}. The page must render stars, expose an aria-live count, include keyboard instructions, and honor prefers-reduced-motion. Make it visually distinctive rather than a generic form. Keep it completely self-contained and offline: do not load fonts, scripts, styles, or other resources from external URLs or CDNs. Run BANTAM preview after implementation. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 30,
+  "editable": ["index.html", "styles.css", "app.js", "src"]
+}

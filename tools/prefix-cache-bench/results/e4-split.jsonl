@@ -1,0 +1,6 @@
+{"cfg": "split", "label": "1. worker warms slot 0", "slot": 0, "prompt_tokens": 8552, "cache_n": 0, "prompt_n": 8552, "reuse_pct": 0.0, "prompt_ms": 3716.5, "wall_ms": 4163.8}
+{"cfg": "split", "label": "2. worker repeats (control: is it warm?)", "slot": 0, "prompt_tokens": 8552, "cache_n": 8548, "prompt_n": 4, "reuse_pct": 100.0, "prompt_ms": 50.0, "wall_ms": 377.6}
+{"cfg": "split", "label": "3. attendant works on slot 1", "slot": 1, "prompt_tokens": 3800, "cache_n": 0, "prompt_n": 3800, "reuse_pct": 0.0, "prompt_ms": 1654.5, "wall_ms": 2326.8}
+{"cfg": "split", "label": "4. worker returns to slot 0  <-- THE TEST", "slot": 0, "prompt_tokens": 8552, "cache_n": 8548, "prompt_n": 4, "reuse_pct": 100.0, "prompt_ms": 48.5, "wall_ms": 660.9}
+{"cfg": "split", "label": "5. attendant repeats on slot 1", "slot": 1, "prompt_tokens": 3800, "cache_n": 3796, "prompt_n": 4, "reuse_pct": 99.9, "prompt_ms": 44.8, "wall_ms": 326.8}
+{"cfg": "split", "label": "6. worker returns again", "slot": 0, "prompt_tokens": 8552, "cache_n": 8548, "prompt_n": 4, "reuse_pct": 100.0, "prompt_ms": 48.0, "wall_ms": 373.6}

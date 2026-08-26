@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "name": "terra-usage-attribution-smoke",
+  "description": "One-run end-to-end proof that action-generation and supplied-image-vision usage survive fixture deltas, run artifacts, experiment aggregation, and Markdown reporting.",
+  "fixtures": [
+    "creative-suite/fixtures/visual-ocr-layout"
+  ],
+  "rounds": 1,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": true,
+  "arms": [
+    {
+      "name": "terra-medium",
+      "env": {
+        "BANTAM_GROUND": "1",
+        "BANTAM_IMAGE_PIXEL_FACTS": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

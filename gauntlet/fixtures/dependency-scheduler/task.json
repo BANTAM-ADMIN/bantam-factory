@@ -1,0 +1,9 @@
+{
+  "name": "dependency-scheduler",
+  "task": "Implement runGraph in src/scheduler.js. runGraph(tasks, run, options) executes a dependency graph and resolves to one result per input task, in input order. Each task is { id, deps } where id is a non-empty string and deps is an optional array of ids. options accepts { concurrency = 4 }. Validate the ENTIRE graph before running any task: reject with TypeError for a non-array tasks, a non-function run, a missing or non-string id, a duplicate id, a non-array deps, a dependency on an unknown id, or a dependency cycle; reject invalid concurrency with RangeError. No task may run when validation fails. A task runs only after every one of its dependencies has fulfilled. Run at most concurrency tasks simultaneously, and when several tasks become ready at the same moment, start the one that appears earliest in the input array. Each result is { id, status, value } for a fulfilled task, { id, status, reason } for a rejected one, where status is \"fulfilled\", \"rejected\" or \"skipped\". If a task rejects, preserve its rejection reason by identity, and mark every task that transitively depends on it \"skipped\" rather than \"rejected\" -- a skipped task's own dependents are skipped too, and its run function is never called. A failure must not prevent independent tasks from running to completion, and the returned promise must resolve once every task has fulfilled, rejected or been skipped. An empty graph resolves to an empty array. Never mutate the inputs. Use only the Node standard library. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 40,
+  "editable": [
+    "src"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "retry-consolidation",
+  "task": "src/clients/billing.js, src/clients/search.js and src/clients/audit.js each carry their own copy of the same retry loop. Consolidate that duplicated retry handling into one shared module under src/, and have the three clients use it. This is a refactor: the observable behaviour of all three clients must not change. They deliberately differ and those differences are load-bearing, so preserve each one exactly. chargeCard makes at most 4 attempts, treats only HTTP 503 and 429 as transient, and backs off exponentially starting at 50ms (50, 100, 200). query makes at most 3 attempts, additionally treats 504 as transient, and backs off exponentially starting at 20ms. append makes at most 5 attempts, treats only 503 and 429 as transient, and backs off a FLAT 10ms between attempts because its writes are idempotent and cheap. In every client a non-transient error propagates immediately without a retry or a wait, a successful call never waits, and when the attempt budget is exhausted the error that propagates is the last one received, by identity. Keep the three client modules at their current paths and keep their exported function names. When you are done no client module may schedule its own backoff wait; the shared module owns it. Use only the Node standard library. Do not modify tests or package configuration.",
+  "verify": "npm test",
+  "maxTurns": 40,
+  "editable": [
+    "src"
+  ]
+}

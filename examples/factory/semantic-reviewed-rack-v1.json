@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "kind": "bantam.semantic-reviewed-rack",
+  "rubric": "factory-mutation-surface-v1",
+  "units": [
+    {
+      "path": "src/factory/blueprint.js",
+      "startLine": 225,
+      "endLine": 240,
+      "sha256": "032d2c260eeda0e74a1d16461a0f444a19b1f09a0555d39b215c9bd77df5f065",
+      "evidenceRef": "review://factory-semantic-cohort-1/blueprint-report-writer",
+      "decisions": {
+        "filesystem_write": true,
+        "process_execution": false,
+        "persistent_state_mutation": false,
+        "authority_gate": false,
+        "release_or_promotion": false,
+        "rollback_or_recovery": true
+      }
+    },
+    {
+      "path": "src/factory/coding-cell.js",
+      "startLine": 257,
+      "endLine": 272,
+      "sha256": "1f835a3dcb18310124c570121116c8e04e7404ed6d7e85cad74c00359180cc63",
+      "evidenceRef": "review://factory-semantic-cohort-1/candidate-apply",
+      "decisions": {
+        "filesystem_write": true,
+        "process_execution": true,
+        "persistent_state_mutation": true,
+        "authority_gate": true,
+        "release_or_promotion": false,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/coding-cell.js",
+      "startLine": 273,
+      "endLine": 288,
+      "sha256": "fb7d8ecbe968ea676387cb8cddae2b531bd041f0cf6cc37a18ce60be86f11fce",
+      "evidenceRef": "review://factory-semantic-cohort-1/verified-promotion",
+      "decisions": {
+        "filesystem_write": true,
+        "process_execution": false,
+        "persistent_state_mutation": true,
+        "authority_gate": true,
+        "release_or_promotion": true,
+        "rollback_or_recovery": true
+      }
+    },
+    {
+      "path": "src/factory/coding-cell.js",
+      "startLine": 289,
+      "endLine": 304,
+      "sha256": "7fceabaa3cca68173da0cad12ca2947505db4204b93a13287981be5277219b11",
+      "evidenceRef": "review://factory-semantic-cohort-1/rollback-and-verifier-launch",
+      "decisions": {
+        "filesystem_write": true,
+        "process_execution": true,
+        "persistent_state_mutation": false,
+        "authority_gate": true,
+        "release_or_promotion": false,
+        "rollback_or_recovery": true
+      }
+    },
+    {
+      "path": "src/factory/coding-cell.js",
+      "startLine": 305,
+      "endLine": 320,
+      "sha256": "86ac28318e7d85f9921c54a332512e6ed8cc74ec9d1f7aeac71e3b1bdccd23f8",
+      "evidenceRef": "review://factory-semantic-cohort-1/verifier-result-projection",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": false,
+        "persistent_state_mutation": false,
+        "authority_gate": false,
+        "release_or_promotion": false,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/semantic-fact-plant.js",
+      "startLine": 97,
+      "endLine": 112,
+      "sha256": "8296bce908e3adbbf047cd9752edfa5812c4ffacfcc2c61c2b78ef1e93ddd9e8",
+      "evidenceRef": "review://factory-semantic-cohort-1/accepted-fact-promotion",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": false,
+        "persistent_state_mutation": true,
+        "authority_gate": true,
+        "release_or_promotion": true,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/semantic-sensor-qualification.js",
+      "startLine": 145,
+      "endLine": 160,
+      "sha256": "23cb5e2b0cda5eb454f5b5c82ef6fe9a6bda179795c4a174fc6b26297a8867b7",
+      "evidenceRef": "review://factory-semantic-cohort-1/qualification-policy-wickets",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": false,
+        "persistent_state_mutation": false,
+        "authority_gate": true,
+        "release_or_promotion": false,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/worker-onboarding.js",
+      "startLine": 33,
+      "endLine": 48,
+      "sha256": "212fc972df131f6c759c737ac4e8143640eec2662296010f9400e6e5272712f8",
+      "evidenceRef": "review://factory-semantic-cohort-1/clockin-gate",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": false,
+        "persistent_state_mutation": true,
+        "authority_gate": true,
+        "release_or_promotion": false,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/workforce.js",
+      "startLine": 49,
+      "endLine": 64,
+      "sha256": "63a05b94e708454e64e22254c41125d795ca6ee24b061947ec18183fb5d8dbbe",
+      "evidenceRef": "review://factory-semantic-cohort-1/profile-install",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": false,
+        "persistent_state_mutation": true,
+        "authority_gate": true,
+        "release_or_promotion": false,
+        "rollback_or_recovery": false
+      }
+    },
+    {
+      "path": "src/factory/yard-server.js",
+      "startLine": 113,
+      "endLine": 128,
+      "sha256": "7b4524a3e0dbf4e4624a7e5f5f1bf27b3fa09890a5d23dc98a5c5341f9ab9e61",
+      "evidenceRef": "review://factory-semantic-cohort-1/server-lifecycle",
+      "decisions": {
+        "filesystem_write": false,
+        "process_execution": true,
+        "persistent_state_mutation": false,
+        "authority_gate": false,
+        "release_or_promotion": false,
+        "rollback_or_recovery": true
+      }
+    }
+  ]
+}

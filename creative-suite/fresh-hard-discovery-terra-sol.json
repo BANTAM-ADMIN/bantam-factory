@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "name": "fresh-hard-discovery-terra-sol",
+  "description": "Fresh two-round discovery matrix on async cross-file orchestration and broad adapter migration using current default BANTAM behavior.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 2,
+  "passAtK": [
+    1,
+    2
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-default",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-default",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

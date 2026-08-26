@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "name": "Local Qwen general source-grounding context AB v1",
+  "description": "Matched same-seed comparison across nine task shapes excluded from the scheduler/retry/channel tuning cohort. Treatments either place literal task-named source in the opening reasoning context or spend one fresh reasoning pass after those paths have been inspected. Seven fixtures name concrete source files and can activate the treatment; the two directory-only adapter tasks are intentional unchanged negative controls. Neither treatment adds a semantic contract, task classifier, verification trigger, or action mask. Full API/request and execution-state shadow evidence is retained.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/ttl-cache",
+    "gauntlet/fixtures/safe-config-merge",
+    "gauntlet/fixtures/range-parser",
+    "gauntlet/fixtures/retry-policy",
+    "gauntlet/fixtures/keyed-task-pool",
+    "gauntlet/fixtures/adapter-migration",
+    "gauntlet/fixtures/keyed-task-pool-strong",
+    "gauntlet/fixtures/adapter-migration-explicit"
+  ],
+  "rounds": 1,
+  "seeds": [81401],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "control",
+      "description": "Current general BANTAM context with literal task-path preloading disabled.",
+      "env": {
+        "BANTAM_TASK_PATH_PRELOAD": "0",
+        "BANTAM_PREEDIT_SYNTHESIS": "0",
+        "BANTAM_SUPPRESS_PREEDIT_CHECKPOINT": "0",
+        "BANTAM_EXECUTION_STATE_SHADOW": "1"
+      },
+      "model": { "runtime": "local" }
+    },
+    {
+      "name": "post-inspection-synthesis",
+      "description": "After all literal task-named source paths are resident, spend one fresh reasoning pass before the first edit.",
+      "env": {
+        "BANTAM_TASK_PATH_PRELOAD": "0",
+        "BANTAM_PREEDIT_SYNTHESIS": "1",
+        "BANTAM_SUPPRESS_PREEDIT_CHECKPOINT": "0",
+        "BANTAM_EXECUTION_STATE_SHADOW": "1"
+      },
+      "model": { "runtime": "local" }
+    },
+    {
+      "name": "literal-path-opening-context",
+      "description": "Put existing source paths explicitly named by the task into the opening context so turn-zero reasoning is source-grounded.",
+      "env": {
+        "BANTAM_TASK_PATH_PRELOAD": "1",
+        "BANTAM_PREEDIT_SYNTHESIS": "1",
+        "BANTAM_SUPPRESS_PREEDIT_CHECKPOINT": "0",
+        "BANTAM_EXECUTION_STATE_SHADOW": "1"
+      },
+      "model": { "runtime": "local" }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

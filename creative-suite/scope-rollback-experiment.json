@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "name": "codex-eval-scope-rollback-ab",
+  "description": "Paired Terra/Sol non-regression check for atomic evaluator scope protection on the recurring range-parser failure family.",
+  "fixtures": [
+    "gauntlet/fixtures/range-parser"
+  ],
+  "rounds": 1,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-control",
+      "description": "Terra medium with post-run scope grading only.",
+      "env": {
+        "BANTAM_EVAL_SCOPE_ROLLBACK": null
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "terra-treatment",
+      "description": "Terra medium with paired direct-edit refusal and protected shell rollback.",
+      "env": {
+        "BANTAM_EVAL_SCOPE_ROLLBACK": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-control",
+      "description": "Sol high with post-run scope grading only.",
+      "env": {
+        "BANTAM_EVAL_SCOPE_ROLLBACK": null
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-treatment",
+      "description": "Sol high with paired direct-edit refusal and protected shell rollback.",
+      "env": {
+        "BANTAM_EVAL_SCOPE_ROLLBACK": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

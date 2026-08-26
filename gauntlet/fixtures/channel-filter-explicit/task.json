@@ -1,0 +1,9 @@
+{
+  "name": "channel-filter-explicit",
+  "task": "Complete the notification channel normalizers in src/channel-filter.js. Contracts: normalizeChannels accepts an array of strings, trims each entry, lowercases it, drops empty entries, removes duplicates while preserving first-seen order, never mutates the input, and rejects everything else with TypeError. normalizeDelivery accepts a plain object whose values are booleans, trims and lowercases each key, returns a new object, never mutates the input, and rejects everything else with TypeError. The visible tests cover only well-formed input; the contracts above are the specification.",
+  "verify": "npm test",
+  "maxTurns": 20,
+  "editable": [
+    "src"
+  ]
+}

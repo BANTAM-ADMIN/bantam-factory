@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "keyed-state-audit-heredoc-sol-after",
+  "description": "Post-fix Sol validation that successful stdin-heredoc lifecycle probes discharge the keyed state audit without redundant deferrals.",
+  "fixtures": [
+    "gauntlet/fixtures/keyed-task-pool"
+  ],
+  "rounds": 1,
+  "passAtK": [
+    1
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "sol-audit-auto-heredoc-fix",
+      "env": {
+        "BANTAM_STATE_AUDIT": "auto"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

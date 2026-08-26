@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "async-state-audit",
+  "description": "Test whether task-scoped async lifecycle counterexamples close stale-settlement bugs without changing unrelated Qwen repairs.",
+  "fixtures": [
+    "heldout-save-coordinator",
+    "async-request-coalescing",
+    "heldout-config-merge",
+    "stateful-cache-bug"
+  ],
+  "rounds": 2,
+  "seeds": [73701, 73702],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_COMPLETION_AUDIT": "1",
+        "BANTAM_STATE_AUDIT": "0",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_COMPLETION_AUDIT": "1",
+        "BANTAM_STATE_AUDIT": "auto",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    }
+  ]
+}

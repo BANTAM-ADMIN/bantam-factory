@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "outcome-cycle-awareness",
+  "description": "Test whether one concise signal on the second exact same test failure after an edit redirects Qwen without harming normal repair loops.",
+  "fixtures": [
+    "async-request-coalescing",
+    "create-missing-adapter",
+    "stateful-cache-bug",
+    "off-by-one-slice"
+  ],
+  "rounds": 2,
+  "seeds": [73302, 73401],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_OUTCOME_CYCLE_GUARD": "0",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_OUTCOME_CYCLE_GUARD": "1",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    }
+  ]
+}

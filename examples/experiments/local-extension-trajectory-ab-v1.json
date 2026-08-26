@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "name": "local extension trajectory A/B v1",
+  "description": "Preregistered rebuild-vs-extension prompt trajectory comparison on the local 27B across the task-size curve. Plan and decision rule: docs/superpowers/reports/2026-08-12-extension-trajectory-preregistration.md. Primary endpoints: strict-pass parity and fresh-token reduction; cache reuse is a mechanism metric, not the decision metric.",
+  "fixtures": [
+    "gauntlet/fixtures/ordered-map",
+    "gauntlet/fixtures/retry-policy",
+    "gauntlet/fixtures/dependency-scheduler",
+    "gauntlet/fixtures/adapter-migration"
+  ],
+  "rounds": 3,
+  "seeds": [20260812, 20260813, 20260814],
+  "passAtK": [1],
+  "arms": [
+    {
+      "name": "local-rebuild",
+      "description": "Control: rebuild trajectory (current local default, run-frozen head)",
+      "model": {
+        "runtime": "local"
+      }
+    },
+    {
+      "name": "local-extension",
+      "description": "Treatment: extension trajectory (byte-extension prompts, immutable history, no volatile tail)",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "extension"
+      },
+      "model": {
+        "runtime": "local"
+      }
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

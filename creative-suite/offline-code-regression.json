@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "name": "codex-offline-creative-code-regression",
+  "description": "Focused Terra/Sol regression for offline creative coding and CSS dependency-aware preview.",
+  "fixtures": [
+    "creative-suite/fixtures/creative-code-constellation"
+  ],
+  "rounds": 1,
+  "thinkMode": "off",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "terra-medium",
+      "env": {
+        "BANTAM_GROUND": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-terra",
+        "effort": "medium",
+        "timeoutMs": 600000
+      }
+    },
+    {
+      "name": "sol-high",
+      "env": {
+        "BANTAM_GROUND": "1"
+      },
+      "model": {
+        "runtime": "codex",
+        "name": "gpt-5.6-sol",
+        "effort": "high",
+        "timeoutMs": 600000
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"name":"gauntlet-dependency-scheduler","private":true,"type":"module","scripts":{"test":"node --test"}}

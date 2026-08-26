@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "name": "type-contract-generalisation-ab",
+  "description": "PRE-REGISTERED 2026-07-30, before any run. The one gap repetition cannot close: every type_contract number so far is adapter-migration. This runs the SECOND fixture, channel-filter, which was built to instantiate the same defect class (coerce where a stated type requires a throw) in a different domain. Validated before use: starting tree public-green / hidden-red with the gate reporting 3 findings; reference solution public-green / hidden-green with the gate reporting 0, which is also the live false-positive test no built-in fixture could supply. PRIMARY METRIC: hidden-contract pass rate, armed vs off. ENGAGEMENT CHECK: typeContractRejections must be non-zero in the armed arm. FALSIFIED IF: the gate engages and the armed arm does no better than control, which would mean the adapter-migration effect does not generalise and the gate should stay fixture-specific.",
+  "fixtures": ["gauntlet/fixtures/channel-filter"],
+  "rounds": 3,
+  "passAtK": [1],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    { "name": "control", "description": "type_contract off", "model": { "runtime": "local" }, "env": { "BANTAM_TYPE_CONTRACT_GATE": "0" } },
+    { "name": "candidate", "description": "type_contract armed", "model": { "runtime": "local" }, "env": { "BANTAM_TYPE_CONTRACT_GATE": "1" } }
+  ]
+}

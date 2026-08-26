@@ -1,0 +1,20 @@
+{
+  "schema": "bantam.factory.accepted-semantic-facts.v1",
+  "basis": "Manually reviewed exact direct-call sites in the 16-line source rack; acceptance is bounded to the stated lane and chunk.",
+  "facts": [
+    { "path": "src/factory/blueprint.js", "startLine": 225, "endLine": 240, "lane": "filesystem_write", "evidenceRef": "reviewed-direct-call:blueprint-write" },
+    { "path": "src/factory/lifecycle-cohort.js", "startLine": 49, "endLine": 64, "lane": "filesystem_write", "evidenceRef": "reviewed-direct-call:cohort-mkdir" },
+    { "path": "src/factory/lifecycle-cell.js", "startLine": 145, "endLine": 160, "lane": "filesystem_write", "evidenceRef": "reviewed-direct-call:lifecycle-mkdir" },
+    { "path": "src/factory/coding-cell.js", "startLine": 97, "endLine": 112, "lane": "filesystem_write", "evidenceRef": "reviewed-direct-call:coding-job-mkdir" },
+
+    { "path": "src/factory/lifecycle-cohort.js", "startLine": 129, "endLine": 144, "lane": "process_execution", "evidenceRef": "reviewed-direct-call:codex-delegate" },
+    { "path": "src/factory/lifecycle-cell.js", "startLine": 193, "endLine": 208, "lane": "process_execution", "evidenceRef": "reviewed-direct-call:diagnosis-agent" },
+    { "path": "src/factory/lifecycle-cell.js", "startLine": 241, "endLine": 256, "lane": "process_execution", "evidenceRef": "reviewed-direct-call:pool-agent" },
+    { "path": "src/factory/lifecycle-cell.js", "startLine": 289, "endLine": 304, "lane": "process_execution", "evidenceRef": "reviewed-direct-call:plan-agent" },
+    { "path": "src/factory/coding-cell.js", "startLine": 129, "endLine": 144, "lane": "process_execution", "evidenceRef": "reviewed-direct-call:coding-agent" },
+
+    { "path": "src/factory/coding-cell.js", "startLine": 257, "endLine": 272, "lane": "release_or_promotion", "evidenceRef": "reviewed-direct-call:workspace-transaction-apply" },
+    { "path": "src/factory/coding-cell.js", "startLine": 225, "endLine": 240, "lane": "rollback_or_recovery", "evidenceRef": "reviewed-direct-call:transaction-recovery" },
+    { "path": "src/factory/coding-cell.js", "startLine": 273, "endLine": 288, "lane": "rollback_or_recovery", "evidenceRef": "reviewed-direct-call:transaction-rollback" }
+  ]
+}

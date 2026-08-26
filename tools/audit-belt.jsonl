@@ -1,0 +1,2 @@
+{"id":"census-manifest","cwd":".","stdin":"tools/audits/census.sh","log":".bantam/audit-logs/census.log"}
+{"id":"guard-fossils","cwd":".","stdin":"tools/audits/guard-fossils.sh","log":".bantam/audit-logs/guard-fossils.log"}

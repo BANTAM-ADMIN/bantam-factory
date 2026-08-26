@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "name": "completion-audit",
+  "description": "Measure whether one post-green requirement audit improves semantic completion without reducing visible verifier reliability.",
+  "fixtures": [
+    "heldout-config-merge",
+    "async-request-coalescing",
+    "stateful-cache-bug",
+    "repair-order-multifile"
+  ],
+  "rounds": 2,
+  "seeds": [73501, 73502],
+  "passAtK": [1, 2],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false,
+  "arms": [
+    {
+      "name": "baseline",
+      "env": {
+        "BANTAM_COMPLETION_AUDIT": "0",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    },
+    {
+      "name": "candidate",
+      "env": {
+        "BANTAM_COMPLETION_AUDIT": "1",
+        "BANTAM_TEST_TIMEOUT_MS": "30000"
+      }
+    }
+  ]
+}

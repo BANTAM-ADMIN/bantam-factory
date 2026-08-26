@@ -60,12 +60,12 @@ export const ADDONS = [
   {
     name: "voice",
     label: "voice I/O",
-    what: "talk to BANTAM out loud (providers are pluggable; see docs)",
+    what: "talk to BANTAM out loud — LitheVoice engine (local VAD/STT/TTS, ~4 GB of models fetched by ITS installer) or any provider implementing src/voice/contract.md",
     status() {
       const d = path.join(addonsRoot(), "voice");
       return fs.existsSync(d) ? { installed: true, detail: d } : { installed: false, detail: "not installed" };
     },
-    installHint: "see docs — voice providers are configured, not downloaded",
+    installHint: "git clone the LitheVoice repo into ~/.bantam/addons/voice, then run its scripts/setup.sh (fetches pinned, hash-verified voice models with consent)",
   },
 ];
 

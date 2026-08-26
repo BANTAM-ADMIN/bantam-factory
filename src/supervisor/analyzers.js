@@ -81,14 +81,42 @@ export function prefixBreaks(film) {
   return { detected: breaks, gaugedBreaks: gauged };
 }
 
-const RED_RE = /# fail [1-9]\d*|\bFAILED\b|AssertionError|\bnot ok\b|Traceback/;
+const RED_RE = /# fail [1-9]\d*|\bFAILED\b|AssertionError|\bnot ok\b|Traceback|\b\d+ failed\b/;
+
+// A "verdict" is any recognizable test result, in ANY of the shapes a real
+// film carries: node's TAP counters, pytest's summary line, and — the one
+// that mattered — BANTAM's own normalized "VERDICT: …" observation. The
+// first version knew only node TAP and therefore scored ten green pytest
+// builds as "no suite runs ever" (series 6 validation sweep, 2026-08-26).
+const VERDICT_RES = [
+  /^# pass (\d+)[\s\S]*?^# fail (\d+)/m,                       // node --test TAP
+  /VERDICT: all (\d+) tests? passed/i,                          // harness-normalized green
+  /VERDICT: (?:\d+) of (\d+) tests? FAILED \((\d+) passed\)/i,  // harness-normalized red
+  /(\d+) passed(?:,\s*(\d+) failed)?/i,                        // pytest summary
+  /(\d+) failed,\s*(\d+) passed/i,
+];
+export function verdictOf(observation) {
+  const text = String(observation ?? "");
+  if (!/VERDICT:|# pass |# fail |passed|failed/i.test(text)) return null;
+  const tap = VERDICT_RES[0].exec(text);
+  if (tap) return { pass: Number(tap[1]), fail: Number(tap[2]) };
+  const allGreen = VERDICT_RES[1].exec(text);
+  if (allGreen) return { pass: Number(allGreen[1]), fail: 0 };
+  const someRed = VERDICT_RES[2].exec(text);
+  if (someRed) return { pass: Number(someRed[2]), fail: Number(someRed[1]) - Number(someRed[2]) };
+  const pyRed = VERDICT_RES[4].exec(text);
+  if (pyRed) return { pass: Number(pyRed[2]), fail: Number(pyRed[1]) };
+  const py = VERDICT_RES[3].exec(text);
+  if (py) return { pass: Number(py[1]), fail: Number(py[2] ?? 0) };
+  return null;
+}
 
 /** Same-file patch chains inside red spans — the repour signature. */
 export function thrashAudit(film, { threshold = 4 } = {}) {
   const chains = new Map(); let red = false; const spans = [];
   for (const t of film.turns ?? []) {
     const a = t.parsedAction ?? {}; const obs = String(t.observation ?? "");
-    if (a.a === "shell" && /# (pass|fail)|not ok|passed|failed/.test(obs)) red = RED_RE.test(obs);
+    if (a.a === "shell") { const v = verdictOf(obs); if (v) red = v.fail > 0; }
     if (a.a === "replace" && red) {
       const n = (chains.get(a.p) ?? 0) + 1; chains.set(a.p, n);
       if (n === threshold) spans.push({ path: a.p, reachedAtTurn: t.i ?? null });
@@ -114,13 +142,15 @@ export function steerEfficacy(film) {
 /** Oracle strength: verifier configured? suite run? how big did self-tests get? */
 export function oracleAudit(film) {
   const m = film.metrics ?? {};
-  let suiteRuns = 0, lastCounts = null, probeOnly = 0;
+  let suiteRuns = 0, last = null, probeOnly = 0;
   for (const t of film.turns ?? []) {
     const a = t.parsedAction ?? {}; const obs = String(t.observation ?? "");
-    if (a.a === "shell" && /# pass \d+/.test(obs)) { suiteRuns += 1; lastCounts = /# pass (\d+)\n# fail (\d+)/.exec(obs.replace(/\r/g, "")) ?? lastCounts; }
-    if (a.a === "shell" && /\b(?:python3?\s+-c|node\s+(?:-e|--eval))\b/.test(String(a.c ?? ""))) probeOnly += 1;
+    if (a.a !== "shell") continue;
+    const v = verdictOf(obs);
+    if (v) { suiteRuns += 1; last = v; }
+    if (/\b(?:python3?\s+-c|node\s+(?:-e|--eval))\b/.test(String(a.c ?? ""))) probeOnly += 1;
   }
-  return { suiteRuns, probeOnly, lastPass: lastCounts ? Number(lastCounts[1]) : null, lastFail: lastCounts ? Number(lastCounts[2]) : null, verifyCadenceSteers: m.verifyCadenceSteers ?? 0 };
+  return { suiteRuns, probeOnly, lastPass: last?.pass ?? null, lastFail: last?.fail ?? null, verifyCadenceSteers: m.verifyCadenceSteers ?? 0 };
 }
 
 /** Think economics: budget pressure and truncation cost. */

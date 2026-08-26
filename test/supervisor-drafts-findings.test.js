@@ -78,6 +78,30 @@ test("a think-phase prompt is never compared against an action-phase prompt", ()
   assert.deepEqual(prefixBreaks(film).detected, [], "phase change is not a rewrite");
 });
 
+test("verdicts are recognized in EVERY shape a real film carries", async () => {
+  const { verdictOf, oracleAudit } = await import("../src/supervisor/analyzers.js");
+  // The shape that broke it: BANTAM's own normalized observation (series 6 —
+  // ten green pytest builds scored as "no suite runs" by a node-TAP-only reader).
+  assert.deepEqual(verdictOf("VERDICT: all 17 tests passed."), { pass: 17, fail: 0 });
+  assert.deepEqual(verdictOf("VERDICT: 17 of 17 tests FAILED (0 passed)."), { pass: 0, fail: 17 });
+  assert.deepEqual(verdictOf("# pass 9\n# fail 0"), { pass: 9, fail: 0 });
+  assert.deepEqual(verdictOf("33 passed in 0.54s"), { pass: 33, fail: 0 });
+  assert.deepEqual(verdictOf("2 failed, 5 passed in 1.2s"), { pass: 5, fail: 2 });
+  assert.equal(verdictOf("wrote 40 bytes"), null);
+  const film = { turns: [{ i: 0, parsedAction: { a: "shell", c: "python3 -m pytest -v" }, observation: "VERDICT: all 17 tests passed." }], metrics: {} };
+  const o = oracleAudit(film);
+  assert.equal(o.suiteRuns, 1);
+  assert.equal(o.lastPass, 17);
+});
+
+test("wall-concentration only drafts when the slow calls are REPROCESSING-dominated", () => {
+  const mk = (i, o) => call(i, o);
+  const emission = { modelCalls: [mk(0, { wall: 20000, prompt: 500, gen: 2000, cache: 3000 }), mk(1, { wall: 1000, prompt: 100, gen: 50, cache: 4000 })], turns: [], metrics: {} };
+  assert.ok(!supervise(emission).findings.some((f) => f.family === "wall-concentration"), "big generation is physics, not a finding");
+  const reprocess = { modelCalls: [mk(0, { wall: 20000, prompt: 30000, gen: 200, cache: 3000 }), mk(1, { wall: 1000, prompt: 100, gen: 50, cache: 4000 })], turns: [], metrics: {} };
+  assert.ok(supervise(reprocess).findings.some((f) => f.family === "wall-concentration"), "reprocessing-dominated wall is a context problem");
+});
+
 test("analyzers are pure and tolerate absent fields", () => {
   assert.deepEqual(prefixBreaks({}).detected, []);
   assert.deepEqual(thrashAudit({}).chains, []);

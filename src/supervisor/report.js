@@ -50,11 +50,17 @@ export function supervise(film) {
     findings.push({ family: "think-pressure", severity: "low", evidence: think,
       next: "repeated severed thinks precede re-edits (the thrash engine); consider BANTAM_THINK_N_PREDICT_FIRST for the analysis phase (A/B before adopting)" });
   }
+  // Wall concentration is only a FINDING when the slow calls are dominated by
+  // prompt REPROCESSING — that is a context problem with a fix. Slow calls
+  // dominated by generation are emission physics, and drafting them on every
+  // healthy build is noise (series 6: fired on 10/10 clean runs, said nothing).
   const slowShare = wall.slow.reduce((n, c) => n + (c.wallMs ?? 0), 0);
-  if (wall.slow.length && slowShare > wall.modelMs * 0.4) {
+  const slowPrompt = wall.slow.reduce((n, c) => n + (c.prompt_n ?? 0), 0);
+  const slowGen = wall.slow.reduce((n, c) => n + (c.gen_n ?? 0), 0);
+  if (wall.slow.length && slowShare > wall.modelMs * 0.4 && slowPrompt > slowGen) {
     findings.push({ family: "wall-concentration", severity: "info",
       evidence: { slowCalls: wall.slow.length, slowMs: slowShare, modelMs: wall.modelMs, worst: wall.slow.slice(0, 4) },
-      next: "over 40% of model wall sits in a few calls — read their cache_n/prompt_n/gen_n columns: big prompt_n = reprocessing (context problem), big gen_n = emission (output volume)" });
+      next: `over 40% of model wall sits in a few calls AND they are reprocessing-dominated (${slowPrompt.toLocaleString()} prompt tokens vs ${slowGen.toLocaleString()} generated) — a context problem: find what changes those prompts` });
   }
   return { wall, breaks, thrash, steers, oracle, think, findings };
 }

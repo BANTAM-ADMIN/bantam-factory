@@ -4981,12 +4981,27 @@ async function repl() {
       const [vsub, ...vrest] = varg.split(/\s+/).filter(Boolean);
       if (!vsub || vsub === "status" || vsub === "list") {
         const s = voiceSessionStatus();
-        console.log(paint("2", `  voice: ${s.running ? `ON (pid ${s.pid})` : "off"}`));
-        const { listLines } = await import("../src/voice/cli.js");
-        for (const l of listLines()) console.log(paint("2", `  ${l}`));
         const { installStatus: vst0 } = await import("../src/voice/install.js");
-        if (!vst0().installed) console.log(paint("1;33", "  engine: not installed — :voice install  (≈1 GB, into ~/.bantam/addons, removable with :voice uninstall)"));
-        console.log(paint("2", "  :voice install [--gpu]  ·  :voice uninstall  ·  :voice start [vad|ptt] [--gpu|--phone]  ·  :voice stop  ·  :voice stats  ·  :voice use <slot> <provider>  ·  :voice doctor"));
+        const engine = vst0();
+        if (!engine.installed) {
+          // Nothing is installed yet, so the twenty-line slot x provider matrix
+          // is answering a question nobody asked. The first screen should say
+          // what this is and what to type next — the matrix is for someone who
+          // HAS the engine and wants to swap a piece of it.
+          console.log(paint("2", "  voice: not installed"));
+          console.log(paint("2", "  talk to BANTAM out loud — local VAD, speech recognition and speech synthesis."));
+          console.log(paint("2", "  she hears you, the factory does the work, and she tells you how it went."));
+          console.log("");
+          console.log(paint("1;33", "    :voice install") + paint("2", "     ≈1 GB into ~/.bantam/addons — nothing lands in this repo"));
+          console.log(paint("2", "    :voice uninstall   removes it again, leaving the checkout untouched"));
+          console.log("");
+          console.log(paint("2", "  once it is in:  :voice start  ·  then just talk  ·  \"stop\" interrupts her"));
+        } else {
+          console.log(paint("2", `  voice: ${s.running ? `ON (pid ${s.pid})` : "off"}`));
+          const { listLines } = await import("../src/voice/cli.js");
+          for (const l of listLines()) console.log(paint("2", `  ${l}`));
+          console.log(paint("2", "  :voice start [vad|ptt] [--gpu|--phone]  ·  :voice stop  ·  :voice stats  ·  :voice use <slot> <provider>  ·  :voice doctor  ·  :voice uninstall"));
+        }
       } else if (vsub === "start") {
         // Mic mode is a WORD, not a registry incantation: `:voice start ptt`
         // or `:voice start vad` swaps the provider and remembers it.

@@ -5047,7 +5047,23 @@ async function repl() {
               // spoken "on it" and the dispatch can never disagree; classify
               // here only for a bridge too old to have stamped one.
               const routed = turn.kind ? { kind: turn.kind } : classifySpokenTurn(turn.text);
-              if (routed.kind === "work") {
+              if (running) {
+                // A run is in flight, so speech behaves exactly like typing
+                // mid-run: it STEERS the work in progress rather than queueing
+                // a second task behind it. Before this, saying "actually make
+                // it JSON" while she was building queued a whole separate
+                // request and she finished the old thing first.
+                if (routed.kind === "control") {
+                  aborted = true;
+                  activeRunController?.abort();
+                  console.log(paint("33", "  ⏹ stopped — you said so"));
+                } else if (routed.kind === "work") {
+                  injections.push(turn.text);
+                  console.log(paint("2", `  ↪ steering: ${turn.text}`));
+                }
+                // chat mid-run stays with the voice brain; it is conversation,
+                // not instruction, and must not perturb the run.
+              } else if (routed.kind === "work") {
                 console.log(paint("33", `  ${dispatchNotice(turn.text)}`));
                 injectRequest(turn.text, { fromVoice: true });
               }
@@ -5562,7 +5578,11 @@ async function repl() {
       ? `, sessions ${sessionStats.delta} delta/${sessionStats.full + sessionStats.rebases} full${sessionStats.rebases ? ` (${sessionStats.rebases} rebase)` : ""}${sessionStats.lost ? ` (${sessionStats.lost} lost)` : ""}`
       : "";
     const meta = res ? paint("2", `(${res.metrics.turns} turns${modelCalls}, ${secs}s${reuse ? `, ${reuse}` : ""}${modeNote}${sessionNote})`) : "";
-    narrator?.feed({ type: "run_end", summary: err ? `Hit a problem: ${err.message}` : res?.summary });
+    // A run the operator STOPPED must not announce "Done." — they know how it
+    // ended, they ended it. Measured 2026-08-29: "wait, scrap that" drew a
+    // spoken "Scrapped." from the voice brain and then, two seconds later, a
+    // cheerful "Done." from the narrator for the very same run.
+    if (!aborted) narrator?.feed({ type: "run_end", summary: err ? `Hit a problem: ${err.message}` : res?.summary });
     const verdict = res ? classifyInteractiveResult(res) : null;
     if (verdict && (verdict.kind === "success" || verdict.kind === "response")) await roosterCrow();
     if (err) {

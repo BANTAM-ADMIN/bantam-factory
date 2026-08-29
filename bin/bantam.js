@@ -5034,6 +5034,7 @@ async function repl() {
           voiceTail?.stop();
           const tails = [];
           const { classifySpokenTurn, dispatchNotice } = await import("../src/voice/router.js");
+          const { transcriptDoubt } = await import("../src/voice/transcript-doubt.js");
           if (r.transcript) tails.push(startTranscriptTail(r.transcript, (turn) => {
             if (turn.role === "user") {
               console.log(paint("36", `  🎤 you: ${turn.text}`));
@@ -5064,8 +5065,23 @@ async function repl() {
                 // chat mid-run stays with the voice brain; it is conversation,
                 // not instruction, and must not perturb the run.
               } else if (routed.kind === "work") {
+                // Did the recogniser drop a word? Measured on this rig, the
+                // words it loses are the ones that carry the instruction --
+                // "wordcount", "readme", "csv". Say so out loud in the terminal
+                // rather than acting on a half-sentence in silence. The RAW
+                // words are still what gets dispatched: asked to guess the
+                // missing noun, the model invented "word_counter.py" for
+                // "wordcount" and "description" for "readme", 3 wrong out of 3,
+                // and a confident wrong name substituted into an instruction is
+                // worse than a visibly missing one.
+                const doubt = transcriptDoubt(turn.text, { kind: routed.kind });
                 console.log(paint("33", `  ${dispatchNotice(turn.text)}`));
-                injectRequest(turn.text, { fromVoice: true });
+                if (doubt.doubt) {
+                  console.log(paint("33", `  ⚠ ${doubt.reason} — say it again if I missed a word`));
+                }
+                injectRequest(doubt.doubt
+                  ? `${turn.text}\n\n(Heard by voice. The recogniser may have dropped a word — ${doubt.reason}. If a name or detail is missing, pick a sensible one and SAY WHICH you chose in your summary so the operator can correct it.)`
+                  : turn.text, { fromVoice: true });
               }
             }
             else if (turn.role === "assistant") console.log(paint("35", `  🔊 bantam: ${turn.text}`) + paint("2", `   [${turn.brain ?? "?"}${turn.model ? " · " + turn.model : ""}]`));

@@ -40,7 +40,7 @@ import {
   describeImageProvider,
   IMAGE_PROVIDERS,
 } from "../src/logic/session-modes.js";
-import { startVoiceSession, stopVoiceSession, voiceSessionStatus, startTranscriptTail, startStatusTail, createTildeGate, voicePttRunning, createLatencyCollector, createNarrator, voiceAnnouncePath } from "../src/voice/session.js";
+import { startVoiceSession, stopVoiceSession, voiceSessionStatus, startTranscriptTail, startStatusTail, createTildeGate, voicePttRunning, createLatencyCollector, createNarrator, voiceAnnouncePath, promoteSpokenSteers } from "../src/voice/session.js";
 // Spoken narration while she works (":narrate on"): deterministic beats plus
 // her own milestone words, queued to the sidecar's announce file. Off unless
 // the operator turned it on; audible only while the voice sidecar runs.
@@ -4255,6 +4255,10 @@ async function repl() {
    *  loop stays unaware that the words arrived by microphone. If a run is in
    *  flight the request queues behind it, exactly like typing during a run. */
   const spokenRequests = new Set();   // requests that arrived by microphone
+  // Voice steering pushed into a RUNNING run. If the run ends before draining
+  // it, the leftover becomes the next request -- and that run must still speak,
+  // because the operator asked for it out loud. See promoteSpokenSteers.
+  const spokenSteers = new Set();
   const injectRequest = (text, { fromVoice = false } = {}) => {
     const line = String(text ?? "").trim();
     if (!line) return false;
@@ -5075,6 +5079,7 @@ async function repl() {
                   console.log(paint("33", "  ⏹ stopped — you said so"));
                 } else if (routed.kind === "work") {
                   injections.push(turn.text);
+                  spokenSteers.add(turn.text);
                   console.log(paint("2", `  ↪ steering: ${turn.text}`));
                 }
                 // chat mid-run stays with the voice brain; it is conversation,
@@ -5256,7 +5261,7 @@ async function repl() {
     // empty Enter — is disambiguated into an explicit continue.
     let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog });
 
-    running = true; aborted = false; injections = [];
+    running = true; aborted = false; injections = []; spokenSteers.clear();
     lastRunStartedAt = Date.now();
     activeRunController = new AbortController();
     let usageBeforeRun = null;
@@ -5516,6 +5521,10 @@ async function repl() {
     // runAgent's between-turn drain. Keep the promise made by the "queued" acknowledgement: treat
     // every undelivered line as the next request instead of silently dropping it.
     if (injections.length) {
+      // A requeued VOICE steer is still a spoken request: keep its claim on a
+      // heartbeat and a spoken result, which it lost by not being dispatched
+      // through injectRequest.
+      promoteSpokenSteers(injections, spokenSteers, spokenRequests);
       pending.splice(0, 0, ...injections);
       injections = [];
     }

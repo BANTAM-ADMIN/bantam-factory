@@ -28,7 +28,7 @@ test("config precedence: env, then saved settings, then defaults", () => {
 
 test("the checkout is discovered as a sibling of the repo or its parents", (t) => {
   const root = tmp(t, "bantam-codexapi-find-");
-  const repo = path.join(root, "FABLESKILLS", "BANTAM");
+  const repo = path.join(root, "projects", "bantam");
   fs.mkdirSync(repo, { recursive: true });
   assert.equal(findCodexapiCheckout({ repoRoot: repo, home: root }), null);
   fs.mkdirSync(path.join(root, "codexapi", "bin"), { recursive: true });

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "name": "qwen38 strictness ab v1",
+  "description": "Qwen 3.8 27B Q5_K_XL on the compact-strictness family, rebuild vs extension. Exact mirror of strictness-routing-ab-v1 fixtures/seeds for direct comparison against the 2026-08-12 Qwen 3.6 evidence (rebuild 10/10, extension 7/10). Key question: does 3.8 land the post-type_contract-bounce repair from in-context memory? Plan: docs/superpowers/reports/2026-08-14-qwen38-characterization-plan.md.",
+  "fixtures": [
+    "gauntlet/fixtures/channel-filter",
+    "gauntlet/fixtures/channel-filter-explicit"
+  ],
+  "rounds": 5,
+  "seeds": [
+    20260830,
+    20260831,
+    20260832,
+    20260833,
+    20260834
+  ],
+  "passAtK": [
+    1
+  ],
+  "arms": [
+    {
+      "name": "qwen38-rebuild",
+      "description": "New 27B, default rebuild trajectory",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "rebuild"
+      },
+      "model": {
+        "runtime": "local"
+      },
+      "skills": null
+    },
+    {
+      "name": "qwen38-extension",
+      "description": "New 27B, opt-in extension trajectory",
+      "env": {
+        "BANTAM_PROMPT_TRAJECTORY": "extension"
+      },
+      "model": {
+        "runtime": "local"
+      },
+      "skills": null
+    }
+  ],
+  "thinkMode": "auto",
+  "preGate": true,
+  "planMode": false,
+  "stopOnFailure": false
+}

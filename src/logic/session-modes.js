@@ -8,9 +8,11 @@
 //   rebuild    — the default. Every prompt re-rendered, superseded file bodies
 //                rewritten in place, the volatile <open_files> panel refreshed.
 //                Clean context, full reprefill. Measured better where it counts:
-//                rebuild 10/10 vs extension 7/10 on the compact-strictness
-//                family (2026-08-12), because a missing panel makes post-bounce
-//                repairs land on stale self-knowledge.
+//                on the preregistered compact-strictness family, rebuild 30/30
+//                vs extension 22/30 across three replications (08-12 and 08-14
+//                7/10, 08-28 8/10 on build 113cc17), because a missing panel
+//                makes post-bounce repairs land on stale self-knowledge. As of
+//                08-28 rebuild is also the FASTER arm end-to-end there.
 //   immutable  — rebuild's prompt, but history is append-only. The prefix stops
 //                churning, so a single-slot llama.cpp server reuses its KV cache
 //                instead of re-prefilling. The volatile panel still re-renders,

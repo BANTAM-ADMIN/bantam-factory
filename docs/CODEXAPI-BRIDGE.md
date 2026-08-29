@@ -1,7 +1,7 @@
 # codexapi as a BANTAM model: the chat dialect, held-open sessions, the picker, and the fight corners
 
 **Measured 2026-08-24/25.** codexapi is an OpenAI-compatible HTTP bridge in front
-of the `codex` CLI (`~/Desktop/PROJECTAI/codexapi`, not a git repo). It serves
+of the `codex` CLI (discovered as a sibling checkout, not a git repo). It serves
 `/v1/chat/completions`, `/v1/models`, `/v1/sessions` and web search, on the LAN,
 in a text-only "chat mode" whose sandbox and tool tripwire guarantee that nothing
 runs on the API end. BANTAM runs every action itself, so the bridge is a text

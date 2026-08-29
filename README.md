@@ -16,7 +16,7 @@ observe → verify → repeat until done.
 ## Receipts, not benchmarks
 
 Open [`docs/fights/fight-night.html`](docs/fights/fight-night.html) — a fully
-self-contained replayable record of **35 cards, 297 corners**, where a stock
+self-contained replayable record of **35 cards, 297 corners**, where a local
 27B in this harness fights the same tasks as codex CLI, Claude Code CLI
 (sonnet/opus), and the same 27B weights in rival harnesses (hermes, opencode).
 Every card carries the full seven-corner roster. Twenty-five are bouts against
@@ -28,6 +28,20 @@ trails, judge errata kept on the record — including the misses. On the 34
 briefs where BANTAM and a same-weights rival both finished clean, BANTAM's
 median is 45s against 137s, and it is the faster of the two on 32 of 34; the
 two it loses are on the board.
+
+**What the board was fought on.** The BANTAM corners ran a Qwen 3.8 27B
+fine-tune (Apache-2.0, Q4_K_M) rather than the stock `ggml-org` conversion
+`bantam setup` installs, and in `--context-mode extension`, which is **not**
+the shipped default. The harness is model-agnostic — any Qwen 3.x GGUF, or any
+OpenAI-compatible endpoint, drives the same loop — but a different model or a
+different mode will not reproduce these exact numbers. Extension in particular
+buys prefix-cache reuse at a measured cost in per-run reliability: 22/30
+against rebuild's 30/30 on the preregistered compact-strictness family,
+replicated three times
+([docs/context-trajectories.md](docs/context-trajectories.md)). A
+stock-weights, default-mode re-fight is an open launch item — until it lands,
+read these cards as a record of that configuration, not of what you get out of
+the box.
 
 Everything needed to *read* that record ships here — walls, verdicts, sealed
 truths, provenance, and every corner's own recorded output, replayable offline

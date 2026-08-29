@@ -94,7 +94,7 @@ test("unparseable output yields no digest rather than a wrong one", () => {
 //
 //   VERDICT: 177 of 1518 tests FAILED (1341 passed).
 //   Failing tests:
-//     ✗ /tmp/claude-1000/-home-…/tb6-ws/test/agent.test.js (/tmp/…/agent.test.js:1)
+//     ✗ …/tb6-ws/test/agent.test.js (/tmp/…/agent.test.js:1)
 //
 // ~250 characters per entry, the same absolute path twice, and the only fact
 // conveyed is "agent.test.js". Those are node's FILE-level failures: the file

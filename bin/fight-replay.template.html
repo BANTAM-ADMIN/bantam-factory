@@ -190,7 +190,9 @@
       <div>
         <h3>why it is faster on the same weights</h3>
         <ul>
-          <li>the prompt is built so the model's cache survives the turn instead of being rewritten</li>
+          <li>on this board the prompt was built so the model's cache survives the turn rather than being
+          rewritten (<code>--context-mode extension</code>) &mdash; note this is <b>not</b> the shipped default,
+          which rebuilds the prompt each turn and scores higher per run</li>
           <li>actions are schema-constrained, so a malformed step is impossible rather than retried</li>
           <li>stations stop the loops that eat the clock: re-reading, re-patching, oscillating edits</li>
           <li>the run records itself, so every claim on this page can be re-derived from bytes</li>
@@ -205,7 +207,14 @@
     and got there by being <b>run</b>: a corner is never fabricated. Three early bouts whose workspaces were generated at
     fight time and not kept could not be completed honestly, so their briefs were rebuilt as reproducible kits and
     refought in full (cards 32 and 33); the originals keep their records but leave the board. Where a corner hit the wall
-    or built nothing, the card says so instead of dropping the row.</p>
+    or built nothing, the card says so instead of dropping the row.
+    <b>What was fought:</b> the BANTAM corners ran a Qwen&nbsp;3.8&nbsp;27B fine-tune (Apache-2.0, Q4_K_M) rather
+    than the stock conversion the installer fetches, and in <code>--context-mode extension</code>, which is not the
+    shipped default. The harness is model-agnostic &mdash; any Qwen&nbsp;3.x GGUF, or any OpenAI-compatible endpoint,
+    drives the same loop &mdash; but a different model or mode will not reproduce these exact numbers. Extension buys prefix-cache reuse at a
+    measured cost in per-run reliability (22/30 vs rebuild&rsquo;s 30/30 on the preregistered compact-strictness
+    family, replicated three times). Both change the numbers on this page; a stock-weights, default-mode re-fight
+    is an open item.</p>
   </footer>
 </div>
 <div class="overlay" id="overlay"></div>

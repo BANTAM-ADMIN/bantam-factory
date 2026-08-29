@@ -13,8 +13,12 @@ import { once } from "node:events";
 
 // Launch default: the llama.cpp project's own conversions of the stock,
 // Apache-2.0 Qwen 3.8 27B (verified 2026-08-26: ungated, license apache-2.0).
-// The bench record in docs/fights was fought on these weights — anyone can
-// pull the same file and reproduce the cards.
+// These are NOT the bench-record weights: the docs/fights cards were fought on
+// a Qwen 3.8 27B fine-tune (Apache-2.0, Q4_K_M) rather than this stock
+// conversion. Any Qwen 3.x GGUF works here — this one is the default because
+// it is stock and ungated, not because it is the only option. A stock-weights
+// re-fight is an open launch item; until it lands, do not describe this
+// download as reproducing the board.
 export const DEFAULT_REPO = "ggml-org/Qwen3.8-27B-GGUF";
 const MODEL_STEM = "Qwen3.8-27B";
 export const DEFAULT_QUANT = "Q4_K_M";

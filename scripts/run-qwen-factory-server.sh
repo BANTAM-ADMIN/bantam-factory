@@ -5,10 +5,13 @@
 
 set -euo pipefail
 
-ROOT=""
+# No baked-in model or tree: MODEL is required, everything else is overridable.
+# (This script used to default to one operator's local fine-tune under a $ROOT
+# that was later blanked, leaving a path that could never resolve.)
+ROOT="${ROOT:-$HOME}"
 LLAMA_DIR="${LLAMA_DIR:-$ROOT/llama.cpp}"
 SERVER_BIN="${SERVER_BIN:-$LLAMA_DIR/build/bin/llama-server}"
-MODEL="${MODEL:-$ROOT/models/qwen_36_27b_k_s/Qwen3.6-27B-uncensored-heretic-v2-Native-MTP-Preserved-Q4_K_M.gguf}"
+MODEL="${MODEL:?set MODEL=/path/to/model.gguf (any Qwen 3.x GGUF works)}"
 PORT="${PORT:-8085}"
 CTX="${CTX:-65536}"
 SLOTS="${SLOTS:-8}"

@@ -29,7 +29,7 @@ export const ADDONS = [
   {
     name: "local-model",
     label: `local model (${DEFAULT_REPO})`,
-    what: `stock Apache-2.0 weights, ${GB(QUANTS[DEFAULT_QUANT])} (${DEFAULT_QUANT}) — the bench-record model`,
+    what: `stock Apache-2.0 weights, ${GB(QUANTS[DEFAULT_QUANT])} (${DEFAULT_QUANT})`,
     status() {
       const f = path.join(modelsDir(), ggufName());
       try { const st = fs.statSync(f); return { installed: st.size > 1e9, detail: f }; }
@@ -60,12 +60,12 @@ export const ADDONS = [
   {
     name: "voice",
     label: "voice I/O",
-    what: "talk to BANTAM out loud — LitheVoice engine (local VAD/STT/TTS, ~4 GB of models fetched by ITS installer) or any provider implementing src/voice/contract.md",
+    what: "talk to BANTAM out loud — LitheVoice engine (local VAD/STT/TTS, ~1.0 GB; the engine's 3.8 GB bundled LLM is skipped because BANTAM is the brain) or any provider implementing src/voice/contract.md",
     status() {
       const d = path.join(addonsRoot(), "voice");
       return fs.existsSync(d) ? { installed: true, detail: d } : { installed: false, detail: "not installed" };
     },
-    installHint: "git clone the LitheVoice repo into ~/.bantam/addons/voice, then run its scripts/setup.sh (fetches pinned, hash-verified voice models with consent)",
+    installHint: "bantam voice install [--cpu]   (removable again with: bantam voice uninstall)",
   },
 ];
 

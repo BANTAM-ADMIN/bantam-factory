@@ -39,8 +39,7 @@ export const BASE_RULES = [
   { id: "correctness-before-constraint", text: `When a task has BOTH a correctness goal and a mechanical constraint (a byte/size cap, a time limit, a line count), get it CORRECT FIRST, then satisfy the constraint mechanically — never the reverse. Build a clean, readable, WORKING version, compile/run it, and confirm it produces the required output. Only then shrink it. Satisfy a size cap by a mechanical minify pass (strip comments and whitespace, shorten identifiers — write a small script to do it so it is exact and reversible), not by hand-shaving the source across dozens of edits. If you catch yourself editing toward a measured number (re-running \`wc\`, a line count, a byte size) without having run the program to prove it still works, STOP: you are optimizing the wrong thing. A submission that fits the limit but was never executed is not done; a working submission that is slightly over the limit is one minify pass from done.` },
 ];
 
-// Rules distilled from the Fable 5 operating loop (see the FABLESKILLS kit this
-// repo sits beside). Kept terse on purpose: a small model's rule budget is
+// Rules distilled from the Fable 5 operating loop. Kept terse on purpose: a small model's rule budget is
 // attention, and three sentences that land beat a page that dilutes.
 //
 // `default: true` marks a rule that ships in every prompt, and it is the ONLY

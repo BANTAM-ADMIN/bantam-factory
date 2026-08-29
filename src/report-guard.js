@@ -7,7 +7,7 @@
 // precisely and bounced exactly once; like every gate, this one is bounded and
 // can never trap a run.
 //
-// Distilled from the Fable 5 reporting rules (FABLESKILLS kit): lead with the
+// Distilled from the Fable 5 reporting rules: lead with the
 // observed outcome, close with evidence, never promise future work in a summary.
 
 const PROMISE_RE = /\b(?:I(?:'|’)?ll\s|I will\s|next step(?:s)? (?:is|are|would)|I can (?:also|then)\b|let me know\b|feel free to\b|remaining work\b|still need(?:s)? to\b|TODO:)/i;

@@ -32,10 +32,20 @@ Measured, gpt2-codegolf, at depth (~16k context):
 
 `extension` is deliberately **off by default**: `rebuild` scores higher on
 repair-heavy tasks because the live open-files panel prevents the model editing
-from stale self-knowledge (measured 7/10 vs rebuild on the compact-strictness
-family). It is a real accuracy trade — but on a LOCAL run where rebuild's
-cache-death *times out at zero reward*, a finished run at slightly lower accuracy
-wins. The bare-history think remedy is default-on in extension mode, so the single
+from stale self-knowledge. Preregistered and replicated three times on the
+compact-strictness family — rebuild **30/30**, extension **22/30** (08-12 7/10,
+08-14 7/10, 08-28 8/10).
+
+The old argument for running extension anyway — *rebuild's cache-death times out
+at zero reward, so a finished run at slightly lower accuracy wins* — **no longer
+holds on this rig and has been withdrawn.** Re-measured 2026-08-28 (build
+`113cc17`): rebuild finished every run and was *faster end-to-end* than extension
+(339.4 s vs 352.1 s), because rebuild's own reuse has climbed to 83.2% against
+extension's 90.8%, and extension's failures each bought an escalation. Nothing
+timed out in either arm. See `docs/context-trajectories.md` and
+`docs/evidence/2026-08-28-strictness-rerun-summary.md`.
+
+The bare-history think remedy is default-on in extension mode, so the single
 flag `BANTAM_PROMPT_TRAJECTORY=extension` is the whole switch.
 
 **Mitigation path (to get speed AND accuracy):** extension's one named failure —

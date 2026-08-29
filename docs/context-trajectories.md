@@ -108,6 +108,37 @@ instruction late in a long context, and pinpointing a subtle bug. Both
 failures are the same failure: decisions made against remembered context
 instead of fresh context.
 
+### The 08-14 and 08-28 replications (Qwen 3.8)
+
+The ruling has now been re-run twice more on the current bench weights, with
+the same spec, the same two fixtures and the same five seeds
+(`examples/experiments/qwen38-strictness-ab-v1.json`):
+
+| Date | Build / weights | rebuild | extension | base fixture, rebuild vs extension |
+|---|---|---:|---:|---|
+| 2026-08-12 | Qwen 3.6 | 10/10 | 7/10 | 5/5 vs 2/5 |
+| 2026-08-14 | Qwen 3.8 | 10/10 | 7/10 | 5/5 vs 2/5 |
+| 2026-08-28 | Qwen 3.8, build `113cc17` | 10/10 | 8/10 | 5/5 vs 3/5 |
+
+Rebuild is **30/30** across all three. Extension is **22/30**, and every one
+of its eight failures is on the base `channel-filter` fixture — the explicit
+variant is 15/15 in both arms, on every run ever fought. Extension gained one
+run between 08-14 and 08-28 and still trails by two, which is exactly the
+margin the preregistered decision rule calls a revert (rule 3, ordered).
+
+**The efficiency case did not survive the re-run.** On 08-28 extension was
+*slower in wall clock than rebuild* — 352.1 s against 339.4 s — while passing
+two fewer runs. Its prefix reuse is still the higher of the two (90.8% vs
+83.2%), but that gap is 7.6 points, not the 3× stated elsewhere in this
+document, because **rebuild itself got much faster**: 429.3 s → 339.4 s and
+78.0% → 83.2% reuse between 08-14 and 08-28. Extension also spent more input
+tokens (668,924 vs 606,068) — each of its two failures bought an escalation
+(`diagnose-with-teacher`, `repair-context`) that cost more than the prefill it
+saved. Evidence: `docs/evidence/2026-08-28-strictness-rerun-summary.md`.
+
+On this workload the trade extension offers is no longer "accuracy for speed."
+It is accuracy for nothing.
+
 ### Why this is the "bantam-class" bet
 
 Bantam runs a 27B where the incumbents run frontier models. The margin has
@@ -169,9 +200,14 @@ line, stop and use that line.
 
 - **Default: `rebuild`.** Freshness is a quality feature, and for a local
   27B it is the cheapest capability multiplier we have.
-- **Optional: `extension`**, first-class and banner-visible, ~3× cache
-  reuse, for recon-heavy and batch work.
+- **Optional: `extension`**, first-class and banner-visible, for recon-heavy
+  and batch work. Its cache-reuse edge is workload-dependent: ~3× on long
+  workday runs (08-18), but only 90.8% vs 83.2% on the compact-strictness
+  fixtures — where, as of 08-28, it is also *slower end-to-end* than rebuild.
+  Measure on your own workload before assuming the speed-up is there.
 - **The ruling is evidence-bound, not sacred.** It was preregistered on
-  08-12, re-verified with new machinery on 08-18, and should be retested
-  when the guard ecology changes materially. The workday benchmark plus
+  08-12, re-verified with new machinery on 08-18, and independently
+  replicated on the current weights on 08-14 and again on 08-28 (rebuild
+  30/30, extension 22/30 across the three preregistered runs). It should be
+  retested when the guard ecology changes materially. The workday benchmark plus
   `runlens`'s cache line make the retest an evening's work.

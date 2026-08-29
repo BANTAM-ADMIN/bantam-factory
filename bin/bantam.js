@@ -4254,9 +4254,11 @@ async function repl() {
    *  uses this: a spoken work request takes the ORDINARY path, so the agent
    *  loop stays unaware that the words arrived by microphone. If a run is in
    *  flight the request queues behind it, exactly like typing during a run. */
-  const injectRequest = (text) => {
+  const spokenRequests = new Set();   // requests that arrived by microphone
+  const injectRequest = (text, { fromVoice = false } = {}) => {
     const line = String(text ?? "").trim();
     if (!line) return false;
+    if (fromVoice) spokenRequests.add(line);
     if (resolveRequest) { const res = resolveRequest; resolveRequest = null; res(line); }
     else pending.push(line);
     return true;
@@ -5013,6 +5015,7 @@ async function repl() {
         }
         else {
           console.log(paint("2", `  ${r.voiceLine}`));
+          for (const n of r.notes ?? []) console.log(paint("33", `  note: ${n}`));
           if (usingCodex && model?.modelName) console.log(paint("2", `  brain model: ${model.modelName} (your session's model)`));
           console.log(paint("2", `  voice sidecar up (pid ${r.pid}) — speak when ready. :voice stop ends it; closing bantam ends it too.`));
           const pttOn = voiceSessionStatus().running && voicePttRunning();
@@ -5046,7 +5049,7 @@ async function repl() {
               const routed = turn.kind ? { kind: turn.kind } : classifySpokenTurn(turn.text);
               if (routed.kind === "work") {
                 console.log(paint("33", `  ${dispatchNotice(turn.text)}`));
-                injectRequest(turn.text);
+                injectRequest(turn.text, { fromVoice: true });
               }
             }
             else if (turn.role === "assistant") console.log(paint("35", `  🔊 bantam: ${turn.text}`) + paint("2", `   [${turn.brain ?? "?"}${turn.model ? " · " + turn.model : ""}]`));
@@ -5323,13 +5326,22 @@ async function repl() {
         // Narration: beats from the run's own events, spoken by the sidecar.
         // The encouragement injection makes her closing words speakable.
         narrator = null;
-        if (narrateVoice && voiceSessionStatus().running) {
-          narrator = createNarrator({ speak: (text) => {
-            try { fs.appendFileSync(voiceAnnouncePath(), `${JSON.stringify({ t: Date.now(), text })}\n`); }
-            catch { /* narration never blocks work */ }
-          } });
+        // Asked out loud, answered out loud. The voice bridge promised "on the
+        // bench" and the factory owes the operator the result BY EAR — measured
+        // 2026-08-29, a spoken "what did you just make?" got an instant ack and
+        // then silence, because the real answer only ever reached the screen.
+        // :narrate stays the switch for chatty PROGRESS; the result is not
+        // optional.
+        const spokenRun = spokenRequests.delete(request);
+        if ((narrateVoice || spokenRun) && voiceSessionStatus().running) {
+          narrator = createNarrator({
+            resultOnly: !narrateVoice,
+            speak: (text) => {
+              try { fs.appendFileSync(voiceAnnouncePath(), `${JSON.stringify({ t: Date.now(), text })}\n`); }
+              catch { /* narration never blocks work */ }
+            } });
           narrator.feed({ type: "run_start", task: request });
-          injections.push({ kind: "narrate", text: "Voice narration is on — the operator is listening by ear. Keep your done summary short and speakable: one or two plain sentences before any detail." });
+          injections.push({ kind: "narrate", text: "The operator is listening by ear. Keep your done summary short and speakable: one or two plain sentences before any detail." });
         }
         const streamRenderer = streamMode
           ? makeStreamRenderer({ wrap: Math.max(40, Math.min(100, (process.stdout.columns || 100) - 6)) })

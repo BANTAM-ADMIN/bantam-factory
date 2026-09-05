@@ -224,3 +224,46 @@ export function describeImageProvider(provider) {
   if (provider === "codex") return "images are read by Codex — spends quota, but sharper on rendered/text-heavy images";
   return "auto: the local mmproj when one is loaded, else Codex";
 }
+
+// What a fresh session starts from. The startup summary shows only the switches
+// that are OFF these defaults: the full line listed all seven every time and,
+// at 170 characters, wrapped into three lines of grey under the first-screen
+// card on an 80-column terminal. `:modes` still renders the whole table.
+export const MODE_DEFAULTS = Object.freeze({
+  context: DEFAULT_CONTEXT_MODE, stream: "off", deepresearch: "off", rooster: "on",
+  usage: "off", image: "off", eyes: "auto",
+});
+
+/** True when an entry sits at its default. Compares the value's leading word so
+ *  `rebuild (default)` and `ON — spends Codex quota` classify correctly. */
+export function isDefaultMode(entry) {
+  const def = MODE_DEFAULTS[entry?.key];
+  if (def === undefined) return false;
+  const head = String(entry.value ?? "").trim().split(/\s+/)[0].toLowerCase();
+  return head === String(def).toLowerCase();
+}
+
+/**
+ * The compact startup summary: only non-default modes, in the same `key=value`
+ * vocabulary as `:modes`. Returns null when everything is at its default. Never
+ * wraps: it fits `cols` (less a two-column indent) by stopping at an entry
+ * boundary and counting the rest, rather than letting the terminal fold it.
+ */
+export function renderModeSummary(entries = [], { cols = 100, omit = [] } = {}) {
+  const live = entries.filter((e) => !omit.includes(e.key) && !isDefaultMode(e));
+  if (!live.length) return null;
+  const max = Math.max(24, (Number.isFinite(cols) && cols > 0 ? cols : 100) - 2);
+  const parts = live.map((e) => `${e.key}=${e.value}`);
+  let line = "modes: ";
+  let used = 0;
+  for (const part of parts) {
+    const next = used ? `${line} · ${part}` : `${line}${part}`;
+    const rest = parts.length - used - 1;
+    const tail = rest ? ` · +${rest} more (:modes)` : "";
+    if (used && (next + tail).length > max) break;
+    line = next;
+    used++;
+  }
+  const rest = parts.length - used;
+  return rest ? `${line} · +${rest} more (:modes)` : line;
+}

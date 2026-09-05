@@ -19,6 +19,7 @@ import {
   describeContextMode,
   normalizeContextMode,
   renderModeLine,
+  renderModeSummary,
   renderModeTable,
   resolveContextMode,
 } from "../src/logic/session-modes.js";
@@ -136,4 +137,40 @@ test("a chosen mode survives into the next session", () => {
   saveUserSetting("contextMode", "extension", file);
   assert.equal(loadUserSettings(file).contextMode, "extension");
   assert.equal(resolveContextMode({ saved: loadUserSettings(file).contextMode }).mode, "extension");
+});
+
+// 2026-09-05. Under the first-screen card the full modes line — all seven
+// switches, every time — wrapped into three rows of grey on an 80-column
+// terminal. The summary shows only what is off its default and never wraps.
+const allDefault = () => [
+  { key: "context", value: "rebuild (default)" }, { key: "stream", value: "off" },
+  { key: "deepresearch", value: "off" }, { key: "rooster", value: "on" },
+  { key: "usage", value: "off" }, { key: "image", value: "off" }, { key: "eyes", value: "auto" },
+];
+
+test("the startup summary is silent when every mode is at its default", () => {
+  assert.equal(renderModeSummary(allDefault(), { cols: 80 }), null);
+});
+
+test("the startup summary lists only the modes that are off their default", () => {
+  const some = allDefault().map((e) =>
+    e.key === "image" ? { ...e, value: "ON — spends Codex quota" } : e.key === "eyes" ? { ...e, value: "codex" } : e);
+  assert.equal(renderModeSummary(some, { cols: 80 }), "modes: image=ON — spends Codex quota · eyes=codex");
+});
+
+test("the summary never wraps: it stops at an entry boundary and counts the rest", () => {
+  const many = [
+    { key: "stream", value: "on" }, { key: "deepresearch", value: "on" }, { key: "usage", value: "on" },
+    { key: "image", value: "ON — spends Codex quota" }, { key: "eyes", value: "codex" },
+  ];
+  const line = renderModeSummary(many, { cols: 40 });
+  assert.ok(line.length <= 38, `${line.length} chars: ${line}`);
+  assert.match(line, /\+\d more \(:modes\)$/);
+  assert.ok(!line.includes("spends Codex quota") || line.length <= 38);
+});
+
+test("context is already a row in the card, so the summary can omit it", () => {
+  const e = [{ key: "context", value: "extension (flag)" }, { key: "stream", value: "off" }];
+  assert.equal(renderModeSummary(e, { cols: 80 }), "modes: context=extension (flag)");
+  assert.equal(renderModeSummary(e, { cols: 80, omit: ["context"] }), null);
 });

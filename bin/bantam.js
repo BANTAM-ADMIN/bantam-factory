@@ -34,6 +34,7 @@ import {
   describeContextMode,
   normalizeContextMode,
   renderModeLine,
+  renderModeSummary,
   renderModeTable,
   resolveContextMode,
   resolveImageMode,
@@ -4147,13 +4148,22 @@ async function repl() {
     servedAt: activeModelLocation,
   }));
   if (autoVerifyNote) console.log(autoVerifyNote);
-  // The full modes line keeps its place on screen — just under the card now,
-  // not above the logo. It is the one place every optional switch is listed.
-  if (interactiveCard) console.log(paint("2", `  ${renderModeLine(startupModeEntries())}`));
+  // Under the card: only the modes that are OFF their default, in `:modes`
+  // vocabulary, fitted to the terminal. The full seven-entry line wrapped into
+  // three grey rows at 80 columns; `:modes` still has the whole table. Context
+  // is omitted because it is already a row in the card.
+  if (interactiveCard) {
+    const summary = renderModeSummary(startupModeEntries(), { cols: process.stdout.columns, omit: ["context"] });
+    if (summary) console.log(paint("2", `  ${summary}`));
+  }
 
   // Standing operator preferences (~/.bantam/profile.md; BANTAM_PROFILE=0 off).
   const operatorProfile = loadOperatorProfile();
-  if (operatorProfile) console.log(paint("2", `  profile: ${operatorProfile.file}`));
+  if (operatorProfile) {
+    const home = os.homedir();
+    const shown = home && operatorProfile.file.startsWith(home) ? "~" + operatorProfile.file.slice(home.length) : operatorProfile.file;
+    console.log(paint("2", `  profile: ${shown}`));
+  }
   const sessionLog = [];
   let lastProposedNext = null;   // the agent's own Next proposal, made pressable
   let lastRunStartedAt = null;   // for instant status answers

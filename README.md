@@ -80,14 +80,14 @@ Then, from any project directory:
 node /path/to/bantam/bin/bantam.js run --task "fix the failing test" --autonomous
 ```
 
-`bantam addons` lists everything optional — vision input, the MTP
-speculative-decoding sidecar, voice — with sizes and install commands.
+`bantam addons` lists everything optional — vision input and the MTP
+speculative-decoding sidecar — with sizes and install commands.
 Nothing optional is ever bundled.
 
 The harness ships with **no model, no weights, no bundled inference server**.
 Optional add-ons (installed on request by `doctor --setup`, never vendored):
-a llama.cpp build with a measured, certified launch profile for local models,
-and voice I/O. Your code and your model never leave your machine; shell
+a llama.cpp build with a measured, certified launch profile for local models.
+Your code and your model never leave your machine; shell
 network access is **off by default** and interactive runs ask you per fetch.
 
 ## What's inside

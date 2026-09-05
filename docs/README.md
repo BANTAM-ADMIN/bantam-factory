@@ -21,10 +21,6 @@ suite, or any generated workflow.
 
 ## Core operation and improvement
 
-- [Voice](VOICE.md) — talk to BANTAM out loud: open-mic or walky-talky,
-  swappable providers, spoken narration while she works, per-turn latency
-  telemetry.
-
 - [Grounding tools](GROUNDING_TOOLS.md) describes the deterministic code,
   concept, map, history, image, and preview tools.
 - [Team mode](TEAM-MODE.md) and [Trio mode](TRIO-MODE.md) describe isolated

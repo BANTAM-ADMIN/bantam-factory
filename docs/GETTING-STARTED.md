@@ -56,7 +56,7 @@ download), and a start script using our **measured** launch configuration —
 every flag annotated with why. Needs ~24 GB VRAM for the default model.
 
 `node bin/bantam.js addons` shows the optional extras (vision input, faster
-generation, voice) with sizes. Nothing optional ever downloads silently.
+generation) with sizes. Nothing optional ever downloads silently.
 
 ## Your first task
 

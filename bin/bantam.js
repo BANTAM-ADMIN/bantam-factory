@@ -40,27 +40,6 @@ import {
   describeImageProvider,
   IMAGE_PROVIDERS,
 } from "../src/logic/session-modes.js";
-import { startVoiceSession, stopVoiceSession, voiceSessionStatus, startTranscriptTail, startStatusTail, createTildeGate, voicePttRunning, createLatencyCollector, createNarrator, voiceAnnouncePath, promoteSpokenSteers, createSpeechCoalescer } from "../src/voice/session.js";
-// Spoken narration while she works (":narrate on"): deterministic beats plus
-// her own milestone words, queued to the sidecar's announce file. Off unless
-// the operator turned it on; audible only while the voice sidecar runs.
-let narrateVoice = false;
-try { narrateVoice = loadUserSettings().narrate === true; } catch { /* fresh machine */ }
-
-
-// The live transcript tail while the voice sidecar runs (null when off).
-let voiceTail = null;
-// Whatever happens to this process, the sidecar must not outlive it: the
-// operator closed bantam and was still being listened to. Best-effort, sync.
-const reapVoiceSidecar = () => {
-  try { voiceTail?.stop(); voiceTail = null; } catch { /* tail already dead */ }
-  try { if (voiceSessionStatus().running) stopVoiceSession(); } catch { /* gone */ }
-};
-// 'exit' only. A SIGINT/SIGTERM handler here would run FIRST (module top) and
-// a process.exit inside it would preempt every graceful signal path the rest
-// of this file registers (exec checkpointing, lane stops, readline's Ctrl-C
-// interrupt-the-run). All of those end in process.exit, which fires 'exit'.
-process.on("exit", reapVoiceSidecar);
 import { randomBytes } from "node:crypto";
 import { offerToLaunchModel, modelStatus, switchToModel, startRegisteredModel, endpointHasVision, firstVisionModel, listModels } from "../src/model-launcher.js";
 import { execFileSync } from "node:child_process";
@@ -1360,7 +1339,7 @@ model.onUsage = ({ entry, totals }) => {
  * startup and listed by `:modes` — one builder feeds both, because a summary
  * that drifts from the live toggles is worse than none.
  */
-function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, rooster, usage, image, imageProvider, voice, narrate }) {
+function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, rooster, usage, image, imageProvider }) {
   return [
     {
       key: "context",
@@ -1376,8 +1355,6 @@ function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, 
     // so it must never be quietly enabled from a remembered setting.
     { key: "image", value: image ? "ON — spends Codex quota" : "off", command: ":image [on|off]", detail: describeImageMode(image) },
     { key: "eyes", value: imageProvider, command: ":eyes [auto|local|codex]", detail: describeImageProvider(imageProvider) },
-    { key: "voice", value: voice?.running ? `ON (pid ${voice.pid})` : "off", command: ":voice start | :voice stop", detail: "voice in/out sidecar — LitheVoice pipeline, BANTAM persona, swappable providers" },
-    { key: "narrate", value: narrate ? "on" : "off", command: ":narrate [on|off]", detail: "spoken progress while she works — audible when the voice sidecar is running" },
   ];
 }
 
@@ -1393,8 +1370,6 @@ function startupModeEntries() {
     usage: usageDisplayEnabled,
     image: imageModeState.on,
     imageProvider: imageProviderState.provider,
-    voice: voiceSessionStatus(),
-    narrate: narrateVoice,
   });
 }
 
@@ -1732,9 +1707,6 @@ if (cmd === undefined || cmd === "chat") {
   const ok = await model.health();
   console.log(ok ? "ok" : "unreachable");
   process.exit(ok ? 0 : 1);
-} else if (cmd === "voice") {
-  const { voiceCommand } = await import("../src/voice/cli.js");
-  process.exit(await voiceCommand(args));
 } else if (cmd === "serve") {
   await serveCommand();
   process.exit(0);
@@ -3749,7 +3721,6 @@ function printReplHelp() {
     row(":image [on|off]", "offer generate_image + edit_image to the model (via Codex — spends quota)"),
     row(":eyes [auto|local|codex]", "which model reads an image: local mmproj or Codex"),
     row(":modes", "list every optional mode, its state, and the command that changes it"),
-    row(":voice", "voice sidecar: install [--gpu] · uninstall · start [vad|ptt] · stop · stats · use <slot> <provider> · doctor — open mic or hold-`/~-to-talk"),
     row(":usage [on|off|reset]", "show or control token/cost reporting"),
     row(":rooster [on|off]", "toggle the rooster antics (labels + crow)"),
     row(":help  ?", "show this help"),
@@ -3933,28 +3904,6 @@ async function repl() {
   }
   const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  // Walky-talky guard: while a --ptt sidecar is armed, ` / ~ is the microphone
-  // button, and the terminal must never insert it. The sidecar reads the key
-  // globally through X11, so this terminal sees the same press; swallowing it
-  // here is what stops a short press leaving a tilde in the prompt that gets
-  // sent to the agent on the next Enter. Engaged ONLY while that sidecar is
-  // running (judged by the live process's argv) — normal typing is untouched.
-  if (process.stdin.isTTY) {
-    const tildeGate = createTildeGate({ isActive: () => voicePttRunning() });
-    const kpListeners = process.stdin.listeners("keypress");
-    if (kpListeners.length) {
-      process.stdin.removeAllListeners("keypress");
-      process.stdin.on("keypress", (ch, key) => {
-        const action = tildeGate.feed(ch ?? key?.sequence ?? "");
-        if (action === "drop") return;
-        if (action === "erase") {
-          for (const l of kpListeners) l("\x7f", { name: "backspace", sequence: "\x7f" });
-          return;
-        }
-        for (const l of kpListeners) l(ch, key);
-      });
-    }
-  }
   const IDLE_PROMPT = `${paint(`1;${C.comb}`, "bantam")} ${paint(C.plume, "❯")} `;
   rl.setPrompt(IDLE_PROMPT);
 
@@ -3994,7 +3943,6 @@ async function repl() {
   let activeRunController = null;
   let injections = [];       // messages typed mid-run, to steer the next turn
   let attendantRun = null;   // event accumulator for the live second voice
-  let narrator = null;       // spoken-progress narrator for the CURRENT run (null when off)
   let attendantBusy = false; // single-flight: one instant reply at a time
   let attendantSlots = null; // cached server slot count (probed once per session)
   let attendantPersona;      // optional ~/.bantam/attendant-voice.md, read once
@@ -4248,24 +4196,6 @@ async function repl() {
     // rl.prompt() resets readline's logical cursor to column 0, so the next key
     // would be inserted at the beginning of that draft.
     return new Promise((res) => { resolveRequest = res; redrawInput(rl); });
-  };
-
-  /** Feed a request into the loop as if it had been typed. The voice router
-   *  uses this: a spoken work request takes the ORDINARY path, so the agent
-   *  loop stays unaware that the words arrived by microphone. If a run is in
-   *  flight the request queues behind it, exactly like typing during a run. */
-  const spokenRequests = new Set();   // requests that arrived by microphone
-  // Voice steering pushed into a RUNNING run. If the run ends before draining
-  // it, the leftover becomes the next request -- and that run must still speak,
-  // because the operator asked for it out loud. See promoteSpokenSteers.
-  const spokenSteers = new Set();
-  const injectRequest = (text, { fromVoice = false } = {}) => {
-    const line = String(text ?? "").trim();
-    if (!line) return false;
-    if (fromVoice) spokenRequests.add(line);
-    if (resolveRequest) { const res = resolveRequest; resolveRequest = null; res(line); }
-    else pending.push(line);
-    return true;
   };
 
   const wizardPrompt = async (label) => {
@@ -4971,272 +4901,7 @@ async function repl() {
         usage: usageDisplayEnabled,
         image: imageModeState.on,
         imageProvider: imageProviderState.provider,
-        voice: voiceSessionStatus(),
-        narrate: narrateVoice,
       }))) console.log(line);
-      continue;
-    }
-
-    // `:voice` — the voice sidecar: talk to this session out loud. CPU is the
-    // lit button (the GPU is usually spoken for); --gpu opts out. The sidecar
-    // is detached in its own process group and `:voice stop` kills the group.
-    if (/^:voice\b/i.test(request)) {
-      const varg = request.replace(/^:voice\b\s*/i, "").trim();
-      const [vsub, ...vrest] = varg.split(/\s+/).filter(Boolean);
-      if (!vsub || vsub === "status" || vsub === "list") {
-        const s = voiceSessionStatus();
-        const { installStatus: vst0 } = await import("../src/voice/install.js");
-        const engine = vst0();
-        if (!engine.installed) {
-          // Nothing is installed yet, so the twenty-line slot x provider matrix
-          // is answering a question nobody asked. The first screen should say
-          // what this is and what to type next — the matrix is for someone who
-          // HAS the engine and wants to swap a piece of it.
-          console.log(paint("2", "  voice: not installed"));
-          console.log(paint("2", "  talk to BANTAM out loud — local VAD, speech recognition and speech synthesis."));
-          console.log(paint("2", "  she hears you, the factory does the work, and she tells you how it went."));
-          console.log("");
-          console.log(paint("1;33", "    :voice install") + paint("2", "     ≈1 GB into ~/.bantam/addons — nothing lands in this repo"));
-          console.log(paint("2", "    :voice uninstall   removes it again, leaving the checkout untouched"));
-          console.log("");
-          console.log(paint("2", "  once it is in:  :voice start  ·  then just talk  ·  \"stop\" interrupts her"));
-        } else {
-          console.log(paint("2", `  voice: ${s.running ? `ON (pid ${s.pid})` : "off"}`));
-          const { listLines } = await import("../src/voice/cli.js");
-          for (const l of listLines()) console.log(paint("2", `  ${l}`));
-          console.log(paint("2", "  :voice start [vad|ptt] [--gpu|--phone]  ·  :voice stop  ·  :voice stats  ·  :voice use <slot> <provider>  ·  :voice doctor  ·  :voice uninstall"));
-        }
-      } else if (vsub === "start") {
-        // Mic mode is a WORD, not a registry incantation: `:voice start ptt`
-        // or `:voice start vad` swaps the provider and remembers it.
-        const { useProvider: pickMic } = await import("../src/voice/registry.js");
-        const micWanted = vrest.includes("ptt") ? "lithevoice/ptt" : vrest.includes("vad") ? "lithevoice/silero" : null;
-        if (micWanted) {
-          const picked = pickMic("vad", micWanted);
-          if (!picked.ok) console.log(paint("33", `  ✗ mic swap failed: ${picked.error} — starting with the current vad provider`));
-        }
-        // The voice brain follows the SESSION's model: a codex session hands
-        // its model id to the codex bridge. (A local-model session already
-        // shares its endpoint via BANTAM_ENDPOINT.)
-        const extraEnv = usingCodex && model?.modelName ? { BANTAM_VOICE_CODEX_MODEL: model.modelName } : {};
-        // Where it runs is measured, announced, and overridable. The voice
-        // stack is ~1.2 GB; whether that fits beside the loaded model is a
-        // fact about this card right now, not a preference to be guessed.
-        const { chooseVoiceDevice, renderDeviceChoice } = await import("../src/voice/install.js");
-        const vWant = vrest.includes("--gpu") ? "gpu" : vrest.includes("--cpu") ? "cpu" : null;
-        const vChoice = chooseVoiceDevice({ want: vWant });
-        for (const l of renderDeviceChoice(vChoice, { verb: "start" })) console.log(paint(vChoice.device === "cpu" && !vChoice.forced ? "2" : "2", `  ${l}`));
-        const r = startVoiceSession({ cpu: vChoice.device === "cpu", phone: vrest.includes("--phone"), extraEnv });
-        if (!r.ok) {
-          for (const prob of r.problems ?? [r.error]) console.log(paint("33", `  ✗ ${prob}`));
-          const { installStatus: vst1 } = await import("../src/voice/install.js");
-          if (!vst1().installed) console.log(paint("1;33", "  the engine is not installed — :voice install"));
-        }
-        else {
-          console.log(paint("2", `  ${r.voiceLine}`));
-          for (const n of r.notes ?? []) console.log(paint("33", `  note: ${n}`));
-          if (usingCodex && model?.modelName) console.log(paint("2", `  brain model: ${model.modelName} (your session's model)`));
-          console.log(paint("2", `  voice sidecar up (pid ${r.pid}) — speak when ready. :voice stop ends it; closing bantam ends it too.`));
-          const pttOn = voiceSessionStatus().running && voicePttRunning();
-          if (pttOn) {
-            console.log(paint("1;33", "  mic: WALKY-TALKY — HOLD ` / ~ to speak, release to send. Nobody else can open a turn."));
-            console.log(paint("2", "       while armed that key is the mic button and will NOT type — :voice stop to get your backtick back"));
-            console.log(paint("2", "       open mic instead: :voice stop, then :voice start vad"));
-          } else {
-            console.log(paint("1;33", "  mic: OPEN MIC (VAD) — she listens whenever speech is detected, hands-free."));
-            console.log(paint("2", "       walky-talky instead (hold ` / ~ to talk): :voice stop, then :voice start ptt"));
-          }
-          console.log(paint("2", `  log: ${r.logPath ?? "(none)"}   ·   :voice stats for latency telemetry`));
-          console.log(paint("2", narrateVoice
-            ? "  narration: on — she'll comment out loud while she works (:narrate off to silence)"
-            : "  narration: off — :narrate on for spoken progress while she works"));
-          voiceTail?.stop();
-          const tails = [];
-          const { classifySpokenTurn, dispatchNotice } = await import("../src/voice/router.js");
-          const { transcriptDoubt } = await import("../src/voice/transcript-doubt.js");
-          const coalesceMs = Number(process.env.BANTAM_VOICE_COALESCE_MS ?? 1200);
-          const speechCoalescer = createSpeechCoalescer({
-            windowMs: coalesceMs,
-            dispatch: (text) => {
-              // Did the recogniser drop a word? Measured on this rig, the words
-              // it loses are the ones that carry the instruction --
-              // "wordcount", "readme", "csv". Say so out loud in the terminal
-              // rather than acting on a half-sentence in silence. The RAW words
-              // are still what gets dispatched: asked to guess the missing
-              // noun, the model invented "word_counter.py" for "wordcount" and
-              // "description" for "readme", 3 wrong out of 3, and a confident
-              // wrong name substituted into an instruction is worse than a
-              // visibly missing one.
-              const doubt = transcriptDoubt(text, { kind: "work" });
-              console.log(paint("33", `  ${dispatchNotice(text)}`));
-              if (doubt.doubt) {
-                console.log(paint("33", `  ⚠ ${doubt.reason} — say it again if I missed a word`));
-              }
-              injectRequest(doubt.doubt
-                ? `${text}\n\n(Heard by voice. The recogniser may have dropped a word — ${doubt.reason}. If a name or detail is missing, pick a sensible one and SAY WHICH you chose in your summary so the operator can correct it.)`
-                : text, { fromVoice: true });
-            },
-          });
-          if (r.transcript) tails.push(startTranscriptTail(r.transcript, (turn) => {
-            if (turn.role === "user") {
-              console.log(paint("36", `  🎤 you: ${turn.text}`));
-              // The voice brain answers in one sentence and can see nothing of
-              // the workspace, so anything that asks for an action -- or asks
-              // about the real state of the repo -- has to become real work.
-              // Without this, "run the tests" gets a cheerful spoken answer and
-              // nothing runs.
-              // The bridge already classified this turn (it needed to, to answer
-              // instantly) and stamped it on the event. Trust that tag so the
-              // spoken "on it" and the dispatch can never disagree; classify
-              // here only for a bridge too old to have stamped one.
-              const routed = turn.kind ? { kind: turn.kind } : classifySpokenTurn(turn.text);
-              if (running) {
-                // A run is in flight, so speech behaves exactly like typing
-                // mid-run: it STEERS the work in progress rather than queueing
-                // a second task behind it. Before this, saying "actually make
-                // it JSON" while she was building queued a whole separate
-                // request and she finished the old thing first.
-                if (routed.kind === "control") {
-                  aborted = true;
-                  activeRunController?.abort();
-                  speechCoalescer.cancel();
-                  console.log(paint("33", "  ⏹ stopped — you said so"));
-                } else if (routed.kind === "work") {
-                  injections.push(turn.text);
-                  spokenSteers.add(turn.text);
-                  console.log(paint("2", `  ↪ steering: ${turn.text}`));
-                }
-                // chat mid-run stays with the voice brain; it is conversation,
-                // not instruction, and must not perturb the run.
-              } else if (routed.kind === "control") {
-                // "stop" with nothing running still means something: drop the
-                // half-spoken request she is holding, so a change of mind
-                // mid-sentence does not start a run a second later.
-                const dropped = speechCoalescer.cancel();
-                if (dropped) console.log(paint("33", "  ⏹ dropped what you were saying"));
-              } else if (routed.kind === "work") {
-                // Hold it for a beat: turn detection ends a turn at every
-                // sentence boundary, so a two-sentence brief arrives as two
-                // work turns and the first would dispatch against half an
-                // instruction. The bridge already spoke its ack, so nothing
-                // feels slower. See createSpeechCoalescer.
-                speechCoalescer.add(turn.text);
-              }
-            }
-            else if (turn.role === "assistant") console.log(paint("35", `  🔊 bantam: ${turn.text}`) + paint("2", `   [${turn.brain ?? "?"}${turn.model ? " · " + turn.model : ""}]`));
-          }));
-          // The pipeline's own markers, translated: hearing you, transcribing,
-          // ducking, cancelled. The terminal is the front-end now.
-          // Telemetry rides the same log: realtime.py prints every stage's
-          // latency per turn; the collector files one record per turn and the
-          // terminal shows the two numbers an operator feels.
-          const metricsFile = r.metrics ?? null;
-          const collector = createLatencyCollector((rec) => {
-            if (metricsFile) { try { fs.appendFileSync(metricsFile, `${JSON.stringify(rec)}\n`); } catch { /* telemetry never blocks voice */ } }
-            const v2v = rec.voiceToVoiceMs ?? rec.pipelineToAudioMs;
-            if (Number.isFinite(v2v)) console.log(paint("2", `  ⏱ ${(v2v / 1000).toFixed(1)}s to first sound (LLM ${((rec.llmFirstTokenMs ?? 0) / 1000).toFixed(1)}s of it) — :voice stats`));
-          });
-          if (r.logPath) tails.push(startStatusTail(r.logPath, (status) => console.log(paint("2", `  ${status}`)), { onLine: (l) => collector.feed(l) }));
-          voiceTail = { stop() { for (const t of tails) t.stop(); } };
-        }
-      } else if (vsub === "stop") {
-        voiceTail?.stop(); voiceTail = null;
-        const r = stopVoiceSession();
-        console.log(paint(r.ok ? "2" : "33", r.ok ? `  voice stopped (pid ${r.pid}, whole group)` : `  ${r.error}`));
-      } else if (vsub === "use") {
-        const { useProvider } = await import("../src/voice/registry.js");
-        const r = useProvider(vrest[0], vrest[1]);
-        console.log(paint(r.ok ? "2" : "33",
-          r.ok ? `  ${r.slot}: ${r.previous ?? "(default)"} → ${r.provider.name}  (remembered; swap back any time)` : `  ✗ ${r.error}`));
-        if (r.ok && voiceSessionStatus().running) console.log(paint("33", "  the running sidecar keeps its old providers — :voice stop, then :voice start."));
-      } else if (vsub === "stats") {
-        const { voiceMetricsPath, formatVoiceStats } = await import("../src/voice/session.js");
-        let records = [];
-        try {
-          records = fs.readFileSync(voiceMetricsPath(), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-        } catch { /* none yet */ }
-        for (const line of formatVoiceStats(records)) console.log(paint("2", line));
-      } else if (vsub === "doctor") {
-        const { preflight } = await import("../src/voice/cli.js");
-        const { installStatus: vst } = await import("../src/voice/install.js");
-        const pf = preflight();
-        if (pf.ok) console.log(paint("2", "  preflight: ok"));
-        else {
-          for (const prob of pf.problems) console.log(paint("33", `  ✗ ${prob}`));
-          if (!vst().installed) console.log(paint("1;33", "  the engine is not installed — :voice install"));
-        }
-      } else if (vsub === "install") {
-        // The add-on installs from inside the session: an operator who just hit
-        // "voice is not installed" should not have to leave, find the CLI and
-        // come back. It lands in ~/.bantam/addons, never in the checkout.
-        const { installStatus: vst, installPlan, installVoice } = await import("../src/voice/install.js");
-        const st = vst();
-        if (st.installed) console.log(paint("2", `  already installed at ${st.dir} — :voice start`));
-        else {
-          // Same decision, made once at install time so the right dependency
-          // stack is fetched: torch-free (~390 MB) when this card has no room,
-          // the CUDA stack when it does.
-          const { chooseVoiceDevice, renderDeviceChoice } = await import("../src/voice/install.js");
-          const iWant = vrest.includes("--gpu") ? "gpu" : vrest.includes("--cpu") ? "cpu" : null;
-          const iChoice = chooseVoiceDevice({ want: iWant });
-          const cpuOnly = iChoice.device === "cpu";
-          const plan = installPlan({ cpu: cpuOnly });
-          if (!plan.ok) console.log(paint("33", `  ✗ ${plan.error}`));
-          else {
-            console.log(paint("2", `  from    ${plan.url}`));
-            console.log(paint("2", `  into    ${plan.dir}  (outside this repo — :voice uninstall leaves no trace)`));
-            console.log(paint("2", `  fetches VAD + turn detection + STT + TTS, about 1.0 GB (Parakeet int8 661 MB + Kokoro 327 MB + VAD/turn/speaker)`));
-            console.log(paint("2", `  skips   the engine's 3.8 GB bundled LLM and llama.cpp — BANTAM is the brain`));
-            for (const l of renderDeviceChoice(iChoice, { verb: "install" })) console.log(paint("2", `  ${l}`));
-            console.log(paint("2", `  this runs for several minutes and holds the prompt until it finishes.`));
-            const go = vrest.includes("--yes") || await askYesNo("  install now? [y/N] ");
-            if (!go) console.log(paint("2", "  cancelled — nothing downloaded"));
-            else {
-              const r = await installVoice({ cpu: cpuOnly, onLine: (l) => console.log(paint("2", `    ${l}`)) });
-              if (!r.ok) console.log(paint("33", `  ✗ ${r.error}`));
-              else {
-                console.log(paint("2", `  voice installed at ${r.dir}`));
-                console.log(paint("1;33", "  :voice start  — she can hear you now"));
-              }
-            }
-          }
-        }
-      } else if (vsub === "uninstall") {
-        const { installStatus: vst, uninstallVoice, humanBytes } = await import("../src/voice/install.js");
-        const st = vst();
-        if (!fs.existsSync(st.dir)) console.log(paint("2", `  nothing to remove — ${st.dir} does not exist`));
-        else {
-          // Pulling the engine out from under a live sidecar would strand the
-          // process; stop it first and say so.
-          if (voiceSessionStatus().running) {
-            console.log(paint("2", "  the voice sidecar is running — stopping it first"));
-            try { voiceTail?.stop(); voiceTail = null; } catch { /* already gone */ }
-            stopVoiceSession();
-          }
-          console.log(paint("2", `  removes ${st.dir}`));
-          console.log(paint("2", "  this checkout is untouched — it never held the engine"));
-          const go = vrest.includes("--yes") || await askYesNo("  remove it? [y/N] ");
-          if (!go) console.log(paint("2", "  cancelled — nothing removed"));
-          else {
-            const r = uninstallVoice();
-            if (!r.ok) console.log(paint("33", `  ✗ ${r.error}`));
-            else console.log(paint("2", r.removed ? `  removed ${r.dir} (${humanBytes(r.bytes)} freed) — :voice install to bring it back` : "  nothing to remove"));
-          }
-        }
-      } else {
-        console.log(paint("2", "  :voice [status] | install [--gpu] | uninstall | start [vad|ptt] [--gpu|--phone] | stop | stats | use <slot> <provider> | doctor"));
-      }
-      continue;
-    }
-
-    // `:narrate [on|off]` — spoken progress while she works. Bare `:narrate` flips it.
-    if (/^:narrate\b/i.test(request)) {
-      const arg = request.replace(/^:narrate\b\s*/i, "").trim().toLowerCase();
-      narrateVoice = arg === "on" ? true : arg === "off" ? false : !narrateVoice;
-      const saved = saveUserSetting("narrate", narrateVoice);
-      const audible = voiceSessionStatus().running;
-      console.log(paint("2", `  narrate ${narrateVoice ? "on — she'll comment out loud while working" : "off — silent work"}${saved ? " (remembered)" : ""}`));
-      if (narrateVoice && !audible) console.log(paint("33", "  the voice sidecar is off — :voice start to actually hear it"));
       continue;
     }
 
@@ -5280,7 +4945,7 @@ async function repl() {
     // empty Enter — is disambiguated into an explicit continue.
     let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog });
 
-    running = true; aborted = false; injections = []; spokenSteers.clear();
+    running = true; aborted = false; injections = [];
     lastRunStartedAt = Date.now();
     activeRunController = new AbortController();
     let usageBeforeRun = null;
@@ -5394,26 +5059,6 @@ async function repl() {
         // Wrap to the live terminal so streamed and canonical text share a
         // silhouette; thinking renders dim ┆, the answer renders plain.
         attendantRun = makeAttendantState();
-        // Narration: beats from the run's own events, spoken by the sidecar.
-        // The encouragement injection makes her closing words speakable.
-        narrator = null;
-        // Asked out loud, answered out loud. The voice bridge promised "on the
-        // bench" and the factory owes the operator the result BY EAR — measured
-        // 2026-08-29, a spoken "what did you just make?" got an instant ack and
-        // then silence, because the real answer only ever reached the screen.
-        // :narrate stays the switch for chatty PROGRESS; the result is not
-        // optional.
-        const spokenRun = spokenRequests.delete(request);
-        if ((narrateVoice || spokenRun) && voiceSessionStatus().running) {
-          narrator = createNarrator({
-            resultOnly: !narrateVoice,
-            speak: (text) => {
-              try { fs.appendFileSync(voiceAnnouncePath(), `${JSON.stringify({ t: Date.now(), text })}\n`); }
-              catch { /* narration never blocks work */ }
-            } });
-          narrator.feed({ type: "run_start", task: request });
-          injections.push({ kind: "narrate", text: "The operator is listening by ear. Keep your done summary short and speakable: one or two plain sentences before any detail." });
-        }
         const streamRenderer = streamMode
           ? makeStreamRenderer({ wrap: Math.max(40, Math.min(100, (process.stdout.columns || 100) - 6)) })
           : null;
@@ -5474,7 +5119,6 @@ async function repl() {
           shouldAbort: () => aborted,
           drainInjections: () => { const q = injections; injections = []; return q; },
           onEvent: (e) => {
-            narrator?.feed(e);
             // Stream frames render and stop here: they are cumulative content
             // snapshots at ~2/sec — recording them would bloat run evidence,
             // and the logger already gets its activity label separately.
@@ -5540,10 +5184,6 @@ async function repl() {
     // runAgent's between-turn drain. Keep the promise made by the "queued" acknowledgement: treat
     // every undelivered line as the next request instead of silently dropping it.
     if (injections.length) {
-      // A requeued VOICE steer is still a spoken request: keep its claim on a
-      // heartbeat and a spoken result, which it lost by not being dispatched
-      // through injectRequest.
-      promoteSpokenSteers(injections, spokenSteers, spokenRequests);
       pending.splice(0, 0, ...injections);
       injections = [];
     }
@@ -5637,11 +5277,6 @@ async function repl() {
       ? `, sessions ${sessionStats.delta} delta/${sessionStats.full + sessionStats.rebases} full${sessionStats.rebases ? ` (${sessionStats.rebases} rebase)` : ""}${sessionStats.lost ? ` (${sessionStats.lost} lost)` : ""}`
       : "";
     const meta = res ? paint("2", `(${res.metrics.turns} turns${modelCalls}, ${secs}s${reuse ? `, ${reuse}` : ""}${modeNote}${sessionNote})`) : "";
-    // A run the operator STOPPED must not announce "Done." — they know how it
-    // ended, they ended it. Measured 2026-08-29: "wait, scrap that" drew a
-    // spoken "Scrapped." from the voice brain and then, two seconds later, a
-    // cheerful "Done." from the narrator for the very same run.
-    if (!aborted) narrator?.feed({ type: "run_end", summary: err ? `Hit a problem: ${err.message}` : res?.summary });
     const verdict = res ? classifyInteractiveResult(res) : null;
     if (verdict && (verdict.kind === "success" || verdict.kind === "response")) await roosterCrow();
     if (err) {
@@ -6283,13 +5918,12 @@ bantam runlens <artifact.json> [--json]
 bantam skills                     list the learned-skills library
 bantam health [--endpoint http://localhost:8085]
 bantam models                     list registered local models (● running, ○ stopped, ✖ launch script missing)
-bantam voice [list|use|remove|doctor|start] voice in/out: slots × providers (LitheVoice bundle; BANTAM is the brain); start [--cpu] [--phone] [--dry-run]
 bantam models add <name> --script /path/to/launch.sh [--endpoint URL] [--vision] [--slots N] [--ctx N] [--vram-mb N]
                                   [--priority N] [--warn "..."] [--notes "..."] [--replace]   (--priority ranks the startup picker)
                                   register a llama.cpp model so the startup picker can launch it (run bare for prompts)
 bantam models remove <name>       unregister a model    ·    bantam models path   print the registry file
 bantam setup [--yes]               one command: install llama-server, download the model, scaffold, launch (= doctor --setup)
-bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding, voice) with sizes — nothing optional is bundled
+bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding) with sizes — nothing optional is bundled
 bantam supervise [film.json] [--json]
                                   read a saved run back and draft findings with evidence (see docs/SUPERVISOR.md)
 bantam doctor --api-url URL [--api-key KEY] [--model NAME] [--api-dialect llamacpp|vllm]  use an existing OpenAI-compatible server (validates + saves it)

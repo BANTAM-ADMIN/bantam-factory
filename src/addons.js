@@ -1,5 +1,5 @@
 // Add-ons: everything BANTAM can use but does not ship. The harness repo
-// stays pure — no weights, no inference server, no voice models vendored.
+// stays pure — no weights and no inference server vendored.
 // Add-ons install under ~/.bantam/addons/<name> on explicit request
 // (doctor --setup, or `bantam addons install <name>`), with sizes shown
 // before any download and checksummed/resumable transfers.
@@ -56,16 +56,6 @@ export const ADDONS = [
       return fs.existsSync(f) ? { installed: true, detail: f } : { installed: false, detail: "not installed" };
     },
     installHint: "bantam doctor --provision-extra mtp",
-  },
-  {
-    name: "voice",
-    label: "voice I/O",
-    what: "talk to BANTAM out loud — LitheVoice engine (local VAD/STT/TTS, ~1.0 GB; the engine's 3.8 GB bundled LLM is skipped because BANTAM is the brain) or any provider implementing src/voice/contract.md",
-    status() {
-      const d = path.join(addonsRoot(), "voice");
-      return fs.existsSync(d) ? { installed: true, detail: d } : { installed: false, detail: "not installed" };
-    },
-    installHint: "bantam voice install [--cpu]   (removable again with: bantam voice uninstall)",
   },
 ];
 

@@ -510,6 +510,28 @@ the immediate stop mechanism. Before running npm scripts offline, Bantam also ch
 declared by the project exist in `node_modules/.bin`; a missing local Vite/TypeScript/etc. is blocked
 instead of falling through to an unrelated host-global command with the same name.
 
+#### Choosing the sandbox
+
+The container is a bare rootfs. Nothing in the image is load-bearing — the
+toolchain the model uses (`python3`, `node`, `git`, a conda or rustup install)
+is bind-mounted read-only from the host, so the image only has to be something
+your machine can pull.
+
+| Switch | Effect | Default |
+|---|---|---|
+| `BANTAM_DOCKER_IMAGE=debian:12` | base image for the shell sandbox | `alpine:3` |
+| `BANTAM_SHELL_SANDBOX=host` | skip Docker; run shell actions on the host | `docker` |
+| `BANTAM_MOUNT_HOME_TOOLS=1` | also mount hidden home dirs (`~/.local`, …) | off |
+
+`BANTAM_SHELL_SANDBOX=host` keeps the workspace confinement and the path checks
+but **drops container isolation and the offline default** — model-chosen commands
+then run with your user's full reach. It exists for machines without Docker and
+for CI; it is not the mode to hand an untrusted model.
+
+If Docker is installed but the image is missing, `docker run` fails the action
+with `exit 125: No such image` rather than falling back silently. That is
+deliberate: quietly downgrading an isolation boundary is worse than a loud stop.
+
 ### Verification and completion gates
 
 This is the product's spine. Every check *runs* in both modes; **`gate-policy.js`**

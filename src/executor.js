@@ -60,6 +60,12 @@ import { parseTestCounts, renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
 
+// Default shell-sandbox image. MUST stay an official Docker Hub library image
+// (no namespace slash) so `docker run` can pull it unattended on any machine.
+// Override per-host with BANTAM_DOCKER_IMAGE, or leave the sandbox entirely
+// with BANTAM_SHELL_SANDBOX=host.
+export const DEFAULT_SANDBOX_IMAGE = "alpine:3";
+
 export class Executor {
   constructor(workspace, opts = {}) {
     this.workspace = path.resolve(workspace);
@@ -94,7 +100,13 @@ export class Executor {
     // shellNetwork on for the rest of the run, anything else declines.
     this.onNetRequest = opts.onNetRequest ?? null;
     this.onShellOutput = opts.onShellOutput ?? null;
-    this.dockerImage = opts.dockerImage ?? process.env.BANTAM_DOCKER_IMAGE ?? "internal/api:latest";
+    // The sandbox image only has to EXIST: the container is a bare rootfs and the
+    // toolchain (python3, node, git, …) is bind-mounted read-only from the host by
+    // toolMountArgs. So the default must be an image ANY machine can pull — an
+    // official Docker Hub library image. It previously named a private image that
+    // existed on exactly one developer's machine, which meant every shell action on
+    // a fresh clone died with `exit 125: No such image` (caught by CI 2026-09-05).
+    this.dockerImage = opts.dockerImage ?? process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE;
     this.processRunner = opts.processRunner;
     this.renameFile = opts.renameFile ?? fs.renameSync;
   }
@@ -1534,7 +1546,7 @@ export async function runShellProcess(workspace, command, {
   timeoutMs = 30000,
   shellSandbox = process.env.BANTAM_SHELL_SANDBOX ?? "docker",
   shellNetwork = envEnabled(process.env.BANTAM_SHELL_NETWORK),
-  dockerImage = process.env.BANTAM_DOCKER_IMAGE ?? "internal/api:latest",
+  dockerImage = process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE,
   pipefail = false,
   envOverrides = null,
   workspaceReadOnly = false,

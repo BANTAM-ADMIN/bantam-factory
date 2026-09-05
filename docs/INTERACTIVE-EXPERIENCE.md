@@ -151,3 +151,5 @@ instead of the flail. Implementation: `src/logic/walled-garden.js`; metric:
 | `BANTAM_SHELL_NETWORK=1` | same grant, via environment | off |
 | *(no flag, interactive)* | consent prompt per classified fetch | ask, default No |
 | *(no flag, headless)* | hard refusal of classified fetches | refuse |
+| `BANTAM_DOCKER_IMAGE=…` | base image for the shell sandbox | `alpine:3` |
+| `BANTAM_SHELL_SANDBOX=host` | skip Docker (drops container isolation) | `docker` |

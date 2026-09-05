@@ -289,7 +289,7 @@ reach for most:
 | Live cockpit view (TTY) | `--tui` |
 | Rooster antics on/off | `--no-rooster` / `BANTAM_NO_ROOSTER=1` / `:rooster` in the REPL |
 | Context reuse/accuracy dial | `--context-mode rebuild\|immutable\|extension` / `:context` — remembered, and printed at startup |
-| Image generation + editing | `BANTAM_CODEX_IMAGE=1` / `:image on` — **spends signed-in Codex quota**, so it is announced on every launch |
+| Image generation + editing | `BANTAM_CODEX_IMAGE=1` / `:image on` — runs on your signed-in Codex plan (no per-image charge) and sends the prompt off-machine, so it is announced on every launch. The first interactive launch that finds a signed-in Codex asks **once** whether to turn this on (default No; answer remembered as `imageOnboarding` in `~/.bantam/settings.json`; `BANTAM_NO_ONBOARDING=1` skips the question) |
 | Which model reads an image | `BANTAM_IMAGE_PROVIDER=local\|codex` / `:eyes` — local mmproj wins by default when a projector is loaded |
 | Image concurrency ceiling | `BANTAM_CODEX_IMAGE_CONCURRENCY=N` — otherwise 3 at ≥2 Mpx or `--quality high`, else 4 |
 | List every optional mode | `:modes` in the REPL |

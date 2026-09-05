@@ -16,6 +16,8 @@ import { runIsAttended } from "../src/attendance.js";
 import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
+import { detectCodex } from "../src/logic/codex-detect.js";
+import { ONBOARDING_KEY, shouldOfferImageOnboarding, imageOnboardingPrompt, imageOnboardingDecision } from "../src/logic/image-onboarding.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
 import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache } from "../src/logic/grounding.js";
 import { researchOffer, elicitGaps } from "../src/logic/research-triggers.js";
@@ -1246,6 +1248,28 @@ const imageProviderState = resolveImageProvider({
   env: process.env.BANTAM_IMAGE_PROVIDER,
   saved: loadUserSettings().imageProvider,
 });
+/** Real probes for detectCodex: PATH lookup, `codex --version`, `codex login
+ *  status`, and the auth file. Each is bounded (3 s) and failure-tolerant. */
+function codexProbes() {
+  const run = (args) => {
+    try { return { ok: true, stdout: execFileSync("codex", args, { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] }) }; }
+    catch (e) { return { ok: false, stdout: String(e?.stdout ?? "") }; }
+  };
+  return {
+    which: (name) => {
+      for (const dir of String(process.env.PATH ?? "").split(path.delimiter)) {
+        if (!dir) continue;
+        const p = path.join(dir, name);
+        try { if (fs.existsSync(p) && (fs.statSync(p).mode & 0o111)) return p; } catch { /* keep looking */ }
+      }
+      return null;
+    },
+    version: () => run(["--version"]).stdout.trim() || null,
+    loginStatus: () => run(["login", "status"]),
+    readAuth: () => JSON.parse(fs.readFileSync(path.join(os.homedir(), ".codex", "auth.json"), "utf8")),
+  };
+}
+
 function applyImageProvider(provider) {
   if (provider === "auto") delete process.env.BANTAM_IMAGE_PROVIDER;
   else process.env.BANTAM_IMAGE_PROVIDER = provider;
@@ -1407,9 +1431,10 @@ function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, 
     { key: "deepresearch", value: deepResearch ? "on" : "off", command: ":deepresearch [on|off]", detail: "pre-answer gap check, then one governed source errand" },
     { key: "rooster", value: rooster ? "on" : "off", command: ":rooster [on|off]", detail: "mood labels and a crow when work lands" },
     { key: "usage", value: usage ? "on" : "off", command: ":usage [on|off|reset]", detail: "token and cost reporting after each turn" },
-    // Printed even when off: this is the one mode whose ON state spends money,
-    // so it must never be quietly enabled from a remembered setting.
-    { key: "image", value: image ? "ON — spends Codex quota" : "off", command: ":image [on|off]", detail: describeImageMode(image) },
+    // Printed even when off: this is the one mode whose ON state sends prompts
+    // to an external account, so it must never be quietly enabled from a
+    // remembered setting.
+    { key: "image", value: image ? "ON — via your Codex plan" : "off", command: ":image [on|off]", detail: describeImageMode(image) },
     { key: "eyes", value: imageProvider, command: ":eyes [auto|local|codex]", detail: describeImageProvider(imageProvider) },
   ];
 }
@@ -3774,7 +3799,7 @@ function printReplHelp() {
     row(":probe [question]", "k local redecodes: fact atoms hold still (knowledge) or scatter (guess); free"),
     row(":research <question>", "bounded web agent shelves quoted sources into reference/; citation-checked"),
     row(":context [rebuild|immutable|extension]", "the context dial: clean reprefill \u2194 fastest KV-cache reuse"),
-    row(":image [on|off]", "offer generate_image + edit_image to the model (via Codex — spends quota)"),
+    row(":image [on|off]", "offer generate_image + edit_image to the model (via your Codex plan)"),
     row(":eyes [auto|local|codex]", "which model reads an image: local mmproj or Codex"),
     row(":modes", "list every optional mode, its state, and the command that changes it"),
     row(":usage [on|off|reset]", "show or control token/cost reporting"),
@@ -4163,6 +4188,31 @@ async function repl() {
     const home = os.homedir();
     const shown = home && operatorProfile.file.startsWith(home) ? "~" + operatorProfile.file.slice(home.length) : operatorProfile.file;
     console.log(paint("2", `  profile: ${shown}`));
+  }
+
+  // First-run offer: use a signed-in Codex for images? Asked ONCE, only of a
+  // person, default No, and only if `:image` was never set by hand. The Codex
+  // probe spawns `codex login status` (~50 ms) and runs only after the cheap
+  // checks pass, so a session that has already answered pays nothing.
+  if (interactiveCard && shouldOfferImageOnboarding({
+    settings: loadUserSettings(), imageSource: imageModeState.source, env: process.env, tty,
+    codex: () => detectCodex(codexProbes()),
+  })) {
+    const codex = detectCodex(codexProbes());
+    process.stdout.write("\n");
+    const answer = await new Promise((res) => rl.question(imageOnboardingPrompt(codex), res));
+    const d = imageOnboardingDecision(answer, codex);
+    applyImageMode(d.imageMode);
+    saveUserSetting("imageMode", d.imageMode);
+    if (d.imageProvider) { applyImageProvider(d.imageProvider); saveUserSetting("imageProvider", d.imageProvider); }
+    saveUserSetting(ONBOARDING_KEY, d.record);
+    if (d.imageMode) {
+      console.log(paint("33", `  image: ON — ${describeImageMode(true)} (remembered)`));
+      console.log(paint("2", `  eyes: codex — ${describeImageProvider("codex")} (remembered)`));
+    } else {
+      console.log(paint("2", "  image: off (remembered) — `:image on` any time."));
+    }
+    console.log("");
   }
   const sessionLog = [];
   let lastProposedNext = null;   // the agent's own Next proposal, made pressable
@@ -4935,7 +4985,7 @@ async function repl() {
         console.log(paint(imageModeState.on ? "33" : "2",
           `  image: ${imageModeState.on ? "ON" : "off"} — ${describeImageMode(imageModeState.on)}${saved ? " (remembered)" : ""}`));
         if (imageModeState.on) {
-          console.log(paint("33", "  every generate_image call spends your signed-in Codex account — `bantam governor status` shows the caps."));
+          console.log(paint("33", "  generate_image runs on your signed-in Codex plan (no per-image charge) — `bantam governor status` shows BANTAM's own caps."));
         }
         console.log(paint("2", "  takes effect on your next request."));
       } else {
@@ -4953,7 +5003,7 @@ async function repl() {
         applyImageProvider(arg);
         const saved = saveUserSetting("imageProvider", arg);
         console.log(paint("2", `  eyes: ${arg} — ${describeImageProvider(arg)}${saved ? " (remembered)" : ""}`));
-        if (arg === "codex") console.log(paint("33", "  Codex vision spends your signed-in account per image."));
+        if (arg === "codex") console.log(paint("33", "  Codex vision reads each image through your signed-in Codex plan."));
         console.log(paint("2", "  takes effect on your next request."));
       } else if (arg) {
         console.log(`  Unknown: ${arg}. Use :eyes ${IMAGE_PROVIDERS.join(" | :eyes ")}.`);
@@ -6015,8 +6065,9 @@ Common model flags: [--endpoint URL] [--profile qwen|gemma|generic] [--think aut
 More run flags: [--tui] [--title "..."] [--plan] [--skills [path]] [--lang X] [--no-pregate] [--no-ground] [--no-edit]
 Usage display: [--usage] [--no-usage] (or BANTAM_USAGE=on|off); in chat use :usage [on|off|reset]
 Images:        [--ground is on by default] BANTAM_CODEX_IMAGE=1 or :image on — offers generate_image and
-               edit_image to the model, brokered through the signed-in Codex account (spends quota, and is
-               announced in the startup modes line). :eyes [auto|local|codex] chooses which model READS an
+               edit_image to the model, brokered through the signed-in Codex account (included with the
+               plan, no per-image charge; announced in the startup modes line). The first interactive launch
+               that finds a signed-in Codex asks once whether to turn this on (BANTAM_NO_ONBOARDING=1 skips). :eyes [auto|local|codex] chooses which model READS an
                image; the local mmproj wins by default whenever a projector is loaded. Concurrency falls to
                3 at >=2 Mpx or --quality high (BANTAM_CODEX_IMAGE_CONCURRENCY overrides).
 

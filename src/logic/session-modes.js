@@ -167,10 +167,13 @@ export function renderModeTable(entries = []) {
 // BANTAM_CODEX_IMAGE=1 before launch. The capability was built and the button
 // was hidden.
 //
-// It differs from the other modes in one way that matters: turning it on spends
-// real money. So it persists like they do, but `describeImageMode` names the
-// cost, and the startup line prints it every launch — a remembered ON that
-// nobody can see is how quota gets spent by accident.
+// It differs from the other modes in one way that matters: turning it on routes
+// prompts through an external account — the operator's signed-in Codex plan.
+// Image generation is included with ChatGPT plans (no per-image charge; the Max
+// plan reports no cap and allows a few concurrent jobs), but it is still data
+// leaving the machine. So it persists like the others, and the startup line
+// prints it every launch — a remembered ON nobody can see is how prompts leave
+// the machine by accident.
 
 export function resolveImageMode({ env, saved } = {}) {
   if (env !== undefined && env !== null && String(env).trim() !== "") {
@@ -182,7 +185,7 @@ export function resolveImageMode({ env, saved } = {}) {
 
 export function describeImageMode(on) {
   return on
-    ? "generate_image is available to the model — each call spends your signed-in Codex quota"
+    ? "generate_image is available to the model — runs on your signed-in Codex plan, no per-image charge"
     : "generate_image is not offered to the model";
 }
 
@@ -221,7 +224,7 @@ export function imageProviderPreference(provider) {
 
 export function describeImageProvider(provider) {
   if (provider === "local") return "images are read by the local mmproj — free, and the default when a projector is loaded";
-  if (provider === "codex") return "images are read by Codex — spends quota, but sharper on rendered/text-heavy images";
+  if (provider === "codex") return "images are read by Codex — through your plan, and sharper on rendered/text-heavy images";
   return "auto: the local mmproj when one is loaded, else Codex";
 }
 
@@ -235,7 +238,7 @@ export const MODE_DEFAULTS = Object.freeze({
 });
 
 /** True when an entry sits at its default. Compares the value's leading word so
- *  `rebuild (default)` and `ON — spends Codex quota` classify correctly. */
+ *  `rebuild (default)` and `ON — via your Codex plan` classify correctly. */
 export function isDefaultMode(entry) {
   const def = MODE_DEFAULTS[entry?.key];
   if (def === undefined) return false;

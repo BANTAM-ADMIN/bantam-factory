@@ -15,6 +15,7 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { Datalog } from "./datalog.js";
 import {
+  WorkspaceTooLargeError,
   extractCodeFacts,
   materializeCodeFacts,
   nearestFiles,
@@ -22,16 +23,47 @@ import {
   walk as walkSourceFiles,
 } from "./codefacts.js";
 
+// The ceiling on how many source files the KB will index. `maxFiles` below
+// (600) is ADVISORY — it sets `stats.capped` and extracts everything anyway —
+// and that is why a 672,891-file workspace was indexed until the heap died
+// (2026-09-05). This one is real: past it the walk stops and the KB is off,
+// loudly. 10,000 files is ~440 MB at the measured ~44 KB per file — above any
+// single project this harness has been pointed at, well under the heap.
+export const DEFAULT_KB_MAX_FILES = 10000;
+export function kbMaxFilesFromEnv(env = process.env) {
+  const n = Number(env.BANTAM_KB_MAX_FILES);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_KB_MAX_FILES;
+}
+
+/** The one-paragraph explanation printed when the ceiling is hit. */
+export function describeTooLarge(tooLarge, workspace) {
+  const cap = Number(tooLarge?.maxFiles ?? DEFAULT_KB_MAX_FILES).toLocaleString();
+  const seen = Number(tooLarge?.files ?? 0).toLocaleString();
+  const name = workspace ? (path.basename(workspace) || workspace) : "this workspace";
+  return [
+    `  \u{1F9ED} code KB: off — ${name} has more than ${cap} source files (stopped counting at ${seen}).`,
+    "     That is a directory of projects, not a project. Each indexed file holds ~44 KB of memory, so",
+    "     indexing it would need gigabytes. Run bantam inside the project you mean, or pass",
+    "     --workspace <dir>; exclude directories with a .bantamignore; or raise BANTAM_KB_MAX_FILES.",
+    "",
+  ].join("\n");
+}
+
 /** Build a grounding context from a workspace. Cheap; safe on non-code workspaces (empty KB). */
-export function buildGrounding(workspace, { maxFiles = 600, onProgress } = {}) {
+export function buildGrounding(workspace, { maxFiles = 600, hardMaxFiles = kbMaxFilesFromEnv(), onProgress } = {}) {
   const db = new Datalog();
   let stats = { files: 0 };
   let factIndex = null;
   try {
-    const extracted = extractCodeFacts(db, workspace, { onProgress });
+    const extracted = extractCodeFacts(db, workspace, { onProgress, maxFiles: hardMaxFiles });
     ({ index: factIndex, ...stats } = extracted);
     if (stats.files > maxFiles) stats.capped = true; // extracted anyway; just note it
-  } catch { /* non-code or unreadable workspace -> empty KB, grounding is a no-op */ }
+  } catch (err) {
+    // Over the ceiling is not "non-code": it is named, so the caller can say
+    // why the KB is off instead of quietly advertising an empty one.
+    if (err instanceof WorkspaceTooLargeError) stats = { files: 0, tooLarge: { files: err.files, maxFiles: err.maxFiles } };
+    /* otherwise: non-code or unreadable workspace -> empty KB, grounding is a no-op */
+  }
   // Separate from the JS/TS fact-index revision: the repository mapper also
   // understands Go/Python and reads package.json executable metadata.
   return { db, workspace, stats, factIndex, maxFiles, staleFiles: new Set(), mapRevision: 0 };
@@ -207,7 +239,8 @@ export function kbCachePath(workspace) {
 function stampTree(ground) {
   const root = ground.factIndex?.root ?? path.resolve(ground.workspace);
   const stamps = [];
-  for (const file of walkSourceFiles(root, ground.factIndex?.exts)) {
+  if (!ground?.factIndex?.exts) return stamps;   // no index (e.g. over the ceiling): nothing to stamp, and never re-walk
+  for (const file of walkSourceFiles(root, ground.factIndex.exts)) {
     try {
       const st = fs.statSync(file);
       stamps.push([path.relative(root, file).split(path.sep).join("/"), `${st.mtimeMs}:${st.size}`]);

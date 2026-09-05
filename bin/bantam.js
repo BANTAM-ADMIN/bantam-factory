@@ -17,10 +17,20 @@ import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { detectCodex } from "../src/logic/codex-detect.js";
+
+// The over-the-ceiling note, once per process. The agent emits grounding_state
+// on EVERY request, and in the REPL the same too-large grounding object is
+// passed each time — so without this the paragraph would repeat per request.
+let kbTooLargeNoted = false;
+function noteKbTooLarge(e) {
+  if (kbTooLargeNoted) return "";
+  kbTooLargeNoted = true;
+  return describeTooLarge(e.tooLarge, e.workspace);
+}
 import { renderHelpRows, renderBullet } from "../src/logic/help-table.js";
 import { ONBOARDING_KEY, shouldOfferImageOnboarding, imageOnboardingPrompt, imageOnboardingDecision } from "../src/logic/image-onboarding.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
-import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache } from "../src/logic/grounding.js";
+import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache, describeTooLarge } from "../src/logic/grounding.js";
 import { researchOffer, elicitGaps } from "../src/logic/research-triggers.js";
 import { diffClaims, renderClaimDiff } from "../src/logic/claim-diff.js";
 import { sampleAnswers, stabilityReport, renderStabilityReport } from "../src/logic/consistency-probe.js";
@@ -1350,7 +1360,9 @@ function liveLogger(e) {
   } else if (e.type === "grounding_state") {
     process.stderr.write(e.enabled
       ? `  🧭 code KB: ${e.files.toLocaleString()} files${e.buildMs >= 50 ? ` indexed in ${(e.buildMs / 1000).toFixed(1)}s` : " ready"} — \`query\` answers defines/symbols/deps/flow\n`
-      : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
+      : e.tooLarge
+        ? noteKbTooLarge(e)
+        : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
   } else if (e.type === "skills_used") {
     process.stderr.write(`  📚 using ${e.skills.length} skill(s): ${e.skills.join("; ")}\n`);
   } else if (e.type === "skill_learned") {
@@ -3955,7 +3967,9 @@ function makeInteractiveLogger(emit, activity = {}) {
   } else if (e.type === "grounding_state") {
     process.stderr.write(e.enabled
       ? `  🧭 code KB: ${e.files.toLocaleString()} files${e.buildMs >= 50 ? ` indexed in ${(e.buildMs / 1000).toFixed(1)}s` : " ready"} — \`query\` answers defines/symbols/deps/flow\n`
-      : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
+      : e.tooLarge
+        ? noteKbTooLarge(e)
+        : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
   } else if (e.type === "skills_used") {
       // Once per skill per run: explains why the model suddenly knows an approach.
       out(`  ${dim(`recalling skill: ${e.skills.join(", ")}`)}`);
@@ -5152,8 +5166,15 @@ async function repl() {
                 process.stderr.write(`\r  \u{1F9ED} indexing code KB  [${"#".repeat(filled)}${"-".repeat(width - filled)}] ${done.toLocaleString()}/${total.toLocaleString()} files`);
                 if (done >= total) process.stderr.write("\r\u001b[2K");
               } });
-              reconcileGrounding(chatGround);  // seed the stat stamps for later diffs
-              saveGroundingCache(chatGround);
+              if (chatGround.stats?.tooLarge) {
+                // Over the ceiling: the agent's grounding_state event prints the
+                // note (once per process). Keep the object as the session's
+                // grounding so the request loop does not rebuild every turn; the
+                // agent treats it as no KB. Nothing to reconcile or cache.
+              } else {
+                reconcileGrounding(chatGround);  // seed the stat stamps for later diffs
+                saveGroundingCache(chatGround);
+              }
             }
           } else {
             const r = reconcileGrounding(chatGround);

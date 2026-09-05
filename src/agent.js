@@ -787,19 +787,26 @@ async function runAgentCore({
   const immutableSnap = immutableInv.mode !== "none" ? immutableViolations.snapshot(workspace, immutableInv) : null;
   // Symbolic grounding context (datalog KB of the workspace). `true` => build it now.
   const groundStartedAt = Date.now();
-  const ground = grounding === true
+  let ground = grounding === true
     ? buildGrounding(workspace, { onProgress: (p) => onEvent({ type: "grounding_progress", ...p }) })
     : (grounding || null);
   // Say whether the code KB is live. An operator reading a run log could not
   // tell (2026-08-16): the header printed the model and endpoint but nothing
   // about a capability that decides whether `query` has any tools behind it —
   // and twelve parity runs went by with the verb advertised and the KB unbuilt.
+  const tooLarge = ground?.stats?.tooLarge ?? null;
   onEvent({
     type: "grounding_state",
-    enabled: Boolean(ground),
+    enabled: Boolean(ground) && !tooLarge,
     files: ground?.stats?.files ?? 0,
     buildMs: ground ? Date.now() - groundStartedAt : 0,
+    tooLarge,
+    workspace,
   });
+  // Over the ceiling the KB is empty by construction. Offering `query` against
+  // it would be the 2026-08-16 failure again — the verb advertised, nothing
+  // behind it — so downstream the honest state is: no grounding.
+  if (tooLarge) ground = null;
   const visualTask = taskRequiresVisualPreview(task);
   // Does this task declare accepted input types without saying what falls outside
   // them? That is the one condition the type_contract gate is measured to convert

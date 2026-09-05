@@ -118,7 +118,25 @@ function loadIgnores(root) {
 // Python to defines-only.
 const DEFAULT_EXTS = [".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts", ".py"];
 
-export function walk(root, exts) {
+/**
+ * Thrown by walk() when a workspace exceeds `maxFiles` source files. It is the
+ * signal that this is not a project but a directory OF projects — a home
+ * folder, a `Desktop/PROJECTS` — and indexing it is the wrong thing to do at
+ * any speed: each indexed file holds ~44 KB of heap (measured 2026-09-05, 1,139
+ * files → 49 MB), and a 672,891-file tree took the process to the 4 GB heap
+ * limit and killed it. Stop counting at the ceiling; do not touch the rest.
+ */
+export class WorkspaceTooLargeError extends Error {
+  constructor(root, files, maxFiles) {
+    super(`workspace has more than ${maxFiles} source files (stopped counting at ${files}): ${root}`);
+    this.name = "WorkspaceTooLargeError";
+    this.root = root;
+    this.files = files;
+    this.maxFiles = maxFiles;
+  }
+}
+
+export function walk(root, exts, { maxFiles = Infinity } = {}) {
   const out = [];
   const ig = loadIgnores(root);
   const stack = [root];
@@ -133,7 +151,10 @@ export function walk(root, exts) {
         if (ig.rels.size && ig.rels.has(path.relative(root, full).split(path.sep).join("/"))) continue;
         stack.push(full);
       }
-      else if (exts.some((x) => e.name.endsWith(x))) out.push(path.join(dir, e.name));
+      else if (exts.some((x) => e.name.endsWith(x))) {
+        out.push(path.join(dir, e.name));
+        if (out.length > maxFiles) throw new WorkspaceTooLargeError(root, out.length, maxFiles);
+      }
     }
   }
   return out;
@@ -257,14 +278,14 @@ export function readAliasConfig(root, readFile = fs.readFileSync) {
 }
 
 /** Read source files once into independently replaceable extraction records. */
-export function createCodeFactIndex(root, { exts = DEFAULT_EXTS, readFile = fs.readFileSync, onProgress } = {}) {
+export function createCodeFactIndex(root, { exts = DEFAULT_EXTS, readFile = fs.readFileSync, onProgress, maxFiles = Infinity } = {}) {
   const absoluteRoot = path.resolve(root);
   const records = new Map();
   // Walk first so progress has a denominator: on a big repository the first
   // chat request sat behind an invisible index build and felt unresponsive
   // (operator taste report, 2026-08-18). The walk is cheap next to reading
   // and extracting every file; knowing the total is what buys the bar.
-  const files = [...walk(absoluteRoot, exts)];
+  const files = [...walk(absoluteRoot, exts, { maxFiles })];   // throws WorkspaceTooLargeError past the ceiling
   files.forEach((file, i) => {
     const relative = portableRelative(absoluteRoot, file);
     let source;

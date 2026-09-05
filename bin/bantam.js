@@ -25,7 +25,7 @@ let kbTooLargeNoted = false;
 function noteKbTooLarge(e) {
   if (kbTooLargeNoted) return "";
   kbTooLargeNoted = true;
-  return describeTooLarge(e.tooLarge, e.workspace);
+  return describeTooLarge(e.tooLarge, e.workspace, { cols: process.stdout.columns });
 }
 import { renderHelpRows, renderBullet } from "../src/logic/help-table.js";
 import { ONBOARDING_KEY, shouldOfferImageOnboarding, imageOnboardingPrompt, imageOnboardingDecision } from "../src/logic/image-onboarding.js";
@@ -3737,8 +3737,8 @@ function describeAction(a) {
 
 // Word-wrap text to the terminal width instead of hard-slicing it, so a long line
 // (a harness note, a reasoning glimpse, command output) is never cut mid-sentence.
-function wrapForTerminal(s, pad = 6) {
-  const width = Math.max(50, (process.stdout.columns || 100) - pad);
+function wrapForTerminal(s, pad = 6, maxWidth = Infinity) {
+  const width = Math.max(50, Math.min(maxWidth, (process.stdout.columns || 100) - pad));
   const lines = [];
   for (const raw of String(s).split("\n")) {
     if (raw.length <= width) { lines.push(raw); continue; }
@@ -5215,12 +5215,12 @@ async function repl() {
         // silhouette; thinking renders dim ┆, the answer renders plain.
         attendantRun = makeAttendantState();
         const streamRenderer = streamMode
-          ? makeStreamRenderer({ wrap: Math.max(40, Math.min(100, (process.stdout.columns || 100) - 6)) })
+          ? makeStreamRenderer({ wrap: Math.max(50, Math.min(100, (process.stdout.columns || 100) - 4)) })
           : null;
         let streamPhase = "thinking";
         const renderStreamChunk = (text, phase) => {
           for (const line of text.split("\n").slice(0, -1)) {
-            if (phase === "action") emit(line);
+            if (phase === "action") emit(line ? "  " + line : line);
             else if (line) emit(paint("2", `  ┆ ${line}`));
           }
         };
@@ -5458,7 +5458,7 @@ async function repl() {
       sessionLog.push({ request, summary: `${String(res.summary || "work completed").replace(/\s+/g, " ").slice(0, 180)} (configured verifier was inconclusive)` });
     } else if (verdict.kind === "response" && res.summary) {
       if (streamedAnswerShown) console.log(`${meta}\n`);
-      else console.log(`\n${res.summary}\n${meta}\n`);
+      else console.log(`\n${wrapForTerminal(res.summary, 4, 100).map((l) => (l ? "  " + l : l)).join("\n")}\n  ${meta}\n`);
       sessionLog.push({ request, summary: String(res.summary).replace(/\s+/g, " ").slice(0, 220) });
     } else if (verdict.kind === "paused") {
       const verified = verdict.externallyVerified ? " Verifier passed." : "";

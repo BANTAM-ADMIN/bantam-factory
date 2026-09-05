@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { Datalog } from "./datalog.js";
+import { wrapWords } from "./help-table.js";
 import {
   WorkspaceTooLargeError,
   extractCodeFacts,
@@ -35,18 +36,23 @@ export function kbMaxFilesFromEnv(env = process.env) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_KB_MAX_FILES;
 }
 
-/** The one-paragraph explanation printed when the ceiling is hit. */
-export function describeTooLarge(tooLarge, workspace) {
+/**
+ * The one-paragraph explanation printed when the ceiling is hit. Wrapped to
+ * the terminal with a hanging indent under the marker — the first version was
+ * hard-wrapped at ~98 columns and folded again on an 85-column terminal.
+ */
+export function describeTooLarge(tooLarge, workspace, { cols = 100 } = {}) {
   const cap = Number(tooLarge?.maxFiles ?? DEFAULT_KB_MAX_FILES).toLocaleString();
   const seen = Number(tooLarge?.files ?? 0).toLocaleString();
   const name = workspace ? (path.basename(workspace) || workspace) : "this workspace";
-  return [
-    `  \u{1F9ED} code KB: off — ${name} has more than ${cap} source files (stopped counting at ${seen}).`,
-    "     That is a directory of projects, not a project. Each indexed file holds ~44 KB of memory, so",
-    "     indexing it would need gigabytes. Run bantam inside the project you mean, or pass",
-    "     --workspace <dir>; exclude directories with a .bantamignore; or raise BANTAM_KB_MAX_FILES.",
-    "",
-  ].join("\n");
+  const lead = "  \u{1F9ED} ";           // 5 columns wide: the emoji takes two
+  const hang = "     ";
+  const body = `code KB: off — ${name} has more than ${cap} source files (stopped counting at ${seen}). `
+    + "That is a directory of projects, not a project: each indexed file holds ~44 KB of memory, "
+    + "so indexing it would need gigabytes. Run bantam inside the project you mean, or pass "
+    + "--workspace <dir>; exclude directories with a .bantamignore; or raise BANTAM_KB_MAX_FILES.";
+  const width = Math.max(40, (Number.isFinite(cols) && cols > 0 ? cols : 100) - hang.length - 1);
+  return wrapWords(body, width).map((l, i) => (i ? hang : lead) + l).join("\n") + "\n";
 }
 
 /** Build a grounding context from a workspace. Cheap; safe on non-code workspaces (empty KB). */

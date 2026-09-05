@@ -61,8 +61,20 @@ test("the ceiling comes from BANTAM_KB_MAX_FILES, with a sane default", () => {
     "high enough for any single real project, low enough to stay far under the 4 GB heap at ~44 KB/file");
 });
 
+test("the note wraps to the terminal with a hanging indent — never hard-wrapped wider than the screen", () => {
+  for (const cols of [80, 85, 120]) {
+    const lines = describeTooLarge({ files: 10001, maxFiles: 10000 }, "/x/PROJECTAI", { cols }).trimEnd().split("\n");
+    assert.match(lines[0], /^ {2}\u{1F9ED} code KB: off/u);
+    for (const l of lines.slice(1)) assert.match(l, /^ {5}\S/, `hanging indent: ${JSON.stringify(l)}`);
+    // the emoji is two columns wide on screen; count it as such
+    for (const l of lines) assert.ok(l.length + 1 <= cols, `${cols}: ${l.length + 1} > ${cols}: ${l}`);
+    assert.ok(lines.length >= (cols < 100 ? 4 : 3), `${cols} cols: ${lines.length} lines`);
+  }
+});
+
 test("the message names the count, the diagnosis, and every remedy", () => {
-  const text = describeTooLarge({ files: 10001, maxFiles: 10000 }, "/home/someone/Desktop/PROJECTAI");
+  // The note is wrapped to the terminal, so match phrases on the collapsed text.
+  const text = describeTooLarge({ files: 10001, maxFiles: 10000 }, "/home/someone/Desktop/PROJECTAI").replace(/\s+/g, " ");
   assert.match(text, /code KB: off/);
   assert.match(text, /PROJECTAI has more than 10,000 source files/);
   assert.match(text, /stopped counting at 10,001/);

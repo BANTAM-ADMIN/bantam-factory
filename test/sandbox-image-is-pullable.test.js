@@ -7,7 +7,7 @@ import path from "node:path";
 import { Executor, DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 
 // CI 2026-09-05, first green-field run of the suite gate. The default shell
-// sandbox named `internal/api:latest` — a private image from an unrelated project
+// sandbox named a private image from an unrelated internal project
 // that existed on exactly one developer's machine. Every shell action on every
 // other machine returned:
 //

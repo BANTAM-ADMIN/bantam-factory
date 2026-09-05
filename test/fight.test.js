@@ -4,6 +4,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { buildArmCommand, parseClaudeStreamLine, sseFrame, assemblePostmortem, startFight, ARMS } from "../src/fight.js";
+import { execFileSync } from "node:child_process";
+
+// judgeFight reruns each corner's own suite (src/fight.js), which for a Python
+// corner means `python3 -m pytest`. GitHub's ubuntu runner ships python3 but not
+// pytest, so this read as a judging bug ('PARTIAL' == 'WIN') when it was a
+// missing tool. Skip it on a contributor's machine that lacks pytest — but NEVER
+// on CI, where the workflow installs it: a silent skip in the gate is how a real
+// regression walks through.
+const havePytest = (() => {
+  try {
+    execFileSync("python3", ["-m", "pytest", "--version"], { stdio: "ignore", timeout: 15000 });
+    return true;
+  } catch { return false; }
+})();
+const needsPytest = havePytest || process.env.CI ? false : "python3 -m pytest not installed";
 
 test("every registered arm builds a runnable command with the task embedded", () => {
   for (const name of Object.keys(ARMS)) {
@@ -114,7 +129,7 @@ test("the finished object: one static file with transcripts and a working zip", 
   assert.match(listing, /built\.py/, "workspace file inside the zip");
 });
 
-test("the judge trusts nothing: reruns suites, catches tampering", async (t) => {
+test("the judge trusts nothing: reruns suites, catches tampering", { skip: needsPytest }, async (t) => {
   const { judgeFight } = await import("../src/fight.js");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "judge-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));

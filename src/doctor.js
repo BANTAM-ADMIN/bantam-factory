@@ -27,6 +27,7 @@ export function nodeMajor(versionString) {
  *   gpuInfo : () => { name, memMB } | null
  *   scanGgufs : () => string[]               — absolute .gguf paths found
  *   listModels : () => Array<{ name, label, script, endpoint }>
+ *   sandboxProbe : () => { mode, image, dockerFound, imagePresent } | null
  *
  * Returns { ready, checks:[{name,status,detail,remedy?}], nextAction,
  *           scaffoldRecommended, detection }.
@@ -47,6 +48,36 @@ export async function runChecks(probes) {
     });
   }
 
+  // 2) Shell sandbox. Checked BEFORE the endpoint short-circuit on purpose: a
+  // reachable model says nothing about whether the agent can run a command, and
+  // this link failed silently for everyone but its author. The sandbox runs
+  // `docker run --pull never` — deliberately, so a model-chosen action can never
+  // reach a registry — which means the base image must already be on the machine.
+  // Without this check the first symptom is `exit 125: No such image` on every
+  // shell action, long after `doctor` said "You're set".
+  const sb = probes.sandboxProbe?.() ?? null;
+  if (sb?.mode === "host") {
+    checks.push({
+      name: "sandbox", status: "warn",
+      detail: "host mode (BANTAM_SHELL_SANDBOX=host) — no container isolation",
+      remedy: "Shell actions run with your user's full reach. Unset BANTAM_SHELL_SANDBOX to restore the Docker sandbox.",
+    });
+  } else if (sb && !sb.dockerFound) {
+    checks.push({
+      name: "sandbox", status: "fail",
+      detail: "docker not found — every shell action will fail",
+      remedy: "Install Docker, or accept the loss of isolation with BANTAM_SHELL_SANDBOX=host.",
+    });
+  } else if (sb && !sb.imagePresent) {
+    checks.push({
+      name: "sandbox", status: "fail",
+      detail: `sandbox image ${sb.image} is not present locally`,
+      remedy: `Run \`docker pull ${sb.image}\`. The sandbox runs --pull never, so it cannot fetch this itself.`,
+    });
+  } else if (sb) {
+    checks.push({ name: "sandbox", status: "pass", detail: `docker, image ${sb.image}` });
+  }
+
   // 2) Model endpoint — the happy path short-circuits everything else.
   const endpoint = await probes.detectEndpoint();
   if (endpoint) {
@@ -55,9 +86,12 @@ export async function runChecks(probes) {
       name: "endpoint", status: "pass",
       detail: `reachable at ${endpoint}${model ? ` — ${model}` : ""}`,
     });
+    const sandboxBroken = checks.find((c) => c.name === "sandbox" && c.status === "fail");
     return {
-      ready: true, checks, detection, scaffoldRecommended: false,
-      nextAction: "You're set — run `bantam` in your project directory.",
+      ready: !sandboxBroken, checks, detection, scaffoldRecommended: false,
+      nextAction: sandboxBroken
+        ? `The model is reachable, but shell actions cannot run: ${sandboxBroken.remedy}`
+        : "You're set — run `bantam` in your project directory.",
     };
   }
   checks.push({

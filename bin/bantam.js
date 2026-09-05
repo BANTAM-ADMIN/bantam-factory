@@ -14,6 +14,7 @@ import { repoRootFromCli } from "../src/repo-root.js";
 import { isChangeShapedRequest, runAgent } from "../src/agent.js";
 import { runIsAttended } from "../src/attendance.js";
 import { ModelClient, detectEndpoint } from "../src/model.js";
+import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
 import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache } from "../src/logic/grounding.js";
 import { researchOffer, elicitGaps } from "../src/logic/research-triggers.js";
@@ -735,6 +736,21 @@ if (cmd === "doctor" || cmd === "setup") {
     }
     return findLlamaServer(llamaInstallRoot()); // a previously fetched prebuilt
   };
+  // The sandbox image must already be local: the executor runs `docker run --pull
+  // never` so a model-chosen action can never reach a registry. `docker image
+  // inspect` is the cheap local-only existence check — never `docker pull`.
+  const sandboxProbe = () => {
+    const mode = process.env.BANTAM_SHELL_SANDBOX ?? "docker";
+    const image = process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE;
+    if (mode !== "docker") return { mode, image, dockerFound: false, imagePresent: false };
+    let dockerFound = false;
+    try { execFileSync("docker", ["version", "--format", "{{.Server.Version}}"], { stdio: "ignore", timeout: 5000 }); dockerFound = true; }
+    catch { return { mode, image, dockerFound: false, imagePresent: false }; }
+    let imagePresent = false;
+    try { execFileSync("docker", ["image", "inspect", image], { stdio: "ignore", timeout: 5000 }); imagePresent = true; }
+    catch { /* absent */ }
+    return { mode, image, dockerFound, imagePresent };
+  };
   const gpuInfo = () => {
     try {
       const out = execFileSync("nvidia-smi", ["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"], { encoding: "utf8", timeout: 3000 });
@@ -929,7 +945,7 @@ if (cmd === "doctor" || cmd === "setup") {
   // missing) fetch llama-server, download the model, scaffold, and launch.
   if (args.setup || cmd === "setup") {
     const detect = async () => { const ep = await detectEndpoint({ endpoint: args.endpoint }); return (await isHealthy(ep)) ? ep : null; };
-    const report = await runChecks({ nodeVersion: process.version, detectEndpoint: detect, loadedModel: (ep) => fetchModelId(ep, 2500).catch(() => null), whichLlama, gpuInfo, scanGgufs, listModels });
+    const report = await runChecks({ nodeVersion: process.version, detectEndpoint: detect, loadedModel: (ep) => fetchModelId(ep, 2500).catch(() => null), whichLlama, gpuInfo, scanGgufs, listModels, sandboxProbe });
     process.stderr.write(`\n${renderReport(report)}\n`);
     if (report.ready) { process.stderr.write("\n✔ Already set up — run `bantam` in your project.\n"); process.exit(0); }
     // Shortest path to a running server: if a model is already registered, just
@@ -966,7 +982,7 @@ if (cmd === "doctor" || cmd === "setup") {
     nodeVersion: process.version,
     detectEndpoint: async () => { const ep = await detectEndpoint({ endpoint: args.endpoint }); return (await isHealthy(ep)) ? ep : null; },
     loadedModel: (ep) => fetchModelId(ep, 2500).catch(() => null),
-    whichLlama, gpuInfo, scanGgufs, listModels,
+    whichLlama, gpuInfo, scanGgufs, listModels, sandboxProbe,
   });
   if (args.json) { console.log(JSON.stringify({ ready: report.ready, checks: report.checks, nextAction: report.nextAction }, null, 2)); process.exit(0); }
   process.stderr.write(`\n${renderReport(report)}\n`);

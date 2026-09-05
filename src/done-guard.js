@@ -18,7 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { editPaths, turnEditApplied } from "./edit-actions.js";
-import { isDeliverableRun, isTestCommand } from "./logic/deliverable-signals.js";
+import { isDeliverableRun, isInlineEvalProbe, isTestCommand } from "./logic/deliverable-signals.js";
 
 // Documentation files cannot be "exercised" by running anything; edits to them
 // never anchor the oracle-silence gate. Code masquerading as docs is not a
@@ -122,6 +122,13 @@ export function verificationVerdict(turn) {
   // fail closed until the model fixes source and re-runs the original check.
   if (turn?.shellScopeRollback?.violations?.length) return "fail";
 
+  // New turns carry an execution-bound record. Never reinterpret their rendered
+  // commentary as runner evidence. Keep the old parser only for historical films.
+  if (Object.hasOwn(turn ?? {}, "verificationEvidence")) {
+    const status = turn.verificationEvidence?.status;
+    return status === "pass" || status === "fail" ? status : null;
+  }
+
   // Trusted provenance beats parsed text: if the HARNESS itself ran a scoped verification for this
   // turn (test-impact graph + framework registry), its stamped verdict is authoritative and cannot
   // be spoofed — the model authors observation text, never a turn field. See agent.js scoped-verify.
@@ -150,6 +157,34 @@ export function verificationVerdict(turn) {
   const exit = String(turn?.observation ?? "").match(/^\s*exit\s+(-?\d+)\s*$/mi);
   if (!exit) return null;
   return Number(exit[1]) === 0 ? "pass" : "fail";
+}
+
+// Automatic/scoped verification belongs to the runner that actually executed,
+// not to the edit action that caused it. Historical films retain their stamp.
+function verificationCommand(turn) {
+  if (Object.hasOwn(turn ?? {}, "verificationEvidence")) {
+    return String(turn.verificationEvidence?.command ?? "").trim();
+  }
+  return String(turn?.scopedVerify?.command
+    ?? (turn?.action ?? turn?.parsedAction ?? {}).c ?? "").trim();
+}
+
+function isSuiteVerification(turn) {
+  const evidence = turn?.verificationEvidence;
+  return Boolean(evidence?.configuredCommand)
+    || evidence?.source === "automatic" || evidence?.source === "scoped"
+    || (!Object.hasOwn(turn ?? {}, "verificationEvidence")
+      && (turn?.scopedVerify?.verdict === "pass" || turn?.scopedVerify?.verdict === "fail"))
+    || isTestCommand(verificationCommand(turn));
+}
+
+function verificationIsCurrent(turn, workspaceGeneration) {
+  // Older replay records have no generation; preserve index-based compatibility
+  // for those alone. New receipts need a generation match when one is known.
+  if (!Number.isInteger(workspaceGeneration)
+      || !Object.hasOwn(turn ?? {}, "verificationEvidence")) return true;
+  return Number.isInteger(turn.verificationEvidence?.generation)
+    && turn.verificationEvidence.generation === workspaceGeneration;
 }
 
 const SECRET_CLEANUP_TASK_RE = /\b(?:sanitize|saniti[sz]e|remove|clean|redact|scrub)\b[\s\S]{0,120}\b(?:secrets?|credentials?|api\s*keys?|tokens?|passwords?|github|hugging\s*face|aws)\b|\b(?:secrets?|credentials?|api\s*keys?|tokens?|passwords?|github|hugging\s*face|aws)\b[\s\S]{0,120}\b(?:sanitize|saniti[sz]e|remove|clean|redact|scrub)\b/i;
@@ -279,19 +314,18 @@ function prematureDoneCore(turns, opts = {}) {
   // a fail — so `done` at 41 sailed through with one of its 21 tests newly red.
   // Deliverable-run verdicts remain the only tier for projects with no tests,
   // where they are the best evidence there is.
-  const shellCommand = (tn) => String((tn?.action ?? tn?.parsedAction ?? {}).c ?? "");
   // isTestCommand expands launcher payloads (bash -c '…') itself — see
   // deliverable-signals.js — so a suite piped through grep inside quotes
   // classifies correctly here and in ranVerification alike.
-  const hasRealTests = all.some((tn) => verificationVerdict(tn) !== null && isTestCommand(shellCommand(tn)));
+  const hasRealTests = all.some((tn) => verificationVerdict(tn) !== null && isSuiteVerification(tn));
   let lastEditIdx = -1, lastTestIdx = -1, lastTestFailed = false, lastTestCommand = null;
   all.forEach((tn, i) => {
     if (turnEditedSource(tn)) lastEditIdx = i;
     const verdict = verificationVerdict(tn);
     if (!verdict) return;
-    if (hasRealTests && !isTestCommand(shellCommand(tn))) return;
+    if (hasRealTests && !isSuiteVerification(tn)) return;
     lastTestIdx = i; lastTestFailed = verdict === "fail";
-    lastTestCommand = shellCommand(tn).trim() || null;
+    lastTestCommand = verificationCommand(tn) || null;
   });
 
   // Only enforce once the model has shown it CAN verify here (avoids trapping a
@@ -307,6 +341,16 @@ function prematureDoneCore(turns, opts = {}) {
       + "verdict, fix what is red, and only then call done.";
   }
 
+  // A restoration can change generation on the SAME turn as its triggering
+  // check. Turn ordering alone would otherwise certify the restored tree using
+  // a receipt captured before that tree existed.
+  if (!verificationIsCurrent(all[lastTestIdx], opts.workspaceGeneration)) {
+    return "You called done, but the latest verification belongs to an earlier workspace state. "
+      + "The workspace changed or was restored after that check. Re-run the verification on the "
+      + "current files before finishing"
+      + (lastTestCommand ? ` — \`${lastTestCommand}\` is the one you used` : "") + ".";
+  }
+
   // 1) The most recent verdict was a failure and nothing was edited after it.
   if (lastTestFailed && lastTestIdx >= lastEditIdx) {
     // Declared-baseline escape (bootstrap #2, 2026-08-18): a workspace may
@@ -317,10 +361,18 @@ function prematureDoneCore(turns, opts = {}) {
     // names still block; missing/corrupt manifests and unparsable output
     // fail closed to the strict rule. Names, not counts: fix-one-break-one
     // keeps the count and must not slip through.
-    const failingNames = [...String(all[lastTestIdx]?.observation ?? "")
-      .matchAll(/^\s*not ok\s+\d+\s*-\s*(.+?)\s*$/gim)].map((m) => m[1]);
+    const lastVerification = all[lastTestIdx];
+    const typed = Object.hasOwn(lastVerification ?? {}, "verificationEvidence");
+    const recordedNames = lastVerification?.verificationEvidence?.failingTests;
+    const failingNames = typed && Array.isArray(recordedNames)
+      ? recordedNames.filter((name) => typeof name === "string" && name.trim())
+      : [...String(typed ? lastVerification.verificationEvidence?.rawOutput ?? "" : lastVerification?.observation ?? "")
+        .matchAll(/^\s*not ok\s+\d+\s*-\s*(.+?)\s*$/gim)].map((m) => m[1]);
     const declared = loadKnownFailures(opts.workspace);
-    if (failingNames.length && declared.length
+    const namesComplete = !typed || (lastVerification.verificationEvidence?.failingTestsComplete !== false
+      && !(lastVerification.verificationEvidence?.counts?.failed > failingNames.length)
+      && lastVerification.verificationEvidence?.countsScope !== "multiple-summaries");
+    if (namesComplete && failingNames.length && declared.length
         && failingNames.every((name) => declared.some((known) => name.includes(known) || known.includes(name)))) {
       return null;
     }
@@ -345,6 +397,10 @@ function prematureDoneCore(turns, opts = {}) {
 
 /** Did this turn run something that exercises the deliverable? */
 export function ranVerification(turn) {
+  if (Object.hasOwn(turn ?? {}, "verificationEvidence")) {
+    const status = turn.verificationEvidence?.status;
+    return status === "pass" || status === "fail";
+  }
   // A harness-run scoped verify IS a real verification of the deliverable (the harness executed the
   // affected tests itself), so it counts even though this turn's own action was the edit, not a shell.
   if (turn?.scopedVerify?.verdict === "pass" || turn?.scopedVerify?.verdict === "fail") return true;
@@ -398,7 +454,7 @@ export function unverifiedEditObjection(turns, alreadyRejected = 0, opts = {}) {
         lastEditPath = paths.at(-1) ?? null;
       }
     }
-    if (ranVerification(tn)) lastVerifyIdx = i;
+    if (ranVerification(tn) && verificationIsCurrent(tn, workspaceGeneration)) lastVerifyIdx = i;
   });
 
   if (lastEditIdx === -1) return null;
@@ -430,6 +486,22 @@ export function unverifiedEditObjection(turns, alreadyRejected = 0, opts = {}) {
       if (i <= lastEditIdx) return false;
       const a = (tn.action || tn.parsedAction || {});
       if (a.a !== "shell" || typeof a.c !== "string" || !a.c.includes(base)) return false;
+      if (Object.hasOwn(tn, "verificationEvidence") || Object.hasOwn(tn, "shellExecution")) {
+        if (tn.verificationEvidence?.status === "pass"
+            && verificationIsCurrent(tn, workspaceGeneration)) return true;
+        // A raw outer-shell exit cannot overrule a recognized runner failure
+        // or an explicitly unavailable receipt from that same execution.
+        if (tn.verificationEvidence) return false;
+        const run = tn.shellExecution;
+        const command = String(run?.command ?? "");
+        const exercisesFile = command.includes(base)
+          && (isInlineEvalProbe(command) || isDeliverableRun(command, { editedNames: new Set([base]) }));
+        return Boolean(exercisesFile && run.exitCode === 0
+          && !run.timedOut && !run.interrupted && !run.bufferExceeded && !run.error
+          && !run.blocked && !run.invalidated
+          && (!Number.isInteger(workspaceGeneration)
+            || (Number.isInteger(run.generation) && run.generation === workspaceGeneration)));
+      }
       const obs = String(tn.observation ?? "").trim();
       return obs.length > 0 && !obs.startsWith("ERROR");
     });

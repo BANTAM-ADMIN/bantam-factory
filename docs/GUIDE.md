@@ -9,11 +9,13 @@ interactive user sees versus what is recorded, and the network-consent model
 (off by default; per-fetch approval; `--dangerously-allow-net`), see
 [The interactive experience](INTERACTIVE-EXPERIENCE.md).
 
-BANTAM is a **local-model coding harness**. It owns the agent loop, constrains
-every model action with a GBNF grammar so a malformed tool call is *structurally
-impossible*, executes actions inside a sandboxed workspace, and — when you give
-it a command to check the work — grades the finished result with a verifier the
-model never sees.
+BANTAM is a **local-model coding harness**. It owns the agent loop, requests
+constrained generation through the selected model adapter, validates actions,
+and executes model-chosen shell commands in Docker by default. When you supply
+a verification command, it records whether that command passed on the finished
+code. This is evidence about the checks you chose, not a guarantee that every
+requirement is covered. Tests the agent can edit are not independent acceptance
+evidence.
 
 It is built to be **interactive-first**: you describe work in natural language,
 watch concise tool activity, steer it while it runs, and continue from the same
@@ -31,25 +33,39 @@ This guide has two halves:
 ### Prerequisites
 
 - **Node 20+**.
-- **A llama.cpp-compatible `/completion` server** with a model loaded. BANTAM
-  talks to the *raw completion* API (not a chat/tools API) precisely so it can
-  enforce its own grammar — so any llama.cpp server exposing `/completion` works.
-  - BANTAM defaults to `http://localhost:8085`. Point it elsewhere with
-    `BANTAM_ENDPOINT` or `--endpoint`.
-  - The dogfood model is a local **Qwen 3.6 27B** (Q4_K_M), 100k context.
+- **A supported model endpoint**. For llama.cpp, use its raw `/completion`
+  endpoint and GBNF support; the usual address is `http://localhost:8085`,
+  configurable with `BANTAM_ENDPOINT` or `--endpoint`. OpenAI-compatible APIs
+  use `--api-url` and the matching `llamacpp`, `vllm`, or `chat` dialect.
+  Compatibility of HTTP routes alone does not establish constrained generation.
+- **Linux or WSL2, Docker, and your project's toolchain** for the default shell
+  sandbox. Native Windows is unsupported. macOS is untested and its host
+  binaries cannot run inside this Linux container; explicit host mode has
+  different isolation and network properties, described below.
+- **Git** for factory snapshots and apply. Factory builds copy existing
+  `node_modules`; install project dependencies before starting offline work.
+
+`bantam setup` currently installs stock Qwen 3.8 27B Q4_K_M, requiring about
+24 GB VRAM for the default profile. The published fight board used a fine-tune
+and `extension` context mode, not those installation defaults. See the
+[configuration disclosure](../README.md#receipts-not-benchmarks).
 
 ### One-time setup (from the BANTAM repo)
 
 ```bash
 cd "/path/to/BANTAM"
-npm install
-npm test                 # optional: confirm the harness is all green
-npm run start -- health  # should print: ok   (verifies the model server is reachable)
+npm ci
+docker pull alpine:3     # required once for the default offline sandbox
+node bin/bantam.js doctor # check local server and sandbox setup
 npm link                 # makes the `bantam` command available everywhere
 ```
 
-If `health` prints `unreachable`, your model server isn't up or the endpoint is
-wrong — start llama.cpp with `/completion` and/or set `BANTAM_ENDPOINT`.
+If the model is unreachable, start your server or set its endpoint. To register
+an API instead, run `bantam doctor --api-url http://HOST:PORT/v1 --model MODEL`
+with `--api-dialect vllm` for vLLM or `--api-dialect chat` for a chat-only API.
+Add `--api-key KEY` when required. Read the constraint-check result as well as
+the reachability result. The startup picker exposes saved API configurations;
+a reachable local model can remain its default choice.
 
 ### The main way: interactive REPL on your project
 
@@ -58,9 +74,9 @@ cd /path/to/your/project
 bantam
 ```
 
-That drops you into a `bantam ❯` prompt operating on the current directory, with
-autonomous guardrails **off** (a human is steering). Describe the outcome you
-want in plain language:
+That drops you into a `bantam ❯` prompt operating on the current directory.
+Interactive policy warns on several completion concerns that block unattended
+runs; explicit file restrictions still block. Describe the outcome you want:
 
 ```
 bantam ❯ make the failing cache test pass
@@ -75,16 +91,17 @@ later `keep going` continues from the real state. If you start interactively
 with **no `--verify`**, BANTAM auto-detects your test command and *offers* to
 attach it as the grader (disable with `--no-autoverify` / `BANTAM_NO_AUTOVERIFY`).
 
-Attach a **project verifier** so every change that touches the workspace is
-graded before you see a green result:
+Attach a **project verifier** to grade the resulting code explicitly:
 
 ```bash
 bantam --verify "npm test"
 ```
 
-- A **green check** means Bantam observed the verifier pass after the change.
-- A **yellow `unverified`** means the edit was allowed but nothing proved it works.
-- A **red** result means the verifier failed (with bounded diagnostic output).
+- **`verifier passed`** means the configured command passed. A completion icon
+  by itself is not evidence that a configured verifier ran.
+- **`done with caveats`** lists remaining completion warnings.
+- **`verifier unverified`** means the configured check was inconclusive.
+- **`verification failed`** means the check failed, with bounded diagnostic output.
 - **Ctrl-C** stops the current model or shell work promptly; completed edits stay
   on disk so a later `keep going` continues from the real state.
 - Explicit restrictions like `do not edit test/foo.test.js` remain **blocking**
@@ -117,8 +134,7 @@ For staged parallel specialists and one accountable Terra candidate, see
 
 ### Unattended: one-shot `run`
 
-For scripted or headless use, `run` takes a task and an explicit final verifier
-and re-enables the strict guardrails:
+For scripted or headless use, pass a verifier and enable unattended gates:
 
 ```bash
 bantam run \
@@ -126,12 +142,13 @@ bantam run \
   --workspace /path/to/your/project \
   --verify "npm test" \
   --autonomous \
-  --save-run .bantam/runs/fix-cache.json
+  --save-run=.bantam/runs/fix-cache.json
 ```
 
 - `--autonomous` turns the interactive backstops into the full progress /
-  premature-done / ledger gates (nothing is watching, so it self-polices).
-- `--save-run <path>` writes a complete artifact: the full turn trajectory,
+  premature-done policy. Individual experimental gates can still be off;
+  `--autonomous` does not supply a missing verifier.
+- `--save-run=<path>` writes a complete artifact: the full turn trajectory,
   metrics (turns, tokens, timings), sampling, and harness git provenance.
 - Exit code is non-zero if the verifier ends in `fail`.
 
@@ -155,7 +172,7 @@ from `./.bantam/models.json` and configured API presets. Terra medium is the
 recommended everyday Codex route; Luna is the fast route; Sol high is the
 hard/high-assurance route. The last successful non-secret selection and effort
 are stored in `.bantam/model-preference.json`. See
-[Model Management](../README.md#model-management).
+[Model runtimes](MODEL-RUNTIMES-AND-IMPROVEMENT.md).
 
 The same picker discovers every non-hidden model in your authenticated Codex
 app-server catalog. Current aliases include `codex-sol`, `codex-terra`,
@@ -187,7 +204,7 @@ artifacts:
 ```bash
 bantam run --codex --model gpt-5.6-sol --codex-effort high \
   --task "fix the failing parser" --workspace . --verify "npm test" \
-  --save-run .bantam/runs/codex-sol.json
+  --save-run=.bantam/runs/codex-sol.json
 ```
 
 Codex does not replace BANTAM's harness. BANTAM still owns prompts, history,
@@ -261,7 +278,7 @@ habits get dramatically better results:
   fail-fast rejects `npm install`/`pip install`. Install deps from a trusted
   terminal first (they belong to *your* project), or opt into networking with
   `--shell-network` for trusted work only.
-- **Record the hard runs.** Add `--save-run <path>` and `BANTAM_SAVE_PROMPTS=1`.
+- **Record the hard runs.** Add `--save-run=<path>` and `BANTAM_SAVE_PROMPTS=1`.
   If a run goes wrong, that artifact lets you replay the exact failing turn and
   test a fix in ~30 seconds — the core of the [self-improvement
   loop](SELF-IMPROVEMENT.md).
@@ -273,19 +290,17 @@ habits get dramatically better results:
 
 ### Configuration
 
-Most behavior is CLI flags; a handful of environment variables cover the rest.
-See the **Configuration** table in the [README](../README.md#configuration) for
-the full list (endpoint, profile, timeouts, `--max-turns`, the completion/state
-audit, patch/file-op exposure, and the experimental guards). The knobs you'll
-reach for most:
+Most behavior is CLI flags; environment variables cover additional policies.
+Use `bantam --help` for the command surface, `bantam factory --help` for isolated
+cells, and `:modes` inside the REPL for active session choices. Common settings:
 
 | Need | Flag / env |
 | --- | --- |
 | Point at a model server | `--endpoint` / `BANTAM_ENDPOINT` (default `:8085`) |
 | Grade the work | `--verify "<command>"` |
 | Unattended run with strict gates | `--autonomous` |
-| Save a full run artifact | `--save-run <path>` |
-| Cap model turns | `--max-turns N` / `BANTAM_MAX_TURNS` (default 200) |
+| Save a full run artifact | `--save-run=<path>` |
+| Cap model turns | `--max-turns N`; defaults differ by entry point (`run`: 200, `exec` and factory general cell: 30, ordinary REPL request: 60) |
 | Live cockpit view (TTY) | `--tui` |
 | Rooster antics on/off | `--no-rooster` / `BANTAM_NO_ROOSTER=1` / `:rooster` in the REPL |
 | Context reuse/accuracy dial | `--context-mode rebuild\|immutable\|extension` / `:context` — remembered, and printed at startup |
@@ -352,7 +367,7 @@ bantam escalate <run.json> --task <t> --yes      # consent-gated escalation to a
 bantam channel  promote --from dev --to regular --evidence <experiment>   # evidence-gated promotion
 ```
 
-Recording a run with `--save-run <path>` (and `BANTAM_SAVE_PROMPTS=1` for
+Recording a run with `--save-run=<path>` (and `BANTAM_SAVE_PROMPTS=1` for
 turn-level replay) is what makes a failure a rewindable specimen. See
 [`docs/SELF-IMPROVEMENT.md`](SELF-IMPROVEMENT.md) for the full loop.
 
@@ -390,8 +405,12 @@ the same turn remains eligible.
 
 ### Troubleshooting
 
-- **`health` says `unreachable`** → server down or wrong endpoint. Start llama.cpp
-  with `/completion`; set `BANTAM_ENDPOINT`.
+- **`health` says `unreachable`** → server down or wrong endpoint. Check the
+  selected provider; raw llama.cpp uses `BANTAM_ENDPOINT`, while compatible
+  APIs use their registered URL and dialect.
+- **Constraint check fails** → verify the adapter and server's generation
+  support. A response that passes local JSON validation alone does not prove
+  that the server constrained token generation.
 - **Model keeps re-reading / looping** → in `--autonomous`, the progress gate
   bounds this automatically; interactively, Ctrl-C and steer it.
 - **`context_overflow`** → Bantam shrinks history and retries automatically; if it
@@ -405,9 +424,9 @@ the same turn remains eligible.
 
 ### The one idea
 
-A local open-weight model, **constrained by a GBNF grammar so it cannot emit a
-malformed tool call**, driven through a loop that separates *what the harness
-observed* from *how that observation is delivered*:
+A model, generation constraints where supported, and local validation, driven
+through a loop that separates *what the harness observed* from *how that
+observation is delivered*:
 
 > **Block on the user's word. Warn on the harness's hunch.**
 
@@ -424,8 +443,8 @@ valid, execute them safely, and be honest about whether the result is verified.
         └───────────────┬─────────────────────────────────────────────┘
                         │  (optional: free-form <think> phase first)
                         ▼
-        model.complete under the GBNF action grammar
-                        │   → exactly one valid action JSON, e.g. {"a":"replace",...}
+        model.complete with the adapter's grammar or structured-output schema
+                        │   → proposed action JSON, e.g. {"a":"replace",...}
                         ▼
         parseAction → validate against the frozen action-protocol table
                         ▼
@@ -441,26 +460,30 @@ valid, execute them safely, and be honest about whether the result is verified.
                         ▼
         on `done`: done-gates evaluated per gate-policy (block / warn by mode)
                         ▼
-        after the loop: optional hidden verifier grades the final tree;
+        after the loop: configured verifier grades the final tree;
         interactive-verdict styles the outcome; a passing run may distill a skill
 ```
 
-Invalid or failing model output never crashes the run — it becomes a **repair
-turn** or an ordinary error observation.
+Malformed model output normally becomes a **repair turn**. Execution failures
+become observations; terminal model or infrastructure failures remain failures.
 
-### The grammar guarantee (the core primitive)
+### Generation constraints and validation
 
 - **`action-protocol.js`** is the single source of truth: one frozen table
   describing every action verb, its field shape, an example, and prompt help.
   The grammar, the runtime validator, and the system-prompt action menu are all
-  generated from it, so the wire shape can never drift between them.
+  generated from it, giving the protocol one shared definition.
 - **`grammar.js`** renders that table into a **GBNF grammar** that constrains
-  sampling, so the model can only produce exactly one syntactically valid action
-  object with fixed key order. Malformed tool calls are impossible by
-  construction — not parsed-and-repaired after the fact.
+  sampling on a server that honors it. A completed constrained output follows
+  the action syntax; truncation and transport failures can still prevent a
+  usable action. API adapters request their supported schema/tool mechanism.
 - **`actions.js`** is the second line of defense: it extracts and validates the
   JSON (with a one-shot repair for the stray control chars small models emit) and
   turns any structural failure into a clean repair turn.
+
+The guarantee has two parts: server-side generation constraints when supported,
+and local action validation before dispatch. Neither proves that a
+syntactically valid action is the right action for the task.
 
 The action verbs: `read_file`, `list_dir`, `search`, `inspect`, `shell`, `write_file`,
 `replace`, `patch` (atomic multi-file, feature-gated), `delete_file` / `move_file`
@@ -471,7 +494,7 @@ The action verbs: `read_file`, `list_dir`, `search`, `inspect`, `shell`, `write_
 | Component | File | Role |
 | --- | --- | --- |
 | Agent loop | `src/agent.js` | The orchestrator (`runAgent`): build → complete → parse → execute → observe, wiring in every guard, then the optional final verifier. |
-| Model client | `src/model.js` | Wraps the llama.cpp `/completion` endpoint; retries transient errors; tags context-window overflow as `context_overflow` so the loop shrinks history instead of crashing. |
+| Model client | `src/model.js` | Selects the local, API, or Codex transport; retries supported transient failures and reports terminal failures. Local context overflow can trigger bounded history reduction. |
 | Prompt assembly | `src/prompt.js` | Builds the raw prompt; scrubs chat-control tokens from all untrusted content so a model can't inject a fake turn by echoing `<|im_start|>`. |
 | Model profiles | `src/profiles.js` | Per-model sampling/prompt quirks (Qwen: temp 0.6, cooler action temp 0.4, closed-`<think>` prefill so generation starts in the grammar channel). |
 | Thinking mode | `src/thinking.js` | Optional two-phase turn: reason freely in `<think>`, then generate the constrained action. In `auto`, thinking is spent only at hard moments (turn 0, after a repair, after a failure). |
@@ -536,8 +559,10 @@ deliberate: quietly downgrading an isolation boundary is worse than a loud stop.
 
 ### Verification and completion gates
 
-This is the product's spine. Every check *runs* in both modes; **`gate-policy.js`**
-decides whether the consequence is **block**, **warn**, or **off** for that mode.
+This is the product's spine. **`gate-policy.js`** decides whether a check
+**blocks**, **warns**, or is **off** for that mode. An off check is not evaluated.
+Interactive warnings and bounded autonomous objections help catch known
+failures; they do not establish universal correctness or replace a verifier.
 
 | Component | File | Role |
 | --- | --- | --- |
@@ -650,20 +675,20 @@ complete single-file Tetris" — and each result was tested in a real browser:
 | **Claude Code** (Sonnet) | Working, 8/8 | **43s**, $0.225 | Clean minimal build; auto-start + restart. |
 | **Codex** (gpt-5.6-sol, ultra) | Working, 8/8 | **~15 min** | Most elaborate (944 lines, game-over modal); spent most of the time self-auditing. |
 
-The honest read: this is one subjective task with each agent on different
-settings, so it's an anecdote, not a benchmark. But it shows the local harness is
-genuinely usable for real builds — the grammar-constrained loop produced a
-working, complete game faster than the cloud agents. BANTAM's *distinct* value
-(honest verification) only engages when you give it something to check; that's
-what the `eval`/`experiment`/`--verify` paths are for.
+This is a historical anecdote with different settings, not a controlled
+benchmark or a claim about a fresh installation. Its table records BANTAM
+slower than Claude and faster than Codex on that run. The BANTAM arm had no
+configured verifier, so its result cannot establish the verification guarantee.
+Use the [fight record](fights/README.md) for the separately documented comparison
+protocol and its configuration limits.
 
 ---
 
 ## See also
 
-- [`README.md`](../README.md) — quick start, interactive details, experiments, configuration.
+- [`README.md`](../README.md) — quick start, platform support, and evidence disclosure.
+- [Factory getting started](FACTORY-GETTING-STARTED.md) — isolated build, inspection, and explicit apply.
 - [`docs/PRINCIPLES.md`](PRINCIPLES.md) — the first principle (*it's the context, not the model*), the evidence table, and the diagnose loop.
 - [`docs/SELF-IMPROVEMENT.md`](SELF-IMPROVEMENT.md) — the full self-improvement loop: record → witness → rewind → A/B → score → evidence-gated promotion.
 - [`docs/ROADMAP.md`](ROADMAP.md) — the product thesis and where it's headed.
 - [`docs/GROUNDING_TOOLS.md`](GROUNDING_TOOLS.md) — the symbolic-tool design in depth.
-- `docs/superpowers/` — the measured upgrade program and results.

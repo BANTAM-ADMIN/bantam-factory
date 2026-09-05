@@ -25,14 +25,21 @@
 //    CLI, a bigger local model, an API endpoint — and so tests mock it deterministically.
 
 import { spawn } from "node:child_process";
+import { testProvenanceGuidance } from "./logic/test-focus.js";
 
 // Build the teacher prompt from the same materials the local diagnosis already has:
 // the failing test's source, the implicated implementation source, and the concrete
 // expected-vs-actual diff. Mirrors the by-hand prompt that produced the measured win.
-export function buildTeacherPrompt({ testName, testSource, implSource, diff }) {
+export function buildTeacherPrompt({ testName, testSource, implSource, diff, task = "", testProvenance = "unknown" }) {
   const parts = [
     "You are a senior engineer diagnosing a bug for a less capable model that will apply your fix.",
     "A single test is stuck red after repeated attempts. Below are the failing test, the implicated implementation, and the concrete failure.",
+    "A failing test alone does not establish whether its expectation, setup, implementation or environment is wrong.",
+    "",
+    "USER TASK:",
+    task || "(task contract unavailable; do not invent requirements)",
+    "",
+    testProvenanceGuidance(testProvenance),
     "",
     `FAILING TEST (${testName || "unnamed"}):`,
     "```",
@@ -49,8 +56,8 @@ export function buildTeacherPrompt({ testName, testSource, implSource, diff }) {
   }
   parts.push(
     "",
-    "In 1-2 SENTENCES state the ROOT CAUSE and exactly what must change to fix it.",
-    "Do NOT write corrected code, do NOT restate the symptom — give the precise causal diagnosis a developer could act on directly.",
+    "In 1-2 SENTENCES state the ROOT CAUSE supported by the evidence and exactly what must change to fix it; if a cause is not established, identify the missing evidence.",
+    "Do NOT write corrected code or merely restate the symptom. Keep protected tests unchanged; for any other test, identify a specific task-supported expectation or setup defect before proposing a correction.",
   );
   return parts.join("\n");
 }
@@ -168,9 +175,9 @@ export function teacherDue({ streak = 0, teacherAfter = 5, firstRedTurn = null, 
 
 // Ask the teacher for a cause. `invoke(prompt, {signal}) -> Promise<string|null>` is injected
 // so any transport (CLI, local model, API) plugs in and tests mock it. Never throws.
-export async function askTeacher({ testName, testSource, implSource, diff, invoke, fallback = null, signal }) {
+export async function askTeacher({ testName, testSource, implSource, diff, task = "", testProvenance = "unknown", invoke, fallback = null, signal }) {
   if (typeof invoke !== "function" && typeof fallback !== "function") return null;
-  const prompt = buildTeacherPrompt({ testName, testSource, implSource, diff });
+  const prompt = buildTeacherPrompt({ testName, testSource, implSource, diff, task, testProvenance });
   for (const teach of [invoke, fallback]) {
     if (typeof teach !== "function") continue;
     let raw;

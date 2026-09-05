@@ -12,7 +12,8 @@ import path from "node:path";
 import { runAgent } from "../agent.js";
 import { writeJsonAtomic } from "../atomic-file.js";
 import { ModelClient } from "../model.js";
-import { runProcess } from "../process-runner.js";
+import { runShellProcess } from "../executor.js";
+import { shellSegments, splitShellWords } from "../shell-lex.js";
 import { WorkspaceStore } from "../workspace-store.js";
 import { WorkspaceTransaction, recoverWorkspaceTransactions } from "../workspace-transaction.js";
 import { FactoryLineController } from "./line-controller.js";
@@ -83,6 +84,10 @@ export async function runFactoryCodingCell({
   model = undefined,
   maxTurns = 30,
   verificationTimeoutMs = 120_000,
+  shellSandbox = process.env.BANTAM_SHELL_SANDBOX ?? "docker",
+  shellNetwork = undefined,
+  dockerImage = undefined,
+  shellProcessRunner = undefined,
   signal = null,
   runAgentFn = runAgent,
   verifier = runFactoryVerifier,
@@ -138,6 +143,7 @@ export async function runFactoryCodingCell({
           maxTurns,
           verificationScript: optionalString(focusedVerificationScript),
           verificationTimeoutMs,
+          shellSandbox, shellNetwork, dockerImage, shellProcessRunner,
           signal,
           onEvent: (event) => emit("bantam-agent-event", compactAgentEvent(event)),
         });
@@ -166,7 +172,9 @@ export async function runFactoryCodingCell({
         evidence: [{ kind: "agent-disposition", result: compactAgentResult(agentResult) }],
       })],
       [gaugeRef(assets.inspection), async () => {
-        finalInspection = await verifier(candidateWorkspace, finalVerifier, verificationTimeoutMs, { signal });
+        finalInspection = await verifier(candidateWorkspace, finalVerifier, verificationTimeoutMs, {
+          signal, shellSandbox, shellNetwork, dockerImage, processRunner: shellProcessRunner,
+        });
         finalInspection = rejectMutatingVerifier(finalInspection, store, candidateWorkspace, candidate);
         return { status: finalInspection.pass ? "pass" : inspectionStatus(finalInspection), evidence: [finalInspection] };
       }],
@@ -216,6 +224,10 @@ export async function applyFactoryCodingCell({
   manifestPath,
   workspace = null,
   verificationTimeoutMs = null,
+  shellSandbox = process.env.BANTAM_SHELL_SANDBOX ?? "docker",
+  shellNetwork = undefined,
+  dockerImage = undefined,
+  shellProcessRunner = undefined,
   verifier = runFactoryVerifier,
 } = {}) {
   const file = resolveManifestPath(manifestPath);
@@ -244,7 +256,8 @@ export async function applyFactoryCodingCell({
     store.materialize(manifest.baseline.commit, baselineRoot);
     store.materialize(manifest.candidate.commit, candidateRoot);
     copyRuntimeDependencies(live, candidateRoot);
-    let candidateVerification = await verifier(candidateRoot, manifest.verification.final, timeoutMs);
+    const verificationOptions = { shellSandbox, shellNetwork, dockerImage, processRunner: shellProcessRunner };
+    let candidateVerification = await verifier(candidateRoot, manifest.verification.final, timeoutMs, verificationOptions);
     candidateVerification = rejectMutatingVerifier(candidateVerification, store, candidateRoot, manifest.candidate);
     if (!candidateVerification.pass) {
       throw new Error(`factory apply refused: released candidate verifier ${candidateVerification.status}`);
@@ -269,7 +282,7 @@ export async function applyFactoryCodingCell({
       const postApplyRoot = path.join(temp, "post-apply-verification");
       store.materialize(manifest.candidate.commit, postApplyRoot);
       copyRuntimeDependencies(live, postApplyRoot);
-      let liveVerification = await verifier(postApplyRoot, manifest.verification.final, timeoutMs);
+      let liveVerification = await verifier(postApplyRoot, manifest.verification.final, timeoutMs, verificationOptions);
       liveVerification = rejectMutatingVerifier(liveVerification, store, postApplyRoot, manifest.candidate);
       if (!liveVerification.pass) throw new Error(`post-apply verifier ${liveVerification.status}`);
       transaction.markVerified({ ...liveVerification, installedTree });
@@ -293,18 +306,34 @@ export async function applyFactoryCodingCell({
   }
 }
 
-export async function runFactoryVerifier(workspace, command, timeoutMs = 120_000, { signal = null } = {}) {
+export async function runFactoryVerifier(workspace, command, timeoutMs = 120_000, {
+  signal = null,
+  shellSandbox = process.env.BANTAM_SHELL_SANDBOX ?? "docker",
+  shellNetwork = undefined,
+  dockerImage = undefined,
+  processRunner = undefined,
+  readOnlyHostFiles = [],
+} = {}) {
   const started = Date.now();
-  const result = await runProcess("/bin/bash", ["-o", "pipefail", "-c", requireString(command, "verification command")], {
-    cwd: requireDirectory(workspace, "verification workspace"),
-    timeoutMs,
-    maxBuffer: 8 * 1024 * 1024,
-    signal,
-  });
+  let result;
+  try {
+    if (!["docker", "host"].includes(shellSandbox)) throw new Error(`Unknown shell sandbox: ${shellSandbox}`);
+    result = await runShellProcess(requireDirectory(workspace, "verification workspace"), requireString(command, "verification command"), {
+      timeoutMs, signal, shellSandbox, shellNetwork, dockerImage, processRunner,
+      // This command is supplied by the operator/controller, never by a model
+      // action. Grant only literal, existing file operands: a standalone hidden
+      // grader can run without exposing its enclosing host directory.
+      readOnlyHostFiles: [...new Set([...readOnlyHostFiles, ...namedVerifierFiles(command, workspace)])],
+      workspaceReadOnly: true,
+      pipefail: true,
+    });
+  } catch (error) {
+    result = { error, stderr: String(error?.message ?? error) };
+  }
   const status = result.timedOut ? "timeout"
     : result.aborted ? "interrupted"
       : result.bufferExceeded ? "output-limit"
-        : result.error ? "infrastructure"
+        : result.error || (result.sandbox?.startsWith("docker:") && result.code === 125) ? "infrastructure"
           : result.code === 0 ? "pass" : "fail";
   return {
     schema: 1,
@@ -312,10 +341,21 @@ export async function runFactoryVerifier(workspace, command, timeoutMs = 120_000
     command,
     pass: status === "pass",
     status,
+    sandbox: result.sandbox ?? shellSandbox,
     exitCode: Number.isInteger(result.code) ? result.code : null,
     durationMs: Date.now() - started,
     detail: [result.stdout, result.stderr].filter(Boolean).join("\n").slice(0, 16_000),
   };
+}
+
+function namedVerifierFiles(command, workspace) {
+  const root = fs.realpathSync(path.resolve(workspace));
+  return shellSegments(command).flatMap(splitShellWords).filter((word) => {
+    if (!path.isAbsolute(word) || word.includes(":")) return false;
+    const full = path.resolve(word);
+    if (full === root || full.startsWith(`${root}${path.sep}`)) return false;
+    try { return fs.statSync(full).isFile(); } catch { return false; }
+  });
 }
 
 function station(overrides) {

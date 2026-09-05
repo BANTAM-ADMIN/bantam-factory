@@ -123,6 +123,17 @@ export class RunCheckpoint {
     if (event.type === "observation" && this._pending) {
       this._pending.observation = String(event.observation ?? "");
       this._pending.rawObservation = event.rawObservation ?? null;
+      // Copy controller-owned execution facts from the sealed turn. Do not
+      // reconstruct them from clipped observations, or erase explicit null /
+      // false: that would turn an unverified new film into a legacy prose proof.
+      for (const key of [
+        "verificationEvidence", "shellExecution", "editOutcome", "contractStateAudit",
+        "contextBasis",
+        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
+        "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
+      ]) {
+        if (Object.hasOwn(event, key)) this._pending[key] = serializableCopy(event[key]);
+      }
       if (event.environmentVerification !== undefined) {
         this._pending.environmentVerification = serializableCopy(event.environmentVerification);
       }

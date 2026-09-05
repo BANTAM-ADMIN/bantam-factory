@@ -1,18 +1,26 @@
-// The operator's standing rule, baked into the loop: THE CONTEXT IS ALWAYS THE
-// PROBLEM. When a run starts to struggle, the productive move is almost never
-// "try harder" — it is "re-read what you were handed": the file's actual
-// bytes, the error's actual words. Two measured failure shapes drive the
-// triggers:
-//
-// - Card 7 (maze): repeated near-identical `replace` anchors — "old text not
-//   found" at 165 s — while the model kept editing from a remembered picture
-//   of the file. Belief/workspace divergence, ground before retrying.
-// - Cards 16/17 wall decomposition: one 45.8 s turn against a ~3 s median.
-//   An outlier turn means grinding; grinding is a context signal.
-//
-// This station AUDITS THE CONTEXT, unlike its neighbors: stuck-test diagnosis
-// reasons about the CODE, completion/state audits gate the FINISH. It fires
-// rarely (caps below) and never blocks — it appends one re-grounding notice.
+// Repeated anchor misses and no-op edits justify checking current file bytes.
+// They do not prove a cause. A guard's confirmation request, invalid syntax or
+// a slow tool call must not be narrated as evidence of stale context.
+// This bounded advisory never blocks execution.
+import { editPaths, isEditAction } from "../edit-actions.js";
+
+const REGROUND_REASONS = new Set(["anchor_missing", "ambiguous", "unchanged"]);
+const REASON_LABELS = {
+  anchor_missing: "the requested anchor or line was not found",
+  ambiguous: "the requested target was not unique or overlapped another edit",
+  unchanged: "the requested bytes were already present",
+};
+
+// Older callers and archived observations have no typed executor metadata.
+// Recognize only specific evidence; generic ERROR text supplies no cause.
+function legacyEditOutcome(action, observation) {
+  let reason = "other";
+  if (/^NO_CHANGE\b/.test(observation)) reason = "unchanged";
+  else if (/^ERROR:.*(?:"old" text not found|(?:start )?line \d+ is (?:out of range|past the end))/.test(observation)) reason = "anchor_missing";
+  else if (/^ERROR:.*"old" text appears more than once/.test(observation)) reason = "ambiguous";
+  else if (/^(?:wrote|replaced|patched|deleted|moved)\b/.test(observation)) reason = "applied";
+  return { applied: reason === "applied", reason, paths: editPaths(action) };
+}
 export class ContextAuditSentinel {
   constructor({ editFailureThreshold = 2, wallFactor = 3, wallFloorMs = 20000, maxWallAudits = 2 } = {}) {
     this.editFailureThreshold = editFailureThreshold;
@@ -26,37 +34,35 @@ export class ContextAuditSentinel {
     this._wallAudits = 0;
   }
 
-  note({ action = {}, observation = "", now = 0 } = {}) {
-    const editNote = this._noteEdit(action, String(observation ?? ""));
+  note({ action = {}, observation = "", editOutcome = null, now = 0 } = {}) {
+    const editNote = this._noteEdit(action, editOutcome ?? legacyEditOutcome(action, String(observation ?? "")));
     const wallNote = this._noteWall(now);
     // An edit-divergence audit outranks a wall audit on the same turn: it
     // names the exact file to re-read instead of a general re-grounding.
     return editNote ?? wallNote;
   }
 
-  _noteEdit(action, observation) {
-    const isEdit = action.a === "replace" || action.a === "patch" || action.a === "write_file";
-    if (!isEdit || !action.p) return null;
-    // A NO_CHANGE edit — writing the file to bytes it already holds — is the
-    // PUREST divergence evidence: the model's picture says "this needs fixing"
-    // and the workspace says "it already is". 7R (card 7 refight) ran seven
-    // consecutive no-ops at turns 121-128 while this detector RESET on each,
-    // reading them as landed edits.
-    const failed = /^ERROR:/.test(observation) || /^NO_CHANGE\b/.test(observation);
-    if (!failed) {
-      this._editFails.delete(action.p);
-      this._editFired.delete(action.p);
-      return null;
+  _noteEdit(action, outcome) {
+    if (!isEditAction(action)) return null;
+    const paths = [...new Set((Array.isArray(outcome.paths) ? outcome.paths : editPaths(action))
+      .filter((p) => typeof p === "string" && p))];
+    let note = null;
+    for (const p of paths) {
+      if (outcome.applied || !REGROUND_REASONS.has(outcome.reason)) {
+        this._editFails.delete(p);
+        this._editFired.delete(p);
+        continue;
+      }
+      const n = (this._editFails.get(p) ?? 0) + 1;
+      this._editFails.set(p, n);
+      if (n < this.editFailureThreshold || this._editFired.has(p) || note) continue;
+      this._editFired.add(p);
+      note = `[context-audit] ${n} consecutive edits to ${p} did not apply; the latest result says ${REASON_LABELS[outcome.reason]}. `
+        + `Before another edit: read_file the exact region and check the requested change against its current bytes. `
+        + `Use a unique, non-overlapping target; if the requested bytes are already present, verify the behavior or choose a different change. `
+        + `These results alone do not establish that the context is stale.`;
     }
-    const n = (this._editFails.get(action.p) ?? 0) + 1;
-    this._editFails.set(action.p, n);
-    if (n < this.editFailureThreshold || this._editFired.has(action.p)) return null;
-    this._editFired.add(action.p);
-    return `[context-audit] ${n} consecutive edits to ${action.p} have failed without landing (errors or NO_CHANGE no-ops — the file already holds what you keep writing). `
-      + `Your picture of this file has diverged from its bytes. Before another edit: read_file the exact `
-      + `region you are changing and work from the text that comes back — the file does not say what you `
-      + `remember. Then re-read the last error literally, not your summary of it. When your mental model `
-      + `and the workspace disagree, the workspace wins.`;
+    return note;
   }
 
   _noteWall(now) {
@@ -75,9 +81,8 @@ export class ContextAuditSentinel {
       if (wall >= limit) {
         this._wallAudits += 1;
         fired = `[context-audit] That turn took ${Math.round(wall / 1000)}s against a ${Math.max(1, Math.round(median / 1000))}s `
-          + `median — grinding is a context signal, not a speed problem. Re-ground before continuing: re-read the `
-          + `failing evidence (actual vs expected, literally), re-read the region you believe you are fixing, and `
-          + `check they describe the same world. If they disagree, the workspace and the output win over your plan.`;
+          + `median. A long turn alone does not establish a context problem. Check whether the time was expected for `
+          + `this command or model request. If a repair is stalled, re-read the current file region and the actual failing evidence before retrying.`;
       }
     }
     walls.push(wall);

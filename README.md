@@ -2,16 +2,20 @@
 
 **A local-model coding agent harness. Bring your own LLM — the factory does the rest.**
 
-BANTAM is a constrained-action agent loop built on one thesis: you don't need a
-smarter model, you need a better factory around the one you have. Every model
-action is structurally constrained (GBNF grammar locally, strict JSON Schema on
-API backends), executed in a sandboxed workspace, verified by the project's own
-tests, and steered by a set of measured stations — poka-yokes forged from real
-failure films, each one shipped with the A/B that proved it.
+BANTAM is a coding agent that wraps your model in a controlled action loop.
+It requests grammar-constrained generation from llama.cpp or structured output
+from supported API adapters, validates actions locally, runs model-chosen shell
+commands in Docker by default, and uses recorded failure cases to steer repairs.
 
-Point it at any OpenAI-compatible endpoint (llama.cpp, vLLM, a cloud API) and
-it runs the full loop: build prompt → constrained completion → execute →
-observe → verify → repeat until done.
+Give it a task and a verifier such as `npm test`. BANTAM reads your project,
+edits files, runs checks, and reports the observed result. A verifier pass means
+that command passed on the resulting code; it does not prove requirements the
+command never checked. Interactive completion can include caveats, while
+`--autonomous` enables stricter completion gates.
+
+The loop is: build prompt → request action → validate → execute → observe →
+check → repeat. OpenAI-compatible API syntax alone does not guarantee constrained
+generation: use the matching adapter and inspect the startup constraint check.
 
 ## Receipts, not benchmarks
 
@@ -50,7 +54,7 @@ bin/fight-concord.mjs`) additionally needs each corner's archived workspace,
 which is hundreds of MB of run artifacts and is deliberately not in the repo;
 the command says so plainly rather than pretending.
 
-New here? **[Getting started](docs/GETTING-STARTED.md)** is the five-minute path.
+New here? Start with **[Getting started](docs/GETTING-STARTED.md)**.
 
 ## Quick start
 
@@ -61,8 +65,9 @@ OpenAI-compatible API):
 git clone https://github.com/BANTAM-ADMIN/bantam-factory && cd bantam-factory
 npm ci                                             # two small deps (acorn); required
 docker pull alpine:3                               # the shell sandbox's base image, once (8 MB)
-node bin/bantam.js doctor                          # diagnoses; wires a found server
-node bin/bantam.js doctor --api-url http://HOST/v1 # or register any OpenAI-compatible API
+node bin/bantam.js doctor                          # check local server and sandbox setup
+# Or register a compatible API (use --api-dialect vllm for vLLM):
+node bin/bantam.js doctor --api-url http://HOST:PORT/v1
 node bin/bantam.js                                 # interactive REPL
 ```
 
@@ -78,7 +83,8 @@ node bin/bantam.js setup
 Then, from any project directory:
 
 ```bash
-node /path/to/bantam/bin/bantam.js run --task "fix the failing test" --autonomous
+node /path/to/bantam/bin/bantam.js run --task "fix the failing test" \
+  --verify "npm test" --autonomous --save-run=.bantam/runs/first-repair.json
 ```
 
 `bantam addons` lists everything optional — vision input and the MTP
@@ -88,8 +94,24 @@ Nothing optional is ever bundled.
 The harness ships with **no model, no weights, no bundled inference server**.
 Optional add-ons (installed on request by `doctor --setup`, never vendored):
 a llama.cpp build with a measured, certified launch profile for local models.
-Your code and your model never leave your machine; shell
-network access is **off by default** and interactive runs ask you per fetch.
+With a local model and local tools, inference stays on your machine. Choosing a
+hosted model or an external image tool sends the relevant prompts and context
+to that provider. Docker shell network access is **off by default**; interactive
+runs can ask for permission to fetch dependencies.
+
+## Factory workflow
+
+For an isolated candidate with a separate apply step, use
+[`bantam factory build`](docs/FACTORY-GETTING-STARTED.md). It snapshots the source,
+runs the agent in a private workspace, records inspections in a durable event
+history, and requires an explicit `bantam factory apply <job-id> --yes` to update
+the source workspace. Release is conditional on the supplied verifier.
+
+`bin/bantamfactory` is a convenience launcher for the same CLI; by itself it
+opens the ordinary interactive agent. `run --factory` adds factory telemetry
+to an ordinary run. Neither selects the isolated `factory build` workflow.
+The broader factory scheduler and research mechanisms remain experimental;
+the operator guide describes the implemented path and its limits.
 
 ## What's inside
 

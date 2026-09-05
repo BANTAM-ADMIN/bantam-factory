@@ -12,8 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { runWorkspaceProbe } from "./workspace-probe.js";
 import { formatEdgeSmoke } from "./edge-smoke.js";
 import { formatSpecExamples } from "./spec-examples.js";
 import { formatLexicalSmoke } from "./logic/lexical-smoke.js";
@@ -27,6 +26,11 @@ import { isGeneratedPath, isTestPath, snapshotTree } from "./scope-guard.js";
 import { isTestCommand, isDeliverableRun, isInlineEvalProbe } from "./logic/deliverable-signals.js";
 import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer, unicodeUnitGauge, shipTheGeneratorSteer, enumerateContractNote } from "./logic/probe-discipline.js";
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
+import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "./verification-evidence.js";
+import { createTestProvenance } from "./test-provenance.js";
+import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
+import { contractStateAuditEnabled, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
+import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
 import { impactFooter, familyFooter, familyFindings, familyBlocks, constantTableFooter, crossScopeUsageFooter, peerFunctionFooter, trimSiteList } from "./edit-context.js";
 import { detectSiblings } from "./logic/completeness-critic.js";
@@ -584,6 +588,7 @@ async function runAgentCore({
   // tasks. Conservative auto-selection is the production default; explicit
   // BANTAM_STATE_AUDIT=0/off remains the rollback.
   stateAudit = process.env.BANTAM_STATE_AUDIT ?? "auto",
+  contractStateAudit = process.env.BANTAM_CONTRACT_STATE_AUDIT ?? "auto",
   // Two bounded objections prevent an immediate second-done bypass while the
   // global turn budget remains a hard escape from a heuristic audit.
   stateAuditMaxDeferrals = positiveInt(process.env.BANTAM_STATE_AUDIT_MAX_DEFERRALS, 2),
@@ -770,6 +775,9 @@ async function runAgentCore({
   // Mirror the executor's sandbox resolution so the prompt teaches the physics
   // the shell will actually have (per-action docker container vs host shell).
   const sandboxedShell = (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker";
+  ({ editGuard, shellScopeGuard } = composeInstructionGuards({
+    workspace, instruction: task, editGuard, shellScopeGuard,
+  }));
   const exec = new Executor(workspace, {
     noopEditGuard,
     shellSandbox,
@@ -785,6 +793,30 @@ async function runAgentCore({
   // the done-gate can prove they are untouched. Off (mode "none") for tasks that name none.
   const immutableInv = extractImmutable(task);
   const immutableSnap = immutableInv.mode !== "none" ? immutableViolations.snapshot(workspace, immutableInv) : null;
+  const resumingContext = Array.isArray(resumeTurns) && resumeTurns.length > 0;
+  const savedContextBasis = resumingContext
+    ? resumeTurns.find((turn) => turn?.contextBasis?.schema === 1)?.contextBasis : null;
+  const testProvenance = createTestProvenance(workspace, {
+    protectedPath: (relative) => Boolean(editGuard?.(relative)),
+    ...(resumingContext ? { snapshot: savedContextBasis?.testProvenance ?? null } : {}),
+  });
+  // A pointer to REQUIREMENTS.md is not the requirement itself. Auxiliary
+  // diagnosis must see the original supplied contract, not an edited document
+  // or only its filename. Capture bounded, workspace-confined bytes up front.
+  const suppliedTaskDocuments = resumingContext
+    ? (Array.isArray(savedContextBasis?.suppliedTaskDocuments) ? savedContextBasis.suppliedTaskDocuments : [])
+      .filter((document) => typeof document?.path === "string" && typeof document?.text === "string")
+      .slice(0, 4).map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.truncated === true || document.text.length > 12000 }))
+    : uneditedTaskSpecDocuments(task, [], exec).slice(0, 4)
+      .map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.text.length > 12000 }));
+  const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments };
+  let contextBasisRecorded = Boolean(savedContextBasis);
+  const contractAuditEnabled = !interactive && !advisoryMode
+    && contractStateAuditEnabled(contractStateAudit, task, suppliedTaskDocuments);
+  const diagnosticTaskContract = [String(task ?? ""),
+    ...suppliedTaskDocuments.map((document) =>
+      `SUPPLIED DOCUMENT ${document.path}:\n${document.text.slice(0, 12000)}${document.truncated || document.text.length > 12000 ? "\n[document truncated; do not infer omitted requirements]" : ""}`),
+  ].join("\n\n");
   // Symbolic grounding context (datalog KB of the workspace). `true` => build it now.
   const groundStartedAt = Date.now();
   let ground = grounding === true
@@ -961,9 +993,14 @@ async function runAgentCore({
         ...(Array.isArray(t.shellChangedPaths) ? { shellChangedPaths: t.shellChangedPaths.slice() } : {}),
         ...(t.shellScopeRollback ? { shellScopeRollback: structuredClone(t.shellScopeRollback) } : {}),
         ...(t.scopedVerify ? { scopedVerify: t.scopedVerify } : {}),
+        ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: t.verificationEvidence } : {}),
+        ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: t.shellExecution } : {}),
+        ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: t.editOutcome } : {}),
         ...(t.environmentVerification ? { environmentVerification: t.environmentVerification } : {}),
         ...(t.preview ? { preview: t.preview } : {}),
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
+        ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
+        ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(t.workspaceCoherence ? {
           workspaceCoherence: {
             fingerprints: { ...(t.workspaceCoherence.fingerprints ?? {}) },
@@ -1332,6 +1369,7 @@ async function runAgentCore({
     engagements: metrics.stateAuditEngagements,
   });
   const gateCounts = Object.create(null);
+  const unfinishedWorkspaceProbes = new Set();
   const warnings = [];
   const warned = new Set();
   let interactiveReconStreak = 0; // consecutive investigative turns (interactive spiral backstop)
@@ -1655,6 +1693,8 @@ async function runAgentCore({
   let connectRetries = 0;   // run-level reconnects: one flaky TCP moment must not kill a 60-turn run
   let editsSinceFullVerify = 0;   // edits the configured verifier has not run against
   const editedPathsThisRun = new Set();   // for the landing note's untouched-requirement check
+  let contractAudits = turns.filter((turn) => turn.contractStateAudit).length;
+  let lastContractAuditGeneration = turns.filter((turn) => turn.contractStateAudit).at(-1)?.contractStateAudit?.generation ?? -1;
   // History is evidence, not a second repository copy. Current seams live in
   // the bounded file panel below; keeping the entire old 180KB transcript made
   // the useful fact progressively harder for a small model to see.
@@ -3196,6 +3236,9 @@ async function runAgentCore({
           ? { queryExecuted, queryTool: queryToolUsed, toolOutcome: queryOutcome }
           : {}),
         ...(isEditAction(action) ? { editApplied: false } : {}),
+        verificationEvidence: null,
+        shellExecution: null,
+        ...(result.editOutcome ? { editOutcome: result.editOutcome } : {}),
         ...(stateAuditIssued ? { stateAudit: stateAuditSnapshot() } : {}),
         rawObservation: null,
         tookMs: nowMs() - turnStart,
@@ -3203,7 +3246,7 @@ async function runAgentCore({
         ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
       });
       metrics.turns++;
-      onEvent({ type: "observation", observation: result.observation, rawObservation: null });
+      onEvent({ type: "observation", ...turns.at(-1) });
       break;
     }
     const afterShellFiles = !gateRejection && !interactiveStop && action.a === "shell"
@@ -3242,7 +3285,7 @@ async function runAgentCore({
       }
     }
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
-      && editSucceeded(action, result.observation);
+      && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
     if (directEditSucceeded && action.a === "write_batch") {
       onEvent({ type: "write_batch_committed", files: directEditPaths });
@@ -3363,6 +3406,21 @@ async function runAgentCore({
       editsSinceBestSnapshot += 1;   // the regression guard only judges runs that follow an edit
       outcomeCycles.noteWorkspaceChanged();
     }
+    result.verificationEvidence = verificationEvidence({
+      execution: result.shellExecution,
+      configuredCommand: verificationScript,
+      generation: workspaceEditGeneration,
+      // A compound test+edit command cannot prove whether its test output
+      // describes the before or after tree. A separate verifier settles it.
+      invalidated: shellChangedWorkspace || Boolean(result.shellScopeRollback?.violations?.length),
+    });
+    if (shellChangedWorkspace && result.verificationEvidence) {
+      result.observation += "\n[verification-scope] This command also changed source files, so its test output is not proof of the final file state. Run the verifier separately, without source writes, to obtain current evidence.";
+    }
+    const shellReceipt = shellExecutionReceipt(result.shellExecution, {
+      generation: workspaceEditGeneration,
+      invalidated: shellChangedWorkspace || Boolean(result.shellScopeRollback?.violations?.length),
+    });
     if (refusedEditPin && directEditSucceeded && directEditPaths.includes(refusedEditPin)) refusedEditPin = null;
     if (editRecoveryPath && directEditSucceeded && directEditPaths.includes(editRecoveryPath)) {
       onEvent({ type: "edit_recovery_completed", path: editRecoveryPath, action: action.a });
@@ -3668,7 +3726,7 @@ async function runAgentCore({
     {
       // Struggle → audit the CONTEXT (bytes, evidence), not the effort. See
       // src/logic/context-audit.js for the measured shapes behind the triggers.
-      const contextAuditNote = contextAuditSentinel.note({ action, observation: result.observation, now: Date.now() });
+      const contextAuditNote = contextAuditSentinel.note({ action, observation: result.observation, editOutcome: result.editOutcome, now: Date.now() });
       steerDelivery("context-audit", contextAuditNote, (n) => {
         result.observation = `${result.observation ?? ""}\n\n${n}`;
         metrics.contextAudits = (metrics.contextAudits ?? 0) + 1;
@@ -3692,14 +3750,13 @@ async function runAgentCore({
         });
       }
       if (editApplied) for (const p of editPaths(action)) editedSourcePaths.add(p);
-      const ranVerification = action.a === "shell" && isTestCommand(String(action.c ?? ""));
+      const ranVerification = Boolean(result.verificationEvidence);
       const probeOnly = action.a === "shell" && !ranVerification && /\b(?:python3?\s+-c|node\s+(?:-e|--eval))\b/.test(String(action.c ?? ""));
       const cadenceNote = verifyCadenceSentinel.note({ editApplied, ranVerification, probeOnly });
       {
         // Maze films: sub-function patch chains at full context cost while
         // the suite stays red. See src/logic/repour.js for the shape.
-        const verificationRed = ranVerification
-          && /# fail [1-9]\d*|\bFAILED\b|\bAssertionError\b|\bTraceback\b|\bnot ok\b/.test(String(result.observation ?? ""));
+        const verificationRed = result.verificationEvidence?.status === "fail";
         const repourNote = repourSentinel.note({
           replacedPath: (action.a === "replace" && editApplied) ? (action.p ?? null) : null,
           ranVerification, verificationRed,
@@ -3765,7 +3822,7 @@ async function runAgentCore({
         metrics.walledGardenSteers = (metrics.walledGardenSteers ?? 0) + 1;
         onEvent({ type: "walled_garden", attempts: wall.count });
       });
-      const seeNote = seeYourWorkSentinel.note({ observation: result.observation });
+      const seeNote = seeYourWorkSentinel.note({ verificationEvidence: result.verificationEvidence });
       steerDelivery("see-your-work", seeNote, (n) => {
         result.observation = `${result.observation ?? ""}\n\n${n}`;
         metrics.seeYourWorkSteers = (metrics.seeYourWorkSteers ?? 0) + 1;
@@ -4250,13 +4307,19 @@ async function runAgentCore({
           processRunner: shellProcessRunner,
         });
         if (!r.aborted) {
+          result.verificationEvidence = verificationEvidence({
+            execution: r, command: plan.command, configuredCommand: verificationScript,
+            generation: workspaceEditGeneration, source: "scoped",
+          });
+          verifyCadenceSentinel.note({ ranVerification: true });
+          repourSentinel.note({ ranVerification: true, verificationRed: result.verificationEvidence?.status === "fail" });
           const verdict = r.timedOut ? "TIMED OUT" : (r.code === 0 ? "PASS" : "FAIL");
           const out = clip(`${r.stdout}${r.stderr ? `\n[stderr]\n${r.stderr}` : ""}`);
           result.observation += `\n[scoped-verify] ${verdict} — ran the ${plan.tests.length} test(s) your edit affects (${plan.command}):\n${out}`;
           // Provenance stamp: the HARNESS ran these tests, so the verdict is trusted and unspoofable —
           // the model authors observation text but can never set a turn field. The done-gates honor
           // this stamp (a same-turn verification of the edit). A timeout is inconclusive -> no stamp.
-          if (!r.timedOut) result.scopedVerify = { verdict: r.code === 0 ? "pass" : "fail", command: plan.command, tests: plan.tests };
+          if (result.verificationEvidence?.status !== "unverified") result.scopedVerify = { verdict: result.verificationEvidence.status, command: plan.command, tests: plan.tests };
           metrics.scopedVerifies = (metrics.scopedVerifies ?? 0) + 1;
           onEvent({ type: "scoped_verify", command: plan.command, verdict, tests: plan.tests });
         }
@@ -4332,6 +4395,12 @@ async function runAgentCore({
         processRunner: shellProcessRunner,
       });
       if (!r.aborted) {
+        result.verificationEvidence = verificationEvidence({
+          execution: r, command: verificationScript, configuredCommand: verificationScript,
+          generation: workspaceEditGeneration, source: "automatic",
+        });
+        verifyCadenceSentinel.note({ ranVerification: true });
+        repourSentinel.note({ ranVerification: true, verificationRed: result.verificationEvidence?.status === "fail" });
         const verdict = r.timedOut ? "TIMED OUT" : (r.code === 0 ? "PASS" : "FAIL");
         // Lead with WHICH tests failed. clip() keeps the HEAD of the output,
         // and the head of a 2,000-test TAP stream is a wall of "ok 1, ok 2 …"
@@ -4342,8 +4411,8 @@ async function runAgentCore({
         // renderFailingTests); auto-verify was the path that did not.
         const rawOut = `${r.stdout}${r.stderr ? `\n[stderr]\n${r.stderr}` : ""}`;
         let digest = "";
-        if (!r.timedOut) {
-          const counts = parseTestCounts(rawOut);
+        if (result.verificationEvidence?.status !== "unverified") {
+          const counts = result.verificationEvidence.counts;
           if (counts && counts.failed > 0) {
             digest = `VERDICT: ${counts.failed} of ${counts.total} tests FAILED (${counts.passed} passed).\n`
               + renderFailingTests(rawOut, {
@@ -4372,13 +4441,14 @@ async function runAgentCore({
         result.observation += r.code === 0
           ? `\n[auto-verify] ${reason}, so I ran them for you — ${verdict}: ${digest.trim()} ${close}\n${clip(rawOut)}`
           : `\n[auto-verify] ${reason}, so I ran them for you — ${verdict}:\n${out}\n${close}`;
-        if (!r.timedOut) result.scopedVerify = { verdict: r.code === 0 ? "pass" : "fail", command: verificationScript, tests: [] };
+        if (result.verificationEvidence?.status !== "unverified") result.scopedVerify = { verdict: result.verificationEvidence.status, command: verificationScript, tests: [] };
         metrics.autoVerifies = (metrics.autoVerifies ?? 0) + 1;
         const verifyTrigger = blindTrigger ? "edits" : (staleTrigger && !probeTrigger ? "stale" : "probes");
         onEvent({ type: "auto_verify", command: verificationScript, verdict, streak: blindTrigger ? blindEditStreak : (staleTrigger ? turnsSinceVerify : probeStreak), trigger: verifyTrigger });
         blindEditStreak = 0;
         probeStreak = 0;
         turnsSinceVerify = 0;
+        editsSinceFullVerify = 0;
       }
     }
 
@@ -4416,6 +4486,8 @@ async function runAgentCore({
         action,
         observation: result.observation,
         scopedVerify: result.scopedVerify,
+        verificationEvidence: verificationReceipt(result.verificationEvidence),
+        shellExecution: shellReceipt,
       },
       task,
       visualAudit: visualCompletionAudit,
@@ -4516,13 +4588,33 @@ async function runAgentCore({
           + ` If that is deliberate, say so in your done summary; otherwise do it now.`;
       }
       if (turnsRemaining <= 2 && verificationScript) {
+        // The model/automatic path may already have run this configured suite
+        // on this exact generation. Preserve that execution's source and full
+        // command instead of erasing compound-scope evidence with a repeat.
+        const currentEvidence = result.verificationEvidence;
+        const currentProof = currentEvidence?.generation === workspaceEditGeneration
+          && currentEvidence.configuredCommand === verificationScript
+          && (currentEvidence.status === "pass"
+            || (currentEvidence.status === "fail" && currentEvidence.command === verificationScript))
+          ? { status: currentEvidence.status, exitCode: currentEvidence.exitCode,
+            detail: clip(currentEvidence.rawOutput) }
+          : null;
         const cached = doneVerificationProof
           && doneVerificationProof.generation === workspaceEditGeneration
           && doneVerificationProof.command === verificationScript
-          ? doneVerificationProof.verification
+          ? doneVerificationProof
           : null;
-        let proof = cached;
-        if (!proof) {
+        let proof = currentProof ?? cached?.verification;
+        let landingEvidence = currentProof ? currentEvidence : cached?.evidence ?? null;
+        let ranLandingVerification = false;
+        if (currentProof) {
+          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+            verification: currentProof, evidence: currentEvidence };
+        }
+        // A classified/clipped verdict is not raw execution evidence. Older
+        // gate caches lack the receipt, so run once to obtain it rather than
+        // synthesizing stdout from rendered detail.
+        if (!proof || !landingEvidence) {
           onEvent({ type: "activity", label: "verifying" });
           proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
             doubleCheck: false,
@@ -4533,15 +4625,38 @@ async function runAgentCore({
             readOnlyWorkspacePaths,
             workspaceReadOnly: verificationWorkspaceReadOnly,
             processRunner: shellProcessRunner,
+            onExecution: (execution) => {
+              landingEvidence = verificationEvidence({
+                execution, command: verificationScript, configuredCommand: verificationScript,
+                generation: workspaceEditGeneration, source: "landing",
+              });
+            },
           });
           if (proof.interrupted || abortRequested()) markInterrupted("verification");
-          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript, verification: proof };
+          // Exit zero alone does not establish a passing suite (for example,
+          // empty discovery). Use the same evidence rules as automatic checks.
+          if (landingEvidence && proof.status !== landingEvidence.status) {
+            proof = { ...proof, status: landingEvidence.status,
+              detail: `Verification did not establish a passing suite.\n${proof.detail ?? ""}` };
+          }
+          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+            verification: proof, evidence: landingEvidence };
+          ranLandingVerification = true;
           metrics.landingVerifies = (metrics.landingVerifies ?? 0) + 1;
+        }
+        result.verificationEvidence = landingEvidence;
+        delete result.scopedVerify;
+        if (landingEvidence && landingEvidence.status !== "unverified") {
+          result.scopedVerify = { verdict: landingEvidence.status, command: verificationScript, tests: [] };
         }
         // A landing verify is real regression evidence. If the model reached a
         // fully green snapshot, edited again, and spent its last turn without
         // re-verifying, preserve the known-good work instead of ending red.
-        const landingRegression = proof.status !== "pass"
+        const landingComparable = bestCommand !== null && landingEvidence
+          && (landingEvidence.command === bestCommand
+            || (embeddedBaselineScope && shellContainsExactCommandSegment(landingEvidence.command, bestCommand)));
+        const landingRegression = landingEvidence?.status === "fail"
+          && landingComparable
           && regressionGuard
           && bestSnapshot && bestSnapshot.size
           && bestTotal > 0 && bestPassed === bestTotal
@@ -4574,6 +4689,17 @@ async function runAgentCore({
             // The failed proof described the pre-restore generation.
             workspaceEditGeneration++;
             doneVerificationProof = null;
+            environmentVerificationProof = null;
+            // Keep the original output identity and generation for the film,
+            // but never certify the restored tree with its pre-restore check.
+            if (landingEvidence) {
+              result.verificationEvidence = Object.freeze({ ...landingEvidence,
+                status: "unverified", invalidated: true, counts: null,
+                failingTests: [], failingTestsComplete: false,
+                uncertainty: "workspace restored after verification" });
+            }
+            delete result.scopedVerify;
+            editsSinceFullVerify = Math.max(1, editsSinceFullVerify);
             onEvent({
               type: "landing_revert",
               from: bestPassed,
@@ -4582,11 +4708,23 @@ async function runAgentCore({
             });
           }
         }
+        if (ranLandingVerification && !landingRestored && landingEvidence
+            && landingEvidence.status !== "unverified") {
+          verifyCadenceSentinel.note({ ranVerification: true });
+          repourSentinel.note({ ranVerification: true, verificationRed: landingEvidence.status === "fail" });
+          blindEditStreak = 0;
+          probeStreak = 0;
+          turnsSinceVerify = 0;
+          editsSinceFullVerify = 0;
+          unverifiedEditSteerGiven = false;
+        }
         landingNote += proof.status === "pass"
           ? " The verify command PASSES on the current tree. Remove any scratch files you created, then emit done — an unlanded run scores zero even with working code."
           : landingRestored
             ? ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nYou broke working code with edits you never re-verified, and the budget is nearly gone — I restored your best-passing version of ${[...bestSnapshot.keys()].join(", ")} (now shown in <open_files>). Run the verify command to confirm it is green, then emit done. Do NOT re-apply the change that broke it.`
-            : ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nFix exactly this, then emit done.`;
+            : proof.status === "unverified"
+              ? ` The verify command did not establish a current passing result:\n${proof.detail ?? ""}\nResolve the verification problem and run a conclusive check before finishing.`
+              : ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nFix exactly this, then emit done.`;
       } else {
         landingNote += " Wrap up: converge on the smallest correct change, run the tests once, remove scratch files, and emit done before the budget ends.";
       }
@@ -4601,9 +4739,9 @@ async function runAgentCore({
     // the failing tests + their source + the exact expected-vs-actual, so the model fixes THOSE
     // instead of re-reading a wall of passing output and editing blindly. This is the "read the
     // error, fix this test" steer that lets an iterative write→run→edit loop actually converge.
-    if (testFocus && /^\s*not ok \d+ - |^FAILED\s+\S+::|={3,}\s*FAILURES\s*={3,}|^\s*--- FAIL: |^\s*FAIL\s+\S+\s+>\s|^\s*●\s+\S|^test \S+ \.\.\. FAILED$|^#\s+Failed test\b|^\(fail\) /m.test(String(result.observation || ""))
-        && !String(result.observation).includes("[fix-tests]")) {
-      const focus = formatFailingTestFocus(result.observation, workspaceTestReader(workspace));
+    if (testFocus && result.verificationEvidence?.status === "fail") {
+      const testOutput = result.verificationEvidence.rawOutput;
+      const focus = formatFailingTestFocus(testOutput, workspaceTestReader(workspace), { testProvenance });
       if (focus) {
         result.observation += `\n\n${focus}`;
         metrics.testFocusHints = (metrics.testFocusHints ?? 0) + 1;
@@ -4612,14 +4750,15 @@ async function runAgentCore({
 
       // Track per-test failure streaks; when one test stays stuck despite repeated focused feedback,
       // sharp feedback is exhausted — spawn ONE focused diagnostic reasoning call on just that test.
-      const fails = parseTestFailures(result.observation);
+      const fails = parseTestFailures(testOutput);
       const nowFailing = new Set(fails.map((f) => f.name));
       for (const k of [...failStreak.keys()]) if (!nowFailing.has(k)) { failStreak.delete(k); diagnosed.delete(k); teacherEscalated.delete(k); }
       for (const failure of fails) {
-        if (!priorDiagnosisWasFalsified(turns, failure)) continue;
-        result.observation += `\n\n[diagnosis-falsified "${failure.name}"] The previous focused diagnosis was applied, but this exact failure did not change. Discard its assumed trace. Expand every test helper/wrapper and retrace from the real function or executable entrypoint with the concrete arguments and environment. Verify every branch is reachable before the next edit; do not keep changing the same surface.`;
-        metrics.falsifiedDiagnoses = (metrics.falsifiedDiagnoses ?? 0) + 1;
-        onEvent({ type: "test_diagnosis_falsified", test: failure.name });
+        const followup = priorDiagnosisFollowup(turns, failure);
+        if (!followup) continue;
+        result.observation += `\n\n${followup}`;
+        metrics.diagnosisFollowups = (metrics.diagnosisFollowups ?? 0) + 1;
+        onEvent({ type: "test_diagnosis_followup", test: failure.name });
         break;
       }
       if (diagnoseStuckTests) {
@@ -4665,15 +4804,18 @@ async function runAgentCore({
               const diag = await diagnoseFailingTest({
                 model, buildRawPrompt: (i) => buildAuxPrompt(i, model.assistantPrefill, model.template),
                 testName: f.name, testSource, implSource: implementation.source, diff, signal,
+                task: diagnosticTaskContract, testProvenance: testProvenance(f),
               });
               if (diag) {
                 const diagnosedPath = diagnosedImplementationPath(diag, implementation.paths);
                 if (diagnosedPath) openList = noteOpenFile(openList, diagnosedPath);
                 const applySteer = diagnosedPath
-                  ? `Apply this fix to ${diagnosedPath} with a targeted edit, then re-run the tests.`
+                  ? `This is an unverified hypothesis about ${diagnosedPath}. Check its trace against the current code and task contract; apply a targeted correction only if supported, then re-run the tests.`
+                  : testProvenance(f) !== "protected"
+                    ? "Check the diagnosis against the task contract, make the justified implementation or test correction, and re-run. A failing assertion alone does not establish which side is wrong."
                   : implementation.paths.length === 1
-                    ? `Apply this fix to ${implementation.paths[0]} with a targeted edit, then re-run the tests.`
-                  : "Apply the exact diagnosed change to the relevant implementation file above, then re-run the tests.";
+                    ? `Check this unverified hypothesis against ${implementation.paths[0]} and the contract before editing; re-run tests after any justified correction.`
+                  : "Check this unverified hypothesis against the implementation and contract before editing; re-run tests after any justified correction.";
                 result.observation += `\n\n[diagnosis of "${f.name}"] ${diag}\n→ ${applySteer}`;
                 metrics.stuckDiagnoses = (metrics.stuckDiagnoses ?? 0) + 1;
                 onEvent({ type: "test_diagnosis", test: f.name, implementationPaths: implementation.paths, diagnosedPath });
@@ -4708,6 +4850,7 @@ async function runAgentCore({
               };
               const cause = await askTeacher({
                 testName: f.name, testSource, implSource: implementation.source, diff,
+                task: diagnosticTaskContract, testProvenance: testProvenance(f),
                 invoke: teacherAssist.invoke ?? selfTeacherInvoke,
                 fallback: teacherAssist.invoke ? selfTeacherInvoke : null,
                 signal,
@@ -4716,10 +4859,12 @@ async function runAgentCore({
                 const diagnosedPath = diagnosedImplementationPath(cause, implementation.paths);
                 if (diagnosedPath) openList = noteOpenFile(openList, diagnosedPath);
                 const applySteer = diagnosedPath
-                  ? `Apply this fix to ${diagnosedPath} with a targeted edit, then re-run the tests.`
+                  ? `This is an unverified hypothesis about ${diagnosedPath}. Check its trace against the current code and task contract; apply a targeted correction only if supported, then re-run the tests.`
+                  : testProvenance(f) !== "protected"
+                    ? "Check the diagnosis against the task contract, make the justified implementation or test correction, and re-run. A failing assertion alone does not establish which side is wrong."
                   : implementation.paths.length === 1
-                    ? `Apply this fix to ${implementation.paths[0]} with a targeted edit, then re-run the tests.`
-                  : "Apply the exact diagnosed change to the relevant implementation file above, then re-run the tests.";
+                    ? `Check this unverified hypothesis against ${implementation.paths[0]} and the contract before editing; re-run tests after any justified correction.`
+                  : "Check this unverified hypothesis against the implementation and contract before editing; re-run tests after any justified correction.";
                 result.observation += `\n\n[teacher diagnosis of "${f.name}"] ${cause}\n→ ${applySteer}`;
                 metrics.teacherDiagnoses = (metrics.teacherDiagnoses ?? 0) + 1;
                 onEvent({ type: "teacher_diagnosis", test: f.name, implementationPaths: implementation.paths, diagnosedPath });
@@ -4734,13 +4879,14 @@ async function runAgentCore({
     // (the model broke several tests from a strong base and is digging deeper), restore that version
     // and steer it to a different fix. This turns "reaches green half the time" into reliable.
     if (regressionGuard) {
-      const counts = parseTestCounts(result.observation);
+      const evidence = result.verificationEvidence;
+      const counts = evidence?.generation === workspaceEditGeneration ? evidence.counts : null;
       // Only compare like with like. Running ONE test file after a full-suite
       // baseline is not a regression — v13 ran `node --test test/exec.test.js`
       // (2 tests, 0 passing), the guard compared that to 705/790 from the full
       // suite, called it catastrophic, and reverted the model's working CLI
       // wiring. A narrower check must never be read as a broken build.
-      const thisCommand = action.a === "shell" ? String(action.c ?? "").trim() : null;
+      const thisCommand = evidence?.command ?? null;
       const embeddedBaseline = counts
         && embeddedBaselineScope
         && bestCommand !== null
@@ -4796,7 +4942,7 @@ async function runAgentCore({
           // "you broke working code" when it broke nothing (v12 t76-78 burned
           // its endgame chasing a phantom regression). Say what is true.
           if (counts.passed < bestPassed) {
-            result.observation += `\n[flaky-suite] This run reports ${counts.passed}/${counts.total} passing but the previous run of the SAME files reported ${bestPassed}/${bestTotal}, and you have made no edit since. The difference is test flakiness, not a regression you caused. Do not "fix" it: identify the unstable test if you need to, otherwise continue with the task.`;
+            result.observation += `\n[flaky-suite] This run reports ${counts.passed}/${counts.total} passing but the previous comparable run reported ${bestPassed}/${bestTotal}, with no tracked edit since. The cause is not established: check nondeterminism, environment, and test discovery before attributing this difference to the implementation. Nothing was reverted.`;
             metrics.flakySuiteNotices = (metrics.flakySuiteNotices ?? 0) + 1;
             onEvent({ type: "flaky_suite", best: bestPassed, observed: counts.passed });
           }
@@ -4832,6 +4978,9 @@ async function runAgentCore({
             try { fs.writeFileSync(exec.resolve(p), content); restored++; } catch { /* skip */ }
           }
           if (restored) {
+            workspaceEditGeneration++;
+            doneVerificationProof = null;
+            environmentVerificationProof = null;
             if (ground) { const r = refreshGrounding(ground, [...bestSnapshot.keys()]); metrics.groundingRefreshMs += r.ms ?? 0; }
             // "(now shown in <open_files>)" is a promise about the NEXT prompt,
             // and writing the file does not by itself put it in the panel — the
@@ -4851,6 +5000,39 @@ async function runAgentCore({
             regressionRevertsThisRun += 1;
             onEvent({ type: "regression_revert", from: bestPassed, to: counts.passed, files: [...bestSnapshot.keys()] });
           }
+        }
+      }
+    }
+    // A fresh, bounded auditor sees only the original contract and current code,
+    // not accumulated failures, repair claims, or the primary agent's role.
+    // Run early, then at most once more after a changed generation reaches green.
+    const postEditGreen = result.verificationEvidence?.status === "pass"
+      && result.verificationEvidence.generation === workspaceEditGeneration;
+    if (contractAuditEnabled && contractAudits < 2
+        && workspaceEditGeneration !== lastContractAuditGeneration
+        && ((contractAudits === 0 && directEditSucceeded) || (contractAudits === 1 && postEditGreen))) {
+      const auditSources = collectContractAuditSources([...editedPathsThisRun, ...openList],
+        (relative) => exec.safeReadText(exec.resolveExisting(relative)));
+      if (auditSources.sources.some((source) => editedPathsThisRun.has(source.path))
+          && auditSources.sources.reduce((total, source) => total + source.text.length, 0) >= 400) {
+        contractAudits++;
+        lastContractAuditGeneration = workspaceEditGeneration;
+        onEvent({ type: "contract_state_audit_start", generation: workspaceEditGeneration, number: contractAudits });
+        try {
+          result.contractStateAudit = await runContractStateAudit({ model, task,
+            documents: suppliedTaskDocuments, ...auditSources, generation: workspaceEditGeneration, signal });
+        } catch (error) {
+          if (signal?.aborted) { markInterrupted("contract_state_audit"); break; }
+          throw error;
+        }
+        result.observation += `\n\n${formatContractStateAudit(result.contractStateAudit)}`;
+        metrics.contractStateAudits = (metrics.contractStateAudits ?? 0) + 1;
+        metrics.contractStateAuditTokens = (metrics.contractStateAuditTokens ?? 0) + (result.contractStateAudit.tokens ?? 0);
+        onEvent({ type: "contract_state_audit", status: result.contractStateAudit.status, generation: workspaceEditGeneration });
+        if (result.done && result.contractStateAudit.status === "report") {
+          result.done = false;
+          result.summary = undefined;
+          result.observation += "\nReview this newly supplied audit before requesting completion again.";
         }
       }
     }
@@ -5047,26 +5229,27 @@ async function runAgentCore({
       // str-title-case failure showed the vague "consider edge cases" nudge moved
       // this 27B ~1/3 of the time, but the concrete "titleCase('') throws" fact
       // fixed it first try. Opt-in via BANTAM_EDGE_SMOKE_GATE=1.
-      await applyExpensiveDoneGate("edge_smoke", 1, () => {
-        let findings = [];
-        try {
-          const out = execFileSync("node", [EDGE_SMOKE_CLI, workspace], {
-            encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"],
+      const applyWorkspaceProbe = async (name, format) => {
+        // A bounded correction opportunity is not permission to accept missing
+        // execution evidence. Retry an incomplete probe until it runs or the
+        // overall turn budget expires, even after its ordinary bounce is spent.
+        const max = unfinishedWorkspaceProbes.has(name) ? Number.MAX_SAFE_INTEGER : 1;
+        await applyExpensiveDoneGate(name, max, async () => {
+          const proof = await runWorkspaceProbe({
+            workspace, kind: name, task, shellSandbox, dockerImage, signal,
+            processRunner: shellProcessRunner,
           });
-          findings = JSON.parse(out || "[]");
-        } catch (e) {
-          // A subprocess TIMEOUT means a candidate function did not terminate on a degenerate
-          // input — the worst degenerate-input failure, and exactly what this gate exists to catch.
-          // Swallowing it as null accepted a non-terminating `done` silently (template-engine
-          // s2, 2026-07-20: render() looped forever on an unclosed block). Bounce it instead.
-          // Any other spawn error (can't introspect) stays a silent null, as before.
-          const timedOut = e?.code === "ETIMEDOUT" || (e?.killed && (e?.signal === "SIGTERM" || e?.signal === "SIGKILL"));
-          return timedOut
-            ? "[edge-smoke] one of your exported functions DID NOT TERMINATE on a degenerate edge input (an empty or blank string). An unbounded loop that hangs on trivial input is a bug the visible tests didn't cover — find the loop that never advances and bound it before finishing."
-            : null;
-        }
-        return findings.length ? formatEdgeSmoke(findings) : null;
-      });
+          onEvent({ type: "workspace_probe", gate: name, status: proof.status, sandbox: proof.sandbox, detail: proof.detail });
+          if (proof.status !== "ok") {
+            unfinishedWorkspaceProbes.add(name);
+            if (proof.status === "interrupted") markInterrupted("workspace_probe");
+            return `[${name.replaceAll("_", "-")}] The verification probe did not complete (${proof.status}); no passing proof was obtained. ${proof.detail ?? ""} Restore the probe's execution prerequisites or correct the reported failure before finishing.`;
+          }
+          unfinishedWorkspaceProbes.delete(name);
+          return proof.findings.length ? format(proof.findings) : null;
+        });
+      };
+      await applyWorkspaceProbe("edge_smoke", formatEdgeSmoke);
 
       // spec_example: the code disagrees with a concrete example STATED in the
       // task spec. Parses `fn(args) -> expected` lines from the spec, runs the
@@ -5075,20 +5258,7 @@ async function runAgentCore({
       // so this catches false beliefs the model's own thin tests miss (the
       // template-engine run "verified" if([]) was falsy in JS and shipped it).
       // Opt-in via BANTAM_SPEC_EXAMPLE_GATE=1.
-      await applyExpensiveDoneGate("spec_example", 1, () => {
-        if (!task) return null;
-        let specFile;
-        try {
-          specFile = path.join(os.tmpdir(), `bantam-spec-${crypto.randomBytes(6).toString("hex")}.txt`);
-          fs.writeFileSync(specFile, typeof task === "string" ? task : JSON.stringify(task));
-          const out = execFileSync("node", [SPEC_EXAMPLE_CLI, workspace, specFile], {
-            encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"],
-          });
-          const findings = JSON.parse(out || "[]");
-          return findings.length ? formatSpecExamples(findings) : null;
-        } catch { return null; }
-        finally { try { if (specFile) fs.unlinkSync(specFile); } catch { /* ignore */ } }
-      });
+      if (task) await applyWorkspaceProbe("spec_example", formatSpecExamples);
 
       // lexical_smoke: the code narrows an accepted-string language the task
       // NAMED (a case-sensitive compare where the spec said case-insensitive).
@@ -5101,20 +5271,7 @@ async function runAgentCore({
       // language is a real oracle: the variant is the same value spelled
       // differently, so it must neither throw nor return a different result.
       // Opt-in via BANTAM_LEXICAL_SMOKE_GATE=1.
-      await applyExpensiveDoneGate("lexical_smoke", 1, () => {
-        if (!task) return null;
-        let taskFile;
-        try {
-          taskFile = path.join(os.tmpdir(), `bantam-lexical-${crypto.randomBytes(6).toString("hex")}.txt`);
-          fs.writeFileSync(taskFile, typeof task === "string" ? task : JSON.stringify(task));
-          const out = execFileSync("node", [LEXICAL_SMOKE_CLI, workspace, taskFile], {
-            encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"],
-          });
-          const findings = JSON.parse(out || "[]");
-          return findings.length ? formatLexicalSmoke(findings) : null;
-        } catch { return null; }
-        finally { try { if (taskFile) fs.unlinkSync(taskFile); } catch { /* ignore */ } }
-      });
+      if (task) await applyWorkspaceProbe("lexical_smoke", formatLexicalSmoke);
 
       // type_contract: the mirror of lexical_smoke. The code ACCEPTS a value the
       // task's stated type excludes -- coercing where the contract requires a
@@ -5122,20 +5279,7 @@ async function runAgentCore({
       // still failed the hidden contract 6/6 here; the visible suite only ever
       // passes well-formed input, so being helpful is never contradicted.
       // Opt-in via BANTAM_TYPE_CONTRACT_GATE=1.
-      await applyExpensiveDoneGate("type_contract", 1, () => {
-        if (!task) return null;
-        let taskFile;
-        try {
-          taskFile = path.join(os.tmpdir(), `bantam-typecontract-${crypto.randomBytes(6).toString("hex")}.txt`);
-          fs.writeFileSync(taskFile, typeof task === "string" ? task : JSON.stringify(task));
-          const out = execFileSync("node", [TYPE_CONTRACT_CLI, workspace, taskFile], {
-            encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"],
-          });
-          const findings = JSON.parse(out || "[]");
-          return findings.length ? formatTypeContractSmoke(findings) : null;
-        } catch { return null; }
-        finally { try { if (taskFile) fs.unlinkSync(taskFile); } catch { /* ignore */ } }
-      });
+      if (task) await applyWorkspaceProbe("type_contract", formatTypeContractSmoke);
 
       // Final pre-accept proof for a narrow false-green class: a task-owned
       // test for "VAR missing/unset" must still pass when the verifier's parent
@@ -5479,6 +5623,11 @@ async function runAgentCore({
       ...(queryPreviewProof ? { preview: queryPreviewProof } : {}),
       ...(isEditAction(action) ? { editApplied: directEditSucceeded } : {}),
       scopedVerify: result.scopedVerify,   // trusted harness-run verdict (undefined if none)
+      verificationEvidence: verificationReceipt(result.verificationEvidence),
+      ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
+      ...(!contextBasisRecorded ? { contextBasis } : {}),
+      shellExecution: shellReceipt,
+      ...(result.editOutcome ? { editOutcome: result.editOutcome } : {}),
       environmentVerification: result.environmentVerification,
       sourceEditedByShell: result.sourceEditedByShell,  // shell command that rewrote source (undefined if not)
       ...(shellChangedPaths.length ? { shellChangedPaths } : {}),
@@ -5491,6 +5640,7 @@ async function runAgentCore({
       rawObservation,
       tookMs: nowMs() - turnStart,
     });
+    contextBasisRecorded = true;
     // Interactive backstop: the autonomous gates are off (the human steers), so nothing
     // otherwise stops an investigation spiral. Count ALL investigative turns — reads AND
     // shell commands (running tests / ls / wc is still investigating, not answering) — and
@@ -5575,6 +5725,15 @@ async function runAgentCore({
     }
     onEvent({
       type: "observation",
+      // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
+      // including explicit null / false and bounded audit state for resume.
+      ...Object.fromEntries([
+        "verificationEvidence", "shellExecution", "editOutcome", "contractStateAudit",
+        "contextBasis",
+        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
+        "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
+      ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)
+        .map((key) => [key, lastTurn[key]])),
       observation: result.observation,
       rawObservation,
       workspaceCoherence: {
@@ -5927,13 +6086,6 @@ function formatEnvironmentVerificationFailure(proof, workspace) {
   ].join("\n");
 }
 
-// Path to the edge-smoke CLI, spawned by the edge_smoke done-gate so the
-// candidate's code runs out of the harness process.
-const EDGE_SMOKE_CLI = fileURLToPath(new URL("./edge-smoke.js", import.meta.url));
-const SPEC_EXAMPLE_CLI = fileURLToPath(new URL("./spec-examples.js", import.meta.url));
-const LEXICAL_SMOKE_CLI = fileURLToPath(new URL("./logic/lexical-smoke.js", import.meta.url));
-const TYPE_CONTRACT_CLI = fileURLToPath(new URL("./logic/type-contract-smoke.js", import.meta.url));
-
 // Current bytes of the files this run edited, rendered read-style for the
 // decision snapshot. Bounded: the four most recently edited files, 160
 // numbered lines each — enough to re-expose a residual defect beside the
@@ -6050,36 +6202,6 @@ function recordFileOperationFailure(metrics, action, observation) {
 
 function formatProgressGateTermination(consecutiveRejections, progresslessTurns) {
   return `[progress-awareness] Progress gate termination: ${consecutiveRejections} consecutive recon actions were rejected after ${progresslessTurns} progressless turns. Ending the agent loop now so the hidden verifier can grade the current workspace instead of spending the remaining turn budget repeating blocked actions.`;
-}
-
-function priorDiagnosisWasFalsified(turns, failure) {
-  if (!failure?.name || !Array.isArray(turns) || !turns.length) return false;
-  const diagnosisTag = `[diagnosis of "${failure.name}"]`;
-  const falsifiedTag = `[diagnosis-falsified "${failure.name}"]`;
-  for (let i = turns.length - 1; i >= 0; i -= 1) {
-    const observation = String(turns[i]?.observation ?? "");
-    if (!observation.includes(diagnosisTag)) continue;
-    const later = turns.slice(i + 1);
-    if (later.some((turn) => String(turn?.observation ?? "").includes(falsifiedTag))) return false;
-    const prior = parseTestFailures(observation).find((entry) => entry.name === failure.name);
-    if (!prior || testFailureSignature(prior) !== testFailureSignature(failure)) return false;
-    const editedPaths = [...new Set(later.flatMap((turn) => [
-      ...(turnEditApplied(turn) ? editPaths(turn?.action ?? turn?.parsedAction) : []),
-      ...(Array.isArray(turn?.shellChangedPaths) ? turn.shellChangedPaths : []),
-    ]))];
-    const diagnosedPath = diagnosedImplementationPath(observation, editedPaths);
-    return diagnosedPath !== null;
-  }
-  return false;
-}
-
-function testFailureSignature(failure) {
-  return JSON.stringify([
-    failure?.name ?? null,
-    failure?.expected ?? null,
-    failure?.actual ?? null,
-    Array.isArray(failure?.diff) ? failure.diff : [],
-  ]);
 }
 
 function classifyReplaceFailure(observation) {
@@ -6572,6 +6694,8 @@ export function editScopeRefusal(action, guard) {
     if (!reason) continue;
     const why = reason === "grader"
       ? "it is part of the grader for this task"
+      : reason === "instruction-forbidden"
+        ? "the task explicitly forbids changing it"
       : reason === "runner-config"
         ? "it configures the test runner for this task"
         : "it is outside the paths this task may edit";
@@ -6657,6 +6781,7 @@ async function runVerification(
     readOnlyWorkspacePaths = null,
     workspaceReadOnly = false,
     processRunner = undefined,
+    onExecution = null,
   } = {},
 ) {
   const root = path.resolve(workspace);
@@ -6672,6 +6797,7 @@ async function runVerification(
     workspaceReadOnly,
     processRunner,
   });
+  onExecution?.(res);
   const first = classifyVerificationResult(res, { root: workspace });
   if (first.status !== "pass") return first;
   // A single verify run is a coin-flip on a flaky/nondeterministic suite, and a flaky PASS is the
@@ -6694,6 +6820,7 @@ async function runVerification(
       workspaceReadOnly,
       processRunner,
     });
+    onExecution?.(res2);
     const second = classifyVerificationResult(res2, { root: workspace });
     if (second.status === "fail") {
       return {

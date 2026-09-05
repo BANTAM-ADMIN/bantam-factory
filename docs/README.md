@@ -1,15 +1,16 @@
 # BANTAM documentation map
 
 This index distinguishes operating guidance from proposals and dated evidence.
-It was source-audited on 2026-08-19 without running BANTAM, a model, the test
-suite, or any generated workflow.
+Launch navigation was reconciled with the implemented CLI on 2026-09-05.
+Recorded measurements retain the date and configuration of their own artifacts.
 
 ## Start here
 
 | Need | Document | Status |
 | --- | --- | --- |
 | Diagnose a run like the factory does | [The supervisor](SUPERVISOR.md) | `bantam supervise`: films in, drafted findings with bytes out |
-| Get running in five minutes | [Getting started](GETTING-STARTED.md) | New-user path: both on-ramps, first task, day-one tips |
+| Connect a model and complete a task | [Getting started](GETTING-STARTED.md) | New-user path: both on-ramps, first task, day-one tips |
+| Build privately, inspect, then apply | [Factory getting started](FACTORY-GETTING-STARTED.md) | Implemented `factory build`, traveler inspection, and explicit apply |
 | Understand the whole harness | [BANTAM System Handbook](BANTAM-SYSTEM-HANDBOOK.md) | Current behavior guide; numerical proof sections are dated |
 | Install and operate it | [Guide](GUIDE.md) | Current operator guide |
 | Watch it work, and grant/deny network | [The interactive experience](INTERACTIVE-EXPERIENCE.md) | Current: feed vs films, station-note visibility, network consent |
@@ -43,29 +44,19 @@ suite, or any generated workflow.
 
 ## BANTAMFACTORY
 
-Start with the factory index, then use:
+Start with [Factory getting started](FACTORY-GETTING-STARTED.md) for the
+implemented operator path. `node bin/bantam.js factory --help` lists the current
+commands. The [factory model](FACTORY-MODEL.md) explains the design thesis;
+[Discoveries and Directions](DISCOVERIES-AND-DIRECTIONS.md) labels broader
+observations and hypotheses.
 
-- Architecture for implemented and proposed
-  layers;
-- Operations for commands, travelers, floor,
-  yard, dispatch, schedule, audits, and authority boundaries;
-- Blueprints,
-  workforce, and
-  station assets for executable contracts;
-- Digital thread,
-  Predicate Cartridges, and the
-  Living Repository Twin for typed
-  evidence and temporal knowledge;
-- Closed production loop and
-  mutation authority for the
-  separation of construction, independent evidence, approval, and apply;
-- Current system through the factory lens
-  only as the explicitly labeled 2026-08-01 branch-point baseline.
-
-The factory folder mixes implemented mechanisms, lab-tier experiments, design
-documents, preregistrations, and dated evidence. The status statement inside
-each file matters. Yard dispatch and scheduling are projections, not production
-authority; `bantam run --factory` is compatibility telemetry, not a scheduler.
+`src/factory/`, `scripts/`, and `examples/factory/` include executable cells,
+research mechanisms, and experiments. Their presence does not establish an
+end-to-end production capability. Yard dispatch and scheduling are projections,
+not production authority; `bantam run --factory` adds compatibility telemetry.
+The `bin/bantamfactory` launcher opens the ordinary CLI unless you supply a
+`factory` subcommand. The larger research documentation referenced by older
+reviews is not included in this launch checkout.
 
 ## Other repository surfaces
 

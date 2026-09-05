@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { formatFailingTestFocus } from "../src/logic/test-focus.js";
 
-test("focused test context explains an empty immediate-start side effect", () => {
+test("focused test context offers a conditional timing hypothesis for an empty side effect", () => {
   const output = `TAP version 13
 not ok 7 - coalesces a queued key, not just a running one
   ---
@@ -31,9 +31,10 @@ not ok 7 - coalesces a queued key, not just a running one
   const focus = formatFailingTestFocus(output, () => source);
 
   assert.match(focus, /your code produced \{ \[\] \}/);
-  assert.match(focus, /TIMING CAUSE/);
-  assert.match(focus, /Promise\.then\(task\).*defers/i);
-  assert.match(focus, /catch a synchronous throw and reject the already-created\/published Promise/i);
+  assert.match(focus, /TIMING HYPOTHESIS/);
+  assert.match(focus, /Promise\.then\(task\).*can defer/i);
+  assert.match(focus, /If synchronous admission is required/);
+  assert.match(focus, /published Promise and its rejection behavior/i);
 });
 
 test("focused test context does not invent a timing cause for ordinary value mismatches", () => {
@@ -47,5 +48,5 @@ test("focused test context does not invent a timing cause for ordinary value mis
   const source = `test("returns the configured value", () => { assert.equal(subject(), 3); });\n`;
 
   const focus = formatFailingTestFocus(output, () => source);
-  assert.doesNotMatch(focus, /TIMING CAUSE/);
+  assert.doesNotMatch(focus, /TIMING (?:CAUSE|HYPOTHESIS)/);
 });

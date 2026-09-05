@@ -107,6 +107,7 @@ function sha(buf) {
 export function snapshotAuthoredState(root, {
   maxFiles = 20_000,
   maxBytes = 128 * 1024 * 1024,
+  includeGenerated = () => false,
 } = {}) {
   const base = path.resolve(root);
   const out = new Map();
@@ -119,7 +120,7 @@ export function snapshotAuthoredState(root, {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       const rel = path.relative(base, full).split(path.sep).join("/");
-      if (isGeneratedPath(rel)) continue;
+      if (isGeneratedPath(rel) && !includeGenerated(rel)) continue;
       if (entry.isDirectory()) {
         walk(full);
         continue;
@@ -154,6 +155,35 @@ export function snapshotAuthoredState(root, {
  * source changes from the same command remain on disk.
  */
 export function createShellScopeGuard(root, spec = {}, bounds = {}) {
+  return scopeTransaction(root, (before, after) => detectScopeViolations(
+    stateSignatures(before), stateSignatures(after), spec,
+  ), bounds);
+}
+
+// General instruction boundaries share the same transaction as fixture scope,
+// without treating every test as immutable when the user asked to add tests.
+export function createPathScopeGuard(root, pathReason, bounds = {}) {
+  if (typeof pathReason !== "function") throw new TypeError("path scope guard requires a path policy");
+  return scopeTransaction(root, (before, after) => {
+    const violations = [];
+    for (const rel of new Set([...before.keys(), ...after.keys()])) {
+      const b = before.get(rel), a = after.get(rel);
+      if (sameStateEntry(b, a) || !pathReason(rel)) continue;
+      violations.push({ path: rel, kind: "instruction-forbidden", change: !b ? "added" : !a ? "deleted" : "modified" });
+    }
+    return violations;
+  }, bounds);
+}
+
+function sameStateEntry(left, right) {
+  if (!left || !right) return left === right;
+  if (left.type !== right.type) return false;
+  return left.type === "symlink"
+    ? left.target === right.target
+    : left.mode === right.mode && left.content.equals(right.content);
+}
+
+function scopeTransaction(root, detect, bounds) {
   const base = path.resolve(root);
   return {
     capture() {
@@ -164,21 +194,13 @@ export function createShellScopeGuard(root, spec = {}, bounds = {}) {
         throw new TypeError("shell scope rollback requires a captured workspace state");
       }
       const after = snapshotAuthoredState(base, bounds);
-      const violations = detectScopeViolations(
-        stateSignatures(before),
-        stateSignatures(after),
-        spec,
-      );
+      const violations = detect(before, after);
       const restored = [];
       for (const violation of violations) {
         restoreStateEntry(base, violation.path, before.get(violation.path));
         restored.push(violation.path);
       }
-      const remaining = detectScopeViolations(
-        stateSignatures(before),
-        stateSignatures(snapshotAuthoredState(base, bounds)),
-        spec,
-      );
+      const remaining = detect(before, snapshotAuthoredState(base, bounds));
       return {
         clean: remaining.length === 0,
         violations,
@@ -208,7 +230,17 @@ function restoreStateEntry(root, rel, entry) {
     fs.rmSync(target, { recursive: true, force: true });
     return;
   }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
+  // A shell can replace a parent directory with a symlink. Never restore bytes
+  // through that link into a different directory or outside the workspace.
+  let parent = root;
+  for (const part of rel.split("/").slice(0, -1)) {
+    parent = path.join(parent, part);
+    let stat = null;
+    try { stat = fs.lstatSync(parent); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    if (stat?.isSymbolicLink()) fs.unlinkSync(parent);
+    else if (stat && !stat.isDirectory()) fs.rmSync(parent);
+    fs.mkdirSync(parent, { recursive: true });
+  }
   let current = null;
   try {
     current = fs.lstatSync(target);

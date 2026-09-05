@@ -159,6 +159,13 @@ export function buildArtifact({
       ...(t.toolOutcome !== undefined ? { toolOutcome: serializableCopy(t.toolOutcome) } : {}),
       ...(t.preview !== undefined ? { preview: serializableCopy(t.preview) } : {}),
       ...(typeof t.editApplied === "boolean" ? { editApplied: t.editApplied } : {}),
+      // Presence is meaningful: explicit null means no execution proof; an
+      // absent field belongs to a legacy film whose prose may be consulted.
+      ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: serializableCopy(t.verificationEvidence) } : {}),
+      ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: serializableCopy(t.shellExecution) } : {}),
+      ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),
+      ...(Object.hasOwn(t, "contractStateAudit") ? { contractStateAudit: serializableCopy(t.contractStateAudit) } : {}),
+      ...(Object.hasOwn(t, "contextBasis") ? { contextBasis: serializableCopy(t.contextBasis) } : {}),
       ...(t.scopedVerify !== undefined ? { scopedVerify: serializableCopy(t.scopedVerify) } : {}),
       ...(t.environmentVerification !== undefined
         ? { environmentVerification: serializableCopy(t.environmentVerification) }
@@ -167,6 +174,7 @@ export function buildArtifact({
         ? { sourceEditedByShell: t.sourceEditedByShell }
         : {}),
       ...(Array.isArray(t.shellChangedPaths) ? { shellChangedPaths: [...t.shellChangedPaths] } : {}),
+      ...(t.shellScopeRollback !== undefined ? { shellScopeRollback: serializableCopy(t.shellScopeRollback) } : {}),
       ...(t.stateAudit !== undefined ? { stateAudit: serializableCopy(t.stateAudit) } : {}),
       ...(t.workspaceCoherence !== undefined
         ? { workspaceCoherence: serializableCopy(t.workspaceCoherence) }

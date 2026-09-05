@@ -382,6 +382,7 @@ export async function runFactoryCommand(argv, {
           codexEffort: normalizeEffort(args.effort),
         } : {
           endpoint: typeof args.endpoint === "string" ? args.endpoint : undefined,
+          ...(typeof args.endpoint === "string" ? { apiUrl: null, apiDialect: "llamacpp" } : {}),
           profile: typeof args.profile === "string" ? args.profile : undefined,
           model: typeof args.model === "string" ? args.model : undefined,
         });
@@ -442,6 +443,7 @@ export async function runFactoryCommand(argv, {
           codexEffort: normalizeEffort(args.effort),
         } : {
           endpoint: typeof args.endpoint === "string" ? args.endpoint : undefined,
+          ...(typeof args.endpoint === "string" ? { apiUrl: null, apiDialect: "llamacpp" } : {}),
           profile: typeof args.profile === "string" ? args.profile : undefined,
           model: typeof args.model === "string" ? args.model : undefined,
         });
@@ -506,6 +508,7 @@ export async function runFactoryCommand(argv, {
           codexEffort: normalizeEffort(args.effort),
         } : {
           endpoint: typeof args.endpoint === "string" ? args.endpoint : undefined,
+          ...(typeof args.endpoint === "string" ? { apiUrl: null, apiDialect: "llamacpp" } : {}),
           profile: typeof args.profile === "string" ? args.profile : undefined,
           model: typeof args.model === "string" ? args.model : undefined,
         });

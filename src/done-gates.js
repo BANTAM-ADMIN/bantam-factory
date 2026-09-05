@@ -59,7 +59,7 @@ export const DONE_GATES = [
   {
     name: "premature_done",
     max: 2,
-    evaluate: (c) => prematureDoneObjection(c.turns, c.count("premature_done"), { maxRejections: 2, workspace: c.workspace }),
+    evaluate: (c) => prematureDoneObjection(c.turns, c.count("premature_done"), { maxRejections: 2, workspace: c.workspace, workspaceGeneration: c.workspaceGeneration }),
   },
   {
     name: "unverified_edit",
@@ -88,7 +88,9 @@ export const DONE_GATES = [
   },
   {
     name: "immutable_file",
-    max: 1,
+    // Authorization never expires; maxTurns bounds recovery without granting
+    // permission for a prohibited change on a later done attempt.
+    max: Number.MAX_SAFE_INTEGER,
     evaluate: (c) => (c.immutableSnap
       ? immutableViolations(c.workspace, c.immutableInv, c.immutableSnap)[0] ?? null
       : null),

@@ -48,6 +48,67 @@ test("numeric assertion failures never draw it", () => {
   assert.equal(s.note({ observation: NUM_FAIL }), null);
 });
 
+const EXCEPTION_FAIL = `TAP version 13
+# Subtest: malformed CSV rejects invalid quotes
+not ok 1 - malformed CSV rejects invalid quotes
+  ---
+  duration_ms: 1.5
+  location: '/tmp/csv/test/csv.test.js:62:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception (SyntaxError).'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: [Function: SyntaxError]
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (/tmp/csv/test/csv.test.js:62:32)
+  ...
+# tests 1
+# pass 0
+# fail 1`;
+
+test("TAP YAML terminators and truncation never turn exception failures into text diffs", () => {
+  for (const tail of ["", "\nFull output truncated", "\nSkipping 20 identical items", "\n..."]) {
+    const s = new SeeYourWorkSentinel();
+    const input = { verificationEvidence: { status: "fail", rawOutput: EXCEPTION_FAIL + tail } };
+    assert.equal(s.note(input), null);
+    assert.equal(s.note(input), null);
+    assert.equal(s.note(input), null);
+    const historical = new SeeYourWorkSentinel();
+    const observation = `VERDICT: 1 of 1 tests FAILED (0 passed).\n${EXCEPTION_FAIL}${tail}`;
+    assert.equal(historical.note({ observation }), null);
+    assert.equal(historical.note({ observation }), null);
+  }
+});
+
+test("typed evidence takes precedence over rendered text and an unexecuted check stays quiet", () => {
+  for (const verificationEvidence of [null, { status: "unverified", rawOutput: GRID_FAIL },
+    { status: "fail", rawOutput: EXCEPTION_FAIL }]) {
+    const s = new SeeYourWorkSentinel();
+    assert.equal(s.note({ verificationEvidence, observation: GRID_FAIL }), null);
+    assert.equal(s.note({ verificationEvidence, observation: GRID_FAIL }), null);
+  }
+});
+
+test("real multiline string diffs activate only for the matching failure", () => {
+  const s = new SeeYourWorkSentinel();
+  const rawOutput = `${EXCEPTION_FAIL}\nnot ok 2 - rendered rows\n  ---\n  expected: 'first\\nsecond'\n  actual: 'first\\nwrong'\n  ...`;
+  const input = { verificationEvidence: { status: "fail", rawOutput } };
+  assert.equal(s.note(input), null);
+  const note = s.note(input);
+  assert.match(note, /"rendered rows" has now failed 2 times/);
+  assert.doesNotMatch(note, /malformed CSV|you are editing a drawing|have not looked/);
+});
+
+test("a non-text failure breaks a same-name text-comparison streak", () => {
+  const s = new SeeYourWorkSentinel();
+  const input = { verificationEvidence: { status: "fail", rawOutput:
+    "not ok 1 - test_total\n  expected: 'one\\ntwo'\n  actual: 'one\\nthree'" } };
+  assert.equal(s.note(input), null);
+  assert.equal(s.note({ observation: NUM_FAIL }), null);
+  assert.equal(s.note(input), null);
+});
+
 test("a green suite resets the streaks", () => {
   const s = new SeeYourWorkSentinel();
   s.note({ observation: GRID_FAIL });

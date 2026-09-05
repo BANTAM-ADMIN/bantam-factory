@@ -59,6 +59,7 @@ import { collateralRefusal } from "./collateral.js";
 import { parseTestCounts, renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
+import { editPaths } from "./edit-actions.js";
 
 // Default shell-sandbox image. MUST stay an official Docker Hub library image
 // (no namespace slash) so `docker run` can pull it unattended on any machine.
@@ -263,8 +264,38 @@ export class Executor {
     return real;
   }
 
-  /** Execute one validated action. Returns { observation, done?, summary? }. */
+  // Keep direct edit methods' string API; collect evidence at the branch that
+  // ran, independently of the wording rendered for the model.
+  editObservation(observation, reason, paths) {
+    if (this._activeEditResult) {
+      this._activeEditResult.outcome = {
+        applied: reason === "applied", reason,
+        paths: [...new Set(paths.filter((p) => typeof p === "string" && p))],
+      };
+    }
+    return observation;
+  }
+
+  executeEdit(action, operation) {
+    const previous = this._activeEditResult;
+    const pending = { outcome: null };
+    this._activeEditResult = pending;
+    try {
+      const observation = operation();
+      return { observation, editOutcome: pending.outcome ?? { applied: false, reason: "other", paths: editPaths(action) } };
+    } catch (error) {
+      return {
+        observation: `ERROR: ${error.message}`,
+        editOutcome: pending.outcome ?? { applied: false, reason: "other", paths: editPaths(action) },
+      };
+    } finally {
+      this._activeEditResult = previous;
+    }
+  }
+
+  /** Execute one validated action; observations retain their legacy string form. */
   async execute(action, { signal = null } = {}) {
+    this.lastShellExecution = null;
     if (signal?.aborted) {
       return { observation: "[interrupted] The user stopped this action before it started.", interrupted: true };
     }
@@ -274,23 +305,24 @@ export class Executor {
         case "list_dir": return { observation: this.listDir(action) };
         case "search": return { observation: this.search(action) };
         case "inspect": return { observation: this.inspect(action) };
-        case "replace": return { observation: this.replace(action) };
-        case "edit_lines": return { observation: this.editLines(action) };
-        case "patch": return { observation: this.patch(action) };
-        case "write_file": return { observation: this.writeFile(action) };
-        case "write_batch": return { observation: this.writeBatch(action) };
-        case "delete_file": return { observation: this.deleteFile(action) };
-        case "move_file": return { observation: this.moveFile(action) };
+        case "replace": return this.executeEdit(action, () => this.replace(action));
+        case "edit_lines": return this.executeEdit(action, () => this.editLines(action));
+        case "patch": return this.executeEdit(action, () => this.patch(action));
+        case "write_file": return this.executeEdit(action, () => this.writeFile(action));
+        case "write_batch": return this.executeEdit(action, () => this.writeBatch(action));
+        case "delete_file": return this.executeEdit(action, () => this.deleteFile(action));
+        case "move_file": return this.executeEdit(action, () => this.moveFile(action));
         case "shell": {
           const shellResult = await this.shell(action, { signal });
-          return typeof shellResult === "string" ? { observation: shellResult } : shellResult;
+          const result = typeof shellResult === "string" ? { observation: shellResult } : shellResult;
+          return { ...result, shellExecution: this.lastShellExecution };
         }
         case "done": return { observation: "", done: true, summary: action.summary };
         case "respond": return { observation: "", done: true, summary: action.text, responded: true };
         default: return { observation: `unknown action: ${action.a}` };
       }
     } catch (e) {
-      return { observation: `ERROR: ${e.message}` };
+      return { observation: `ERROR: ${e.message}`, ...(action.a === "shell" ? { shellExecution: this.lastShellExecution } : {}) };
     }
   }
 
@@ -489,10 +521,10 @@ export class Executor {
     const text = fs.readFileSync(full, "utf8");
     const lines = text.split("\n");
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
-      return `ERROR: edit_lines needs integer start <= end (1-based). Got start=${start}, end=${end}.`;
+      return this.editObservation(`ERROR: edit_lines needs integer start <= end (1-based). Got start=${start}, end=${end}.`, "other", [p]);
     }
     if (start > lines.length) {
-      return `ERROR: start line ${start} is past the end of ${p} (${lines.length} lines).`;
+      return this.editObservation(`ERROR: start line ${start} is past the end of ${p} (${lines.length} lines).`, "anchor_missing", [p]);
     }
     const last = Math.min(end, lines.length);
     const removed = lines.slice(start - 1, last);
@@ -500,7 +532,7 @@ export class Executor {
     const next = [...lines.slice(0, start - 1), ...String(repl ?? "").split("\n"), ...lines.slice(last)];
     const output = next.join("\n");
     const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return syntax.message;
+    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
     // edit_lines overwrites the whole range — anything in it the model did not
     // retype is destroyed. Name what would vanish BEFORE it does. An identical
     // re-issue means the model meant it, and is allowed through.
@@ -512,10 +544,11 @@ export class Executor {
       removed: removed.join("\n"),
       replacement: String(repl ?? ""),
     });
-    if (refusal) return refusal;
+    if (refusal) return this.editObservation(refusal, "confirmation_required", [p]);
 
-    if (this.noopEditGuard && output === text) return noChangeMessage(p);
+    if (this.noopEditGuard && output === text) return this.editObservation(noChangeMessage(p), "unchanged", [p]);
     this.writeTextFile(full, output);
+    this.editObservation("", output === text ? "unchanged" : "applied", [p]);
 
     // Show the RESULT, not just the casualties. We used to echo only the lines
     // we removed — so the model pointed at a range, learned what died, and had
@@ -558,26 +591,27 @@ export class Executor {
       return this.replaceAtLine({ p, full, text, old, repl, line });
     }
     const idx = text.indexOf(old);
-    if (idx === -1) return replaceNotFoundDiagnosis(p, text, old);
+    if (idx === -1) return this.editObservation(replaceNotFoundDiagnosis(p, text, old), "anchor_missing", [p]);
     if (text.indexOf(old, idx + 1) !== -1) {
-      return `ERROR: "old" text appears more than once in ${p}. Include more surrounding context to make it unique.`;
+      return this.editObservation(`ERROR: "old" text appears more than once in ${p}. Include more surrounding context to make it unique.`, "ambiguous", [p]);
     }
     const output = text.slice(0, idx) + repl + text.slice(idx + old.length);
     const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return syntax.message;
+    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
     const refusal = this.collateralGate({
       path: p, classificationPath: full, removed: old, replacement: repl,
     });
-    if (refusal) return refusal;
-    if (this.noopEditGuard && output === text) return noChangeMessage(p);
+    if (refusal) return this.editObservation(refusal, "confirmation_required", [p]);
+    if (this.noopEditGuard && output === text) return this.editObservation(noChangeMessage(p), "unchanged", [p]);
     this.writeTextFile(full, output);
+    this.editObservation("", output === text ? "unchanged" : "applied", [p]);
     return `replaced 1 occurrence in ${p}`
       + this.dupDefNote(p, text, output);
   }
 
   replaceAtLine({ p, full, text, old, repl, line }) {
     const start = lineStartOffset(text, line);
-    if (start === null) return `ERROR: line ${line} is out of range in ${p}. Read the file again for current line numbers.`;
+    if (start === null) return this.editObservation(`ERROR: line ${line} is out of range in ${p}. Read the file again for current line numbers.`, "anchor_missing", [p]);
     const end = lineEndOffset(text, start);
     const matches = [];
     let idx = text.indexOf(old, start);
@@ -586,21 +620,22 @@ export class Executor {
       idx = text.indexOf(old, idx + 1);
     }
     if (matches.length === 0) {
-      return `ERROR: "old" text not found starting on line ${line} in ${p}.${misplacedOldHint(text, old, p)}`;
+      return this.editObservation(`ERROR: "old" text not found starting on line ${line} in ${p}.${misplacedOldHint(text, old, p)}`, "anchor_missing", [p]);
     }
     if (matches.length > 1) {
-      return `ERROR: "old" text appears more than once on line ${line} in ${p}. Include more surrounding context.`;
+      return this.editObservation(`ERROR: "old" text appears more than once on line ${line} in ${p}. Include more surrounding context.`, "ambiguous", [p]);
     }
     const match = matches[0];
     const output = text.slice(0, match) + repl + text.slice(match + old.length);
     const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return syntax.message;
+    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
     const refusal = this.collateralGate({
       path: p, classificationPath: full, start: line, end: line, removed: old, replacement: repl,
     });
-    if (refusal) return refusal;
-    if (this.noopEditGuard && output === text) return noChangeMessage(p);
+    if (refusal) return this.editObservation(refusal, "confirmation_required", [p]);
+    if (this.noopEditGuard && output === text) return this.editObservation(noChangeMessage(p), "unchanged", [p]);
     this.writeTextFile(full, output);
+    this.editObservation("", output === text ? "unchanged" : "applied", [p]);
     return `replaced 1 occurrence in ${p} at line ${line}`
       + this.dupDefNote(p, text, output);
   }
@@ -616,13 +651,13 @@ export class Executor {
       let file = files.get(full);
       if (!file) {
         const stat = fs.statSync(full);
-        if (!stat.isFile()) return `ERROR: patch edit ${i + 1}: not a file: ${edit.p}`;
+        if (!stat.isFile()) return this.editObservation(`ERROR: patch edit ${i + 1}: not a file: ${edit.p}`, "other", [edit.p]);
         file = { full, paths: new Set(), text: fs.readFileSync(full, "utf8"), mode: stat.mode, edits: [] };
         files.set(full, file);
       }
       file.paths.add(edit.p);
       const range = locateExactEdit(file.text, edit);
-      if (!range.ok) return `ERROR: patch edit ${i + 1} (${edit.p}): ${range.error}`;
+      if (!range.ok) return this.editObservation(`ERROR: patch edit ${i + 1} (${edit.p}): ${range.error}`, range.reason, [edit.p]);
       const item = {
         ...range,
         path: edit.p,
@@ -639,7 +674,7 @@ export class Executor {
       const ordered = [...file.edits].sort((a, b) => a.start - b.start || a.end - b.end);
       for (let i = 1; i < ordered.length; i++) {
         if (ordered[i].start < ordered[i - 1].end) {
-          return `ERROR: patch edits ${ordered[i - 1].index} and ${ordered[i].index} overlap in ${[...file.paths][0]}; no files changed`;
+          return this.editObservation(`ERROR: patch edits ${ordered[i - 1].index} and ${ordered[i].index} overlap in ${[...file.paths][0]}; no files changed`, "ambiguous", [...file.paths]);
         }
       }
       file.output = [...file.edits]
@@ -655,7 +690,7 @@ export class Executor {
     for (const file of files.values()) {
       const rel = [...file.paths][0];
       const syntax = validateSourceTransition({ path: rel, before: file.text, after: file.output, runtimePath: file.full });
-      if (!syntax.ok) return syntax.message;
+      if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [rel]);
     }
 
     // Patch is atomic, so collateral checks happen before the first staged file
@@ -699,17 +734,18 @@ export class Executor {
           edit.replacement,
         ]),
       });
-      if (refusal) return refusal;
+      if (refusal) return this.editObservation(refusal, "confirmation_required", [patchCollateral.rel]);
     } else {
       this._collateralConfirm = null;
     }
 
     const changedFiles = [...files.values()].filter((file) => file.output !== file.text);
     if (this.noopEditGuard && changedFiles.length === 0) {
-      return `NO_CHANGE: patch output is byte-identical across ${files.size} file${files.size === 1 ? "" : "s"}; choose a different edit.`;
+      return this.editObservation(`NO_CHANGE: patch output is byte-identical across ${files.size} file${files.size === 1 ? "" : "s"}; choose a different edit.`, "unchanged", [...files.values()].flatMap((file) => [...file.paths]));
     }
     this.commitPatchedFiles(this.noopEditGuard ? changedFiles : [...files.values()]);
     const paths = [...files.values()].map((file) => [...file.paths][0]).sort();
+    this.editObservation("", changedFiles.length ? "applied" : "unchanged", changedFiles.length ? changedFiles.flatMap((file) => [...file.paths]) : paths);
     return `patched ${resolved.length} edit${resolved.length === 1 ? "" : "s"} across ${files.size} file${files.size === 1 ? "" : "s"}: ${paths.join(", ")}`;
   }
 
@@ -806,13 +842,14 @@ export class Executor {
       if (stat.isFile()) before = fs.readFileSync(full, "utf8");
     }
     const syntax = validateSourceTransition({ path: p, before, after: content, runtimePath: lexical });
-    if (!syntax.ok) return syntax.message;
+    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
 
     full ??= this.resolveWriteTarget(p);
     if (this.noopEditGuard && fs.existsSync(full) && fs.readFileSync(full, "utf8") === content) {
-      return noChangeMessage(p);
+      return this.editObservation(noChangeMessage(p), "unchanged", [p]);
     }
     this.writeTextFile(full, content);
+    this.editObservation("", before === content ? "unchanged" : "applied", [p]);
     return `wrote ${content.length} bytes to ${p}`;
   }
 
@@ -827,7 +864,7 @@ export class Executor {
     for (let index = 0; index < files.length; index++) {
       const item = files[index];
       if (seen.has(item.p)) {
-        return `ERROR: write_batch file ${index + 1} repeats path ${item.p}; no files changed`;
+        return this.editObservation(`ERROR: write_batch file ${index + 1} repeats path ${item.p}; no files changed`, "ambiguous", [item.p]);
       }
       seen.add(item.p);
 
@@ -838,10 +875,10 @@ export class Executor {
         if (error.code !== "ENOENT") throw error;
       }
       if (stat?.isSymbolicLink()) {
-        return `ERROR: write_batch file ${index + 1}: refusing to write through symlink: ${item.p}; no files changed`;
+        return this.editObservation(`ERROR: write_batch file ${index + 1}: refusing to write through symlink: ${item.p}; no files changed`, "other", [item.p]);
       }
       if (stat && !stat.isFile()) {
-        return `ERROR: write_batch file ${index + 1}: not a regular file: ${item.p}; no files changed`;
+        return this.editObservation(`ERROR: write_batch file ${index + 1}: not a regular file: ${item.p}; no files changed`, "other", [item.p]);
       }
       if (stat) this.assertInsideReal(fs.realpathSync(full), item.p);
 
@@ -855,7 +892,7 @@ export class Executor {
         after: item.content,
         runtimePath: full,
       });
-      if (!syntax.ok) return `${syntax.message}\n[write_batch] No files changed.`;
+      if (!syntax.ok) return this.editObservation(`${syntax.message}\n[write_batch] No files changed.`, "syntax_invalid", [item.p]);
 
       records.push({
         path: item.p,
@@ -870,7 +907,7 @@ export class Executor {
 
     const changed = records.filter((record) => record.text !== record.output);
     if (this.noopEditGuard && changed.length === 0) {
-      return `NO_CHANGE: write_batch output is byte-identical across ${records.length} file${records.length === 1 ? "" : "s"}; choose a different edit.`;
+      return this.editObservation(`NO_CHANGE: write_batch output is byte-identical across ${records.length} file${records.length === 1 ? "" : "s"}; choose a different edit.`, "unchanged", records.map((record) => record.path));
     }
     const committing = this.noopEditGuard ? changed : records;
     for (const record of committing) {
@@ -881,6 +918,7 @@ export class Executor {
       this.resolveWriteTarget(record.path);
     }
     this.commitWrittenFiles(committing);
+    this.editObservation("", changed.length ? "applied" : "unchanged", (changed.length ? changed : records).map((record) => record.path));
     const paths = committing.map((record) => record.path).sort();
     const bytes = committing.reduce((sum, record) => sum + Buffer.byteLength(record.output), 0);
     return `wrote batch of ${committing.length} file${committing.length === 1 ? "" : "s"} (${bytes} bytes): ${paths.join(", ")}`;
@@ -952,6 +990,7 @@ export class Executor {
     const full = this.resolveMutableFile(p, "delete");
     this.assertWritablePolicy(full, p);
     fs.unlinkSync(full);
+    this.editObservation("", "applied", [p]);
     return `deleted file ${p}`;
   }
 
@@ -985,8 +1024,9 @@ export class Executor {
       after: sourceText,
       runtimePath: destination,
     });
-    if (!syntax.ok) return syntax.message;
+    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [to]);
     this.renameFile(source, destination);
+    this.editObservation("", "applied", [from, to]);
     return `moved file ${from} to ${to}`;
   }
 
@@ -1018,6 +1058,8 @@ export class Executor {
   }
 
   async shell({ c }, { signal = null } = {}) {
+    this.lastShellExecution = null;
+    const requestedCommand = c;
     const cwdError = shellCwdError(c, this.workspace);
     if (cwdError) return cwdError;
     const discardError = discardsUncommittedWorkError(c);
@@ -1105,6 +1147,18 @@ export class Executor {
       onOutput: this.onShellOutput,
       processRunner: this.processRunner,
     });
+
+    // Preserve the process result before verdict narration, hints or clipping.
+    // Refused commands never reach this boundary and leave this field null.
+    this.lastShellExecution = {
+      command: c, requestedCommand, executedCommand: command,
+      exitCode: res.code ?? null,
+      stdout: String(res.stdout ?? ""), stderr: String(res.stderr ?? ""),
+      timedOut: Boolean(res.timedOut), interrupted: Boolean(res.aborted),
+      blocked: false, bufferExceeded: Boolean(res.bufferExceeded),
+      signal: res.signal ?? null, error: res.error?.message ?? null,
+      sandbox: res.sandbox ?? this.shellSandbox, cwd: this.realWorkspace,
+    };
 
     const code = res.code ?? 1;
     const killed = res.aborted ? " (interrupted)" : res.timedOut ? " (timed out)" : res.bufferExceeded ? " (output limit exceeded)" : "";
@@ -1287,7 +1341,7 @@ export class Executor {
     if (res.aborted) {
       out += "\n[interrupted] The user stopped this command. Do not treat its partial output as verification evidence.";
     }
-    return { observation: clipShellObservation(out, c), interrupted: res.aborted };
+    return { observation: clipShellObservation(out, c), interrupted: res.aborted, shellExecution: this.lastShellExecution };
   }
 }
 
@@ -1325,15 +1379,15 @@ function misplacedOldHint(text, old, p) {
 function locateExactEdit(text, { old, line }) {
   if (line === undefined) {
     const start = text.indexOf(old);
-    if (start === -1) return { ok: false, error: '"old" text not found; read the file and copy the exact text' };
+    if (start === -1) return { ok: false, reason: "anchor_missing", error: '"old" text not found; read the file and copy the exact text' };
     if (text.indexOf(old, start + 1) !== -1) {
-      return { ok: false, error: '"old" text appears more than once; include more context or a line anchor' };
+      return { ok: false, reason: "ambiguous", error: '"old" text appears more than once; include more context or a line anchor' };
     }
     return { ok: true, start, end: start + old.length };
   }
 
   const lineStart = lineStartOffset(text, line);
-  if (lineStart === null) return { ok: false, error: `line ${line} is out of range; read the file again` };
+  if (lineStart === null) return { ok: false, reason: "anchor_missing", error: `line ${line} is out of range; read the file again` };
   const lineEnd = lineEndOffset(text, lineStart);
   const matches = [];
   let start = text.indexOf(old, lineStart);
@@ -1341,8 +1395,8 @@ function locateExactEdit(text, { old, line }) {
     matches.push(start);
     start = text.indexOf(old, start + 1);
   }
-  if (matches.length === 0) return { ok: false, error: `"old" text not found starting on line ${line}` };
-  if (matches.length > 1) return { ok: false, error: `"old" text appears more than once on line ${line}` };
+  if (matches.length === 0) return { ok: false, reason: "anchor_missing", error: `"old" text not found starting on line ${line}` };
+  if (matches.length > 1) return { ok: false, reason: "ambiguous", error: `"old" text appears more than once on line ${line}` };
   return { ok: true, start: matches[0], end: matches[0] + old.length };
 }
 
@@ -1551,10 +1605,14 @@ export async function runShellProcess(workspace, command, {
   envOverrides = null,
   workspaceReadOnly = false,
   readOnlyWorkspacePaths = null,
+  readOnlyHostFiles = [],
   signal = null,
   onOutput = null,
   processRunner = runProcess,
 } = {}) {
+  if (!["docker", "host"].includes(shellSandbox)) {
+    throw new Error(`Unknown shell sandbox: ${shellSandbox}; expected docker or explicit host mode.`);
+  }
   if (typeof workspaceReadOnly !== "boolean") {
     throw new Error("workspaceReadOnly must be a boolean");
   }
@@ -1566,6 +1624,7 @@ export async function runShellProcess(workspace, command, {
         envOverrides: explicitEnv,
         workspaceReadOnly,
         readOnlyWorkspacePaths: normalizeReadOnlyWorkspacePaths(readOnlyWorkspacePaths),
+        readOnlyHostFiles,
         pipefail,
       })
     : hostShellRunner(realWorkspace, command, explicitEnv, { pipefail });
@@ -1599,6 +1658,7 @@ function dockerShellRunner(workspace, image, command, {
   envOverrides = {},
   workspaceReadOnly = false,
   readOnlyWorkspacePaths = [],
+  readOnlyHostFiles = [],
   pipefail = false,
 } = {}) {
   const name = `bantam-shell-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1622,7 +1682,12 @@ function dockerShellRunner(workspace, image, command, {
       // host dir preserves the swarf into the run bundle and returns that RAM
       // to real work. suid risk is covered by --no-new-privileges + cap-drop;
       // BANTAM_SCRATCH_TMPFS=1 restores the old ephemeral behavior.
-      ...scratchMountArgs(workspace),
+      // Readonly verifiers need temporary scratch, not a persistent artifact
+      // bench. A /tmp bind with a workspace also under /tmp causes Docker to
+      // create root-owned nested mountpoints inside the host scratch directory.
+      // Ephemeral scratch avoids that leak and keeps private factory workspaces
+      // removable after verification.
+      ...scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env),
       "-e", `PATH=${process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}`,
       "-e", "HOME=/tmp",
       "-e", "TMPDIR=/tmp",
@@ -1630,6 +1695,7 @@ function dockerShellRunner(workspace, image, command, {
       ...Object.entries(envOverrides).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
       ...rust.env,
       ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly),
+      ...readOnlyHostFileMounts(readOnlyHostFiles),
       "-w", workspace,
       image,
       ...(pipefail
@@ -1644,6 +1710,19 @@ function dockerShellRunner(workspace, image, command, {
 
 function envEnabled(value) {
   return /^(?:1|true|yes|on)$/i.test(String(value ?? ""));
+}
+
+function readOnlyHostFileMounts(files) {
+  if (!Array.isArray(files)) throw new TypeError("readOnlyHostFiles must be an array of exact file paths");
+  return [...new Set(files)].flatMap((file) => {
+    if (typeof file !== "string" || !path.isAbsolute(file) || file.includes(":")) {
+      throw new Error("readOnlyHostFiles requires absolute file paths without mount separators");
+    }
+    const target = path.resolve(file), source = fs.realpathSync(target);
+    if (source.includes(":")) throw new Error("readonly verifier input resolves to a path containing mount separators");
+    if (!fs.statSync(source).isFile()) throw new Error(`readonly verifier input is not a regular file: ${file}`);
+    return ["-v", `${source}:${target}:ro`];
+  });
 }
 
 // Model-chosen shell in HOST sandbox mode inherits the environment. It must not inherit the user's

@@ -1,7 +1,4 @@
-// "Context is always the problem" as a station: when a run thrashes (failed
-// edits to the same file) or grinds (an outlier turn wall), audit the CONTEXT
-// — re-read bytes and evidence — instead of trying harder. Card 7's maze
-// thrash and card 17's 45.8s outlier turn are the measured shapes.
+// Context audits offer bounded checks from specific observed outcomes.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,13 +20,14 @@ test("two consecutive failed edits to one file draw the re-grounding audit, once
   assert.equal(s.note({ action: R, observation: FAIL, now: 3000 }), null, "capped per episode");
 });
 
-test("a NO_CHANGE edit is divergence evidence, not a landed edit (7R: seven no-ops in a row, streak reset each time)", () => {
+test("repeated NO_CHANGE edits request a byte check without claiming a cause", () => {
   const s = new ContextAuditSentinel();
   const NOOP = "NO_CHANGE: maze.py already has the requested content; this action did not edit the workspace.";
   assert.equal(s.note({ action: { a: "write_file", p: "maze.py" }, observation: NOOP, now: 1000 }), null);
   const note = s.note({ action: { a: "replace", p: "maze.py" }, observation: NOOP, now: 2000 });
   assert.match(note, /\[context-audit\]/);
-  assert.match(note, /without landing|already holds/);
+  assert.match(note, /did not apply|already present/);
+  assert.doesNotMatch(note, /Your picture.*has diverged|file does not say what you remember/);
 });
 
 test("a successful edit resets the episode; divergence can be caught again", () => {
@@ -47,7 +45,7 @@ test("an outlier turn wall draws the audit only after a baseline, capped at two"
   for (let i = 0; i < 6; i++) assert.equal(tick(3000), null, "steady turns are quiet");
   const note = tick(45000);
   assert.match(note, /\[context-audit\] That turn took 45s against a 3s median/);
-  assert.match(note, /grinding is a context signal/);
+  assert.match(note, /long turn alone does not establish a context problem/);
   assert.ok(tick(50000), "second audit allowed");
   assert.equal(tick(60000), null, "third is capped");
 });

@@ -3,16 +3,29 @@
 // A small model handed the raw `node --test` dump (a wall of `ok` lines around one `not ok`) often
 // can't find the signal, so it edits blindly and never converges even when it is one assertion away.
 // This turns that dump into a focused steer: for each failing test, the exact expected-vs-actual AND
-// the test's own source, so the model can trace why its code produces the wrong value and fix it.
+// the test's own source, so the model can compare the disagreement with the task contract.
 
 import fs from "node:fs";
 import path from "node:path";
 
 const FOCUS_TAG = "[fix-tests]";
+const TEST_PROVENANCES = new Set(["protected", "baseline", "baseline-context-changed", "generated", "self-authored", "added-or-modified", "unknown"]);
+
+export function testProvenanceGuidance(value = "unknown") {
+  const provenance = TEST_PROVENANCES.has(value) ? value : "unknown";
+  if (provenance === "protected") {
+    return "Test provenance: protected. This is a protected invariant: keep the test unchanged. Diagnose the implementation or environment against the task; if the evidence conflicts, report the conflict instead of weakening the test.";
+  }
+  const ownership = provenance === "self-authored" || provenance === "generated"
+    ? "This test was added during this run; preserving supplied tests does not prohibit task-justified correction of it. "
+    : "";
+  return `Test provenance: ${provenance}. ${ownership}The test is evidence, not a guaranteed oracle. Compare its assertion and setup with the user's task and the observed behavior. `
+    + "A test correction requires a specific task-supported defect in its expectation or setup; do not remove coverage or weaken an assertion merely to make it pass. If the contract is insufficient, state what remains unknown.";
+}
 
 /** Parse pass/fail counts from a test run. Returns { passed, failed, total } or null. */
 export function parseTestCounts(output) {
-  const t = String(output ?? "");
+  const t = String(output ?? "").replace(/\u001b\[[0-9;]*m/g, "");
   const p = t.match(/^\s*#\s*pass\s+(\d+)\s*$/m);
   const f = t.match(/^\s*#\s*fail\s+(\d+)\s*$/m);
   if (p && f) {
@@ -27,33 +40,35 @@ export function parseTestCounts(output) {
     const failed = Number(f[1]) + cancelled;
     return { passed, failed, total: passed + failed, ...(cancelled ? { cancelled } : {}) };
   }
-  const nm = t.match(/(\d+)\s*\/\s*(\d+)\s+tests?\s+passed/i);
-  if (nm) return { passed: Number(nm[1]), failed: Number(nm[2]) - Number(nm[1]), total: Number(nm[2]) };
+  const nm = t.match(/^[ \t]*(\d+)[ \t]*\/[ \t]*(\d+)[ \t]+tests?[ \t]+passed[.!]?[ \t]*$/im);
+  if (nm && Number(nm[1]) <= Number(nm[2])) return { passed: Number(nm[1]), failed: Number(nm[2]) - Number(nm[1]), total: Number(nm[2]) };
   // perl `prove` failure summary — must precede the generic passed/failed branch, whose
   // "(\d+) failed" would read "Tests: 2 Failed: 1" as TWO failures.
-  const prove = t.match(/\bTests:\s*(\d+)\s+Failed:\s*(\d+)\b/);
-  if (prove) { const total = Number(prove[1]), failed = Number(prove[2]); return { passed: total - failed, failed, total }; }
-  // jest/vitest print a per-SUITE line ("Test Suites: 1 failed" / "Test Files  1 failed") BEFORE the
-  // per-test totals — a whole-text "(\d+) failed" grabs the suite count. Scope to the "Tests" line.
-  const testsLine = t.match(/^\s*Tests:?\s+(.+)$/m);
-  const counted = testsLine ? testsLine[1] : t;
-  // SAME LINE ONLY, and not a size/length figure. The old \\s+ crossed newlines,
-  // so "stream size: 2421\\nFAILED to write" read as 2421 failures and
-  // "Output bytes: 5066\\nFAILED - too many errors" as 5066: a model's own
-  // debug print became a test BASELINE ("0/2421 is now the number later runs
-  // are compared against") that every later verify was then judged against.
-  // Two write-compressor runs (2026-08-22/23) carried that invented number for
-  // the rest of the run. A count is a count only when a runner says so on the
-  // line the number is on.
-  const NOT_A_COUNT = /(?:size|bytes?|len|length|count|lines?|chars?|tokens?|bits?|ops?|items?)\s*[:=]?\s*$/i;
-  const pick = (re) => {
-    const m = counted.match(re);
-    if (!m) return null;
-    return NOT_A_COUNT.test(counted.slice(0, m.index).slice(-24)) ? null : m;
-  };
-  const pp = pick(/\b(\d+)[ \t]+passed\b/i);
-  const ff = pick(/\b(\d+)[ \t]+failed\b/i);
-  if (pp || ff) { const passed = pp ? Number(pp[1]) : 0, failed = ff ? Number(ff[1]) : 0; return { passed, failed, total: passed + failed }; }
+  const prove = t.match(/^[ \t]*Tests:[ \t]*(\d+)[ \t]+Failed:[ \t]*(\d+)[ \t]*$/m);
+  if (prove && Number(prove[2]) <= Number(prove[1])) { const total = Number(prove[1]), failed = Number(prove[2]); return { passed: total - failed, failed, total }; }
+  // Only a complete runner-summary line can supply counts. In particular,
+  // `test/csv.test.js:62:32 failed to parse` is a location, not 32 failures.
+  // Keep pytest, jest/vitest, cargo and bare summaries, but require the whole
+  // line to have summary grammar instead of searching arbitrary prose.
+  const status = "(?:passed|failed|errors?|skipped|pending|todo|ignored|measured|filtered out|deselected|warnings?|xfailed|xpassed|total)";
+  const summaryPattern = new RegExp(`^\\d+[ \\t]+${status}(?:[ \\t]*[,;|][ \\t]*\\d+[ \\t]+${status})*(?:[ \\t]+\\(\\d+\\))?$`, "i");
+  for (const line of t.split(/\r?\n/).reverse()) {
+    const summary = line.trim()
+      .replace(/^=+[ \t]*|[ \t]*=+$/g, "")
+      .replace(/^(?:Tests:?|test result:[ \t]*(?:ok|FAILED)\.)[ \t]+/i, "")
+      .replace(/;[ \t]*finished in[ \t]+[\d.]+s[ \t]*$/i, "")
+      .replace(/[ \t]+in[ \t]+[\d.]+s(?:[ \t]+\([\d:]+\))?[ \t]*$/i, "")
+      .trim();
+    if (!summaryPattern.test(summary)) continue;
+    const pp = summary.match(/\b(\d+)[ \t]+passed\b/i);
+    const ff = summary.match(/\b(\d+)[ \t]+failed\b/i);
+    const ee = summary.match(/\b(\d+)[ \t]+errors?\b/i);
+    if (pp || ff || ee) {
+      const passed = pp ? Number(pp[1]) : 0;
+      const failed = (ff ? Number(ff[1]) : 0) + (ee ? Number(ee[1]) : 0);
+      return { passed, failed, total: passed + failed };
+    }
+  }
   // go test -v: count top-level "--- PASS/FAIL:" lines. Subtests are INDENTED ("    --- FAIL:"), so an
   // anchored ^ counts each test function once — the stable denominator the regression guard needs.
   const goPass = (t.match(/^--- PASS: /gm) || []).length;
@@ -655,7 +670,7 @@ function likelyTestPath(value) {
  * Build a focused steer from failing-test output. `readTestFile(relOrAbs)` returns a test file's
  * source (workspace-confined by the caller). Returns the steer string, or null if nothing parsed.
  */
-export function formatFailingTestFocus(output, readTestFile, { maxTests = 2 } = {}) {
+export function formatFailingTestFocus(output, readTestFile, { maxTests = 2, testProvenance = () => "unknown" } = {}) {
   const fails = parseTestFailures(output);
   if (!fails.length) return null;
   const counts = parseTestCounts(output);
@@ -667,8 +682,10 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2 } = 
   // complete failure count.
   const failed = counts && counts.failed >= fails.length ? counts.failed : fails.length;
   const shown = fails.slice(0, maxTests);
-  const parts = [`${FOCUS_TAG} ${failed} test(s) fail${passed != null ? ` (${passed} already pass)` : ""}. Fix them ONE at a time — trace why your code produces the wrong value, edit, then re-run the tests:`];
+  const parts = [`${FOCUS_TAG} ${failed} test(s) fail${passed != null ? ` (${passed} already pass)` : ""}. Investigate them ONE at a time — compare the failure, test and task contract before choosing a change, then re-run the tests:`];
   for (const f of shown) {
+    let provenance = "unknown";
+    try { if (typeof testProvenance === "function") provenance = testProvenance(f); } catch { /* unknown stays conservative */ }
     let block = null;
     if (f.file && f.line && typeof readTestFile === "function") {
       const ext = path.extname(f.file).toLowerCase();
@@ -683,15 +700,16 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2 } = 
       ? `your code produced { ${got || "?"} }, but the test requires { ${want || "?"} }`
       : (f.expected != null && f.actual != null ? `expected ${f.expected}, got ${f.actual}` : "see the assertion in the test output");
     parts.push(`\nFAILING: "${f.name}"${f.file ? ` (${path.basename(f.file)}:${f.line})` : ""}\n  ${diffLine}`);
-    if (block) parts.push(`  the test that must pass:\n${block.split("\n").map((l) => "    " + l).join("\n")}`);
+    parts.push(`  ${testProvenanceGuidance(provenance)}`);
+    if (block) parts.push(`  failing test source:\n${block.split("\n").map((l) => "    " + l).join("\n")}`);
     const timingText = `${f.name}\n${f.diff.join("\n")}\n${block ?? ""}`;
     const producedEmptySequence = f.diff.some((line) => /^\+\s*(?:\[\s*\]|Array\(0\)|\{\s*\})\s*$/.test(line));
     const expectedStartedValue = f.diff.some((line) => /^-\s*(?!\[?\s*\]?$|\{\s*\}$)\S/.test(line));
     if (producedEmptySequence && expectedStartedValue
         && /\b(?:start(?:ed|s|ing)?|immediate(?:ly)?|synchronous(?:ly)?)\b/i.test(timingText)) {
-      parts.push("  TIMING CAUSE: this assertion runs immediately after the API call and expects the callback's start-side effect already to exist, but the actual collection is still empty. A `Promise.then(task)`, `await`, or `queueMicrotask` wrapper defers that callback. Invoke it synchronously at admission; catch a synchronous throw and reject the already-created/published Promise.");
+      parts.push("  TIMING HYPOTHESIS: the empty collection may reflect a deferred callback. Check whether the task requires its start-side effect before the API call returns and whether this assertion actually runs at that point. A `Promise.then(task)`, `await`, or `queueMicrotask` wrapper can defer it; inspect the reachable path before choosing a repair. If synchronous admission is required, preserve the published Promise and its rejection behavior when invoking the callback.");
     }
-    parts.push(`  Your implementation produced the wrong value here. Work out exactly which line of your code causes it, fix that, and re-run — do not guess-and-retry.`);
+    parts.push("  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.");
   }
   return parts.join("\n");
 }
@@ -702,15 +720,20 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2 } = 
  * exact failure, and ask it to reason out the root cause and fix, free of the noisy agentic loop.
  * Returns the model's diagnosis text, or null. This is the "call the llm for a hard sub-step" lever.
  */
-export async function diagnoseFailingTest({ model, buildRawPrompt, testName, testSource, implSource, diff, nPredict = 640, signal = null }) {
-  const instruction = `You keep failing ONE test and cannot fix it. Stop guessing. Give the implementation fix FIRST so a truncated answer still contains the actionable change.
+export async function diagnoseFailingTest({ model, buildRawPrompt, testName, testSource, implSource, diff, task = "", testProvenance = "unknown", nPredict = 640, signal = null }) {
+  const instruction = `ONE test remains failing. Give the evidence-supported fix FIRST so a truncated answer still contains the actionable change. A failing test alone does not establish whether the implementation or the test is wrong.
 
 STRICT OUTPUT — exactly these THREE short lines, in this order, with nothing before FIX:
-FIX: <implementation path + symbol/line + exact code change; max 35 words>
-CAUSE: <the precise implementation branch/error that produced the failure; max 35 words>
+FIX: <responsible path + symbol/line + exact change, or the missing evidence needed; max 35 words>
+CAUSE: <the precise implementation branch, test expectation/setup, or environment defect supported by the evidence; max 35 words>
 TRACE: <only the 2-4 decisive runtime steps, joined with ->; max 45 words>
 
-THE FAILING TEST "${testName}" AND ITS BOUNDED SUPPORT CONTEXT (the test is correct and must pass unchanged):
+USER TASK:
+${task || "(task contract unavailable; do not invent requirements)"}
+
+${testProvenanceGuidance(testProvenance)}
+
+THE FAILING TEST "${testName}" AND ITS BOUNDED SUPPORT CONTEXT:
 ${testSource}
 
 CURRENT IMPLEMENTATION CONTEXT (path-labelled; choose the file that actually owns the fault):
@@ -720,7 +743,7 @@ THE FAILURE: ${diff}
 
 Before choosing a fix, expand every helper/wrapper used by the failing test far enough to establish the real function or executable entrypoint and its concrete arguments/environment. Every TRACE arrow must follow a branch that is reachable in the current code; never infer dispatch from the test name.
 
-Do not repeat the test or context. Do not propose changing the test. Name the exact implementation path and code change on the FIRST line, then stop after TRACE.`;
+Do not repeat the test or context. Name the exact responsible path and evidence-supported change on the FIRST line, then stop after TRACE.`;
   try {
     const out = await model.complete(buildRawPrompt(instruction), { nPredict, signal });
     const text = String(out?.content || "").replace(/<\/?think>/g, "").trim();

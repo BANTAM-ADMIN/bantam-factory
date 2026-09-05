@@ -17,6 +17,7 @@ import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { detectCodex } from "../src/logic/codex-detect.js";
+import { renderHelpRows, renderBullet } from "../src/logic/help-table.js";
 import { ONBOARDING_KEY, shouldOfferImageOnboarding, imageOnboardingPrompt, imageOnboardingDecision } from "../src/logic/image-onboarding.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
 import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache } from "../src/logic/grounding.js";
@@ -3774,9 +3775,14 @@ async function roosterCrow() {
 
 // `:help` — what you can do inside the interactive session.
 function printReplHelp() {
-  const cmd = (s) => paint(C.beak, s);
   const dim = (s) => paint(C.dim, s);
-  const row = (c, d) => `    ${cmd(c)}${" ".repeat(Math.max(2, 20 - c.length))}${dim(d)}`;
+  // Measure plain, then paint: the description column is set by the longest
+  // command that fits the cap, every description starts there, and a wrapped
+  // description continues under itself — never at column 0 (help-table.js).
+  const table = (rows) => renderHelpRows(rows, {
+    cols: process.stdout.columns, paintCmd: (s) => paint(C.beak, s), paintDesc: dim,
+  });
+  const tip = (t) => renderBullet(t, { cols: process.stdout.columns, paint: dim });
   console.log([
     "",
     paint(`1;${C.plume}`, "  bantam — what you can do here"),
@@ -3784,32 +3790,36 @@ function printReplHelp() {
     "  Just say what you want in plain language and I'll work on it.",
     "",
     dim("  while I'm working"),
-    row("type a line + ↵", "steer the next step without stopping"),
-    row("Ctrl-C", "stop the current model or shell action"),
+    ...table([
+      { cmd: "type a line + ↵", desc: "steer the next step without stopping" },
+      { cmd: "Ctrl-C", desc: "stop the current model or shell action" },
+    ]),
     "",
     dim("  commands"),
-    row(":self-improve [plan]", "governed observe, build, test, promote (or inspect only)"),
-    row(":model [name|n]", "switch local / DeepSeek / Codex (:model codex-sol)"),
-    row(":team [on|off|status]", "optional Local/Luna/Sol scouts + Terra primary"),
-    row(":trio [on|off|status]", "parallel isolated local / Sol / Terra mode"),
-    row(":api-model [name]", "compatibility alias for API presets"),
-    row(":stream [on|off]", "render reasoning and answers live as they generate (delivery-only)"),
-    row(":deepresearch [on|off]", "pre-answer self-assessed gaps -> one governed source errand (A/B winner)"),
-    row(":fight [task]", "chicken fight: bantam vs hermes (same 27B) vs codex vs claude, live lanes"),
-    row(":probe [question]", "k local redecodes: fact atoms hold still (knowledge) or scatter (guess); free"),
-    row(":research <question>", "bounded web agent shelves quoted sources into reference/; citation-checked"),
-    row(":context [rebuild|immutable|extension]", "the context dial: clean reprefill \u2194 fastest KV-cache reuse"),
-    row(":image [on|off]", "offer generate_image + edit_image to the model (via your Codex plan)"),
-    row(":eyes [auto|local|codex]", "which model reads an image: local mmproj or Codex"),
-    row(":modes", "list every optional mode, its state, and the command that changes it"),
-    row(":usage [on|off|reset]", "show or control token/cost reporting"),
-    row(":rooster [on|off]", "toggle the rooster antics (labels + crow)"),
-    row(":help  ?", "show this help"),
-    row("exit  quit  :q", "leave the session"),
+    ...table([
+      { cmd: ":self-improve [plan]", desc: "governed observe, build, test, promote (or inspect only)" },
+      { cmd: ":model [name|n]", desc: "switch local / DeepSeek / Codex (:model codex-sol)" },
+      { cmd: ":team [on|off|status]", desc: "optional Local/Luna/Sol scouts + Terra primary" },
+      { cmd: ":trio [on|off|status]", desc: "parallel isolated local / Sol / Terra mode" },
+      { cmd: ":api-model [name]", desc: "compatibility alias for API presets" },
+      { cmd: ":stream [on|off]", desc: "render reasoning and answers live as they generate (delivery-only)" },
+      { cmd: ":deepresearch [on|off]", desc: "pre-answer self-assessed gaps -> one governed source errand (A/B winner)" },
+      { cmd: ":fight [task]", desc: "chicken fight: bantam vs hermes (same 27B) vs codex vs claude, live lanes" },
+      { cmd: ":probe [question]", desc: "k local redecodes: fact atoms hold still (knowledge) or scatter (guess); free" },
+      { cmd: ":research <question>", desc: "bounded web agent shelves quoted sources into reference/; citation-checked" },
+      { cmd: ":context [rebuild|immutable|extension]", desc: "the context dial: clean reprefill \u2194 fastest KV-cache reuse" },
+      { cmd: ":image [on|off]", desc: "offer generate_image + edit_image to the model (via your Codex plan)" },
+      { cmd: ":eyes [auto|local|codex]", desc: "which model reads an image: local mmproj or Codex" },
+      { cmd: ":modes", desc: "list every optional mode, its state, and the command that changes it" },
+      { cmd: ":usage [on|off|reset]", desc: "show or control token/cost reporting" },
+      { cmd: ":rooster [on|off]", desc: "toggle the rooster antics (labels + crow)" },
+      { cmd: ":help  ?", desc: "show this help" },
+      { cmd: "exit  quit  :q", desc: "leave the session" },
+    ]),
     "",
     dim("  tips"),
-    dim("    · drop an image path (shot.png) in a request — I'll view it if a vision model is loaded"),
-    dim("    · run `bantam strut` from your shell for the full rooster show"),
+    ...tip("drop an image path (shot.png) in a request — I'll view it if a vision model is loaded"),
+    ...tip("run `bantam strut` from your shell for the full rooster show"),
     "",
   ].join("\n"));
 }

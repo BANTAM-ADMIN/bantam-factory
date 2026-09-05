@@ -33,8 +33,9 @@ You bring the engine. BANTAM is the rest of the car.
 Any llama.cpp / vLLM / LM Studio server, or an OpenAI-compatible API:
 
 ```bash
-git clone <repo> bantam && cd bantam
+git clone https://github.com/BANTAM-ADMIN/bantam-factory && cd bantam-factory
 npm ci                                        # two small deps; BANTAM won't start without them
+docker pull alpine:3                          # the shell sandbox's base image — once, 8 MB
 node bin/bantam.js doctor                     # finds a running local server
 # — or —
 node bin/bantam.js doctor --api-url http://HOST:PORT/v1 --api-key KEY

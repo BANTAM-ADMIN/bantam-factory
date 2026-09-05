@@ -525,8 +525,10 @@ your machine can pull.
 
 `BANTAM_SHELL_SANDBOX=host` keeps the workspace confinement and the path checks
 but **drops container isolation and the offline default** — model-chosen commands
-then run with your user's full reach. It exists for machines without Docker and
-for CI; it is not the mode to hand an untrusted model.
+then run with your user's full reach. It exists for machines without Docker —
+macOS, or a Linux box that simply has none — and for CI; it is not the mode to
+hand an untrusted model. Native Windows has no `/bin/sh` and is not supported in
+either mode; use WSL2, where everything here holds.
 
 If Docker is installed but the image is missing, `docker run` fails the action
 with `exit 125: No such image` rather than falling back silently. That is

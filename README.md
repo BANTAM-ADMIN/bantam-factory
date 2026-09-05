@@ -60,6 +60,7 @@ OpenAI-compatible API):
 ```bash
 git clone https://github.com/BANTAM-ADMIN/bantam-factory && cd bantam-factory
 npm ci                                             # two small deps (acorn); required
+docker pull alpine:3                               # the shell sandbox's base image, once (8 MB)
 node bin/bantam.js doctor                          # diagnoses; wires a found server
 node bin/bantam.js doctor --api-url http://HOST/v1 # or register any OpenAI-compatible API
 node bin/bantam.js                                 # interactive REPL
@@ -105,6 +106,29 @@ network access is **off by default** and interactive runs ask you per fetch.
   [operator guide](docs/GUIDE.md), [the interactive experience &
   network-consent model](docs/INTERACTIVE-EXPERIENCE.md), and
   [the factory doctrine](docs/FACTORY-MODEL.md)
+
+## Platforms
+
+**Linux** is the platform this is built and tested on — the suite runs on
+Ubuntu in CI, and the fight record was made on Linux. Two things make it
+Linux-shaped by design, not by accident: every model-chosen shell command
+runs through `/bin/sh`, and the Docker sandbox bind-mounts the host's own
+`/usr`, `/bin`, and `/lib` read-only into a bare container, so the model uses
+the toolchain you already have without an image that ships one.
+
+- **Windows — use WSL2.** Inside WSL2 it *is* Linux: Docker Desktop's WSL
+  integration provides `docker`, and everything above holds. Native Windows
+  (PowerShell/cmd) is not supported: there is no `/bin/sh` and nothing to
+  bind-mount. The llama.cpp installer does know Windows builds, so a model
+  server can live on the Windows side while BANTAM runs in WSL2.
+- **macOS** — untested. The Docker sandbox cannot work there (a Mac's `/usr`
+  holds Mach-O binaries a Linux container cannot run), so the only path is
+  `BANTAM_SHELL_SANDBOX=host`, which keeps the workspace confinement and path
+  checks but drops container isolation and the offline default — see the
+  operator guide before handing that mode an untrusted model.
+
+If you make it run somewhere else, a seam test that proves it is the kind of
+contribution `CONTRIBUTING.md` asks for.
 
 ## License
 

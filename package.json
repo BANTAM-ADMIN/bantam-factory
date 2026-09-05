@@ -5,6 +5,24 @@
   "type": "module",
   "description": "A bantamweight local-model coding agent. Grammar-constrained, verifiable actions.",
   "license": "Apache-2.0",
+  "author": "The BANTAM Authors",
+  "homepage": "https://github.com/BANTAM-ADMIN/bantam-factory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BANTAM-ADMIN/bantam-factory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BANTAM-ADMIN/bantam-factory/issues"
+  },
+  "keywords": [
+    "coding-agent",
+    "local-llm",
+    "llama-cpp",
+    "grammar-constrained",
+    "gbnf",
+    "agent-harness",
+    "llm-tools"
+  ],
   "bin": {
     "bantam": "bin/bantam.js"
   },

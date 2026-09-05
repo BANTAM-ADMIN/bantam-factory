@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/BANTAM-ADMIN/bantam-factory/security/advisories/new
+    about: Report privately. Please do not open a public issue for a security problem.
+  - name: Read the record first
+    url: https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/GETTING-STARTED.md
+    about: Getting started, the operator guide, and the fight record.

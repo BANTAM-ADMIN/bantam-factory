@@ -17,7 +17,7 @@
 // bin/bantam.js carried a dead string branch.
 
 export const BOOLEAN_FLAGS = new Set([
-  "help", "json", "ground", "no-ground", "shell-network", "autonomous",
+  "help", "json", "ground", "no-ground", "shell-network", "dangerously-allow-net", "autonomous",
   "tui", "plan", "dry-run", "all-runs", "micro", "list", "no-rooster",
   "no-pregate", "no-skills", "rooster", "backfill", "line-edit",
   "launch", "provision", "yes", "no-autoverify", "install-llama", "vulkan", "setup",

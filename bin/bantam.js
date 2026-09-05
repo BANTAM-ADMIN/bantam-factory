@@ -15,6 +15,7 @@ import { isChangeShapedRequest, runAgent } from "../src/agent.js";
 import { runIsAttended } from "../src/attendance.js";
 import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
+import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
 import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache } from "../src/logic/grounding.js";
 import { researchOffer, elicitGaps } from "../src/logic/research-triggers.js";
@@ -336,7 +337,7 @@ function ansiBannerArt() {
   } catch { return null; }
 }
 
-function renderBanner({ profileName, workspace, verify, tty }) {
+function renderBanner({ profileName, workspace, verify, tty, servedModel = null, servedAt = null }) {
   const home = process.env.HOME || "";
   const dir = home && workspace.startsWith(home) ? "~" + workspace.slice(home.length) : workspace;
   const verifyBit = verify ? paint(C.dim, "verify ") + paint(C.beak, verify) : paint(C.dim, "no verifier");
@@ -355,10 +356,43 @@ function renderBanner({ profileName, workspace, verify, tty }) {
     ? "type a request · steer mid-run · :help for commands · Ctrl-C to stop · exit"
     : 'type a request, or "exit"');
 
-  // The full pixel rooster (art already carries the BANTAM wordmark + tagline). Opt out with
-  // BANTAM_ASCII_BANNER=1 for a lean text banner; the art is skipped without color anyway.
-  const art = tty && USE_COLOR && !process.env.BANTAM_ASCII_BANNER ? ansiBannerArt() : null;
-  if (art) return ["", art + "\x1b[0m", "", status, help, ""].join("\n");
+  // The first screen is a compact card: the idle sprite, the wordmark, and one
+  // `key   value` column, centred to the terminal (src/logic/first-screen.js).
+  // The 29-row pixel banner it replaces printed from column 0 with no width
+  // awareness and was preceded by two grey metadata lines — the model was named
+  // before the logo was. The full art still plays in `bantam strut`. Opt out
+  // with BANTAM_ASCII_BANNER=1 for the lean text banner below.
+  if (tty && USE_COLOR && !process.env.BANTAM_ASCII_BANNER) {
+    const frame = loadAnimations("full")?.idle?.frames?.[0];
+    const bird = typeof frame === "string" ? frame.replace(/\n$/, "").split("\n") : null;
+    const K = (k) => paint(C.dim, k.padEnd(9));
+    const sandboxMode = process.env.BANTAM_SHELL_SANDBOX ?? "docker";
+    const netOn = process.env.BANTAM_SHELL_NETWORK === "1" || Boolean(args["dangerously-allow-net"]);
+    const sandbox = sandboxMode === "docker"
+      ? paint(C.paper, "docker") + paint(C.dim, ` · ${process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE} · `) + (netOn ? paint(C.comb, "network on") : paint(C.dim, "offline"))
+      : paint(C.comb, sandboxMode) + paint(C.dim, " — no container isolation");
+    // Fit an 80-column terminal: the model id and the path are the two values
+    // with no upper bound, so they are elided to what the column can hold.
+    const budget = columnBudget(process.stdout.columns, bird ? Math.max(...bird.map(visibleWidth)) : 22) - 9; // minus the key
+    const host = servedAt ? String(servedAt).replace(/^https?:\/\//, "") : "";
+    const modelName = elideMiddle(servedModel || profileName, Math.max(12, budget - (host ? host.length + 2 : 0)));
+    const modelCell = paint(C.paper, modelName) + (host ? paint(C.dim, `  ${host}`) : "");
+    const lines = [
+      paint(`1;${C.plume}`, "BANTAM") + (PKG_VERSION ? paint(C.dim, `  v${PKG_VERSION}`) : ""),
+      paint(C.dim, "a scrappy little terminal agent"),
+      "",
+      K("model") + modelCell,
+      K("dir") + paint(C.paper, elideMiddle(dir, Math.max(12, budget))),
+      K("verify") + (verify ? paint(C.beak, elideMiddle(verify, 24)) : paint(C.dim, "none")) + "   " + K("context") + (live === "rebuild" ? paint(C.dim, live) : paint(C.beak, `${live} (cache-fast)`)),
+      K("sandbox") + sandbox,
+      "",
+      paint(C.dim, "type a request · :help · Ctrl-C stops · exit"),
+      paint(C.dim, ":modes to see what else is switched on"),
+      "",
+    ];
+    const card = renderFirstScreen({ cols: process.stdout.columns, bird, lines, paint: (t) => paint(C.rule, t) });
+    if (card) return ["", card, ""].join("\n");
+  }
 
   // Fallback text rooster.
   const rooster = [
@@ -1168,7 +1202,12 @@ const activeModelLocation = usingCodex
   : usingApi
     ? `${model.apiUrl} (openai)`
     : model.endpoint;
-process.stderr.write(`model: ${activeModelId || "unknown"} @ ${activeModelLocation}\n`);
+// On the interactive path the first-screen card carries model + endpoint, so
+// this line would only put grey metadata above the logo. Every other command
+// (run/exec/eval, a pipe, --ascii) still gets it — that is where the
+// "what is actually serving" question matters for comparable eval numbers.
+const interactiveCard = (cmd === undefined || cmd === "chat") && Boolean(process.stdout.isTTY) && USE_COLOR && !process.env.BANTAM_ASCII_BANNER;
+if (!interactiveCard) process.stderr.write(`model: ${activeModelId || "unknown"} @ ${activeModelLocation}\n`);
 // Context mode, resolved once and pushed back into the environment that
 // src/agent.js reads per turn — so `:context` mid-session takes effect on the
 // very next turn without threading a new parameter through the whole loop.
@@ -1389,7 +1428,7 @@ function startupModeEntries() {
   });
 }
 
-if (cmd === undefined || cmd === "chat") {
+if ((cmd === undefined || cmd === "chat") && !interactiveCard) {
   process.stderr.write(`${renderModeLine(startupModeEntries())}\n`);
 }
 
@@ -3931,12 +3970,15 @@ async function repl() {
   // was friction charging the operator a keystroke for the only sensible
   // choice. Adopt it, say so in one line, and name both escapes. The correct
   // move should be the lit button, not a quiz.
+  // Printed AFTER the first-screen card (which already shows the verifier),
+  // so the adoption note and its two escapes sit under the logo, not above it.
+  let autoVerifyNote = null;
   if (!verificationScript && tty && !args["no-autoverify"] && !envTruthy("BANTAM_NO_AUTOVERIFY")) {
     const detected = detectVerifier(workspace);
     if (detected) {
       verificationScript = detected.command;
-      console.log(paint(C.good, `✔ verifier: ${detected.command}`)
-        + paint(C.dim, `  (${detected.source} — every change is graded with it; --verify "..." to change, --no-autoverify to skip)`));
+      autoVerifyNote = "  " + paint(C.good, `✔ verifier: ${detected.command}`)
+        + paint(C.dim, `  (${detected.source} — every change is graded with it; --verify "..." to change, --no-autoverify to skip)`);
     }
   }
 
@@ -4101,7 +4143,13 @@ async function repl() {
     workspace,
     verify: verificationScript,
     tty,
+    servedModel: activeModelId,
+    servedAt: activeModelLocation,
   }));
+  if (autoVerifyNote) console.log(autoVerifyNote);
+  // The full modes line keeps its place on screen — just under the card now,
+  // not above the logo. It is the one place every optional switch is listed.
+  if (interactiveCard) console.log(paint("2", `  ${renderModeLine(startupModeEntries())}`));
 
   // Standing operator preferences (~/.bantam/profile.md; BANTAM_PROFILE=0 off).
   const operatorProfile = loadOperatorProfile();

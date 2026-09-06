@@ -29,6 +29,8 @@ const BASE_COSTS = {
   delete_file: { latency: 3, io: 2, cpu: 1 },
   move_file: { latency: 3, io: 2, cpu: 1 },
   shell: { latency: 50, io: 1, cpu: 3 },
+  // Unmeasured conservative prior: one probe can run three isolated shells.
+  probe: { latency: 150, io: 3, cpu: 9 },
   inspect: { latency: 8, io: 3, cpu: 2 },
   query: { latency: 2, io: 0, cpu: 0.5 },
   done: { latency: 1, io: 0, cpu: 0.1 },

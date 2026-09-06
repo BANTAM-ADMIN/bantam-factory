@@ -57,6 +57,7 @@ export const PATCH_ACTION_FEATURE = "patch";
 export const WRITE_BATCH_FEATURE = "write_batch";
 export const LINE_EDIT_FEATURE = "line_edit";
 export const FILE_OPS_FEATURE = "file_ops";
+export const PROBE_ACTION_FEATURE = "probe";
 
 // How many read-only ops one `inspect` may batch.
 //
@@ -256,6 +257,36 @@ export const ACTION_DEFINITIONS = deepFreeze([
   ], {
     example: { a: "shell", c: "command" },
     help: "                 run a shell command in the workspace",
+  }),
+  define("probe", [
+    string("question"),
+    recordArray("inputs", {
+      fields: [string("p")],
+      minItems: 0,
+      maxItems: 16,
+      grammarRule: "probe-inputs",
+      itemGrammarRule: "probe-input",
+      inlineGrammar: true,
+    }),
+    string("setup"),
+    string("witness"),
+    string("check"),
+  ], {
+    example: {
+      a: "probe",
+      question: "Does the fixture contain exactly one line?",
+      inputs: [],
+      setup: "printf 'sample\\n' > case.txt",
+      witness: "test -f case.txt",
+      check: "test \"$(wc -l < case.txt)\" -eq 1",
+    },
+    help: "  test one assumption in a fresh disposable fixture",
+  }, {
+    feature: PROBE_ACTION_FEATURE,
+    rules: [
+      'Use "probe" for an uncertain assumption: setup prepares the case, witness asserts that the intended case exists, check asserts the behavior. A failed setup or witness skips later stages; a printout alone is not an assertion. The witness is your assertion, not independent semantic proof.',
+      'Each probe uses fresh offline Docker isolation, separate from the workspace. List 0-16 exact input files; immutable copies appear under subject/ with their relative paths. All three commands start in /probe. Fixture files AND /tmp persist between its stages; shell variables, working-directory changes, and processes do not. A NEW probe starts empty. Import the copied subject instead of retyping it. A probe result is scoped evidence, NEVER whole-task verification; run the ordinary project verifier separately.',
+    ],
   }),
   define("done", [
     string("summary"),

@@ -8,6 +8,7 @@ import {
   FILE_OPS_FEATURE,
   LINE_EDIT_FEATURE,
   PATCH_ACTION_FEATURE,
+  PROBE_ACTION_FEATURE,
   WRITE_BATCH_FEATURE,
   READ_ONLY_ACTION_VERBS,
   actionDefinition,
@@ -43,6 +44,7 @@ const ALL_VERBS = [
   "delete_file",
   "move_file",
   "shell",
+  "probe",
   "done",
   "respond",
   "query",
@@ -72,7 +74,7 @@ test("feature gates enable only the requested actions in canonical order", () =>
   );
   assert.deepEqual(
     enabledActionDefinitions({
-      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE],
+      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE, PROBE_ACTION_FEATURE],
     }).map(({ verb }) => verb),
     ALL_VERBS,
   );
@@ -147,7 +149,7 @@ test("every definition has internally consistent immutable metadata", () => {
       assert.equal(Object.isFrozen(field), true, `${definition.verb}.${field.key}`);
       if (field.type === "recordArray") {
         assert.equal(Object.isFrozen(field.fields), true, definition.verb);
-        assert.ok(field.minItems > 0 && field.maxItems >= field.minItems);
+        assert.ok(field.minItems >= 0 && field.maxItems >= Math.max(1, field.minItems));
       }
       if (field.type === "actionArray") {
         assert.ok(field.minItems > 0 && field.maxItems >= field.minItems);
@@ -170,7 +172,7 @@ test("prompt menu mirrors feature gates without leaking disabled actions", () =>
   for (const verb of DEFAULT_VERBS) {
     assert.match(defaultMenu, new RegExp(`\"a\":\"${verb}\"`));
   }
-  for (const verb of ["edit_lines", "patch", "write_batch", "delete_file", "move_file"]) {
+  for (const verb of ["edit_lines", "patch", "write_batch", "delete_file", "move_file", "probe"]) {
     assert.doesNotMatch(defaultMenu, new RegExp(`\"a\":\"${verb}\"`));
   }
 

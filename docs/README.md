@@ -18,12 +18,15 @@ Recorded measurements retain the date and configuration of their own artifacts.
 | Choose local, Codex, or DeepSeek runtimes | [Model runtimes and improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md) | Current runtime guide; live catalogs and local registries remain authoritative |
 | Understand provider integration | [External API provider integration](EXTERNAL-API-PROVIDER-INTEGRATION.md) | Current provider boundary and repair history |
 | Understand the manufacturing thesis | [BANTAM as a factory](FACTORY-MODEL.md) | Evidence-derived design model |
+| Build useful factory machinery through benchmark work orders | [The machinery program](FACTORY-MACHINERY-PROGRAM.md) | Proposal: mixed-model builds, independent qualification, measured adoption |
 | Explore observations and possible next directions | [Discoveries and Directions](DISCOVERIES-AND-DIRECTIONS.md) | Review notebook; hypotheses are labeled |
 
 ## Core operation and improvement
 
 - [Grounding tools](GROUNDING_TOOLS.md) describes the deterministic code,
   concept, map, history, image, and preview tools.
+- [Fixture-backed probes](FIXTURE-PROBE.md) describes the opt-in experiment
+  action, Datalog evidence, isolation, and its boundary with task verification.
 - [Team mode](TEAM-MODE.md) and [Trio mode](TRIO-MODE.md) describe isolated
   multi-model workflows and their apply boundaries.
 - [Self-improvement](SELF-IMPROVEMENT.md) and the

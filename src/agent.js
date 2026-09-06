@@ -132,6 +132,7 @@ import {
   PATCH_ACTION_FEATURE,
   WRITE_BATCH_FEATURE,
   LINE_EDIT_FEATURE,
+  PROBE_ACTION_FEATURE,
 } from "./action-protocol.js";
 import { decidePatchAction } from "./patch-policy.js";
 import { decideFileOperations } from "./file-op-policy.js";
@@ -605,6 +606,8 @@ async function runAgentCore({
   // that fewer physical calls outweigh the larger single completion on the
   // target worker. Legacy one-file writes remain available in either arm.
   writeBatch = envTruthy(process.env.BANTAM_WRITE_BATCH),
+  // Candidate fixture experiments remain opt-in until downstream qualification.
+  probeEnabled = envTruthy(process.env.BANTAM_PROBE),
   // Direct delete/move actions only for tasks that explicitly name those file
   // operations. A balanced local-Qwen A/B preserved 8/8 strict passes, used
   // both verbs with zero failures, and reduced summed task time by 3.1%.
@@ -765,6 +768,7 @@ async function runAgentCore({
     ...(patchActionPolicy.enabled ? [PATCH_ACTION_FEATURE] : []),
     ...(writeBatch ? [WRITE_BATCH_FEATURE] : []),
     ...(fileOperationPolicy.enabled ? [FILE_OPS_FEATURE] : []),
+    ...(probeEnabled ? [PROBE_ACTION_FEATURE] : []),
   ];
   // Is this a "build/create something" request (vs a question or a small edit)? On these the
   // deliverable is running code, so a plan-only answer before any file exists is premature —
@@ -780,6 +784,7 @@ async function runAgentCore({
     workspace, instruction: task, editGuard, shellScopeGuard,
   }));
   const exec = new Executor(workspace, {
+    probeEnabled,
     noopEditGuard,
     shellSandbox,
     shellNetwork,
@@ -996,6 +1001,7 @@ async function runAgentCore({
         ...(t.scopedVerify ? { scopedVerify: t.scopedVerify } : {}),
         ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: t.verificationEvidence } : {}),
         ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: t.shellExecution } : {}),
+        ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: structuredClone(t.probeEvidence) } : {}),
         ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: t.editOutcome } : {}),
         ...(t.environmentVerification ? { environmentVerification: t.environmentVerification } : {}),
         ...(t.preview ? { preview: t.preview } : {}),
@@ -1203,6 +1209,7 @@ async function runAgentCore({
     sequenceStrategyDecisions: { recommender: 0, planner: 0, total: 0 },
     patchActionPolicy,
     writeBatchEnabled: Boolean(writeBatch),
+    probeEnabled: Boolean(probeEnabled),
     fileOperationPolicy,
     verificationPolicy,
     verificationTriggered: false,
@@ -2022,6 +2029,10 @@ async function runAgentCore({
       maskedVerbForTurn,
       patchEnabled: patchActionPolicy.enabled,
     });
+    // A fixture experiment is investigation, never an escape from edit-only,
+    // source-review, or wrap-up masks. Keep this candidate opt-in and local.
+    if (useGrammar && (forceWrapUp || forceBuildEdit || documentRevisionTurn
+        || documentReviewTurn || lineEditRecoveryTurn)) requestedExclusions.push("probe");
     // Caller policy is expressed against the complete protocol so dynamically
     // enabled verbs (patch/edit_lines/file ops) cannot escape it. Grammar/schema
     // generation is stricter: it rejects exclusions for verbs that are not
@@ -2695,9 +2706,12 @@ async function runAgentCore({
       if (parsed.ok) {
         degeneratePenalty = 0;
         const normalizedAction = normalizeWorkspaceAction(parsed.action);
-        if (callerExcludedActions.includes(normalizedAction.a)) {
+        if (callerExcludedActions.includes(normalizedAction.a)
+            || (normalizedAction.a === "probe" && !probeEnabled)) {
           metrics.invalid++;
-          const error = `Action "${normalizedAction.a}" is disabled by the caller policy.`;
+          const error = normalizedAction.a === "probe" && !probeEnabled
+            ? 'Action "probe" is disabled. Enable the fixture-probe feature explicitly before using it.'
+            : `Action "${normalizedAction.a}" is disabled by the caller policy.`;
           rejectedOutputs.push({
             turn: turns.length,
             attempt,
@@ -2950,7 +2964,7 @@ async function runAgentCore({
     // model is told its next move must be `respond` (or an edit). A task that reads-then-edits
     // resets the streak and never hits this.
     const investigativeAction = action.a === "read_file" || action.a === "list_dir"
-      || action.a === "search" || action.a === "inspect" || action.a === "shell" || action.a === "query";
+      || action.a === "search" || action.a === "inspect" || action.a === "shell" || action.a === "query" || action.a === "probe";
     if (!gateRejection && investigativeAction) investigationActionCount++;
     const interactiveStop = (interactive && !gateRejection && investigativeAction
       && interactiveReconStreak >= interactiveReconLimit)
@@ -3201,6 +3215,9 @@ async function runAgentCore({
         }
       }
     }
+    if (action.a === "probe" && result.probeEvidence) {
+      onEvent({ type: "probe", probeEvidence: structuredClone(result.probeEvidence) });
+    }
     if (shellScopeSnapshot && shellScopeGuard && typeof shellScopeGuard.rollback === "function") {
       const rollback = shellScopeGuard.rollback(shellScopeSnapshot);
       if (rollback.violations.length) {
@@ -3340,6 +3357,7 @@ async function runAgentCore({
         ...(isEditAction(action) ? { editApplied: false } : {}),
         verificationEvidence: null,
         shellExecution: null,
+        ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
         ...(result.editOutcome ? { editOutcome: result.editOutcome } : {}),
         ...(stateAuditIssued ? { stateAudit: stateAuditSnapshot() } : {}),
         rawObservation: null,
@@ -5717,6 +5735,7 @@ async function runAgentCore({
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
       shellExecution: shellReceipt,
+      ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
       ...(result.editOutcome ? { editOutcome: result.editOutcome } : {}),
       environmentVerification: result.environmentVerification,
       sourceEditedByShell: result.sourceEditedByShell,  // shell command that rewrote source (undefined if not)
@@ -5743,7 +5762,7 @@ async function runAgentCore({
       // if query didn't count here nothing would ever force a wrap-up: a model that only queries would
       // spiral to maxTurns. Count it like a read; only an actual edit (or answering) ends the streak.
       const isInvestigation = action.a === "read_file" || action.a === "list_dir"
-        || action.a === "search" || action.a === "inspect" || action.a === "shell" || action.a === "query";
+        || action.a === "search" || action.a === "inspect" || action.a === "shell" || action.a === "query" || action.a === "probe";
       if (isEdit) {
         interactiveReconStreak = 0;
         lastInteractiveNudge = 0;
@@ -5818,7 +5837,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "shellExecution", "editOutcome", "contractStateAudit",
+        "verificationEvidence", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit",
         "contextBasis", "contextUpdates",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

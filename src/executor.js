@@ -60,6 +60,7 @@ import { parseTestCounts, renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
 import { editPaths } from "./edit-actions.js";
+import { runProbe } from "./probe.js";
 
 // Default shell-sandbox image. MUST stay an official Docker Hub library image
 // (no namespace slash) so `docker run` can pull it unattended on any machine.
@@ -109,6 +110,7 @@ export class Executor {
     // a fresh clone died with `exit 125: No such image` (caught by CI 2026-09-05).
     this.dockerImage = opts.dockerImage ?? process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE;
     this.processRunner = opts.processRunner;
+    this.probeEnabled = opts.probeEnabled ?? envEnabled(process.env.BANTAM_PROBE);
     this.renameFile = opts.renameFile ?? fs.renameSync;
   }
 
@@ -317,12 +319,17 @@ export class Executor {
           const result = typeof shellResult === "string" ? { observation: shellResult } : shellResult;
           return { ...result, shellExecution: this.lastShellExecution };
         }
+        case "probe": {
+          if (!this.probeEnabled) return { observation: "ERROR: probe is disabled; enable BANTAM_PROBE=1 for this experimental action.", shellExecution: null, verificationEvidence: null };
+          return await runProbe(this.workspace, action, { signal, dockerImage: this.dockerImage, processRunner: this.processRunner });
+        }
         case "done": return { observation: "", done: true, summary: action.summary };
         case "respond": return { observation: "", done: true, summary: action.text, responded: true };
         default: return { observation: `unknown action: ${action.a}` };
       }
     } catch (e) {
-      return { observation: `ERROR: ${e.message}`, ...(action.a === "shell" ? { shellExecution: this.lastShellExecution } : {}) };
+      return { observation: `ERROR: ${e.message}`, ...(action.a === "shell" ? { shellExecution: this.lastShellExecution } : {}),
+        ...(action.a === "probe" ? { shellExecution: null, verificationEvidence: null } : {}) };
     }
   }
 
@@ -1606,6 +1613,7 @@ export async function runShellProcess(workspace, command, {
   workspaceReadOnly = false,
   readOnlyWorkspacePaths = null,
   readOnlyHostFiles = [],
+  fixtureScratch = null,
   signal = null,
   onOutput = null,
   processRunner = runProcess,
@@ -1617,6 +1625,18 @@ export async function runShellProcess(workspace, command, {
     throw new Error("workspaceReadOnly must be a boolean");
   }
   const realWorkspace = fs.realpathSync(path.resolve(workspace));
+  // Harness-owned fixture scratch is a sibling of the writable fixture, never
+  // a worker-selected .bantam/scratch path. The /probe alias also avoids Docker
+  // creating nested, root-owned mountpoints beneath a persistent /tmp bind.
+  if (fixtureScratch !== null) {
+    if (shellSandbox !== "docker" || typeof fixtureScratch !== "string" || !path.isAbsolute(fixtureScratch)
+        || fixtureScratch.includes(":") || fixtureScratch.includes("\0")
+        || fs.realpathSync(fixtureScratch) !== fixtureScratch || !fs.lstatSync(fixtureScratch).isDirectory()
+        || fixtureScratch === realWorkspace || fixtureScratch.startsWith(realWorkspace + path.sep)
+        || realWorkspace.startsWith(fixtureScratch + path.sep)) {
+      throw new Error("fixtureScratch requires an exact, separate Docker scratch directory");
+    }
+  }
   const explicitEnv = normalizeShellEnvOverrides(envOverrides);
   const runner = shellSandbox === "docker"
     ? dockerShellRunner(realWorkspace, dockerImage, command, {
@@ -1625,6 +1645,7 @@ export async function runShellProcess(workspace, command, {
         workspaceReadOnly,
         readOnlyWorkspacePaths: normalizeReadOnlyWorkspacePaths(readOnlyWorkspacePaths),
         readOnlyHostFiles,
+        fixtureScratch,
         pipefail,
       })
     : hostShellRunner(realWorkspace, command, explicitEnv, { pipefail });
@@ -1659,10 +1680,12 @@ function dockerShellRunner(workspace, image, command, {
   workspaceReadOnly = false,
   readOnlyWorkspacePaths = [],
   readOnlyHostFiles = [],
+  fixtureScratch = null,
   pipefail = false,
 } = {}) {
   const name = `bantam-shell-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const rust = rustSandboxExtras();
+  const containerWorkspace = fixtureScratch ? "/probe" : workspace;
   return {
     file: "docker",
     args: [
@@ -1687,16 +1710,17 @@ function dockerShellRunner(workspace, image, command, {
       // create root-owned nested mountpoints inside the host scratch directory.
       // Ephemeral scratch avoids that leak and keeps private factory workspaces
       // removable after verification.
-      ...scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env),
+      ...(fixtureScratch ? ["-v", `${fixtureScratch}:/tmp:rw`]
+        : scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env)),
       "-e", `PATH=${process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}`,
       "-e", "HOME=/tmp",
       "-e", "TMPDIR=/tmp",
       "-e", "GOCACHE=/tmp/go-cache",
       ...Object.entries(envOverrides).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
       ...rust.env,
-      ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly),
+      ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly, containerWorkspace),
       ...readOnlyHostFileMounts(readOnlyHostFiles),
-      "-w", workspace,
+      "-w", containerWorkspace,
       image,
       ...(pipefail
         ? ["/bin/bash", "-o", "pipefail", "-c", command]
@@ -1815,6 +1839,7 @@ function dockerMountArgs(
   extraMounts = [],
   readOnlyWorkspacePaths = [],
   workspaceReadOnly = false,
+  containerWorkspace = workspace,
 ) {
   const mounts = [...extraMounts];
   const addRo = (p, dest = p) => {
@@ -1823,9 +1848,9 @@ function dockerMountArgs(
     if (mounts.some((m) => m[1]?.split(":")[1] === dest)) return;
     mounts.push(["-v", `${src}:${dest}:ro`]);
   };
-  const addRw = (p) => {
+  const addRw = (p, dest = p) => {
     const real = fs.realpathSync(p);
-    mounts.push(["-v", `${real}:${real}:rw`]);
+    mounts.push(["-v", `${real}:${dest}:rw`]);
   };
 
   // /etc/alternatives is Debian's symlink farm for cc/ld/editor defaults — /usr/bin/cc points through
@@ -1833,11 +1858,11 @@ function dockerMountArgs(
   // not found" from rustc). It holds only dpkg-managed symlinks, no secrets; skipped where absent.
   for (const p of ["/usr", "/bin", "/lib", "/lib64", "/usr/local", "/etc/alternatives"]) addRo(p, p);
   for (const root of hostToolRoots()) addRo(root);
-  if (workspaceReadOnly) addRo(workspace, workspace);
-  else addRw(workspace);
+  if (workspaceReadOnly) addRo(workspace, containerWorkspace);
+  else addRw(workspace, containerWorkspace);
   for (const relative of readOnlyWorkspacePaths) {
     const target = path.join(workspace, ...relative.split("/"));
-    addRo(target, target);
+    addRo(target, path.join(containerWorkspace, ...relative.split("/")));
   }
   return mounts.flat();
 }

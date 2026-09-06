@@ -19,6 +19,7 @@ const MATERIAL_EVENTS = new Set([
   "auto_verify",
   "verification",
   "verification_skipped",
+  "probe",
   "integrity",
   "external_workspace_change",
   "infrastructure_blocked",

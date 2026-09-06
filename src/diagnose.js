@@ -171,7 +171,7 @@ export const CONTEXT_REMEDIES = {
 // the full verb table so a new verb cannot silently classify as "invalid"
 // (edit_lines did exactly that: promoted to the protocol, never added here,
 // scored as a malformed output by every diagnose A/B).
-const RECON = new Set(["read_file", "inspect", "list_dir", "search", "query"]);
+const RECON = new Set(["read_file", "inspect", "list_dir", "search", "query", "probe"]);
 const PRODUCTIVE = new Set(ALL_ACTION_VERBS.filter((verb) => !RECON.has(verb)));
 
 /** recon | productive | invalid — the coarse classes that decide whether a run advances. */

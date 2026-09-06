@@ -163,6 +163,7 @@ export function buildArtifact({
       // absent field belongs to a legacy film whose prose may be consulted.
       ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: serializableCopy(t.verificationEvidence) } : {}),
       ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: serializableCopy(t.shellExecution) } : {}),
+      ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: serializableCopy(t.probeEvidence) } : {}),
       ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),
       ...(Object.hasOwn(t, "contractStateAudit") ? { contractStateAudit: serializableCopy(t.contractStateAudit) } : {}),
       ...(Object.hasOwn(t, "contextBasis") ? { contextBasis: serializableCopy(t.contextBasis) } : {}),

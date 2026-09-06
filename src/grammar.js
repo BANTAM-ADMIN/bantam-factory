@@ -235,10 +235,11 @@ function renderRecordArrayRules(definitions) {
         () => ` ws "," ws ${field.itemGrammarRule}`,
       ).join("");
       const optionalItems = Array.from(
-        { length: Math.max(0, field.maxItems - field.minItems) },
+        { length: Math.max(0, field.maxItems - Math.max(1, field.minItems)) },
         () => ` ( ws "," ws ${field.itemGrammarRule} )?`,
       ).join("");
-      rules.push(`${field.grammarRule} ::= "[" ws ${field.itemGrammarRule}${requiredItems}${optionalItems} ws "]"`);
+      const items = `${field.itemGrammarRule}${requiredItems}${optionalItems}`;
+      rules.push(`${field.grammarRule} ::= "[" ws ${field.minItems === 0 ? `( ${items} )?` : items} ws "]"`);
       rules.push(`${field.itemGrammarRule} ::= "{" ws ${renderRecordFields(field.fields)} ws "}"`);
     }
   }

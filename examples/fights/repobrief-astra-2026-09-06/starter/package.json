@@ -1,0 +1,9 @@
+{
+  "name": "repobrief",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "repobrief": "bin/repobrief.js" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

@@ -12,7 +12,7 @@
 import { verificationVerdict } from "../done-guard.js";
 import { EDIT_ACTIONS, editPaths, turnEditApplied } from "../edit-actions.js";
 import { clipText } from "../clip.js";
-import { CRASH_RE, INTERPRETER_FAIL_RE, RUNNER_FAIL_RE, isDeliverableRun, nonZeroExit } from "./deliverable-signals.js";
+import { CRASH_RE, EXIT_RE, INTERPRETER_FAIL_RE, RUNNER_FAIL_RE, isDeliverableRun, legacyProcessObservation, nonZeroExit } from "./deliverable-signals.js";
 
 // A working note is a continuity capsule, not a second transcript. Keep enough
 // of the latest private reasoning to retain the decision/checklist across an
@@ -81,13 +81,61 @@ export function deliverableRunOutcome(action, observation, { editedNames } = {})
   // laundered a red run into a clean one (fair-bantam t55, 2026-08-18): the
   // blocked retry "resolved" the failure and the evidence gate went blind.
   if (/^\s*\[(?:repetition|panel|budget)\]/.test(String(observation ?? ""))) return null;
-  const o = String(observation ?? "");
+  const o = legacyProcessObservation(observation);
+  if (!o) return null;
   if (CRASH_RE.test(o) || RUNNER_FAIL_RE.test(o) || INTERPRETER_FAIL_RE.test(o) || nonZeroExit(o) !== null) return "fail";
-  return "pass";
+  // A remaining cwd/sandbox header or arbitrary prose is not proof of success.
+  // Nonzero exits were handled above, so an actual status line here is zero.
+  return new RegExp(EXIT_RE.source, "im").test(o)
+    || verificationVerdict({ action, observation: o }) === "pass" ? "pass" : null;
+}
+
+/** Execution-bound deliverable verdict, with the reason taken from the SAME evidence. */
+export function deliverableTurnEvidence(turn, { editedNames, workspaceGeneration } = {}) {
+  const action = turn?.action ?? turn?.parsedAction ?? {};
+  const result = (status, command, reason = null) => ({ status, command, reason });
+  if (turn?.shellScopeRollback?.violations?.length) {
+    return result("fail", action.c, "verification changed protected files");
+  }
+  const current = (receipt) => !Number.isInteger(workspaceGeneration)
+    || (Number.isInteger(receipt?.generation) && receipt.generation === workspaceGeneration);
+  const unavailable = (receipt) => !receipt || receipt.invalidated || receipt.timedOut
+    || receipt.interrupted || receipt.aborted || receipt.bufferExceeded || receipt.error || receipt.blocked;
+  if (Object.hasOwn(turn ?? {}, "verificationEvidence") && turn.verificationEvidence !== null) {
+    const receipt = turn.verificationEvidence;
+    if (unavailable(receipt) || !current(receipt)
+        || !["pass", "fail"].includes(receipt.status)) return null;
+    return result(receipt.status, receipt.command ?? action.c,
+      receipt.status === "fail" ? (Number.isInteger(receipt.exitCode) && receipt.exitCode !== 0
+        ? `exit ${receipt.exitCode}` : "test-failure") : null);
+  }
+  if (Object.hasOwn(turn ?? {}, "shellExecution")) {
+    const receipt = turn.shellExecution;
+    if (action.a !== "shell" || unavailable(receipt) || !current(receipt)
+        || !Number.isInteger(receipt.exitCode)
+        || !isDeliverableRun(receipt.command, { editedNames })) return null;
+    return result(receipt.exitCode === 0 ? "pass" : "fail", receipt.command,
+      receipt.exitCode === 0 ? null : `exit ${receipt.exitCode}`);
+  }
+  // Explicit typed absence must not fall through to a legacy stamp or prose.
+  if (Object.hasOwn(turn ?? {}, "verificationEvidence")) return null;
+  const stamped = turn?.scopedVerify;
+  if (stamped?.verdict === "pass" || stamped?.verdict === "fail") {
+    return result(stamped.verdict, stamped.command ?? action.c,
+      stamped.verdict === "fail" ? "test-failure" : null);
+  }
+  const observation = legacyProcessObservation(turn?.observation);
+  const status = deliverableRunOutcome(action, observation, { editedNames });
+  if (!status) return null;
+  const exit = nonZeroExit(observation);
+  return result(status, action.c, status !== "fail" ? null
+    : CRASH_RE.test(observation) ? "crash"
+      : RUNNER_FAIL_RE.test(observation) ? "test-failure"
+        : exit !== null ? `exit ${exit}` : "failure");
 }
 
 /** Record a trajectory (turns of {action|parsedAction, observation}) as EAVT datoms. */
-export function recordTurns(turns) {
+export function recordTurns(turns, { workspaceGeneration } = {}) {
   const log = new RunLog();
   const editedNames = new Set();
   (turns || []).forEach((tn, i) => {
@@ -134,16 +182,11 @@ export function recordTurns(turns) {
     if (verdict) log.add("run", "verdict", verdict, i);
     // A deliverable run's crash/exit is a SEPARATE verdict channel — the oracle-blindness signal
     // that formal-runner detection misses (a SIGSEGV on a binary the model built).
-    const dv = deliverableRunOutcome(a, tn.observation, { editedNames });
-    if (dv) log.add("run", "deliverable", dv, i);
-    // A harness-run verification (auto-verify / scoped-verify) stamps `scopedVerify` on the EDIT turn
-    // that triggered it. That is a TRUSTED deliverable outcome (the harness itself ran the tests), so
-    // credit it in the deliverable channel too — otherwise a passing harness re-run after the model's
-    // own failed run leaves the failure "unresolved" and the evidence-guard falsely tells the model
-    // "your last check failed" right after the harness confirmed the fix (risking a regress-good-code
-    // re-edit). The turn's action is the edit, so deliverableRunOutcome (which needs a shell run) missed it.
-    const stamped = tn.scopedVerify?.verdict;
-    if (!dv && (stamped === "pass" || stamped === "fail")) log.add("run", "deliverable", stamped, i);
+    const evidence = deliverableTurnEvidence(tn, { editedNames, workspaceGeneration });
+    if (evidence) {
+      log.add("run", "deliverable", evidence.status, i);
+      log.add(`turn:${i}`, "deliverable-evidence", evidence, i);
+    }
   });
   return log;
 }

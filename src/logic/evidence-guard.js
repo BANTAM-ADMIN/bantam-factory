@@ -18,7 +18,6 @@
 // model-defined failure tokens risks false positives on passing runs that print "fail" while exploring.
 
 import { recordTurns, unresolvedDeliverableFailure } from "./runlog.js";
-import { CRASH_RE, RUNNER_FAIL_RE, nonZeroExit } from "./deliverable-signals.js";
 
 const EVIDENCE_TAG = "[done-guard]";
 
@@ -33,22 +32,21 @@ function act(turn) { return (turn && (turn.action || turn.parsedAction)) || turn
  * a predicate over the append-only run history, matching the pattern of `prematureDoneByQuery`.
  * @returns {null | { cmd, reason, idx }} null when the last verification was clean or absent.
  */
-export function unresolvedRunFailure(turns) {
+export function unresolvedRunFailure(turns, { workspaceGeneration } = {}) {
   const all = turns ?? [];
   // recordTurns reads {action|parsedAction}; saved fixtures/tests may be flat {a,c,p}. Normalize.
   // Preserve `scopedVerify` — a trusted harness-run verdict recordTurns credits in the deliverable
   // channel; dropping it here made a passing auto/scoped verify invisible, so the guard falsely
   // reported the model's earlier failed run as still unresolved.
-  const norm = all.map((t) => ({ action: act(t), observation: t.observation, scopedVerify: t.scopedVerify }));
-  const log = recordTurns(norm);
+  // Preserve typed presence AND typed absence, plus edit/generation provenance.
+  // Discarding the receipt made assignment prose appended to exit-0 test output
+  // ("a non-repository directory must exit 1") fabricate a failed execution.
+  const norm = all.map((t) => ({ ...t, action: act(t) }));
+  const log = recordTurns(norm, { workspaceGeneration });
   const q = unresolvedDeliverableFailure(log, all.length);
   if (!q) return null;
-  const ac = act(all[q.at]);
-  const obs = String(all[q.at]?.observation ?? "");
-  const reason = CRASH_RE.test(obs) ? "crash"
-    : RUNNER_FAIL_RE.test(obs) ? "test-failure"
-    : (nonZeroExit(obs) !== null ? `exit ${nonZeroExit(obs)}` : "failure");
-  return { cmd: ac.c, reason, idx: q.at };
+  const evidence = log.asof(`turn:${q.at}`, "deliverable-evidence", q.at)?.v;
+  return { cmd: evidence?.command, reason: evidence?.reason ?? "failure", idx: q.at };
 }
 
 /**
@@ -57,12 +55,12 @@ export function unresolvedRunFailure(turns) {
  * @param {{maxRejections?: number}} opts
  * @returns {string|null}
  */
-export function unresolvedEvidenceObjection(turns, alreadyRejected = 0, { maxRejections = 1 } = {}) {
+export function unresolvedEvidenceObjection(turns, alreadyRejected = 0, { maxRejections = 1, workspaceGeneration } = {}) {
   if (maxRejections <= 0 || alreadyRejected >= maxRejections) return null;
-  const fail = unresolvedRunFailure(turns);
+  const fail = unresolvedRunFailure(turns, { workspaceGeneration });
   if (!fail) return null;
   return `${EVIDENCE_TAG} You called done, but your own last check of the deliverable failed and you did`
     + ` not fix it. Command:\n  ${String(fail.cmd).slice(0, 200)}\nreported: ${fail.reason}.\n`
-    + `That is the exact condition the grader checks. Re-run that command, confirm it now succeeds`
+    + `Re-run that command, confirm it now succeeds`
     + ` (clean exit, no crash, no test failures), and only then call done.`;
 }

@@ -51,6 +51,9 @@ test("a third mostly-stale inspect batch draws the shuffle steer and masks inspe
   const steers = [];
   const result = await runAgent({
     task: "What do these files export?",
+    // Keep the repeated reads executable: a panel/ledger-skipped op is not a
+    // new read delivery and cannot count as one for the shuffle detector.
+    openFilesView: false,
     workspace,
     model,
     maxTurns: 8,

@@ -78,6 +78,7 @@ test("Codex model options provide a complete offline fallback catalog", () => {
     "codex-5.4",
     "codex-5.4-mini",
     "codex-spark",
+    "codex-astra",
   ]);
   assert.deepEqual(options[0].supportedReasoningEfforts, [
     "low", "medium", "high", "xhigh", "max", "ultra",
@@ -126,4 +127,32 @@ test("Codex CLI aliases resolve roles while preserving exact live model IDs", ()
   assert.equal(resolveCodexModelAlias("codex-sol"), "gpt-5.6-sol");
   assert.equal(resolveCodexModelAlias("gpt-5.6-luna"), "gpt-5.6-luna");
   assert.equal(resolveCodexModelAlias("future-catalog-model"), "future-catalog-model");
+});
+
+test("Astra is an exact manual option with supported native reasoning levels", () => {
+  const entry = codexModelOptions([]).find(entry => entry.name === "codex-astra");
+  assert.equal(entry.model, "gpt-6-astra");
+  assert.equal(entry.effort, "medium");
+  assert.equal(entry.automatic, false);
+  for (const alias of ["astra", "codex-astra", "gpt-6-astra"]) {
+    assert.equal(resolveCodexModelAlias(alias), "gpt-6-astra");
+  }
+  for (const effort of ["low", "medium", "high", "xhigh", "max", "ultra"]) {
+    assert.deepEqual(resolveCodexReasoningEffort(entry, effort), { ok: true, effort });
+  }
+  assert.equal(resolveCodexReasoningEffort(entry, "none").ok, false);
+  assert.equal(resolveCodexReasoningEffort(entry, "minimal").ok, false);
+  assert.deepEqual(recommendedCodexModels([]).map(entry => entry.name), ["codex-terra", "codex-luna", "codex-sol"]);
+});
+
+test("Astra selection respects the live account catalog without changing its default effort", () => {
+  const [entry] = codexModelOptions([{
+    model: "gpt-6-astra", displayName: "GPT-6-Astra", defaultReasoningEffort: "low",
+    supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "medium" }],
+  }]);
+  assert.equal(entry.name, "codex-astra");
+  assert.equal(entry.effort, "low");
+  assert.deepEqual(entry.supportedReasoningEfforts, ["low", "medium"]);
+  assert.equal(entry.automatic, false);
+  assert.equal(codexModelOptions([{ model: "gpt-5.6-terra" }]).some(entry => entry.model === "gpt-6-astra"), false);
 });

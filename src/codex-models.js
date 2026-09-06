@@ -1,5 +1,5 @@
 const FALLBACK_MODELS = Object.freeze([
-  model("gpt-5.6-sol", "GPT-5.6-Sol", "Latest frontier agentic coding model.", "low",
+  model("gpt-5.6-sol", "GPT-5.6-Sol", "Frontier agentic coding model.", "low",
     ["low", "medium", "high", "xhigh", "max", "ultra"]),
   model("gpt-5.6-terra", "GPT-5.6-Terra", "Balanced agentic coding model for everyday work.", "medium",
     ["low", "medium", "high", "xhigh", "max", "ultra"]),
@@ -13,9 +13,19 @@ const FALLBACK_MODELS = Object.freeze([
     ["low", "medium", "high", "xhigh"], "gpt-5.6-luna"),
   model("gpt-5.3-codex-spark", "GPT-5.3-Codex-Spark", "Ultra-fast coding model.", "high",
     ["low", "medium", "high", "xhigh"]),
+  // Explicit opt-in; preserve the measured automatic roles and existing menu
+  // positions. The live account catalog takes precedence over this fallback.
+  model("gpt-6-astra", "GPT-6-Astra", "Frontier model for complex end-to-end work.", "medium",
+    ["low", "medium", "high", "xhigh", "max", "ultra"]),
 ]);
 
 const MODEL_POLICY = Object.freeze({
+  "gpt-6-astra": Object.freeze({
+    role: "Frontier",
+    recommendation: "Explicit Astra option for comparative evaluation; not automatically selected.",
+    rank: 4,
+    automatic: false,
+  }),
   "gpt-5.6-terra": Object.freeze({
     role: "Everyday",
     recommendation: "Recommended default for routine coding, review, and refactors.",
@@ -143,6 +153,7 @@ export function resolveCodexReasoningEffort(entry, selection = "") {
 }
 
 function aliasFor(modelId) {
+  if (modelId === "gpt-6-astra") return "codex-astra";
   if (modelId === "gpt-5.6-sol") return "codex-sol";
   if (modelId === "gpt-5.6-terra") return "codex-terra";
   if (modelId === "gpt-5.6-luna") return "codex-luna";

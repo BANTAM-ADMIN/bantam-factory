@@ -41,7 +41,24 @@ export const INTERPRETER_FAIL_RE = /Traceback \(most recent call last\)|SyntaxE
 export const RUNNER_FAIL_RE =
   /\b[1-9]\d*\s+[Ff]ailed\b|\bFAILED\b(?!\s*\(0\))|=====\s*FAILURES|\bAssertionError\b|(?<!\b0\s)\btests? [Ff]ailed\b|\b[Rr]untime [Ee]rror\b|(?:^|\n)\s*--- FAIL: |(?:^|\n)FAIL[ \t]|(?:^|\n)not ok\b|(?:^|\n)\s*[1-9]\d* fail\b|(?:^|\n)\(fail\) /;
 
-export const EXIT_RE = /\b(?:exit(?:\s*code|\s*status)?|returncode)\s*[:=]?\s*(-?\d+)\b/gi;
+// Legacy process status lines, not requirements such as "invalid names exit 1".
+export const EXIT_RE = /^[ \t]*(?:exit(?:[ \t]*code|[ \t]*status)?|returncode)[ \t]*[:=]?[ \t]*(-?\d+)[ \t]*$/gim;
+
+/**
+ * Historical turns have only rendered text. Restrict their fallback to the
+ * process portion, before any appended harness annotation. New turns must use
+ * their structured receipt instead. Keep stdout/stderr section delimiters.
+ * Unknown bracketed annotations are uncertainty, never a successful process.
+ */
+export function legacyProcessObservation(observation) {
+  const text = String(observation ?? "").replace(/^\$[^\n]*(?:\n|$)/, "");
+  const annotation = /(?:^|\n)[ \t]*\[((?!stderr\]|stdout\])[a-z][a-z0-9_ /:-]*)\](?=[ \t\r\n]|$)/im.exec(text);
+  // A program may itself print [error], [info], or another bracketed label.
+  // Without typed provenance an unknown boundary is not safe to truncate and
+  // then certify from the surviving prefix. Decline to infer an outcome.
+  if (annotation && !/^(?:guidance|assignment|review|completion-audit|fs|verification-scope|impact|peer|budget|panel|repetition|done-guard|trusted-review-evidence)$/i.test(annotation[1])) return "";
+  return (annotation ? text.slice(0, annotation.index) : text).trim();
+}
 
 /** Is any command segment a recognized test runner invocation? */
 // `bash -c 'inner'` runs INNER, and the payload arrives from splitShellWords as
@@ -273,7 +290,7 @@ function unwrapLaunchers(input) {
  * observation shows no failure signal.
  */
 export function shellFailureSignature(observation) {
-  const o = String(observation ?? "");
+  const o = legacyProcessObservation(observation);
   if (!(CRASH_RE.test(o) || RUNNER_FAIL_RE.test(o) || nonZeroExit(o) !== null)) return null;
   const lines = o.split("\n").map((l) => l.trim()).filter(Boolean);
   const last = lines[lines.length - 1] ?? "failure";

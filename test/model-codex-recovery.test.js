@@ -42,8 +42,15 @@ test("ModelClient rebuilds a long-running delta thread after the app-server proc
   const token = client.beginAgentRun();
   const stable = "stable long-horizon canonical instructions\n".repeat(300);
   const accepted = [];
+  let canonical = stable;
   for (let turn = 1; turn <= 8; turn++) {
-    accepted.push(await client.complete(`${stable}accepted observation ${turn}`));
+    const previous = canonical;
+    canonical += `accepted observation ${turn}\n`;
+    const result = await client.complete(canonical);
+    if (turn > 1) {
+      assert.equal(reconstructCodexPromptDelivery(previous, result.codexPromptDelivery.deliveredText), canonical);
+    }
+    accepted.push(result);
   }
 
   const originalThread = accepted[0].codexThread.threadId;
@@ -51,7 +58,7 @@ test("ModelClient rebuilds a long-running delta thread after the app-server proc
   assert.equal(accepted[0].codexPromptDelivery.mode, "full");
   assert.ok(accepted.slice(1).every((result) => result.codexPromptDelivery.mode === "delta"));
 
-  const recoveryPrompt = `${stable}accepted observation 9\nBANTAM_FAKE_EXIT_ONCE=${exitMarker}`;
+  const recoveryPrompt = `${canonical}accepted observation 9\nBANTAM_FAKE_EXIT_ONCE=${exitMarker}`;
   const recovered = await client.complete(recoveryPrompt);
   const recoveryRecord = client.requestLog().at(-1);
 
@@ -66,7 +73,7 @@ test("ModelClient rebuilds a long-running delta thread after the app-server proc
   assert.equal(recovered.codexPromptDelivery.canonicalChars, recoveryPrompt.length);
   assert.equal(recovered.codexPromptDelivery.deliveredChars, recoveryPrompt.length);
 
-  const continuationPrompt = `${stable}accepted observation 10 after recovery`;
+  const continuationPrompt = `${recoveryPrompt}\naccepted observation 10 after recovery`;
   const continued = await client.complete(continuationPrompt);
   assert.equal(continued.codexThread.threadId, recovered.codexThread.threadId);
   assert.equal(continued.codexThread.threadReused, true);

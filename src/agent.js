@@ -1522,7 +1522,36 @@ async function runAgentCore({
   // writing dbg1/dbg2/... one per turn instead of scripting the loop (script-churn.js).
   const churnState = createChurnState();
   const readLedger = new ReadLedger();  // union of line ranges already read, per file
-  for (const turn of turns) restoreReadLedgerTurn(readLedger, turn);
+  const recordReadDelivery = (turn, observation, panelText) => {
+    // Only the newest turn can add coverage: older snapshots may predate an
+    // edit. This callback receives the scrubbed, clipped model-facing body,
+    // not an executor header promising a range that clipping removed.
+    const latest = turns.at(-1);
+    if (turn !== latest && !(Number.isInteger(turn?.i) && turn.i === latest?.i)) return;
+    const action = turn.action ?? turn.parsedAction;
+    const ops = action?.a === "inspect" ? action.ops : [action];
+    const panel = panelRenderedRanges(panelText);
+    for (const op of ops ?? []) {
+      if (op?.a !== "read_file") continue;
+      const range = deliveredReadRange(op, observation);
+      if (range) readLedger.note(op.p, range.start, range.end, range.total);
+      // A slimmed read can be supplied by the actual current panel instead.
+      // Credit only this requested region, not every file the panel happens
+      // to contain. WS0 supplies no panelText and cannot enter this route.
+      const entry = panel.get(op.p);
+      if (!entry) continue;
+      const start = Number.isInteger(op.start) ? op.start : 1;
+      const end = Math.min(entry.total, Number.isInteger(op.limit)
+        ? start + op.limit - 1 : (Number.isInteger(op.start) ? start + START_WINDOW - 1 : entry.total));
+      for (const [from, to] of entry.ranges) {
+        if (Math.max(start, from) <= Math.min(end, to)) {
+          readLedger.note(op.p, Math.max(start, from), Math.min(end, to), entry.total);
+        }
+      }
+    }
+  };
+  // A resumed observation is pre-render text, not a delivery receipt. Start
+  // coverage empty; the next actual render records what is available now.
   const workspaceCoherence = new WorkspaceCoherenceTracker(workspace);
   const pendingExternalChanges = new Set();
   const restoredWorkspaceCoherence = [...turns].reverse()
@@ -2205,23 +2234,22 @@ async function runAgentCore({
     //
     // Parsing the emitted packet is the one description that cannot drift from
     // what the model was actually sent.
-    const openPaths = openFilesView ? panelEntryPaths(openFilesText) : [];
+    const panelIsRendered = openFilesView && (!extensionTrajectory || extensionWorkingSet);
+    const openPaths = panelIsRendered ? panelEntryPaths(openFilesText) : [];
     // Same rule as openPaths above: the packet that shipped, not the plan that
     // preceded it. fullyRenderedPaths() re-runs the planner without the byte
     // budget compileContextPacket chose, so it can call a file complete that the
     // packet clipped or dropped.
-    const completeOpenFiles = openFilesView ? completePanelEntries(openFilesText) : new Map();
+    const completeOpenFiles = panelIsRendered ? completePanelEntries(openFilesText) : new Map();
     // Range-level residency for the read ledger. `end === null` asks the
     // whole-file question, which only a complete entry answers.
-    const packetRanges = openFilesView ? panelRenderedRanges(openFilesText) : new Map();
+    const packetRanges = panelIsRendered ? panelRenderedRanges(openFilesText) : new Map();
     const packetResident = (rel, start, end) => {
       if (end === null) return completeOpenFiles.has(rel);
       const entry = packetRanges.get(rel);
-      if (entry && packetCoversRange(entry.ranges, start, Math.min(end, entry.total))) return true;
-      // prompt.js keeps the newest live read of a file the panel cannot
-      // substitute, so that one range is still reachable in history.
-      const newest = newestServedReadRange(turns, rel);
-      return Boolean(newest) && start >= newest.start && (entry ? Math.min(end, entry.total) : end) <= newest.end;
+      // Historical read headers do not prove residency: their numbered bytes
+      // may have been clipped, slimmed, or frozen before later annotations.
+      return Boolean(entry && packetCoversRange(entry.ranges, start, Math.min(end, entry.total)));
     };
     const completeReadPaths = [...completeOpenFiles.keys()];
     const preEditSynthesisTurn = preEditSynthesis
@@ -2535,7 +2563,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -2617,7 +2645,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
           return built;
         },
@@ -3018,7 +3046,7 @@ async function runAgentCore({
       && !duplicate && !panelRedirect && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       && (inspectFullyInLedger(action, readLedger) || readFullyInLedger(action, readLedger))
-      ? ledgerReplayMessage(action, openFilesView)
+      ? ledgerReplayMessage(action, panelIsRendered)
       : null;
     let insideLedgerReread = false; // a subrange re-read evades the byte-identical dedup but is the same stall
     let result;
@@ -3413,7 +3441,8 @@ async function runAgentCore({
       for (const finding of familyFindings({ ground, action, editedFile, symbolsIn })) {
         if (!pendingFamilyFindings.has(finding.name)) pendingFamilyFindings.set(finding.name, finding);
       }
-      const peer = peerFunctionFooter({ ground, action, editedFile, seen: impactSymbolsSeen });
+      const peer = peerFunctionFooter({ ground, action, editedFile, seen: impactSymbolsSeen,
+        readSource: (rel) => exec.safeReadText(exec.resolveExisting(rel)) });
       if (peer) {
         result.observation += peer;
         metrics.peerFunctionFooters = (metrics.peerFunctionFooters ?? 0) + 1;
@@ -3701,11 +3730,8 @@ async function runAgentCore({
       }
     }
     if (action.a === "read_file" && typeof action.p === "string") {
-      const shown = /\((\d+) lines, showing (\d+)-(\d+)\)/.exec(String(result.observation ?? ""));
-      if (shown) {
-        insideLedgerReread = readLedger.covers(action.p, Number(shown[2]), Number(shown[3]));
-        readLedger.note(action.p, Number(shown[2]), Number(shown[3]), Number(shown[1]));
-      }
+      const range = deliveredReadRange(action, result.observation);
+      if (range) insideLedgerReread = readLedger.covers(action.p, range.start, range.end);
     } else if (!ledgerReplay && action.a === "inspect" && Array.isArray(action.ops)) {
       // Inspect wraps reads as sub-ops; without this the model can loop
       // through inspect variants the ledger never sees (observed: v5 climbed
@@ -3718,23 +3744,13 @@ async function runAgentCore({
       let coveredOps = 0;
       let inspectPagingSteer = null;   // fire at most once per batch
       for (const op of readOps) {
-        // COMPUTE the window rather than parse it back out of the observation.
-        //
-        // Parsing keyed on the path, and a batch reads the same path more than
-        // once — so for every op the regex matched the FIRST header and recorded
-        // that one range repeatedly, leaving the later ops' ranges unknown and
-        // guaranteeing they are re-read forever. tb13 turn 9 read src/agent.js
-        // at 294, 2380 and 2820; only 294 and 2380 were recorded, and turn 10
-        // re-read 2820 (.bantam/runs/2026-08-16T20-40-12-127Z.json: 84 of 86
-        // within-epoch repeats were multi-op inspects, 85 of them this file).
-        // Clipping compounded it — the third header was outside the 4,000-char
-        // window entirely — but the ambiguity is the root cause, and the range
-        // is deterministic without the text.
-        const range = deliveredReadRange(op, exec) ?? headerReadRange(op, obsText);
+        // Match this op's start as well as its path. A header alone is not
+        // coverage; only intact, consecutive numbered lines qualify.
+        const range = deliveredReadRange(op, obsText);
         if (!range) { allCovered = false; continue; }
         if (readLedger.covers(op.p, range.start, range.end)) coveredOps += 1;
         else allCovered = false;
-        readLedger.note(op.p, range.start, range.end, range.total);
+        // Coverage is recorded by recordReadDelivery after prompt clipping.
         // Windowed sub-ops are pages too. The carve-off retry (chat r0 @
         // 2026-08-17T22:29) grew the same five files' windows 80→120→150→200→250
         // entirely inside inspect batches; pagedReads keyed on bare read_file
@@ -6408,33 +6424,6 @@ export function formatWorkingNoteReanchor(state, {
   return `[working-checkpoint from turn ${note.turn + 1}] Keep this bounded checklist active across its edit sequence:\n${note.text}\nRe-evaluate every item against the CURRENT source before acting. Continue only unfinished items in the stated direction; never restore an older value merely because it appears in this note. Then verify before done.`;
 }
 
-function restoreReadLedgerTurn(ledger, turn) {
-  const action = turn?.action;
-  const observation = String(turn?.observation ?? "");
-  const note = (file, { allowGeneric = false } = {}) => {
-    if (!file) return;
-    const escaped = String(file).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const named = new RegExp(`${escaped} \\(\\d+ lines, showing (\\d+)-(\\d+)\\)`).exec(observation);
-    // A direct read has only one range, so legacy observations that omitted
-    // the filename remain recoverable. An inspect can contain several reads;
-    // never assign its first generic range to every requested file.
-    const shown = named || (allowGeneric ? /\(\d+ lines, showing (\d+)-(\d+)\)/.exec(observation) : null);
-    if (shown) ledger.note(file, Number(shown[1]), Number(shown[2]));
-  };
-  if (action?.a === "read_file") note(action.p, { allowGeneric: true });
-  else if (action?.a === "inspect") {
-    for (const op of action.ops ?? []) if (op?.a === "read_file") note(op.p);
-  }
-  if (turnEditApplied(turn)) {
-    for (const file of editPaths(action)) ledger.invalidate(file);
-  }
-  if (Array.isArray(turn?.shellChangedPaths)) {
-    for (const file of turn.shellChangedPaths) ledger.invalidate(file);
-  } else if (turn?.sourceEditedByShell === true) {
-    ledger.clear();
-  }
-}
-
 // True when EVERY read sub-op of an inspect batch re-requests a line range the
 // read ledger already holds — executing it would return only bytes the model has
 // already seen this run. The predicted span reuses the executor's windowing
@@ -6454,32 +6443,27 @@ function restoreReadLedgerTurn(ledger, turn) {
 // exact repeats or overlaps of ranges already delivered, while the guards fired
 // 9 times against 87 op-level repeats in tb7 alone. The batch is the unit of
 // dedup; the op is the unit of waste.
-// The window a read op must have returned, computed rather than parsed: the
-// requested range bounded by the file's real length. Used when the observation
-// header did not survive clipping. Returns null when the file is unreadable,
-// which is also when the op produced an error rather than a range.
-function deliveredReadRange(op, exec) {
-  try {
-    const text = fs.readFileSync(exec.resolve(op.p), "utf8");
-    const total = text.split("\n").length;
-    const start = Number.isInteger(op.start) && op.start > 0 ? op.start : 1;
-    if (start > total) return null;
-    const requestedEnd = Number.isInteger(op.limit) ? start + op.limit - 1 : start + START_WINDOW - 1;
-    return { total, start, end: Math.min(requestedEnd, total) };
-  } catch {
-    return null;
-  }
-}
-
-// Last resort when the file cannot be read back (deleted mid-turn, permissions):
-// take the range from the observation header. Ambiguous when one batch reads a
-// path more than once — it can only ever return the first — so it is the
-// fallback, never the primary.
-function headerReadRange(op, obsText) {
+// A requested range is not a delivery receipt. Count only the consecutive,
+// complete numbered lines following this op's matching header in the rendered
+// observation. A clipped-away header or middle/tail fragment proves nothing.
+export function deliveredReadRange(op, observation) {
+  if (op?.a !== "read_file" || typeof op.p !== "string") return null;
+  const obsText = String(observation ?? "");
   const escaped = op.p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const shown = new RegExp(`${escaped} \\((\\d+) lines, showing (\\d+)-(\\d+)\\)`).exec(obsText);
+  const start = Number.isInteger(op.start) ? op.start : 1;
+  const shown = new RegExp(`(?:^|\\n)${escaped} \\((\\d+) lines, showing (${start})-(\\d+)\\):\\n`).exec(obsText);
   if (!shown) return null;
-  return { total: Number(shown[1]), start: Number(shown[2]), end: Number(shown[3]) };
+  const lines = obsText.slice(shown.index + shown[0].length).split("\n");
+  let end = start - 1;
+  for (let i = 0; i < lines.length - 1 && end < Number(shown[3]); i += 1) {
+    const line = /^(\d+)\t/.exec(lines[i]);
+    if (!line || Number(line[1]) !== end + 1) break;
+    // clipText may manufacture a newline after a half-line. Never credit that
+    // boundary line, even when its line-number prefix survived.
+    if (/^(?:\.\.\.|…) .*clipped/.test(lines[i + 1])) break;
+    end += 1;
+  }
+  return end >= start ? { total: Number(shown[1]), start, end } : null;
 }
 
 function splitInspectByLedger(action, ledger, isResident) {
@@ -6578,7 +6562,13 @@ export function panelRenderedRanges(packetText) {
   for (const entry of String(packetText ?? "").split(/\n(?=# \S)/)) {
     const header = /^# (\S+) \(current, (\d+) lines\)/.exec(entry);
     if (!header) continue;
-    const lines = [...entry.matchAll(/(?:^|\n)\s*(\d+)\t/g)].map((m) => Number(m[1])).sort((a, b) => a - b);
+    const renderedLines = entry.split("\n");
+    const lines = renderedLines.flatMap((line, index) => {
+      const match = /^(\d+)\t/.exec(line);
+      if (!match || /chars — read_file to page/.test(line)
+          || /panel truncated/.test(renderedLines[index + 1] ?? "")) return [];
+      return [Number(match[1])];
+    }).sort((a, b) => a - b);
     const ranges = [];
     for (const n of lines) {
       const last = ranges[ranges.length - 1];
@@ -6619,23 +6609,6 @@ export function completePanelEntries(packetText) {
     complete.set(header[1], claimed);
   }
   return complete;
-}
-
-// The newest read of `path` that actually delivered bytes, as the range its
-// observation reported showing. prompt.js retains exactly this one when the
-// panel cannot substitute for the file, so it is the only historical read whose
-// bytes are still reachable.
-function newestServedReadRange(turns, path) {
-  for (let i = turns.length - 1; i >= 0; i -= 1) {
-    const turn = turns[i];
-    const action = turn?.parsedAction ?? turn?.action;
-    const reads = action?.a === "read_file" ? [action] : (action?.a === "inspect" ? (action.ops ?? []) : []);
-    if (!reads.some((op) => op?.a === "read_file" && op.p === path)) continue;
-    const shown = new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\(\\d+ lines, showing (\\d+)-(\\d+)\\)`)
-      .exec(String(turn.observation ?? ""));
-    if (shown) return { start: Number(shown[1]), end: Number(shown[2]) };
-  }
-  return null;
 }
 
 // "Listed in the panel" was taken to mean "its bytes are in this prompt",
@@ -6705,7 +6678,7 @@ function ledgerReplayMessage(action, openFilesView) {
   const paths = Array.isArray(action.ops)
     ? [...new Set(action.ops.map((op) => op.p))].join(", ")
     : String(action.p ?? "");
-  const panelHint = openFilesView ? " and the exact current files are resident in <open_files> above" : "";
+  const panelHint = openFilesView ? " and the requested current ranges are visible in <open_files> above" : "";
   return `[ledger] Not re-read: every range in this inspect (${paths}) is already recorded in your read history${panelHint}. Re-running it would return only bytes already present in this prompt, so it was not executed. To make progress: inspect an UNREAD range, run a \`search\` for the exact identifier you need (it answers with file:line), request a \`map\` overview you have not fetched yet, or — if you already have enough — answer now.`;
 }
 

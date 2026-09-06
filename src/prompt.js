@@ -375,6 +375,7 @@ export function buildPrompt({
   historyPrefill = QWEN_ASSISTANT_PREFILL,     // prefix for prior assistant turns (always the stable closed form)
   skillsText = "", planText = "", contractText = "", reanchorText = "", finalReanchorText = "", openFilesText = "", openPaths = [], readPaths = openPaths,
   renderCache = null,
+  onRenderedObservation = null,
   repositoryHeadText = "",
   extensionWorkingSet = false,
   outputTokenCap = null,
@@ -645,7 +646,12 @@ export function buildPrompt({
           preserveSlimmedControlAnnotations,
         ), preserveSlimmedControlAnnotations));
     if (rewriteSuperseded) stubbedTurns.add(recordedTurn);
-    p += userTurn(`<observation>\n${scrub(resolvePointer(observation, stubbedTurns))}\n</observation>\n`);
+    const deliveredObservation = scrub(resolvePointer(observation, stubbedTurns));
+    p += userTurn(`<observation>\n${deliveredObservation}\n</observation>\n`);
+    if (typeof onRenderedObservation === "function") {
+      onRenderedObservation(turn, deliveredObservation,
+        (!extensionTrajectory || extensionWorkingSet) ? scrub(openFilesText) : "");
+    }
     // Fresh controller-owned source context must not compete with quoted tool
     // output for OBS_MAX. Render whole validated records after that clipping,
     // inside the same frozen fragment, so delivery and prefix stability agree.

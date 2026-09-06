@@ -51,6 +51,21 @@ test("Codex delegate arguments pin native safety, model, effort, and workspace",
   assert.equal(args.at(-1), "fix it");
 });
 
+test("native delegation selects exact Astra without substituting another model or weakening isolation", () => {
+  for (const model of ["astra", "codex-astra", "gpt-6-astra"]) {
+    const args = buildCodexExecArgs({ model, effort: "medium", workspace: "/tmp/work", task: "fix it" });
+    assert.equal(args[args.indexOf("--model") + 1], "gpt-6-astra");
+    assert.ok(args.includes('model_reasoning_effort="medium"'));
+    assert.ok(args.includes("--ignore-user-config"));
+    assert.ok(args.includes("workspace-write"));
+    assert.ok(!args.includes("--dangerously-bypass-approvals-and-sandbox"));
+  }
+  for (const effort of ["none", "minimal"]) {
+    assert.throws(() => buildCodexExecArgs({ model: "astra", effort, workspace: "/tmp/work", task: "fix it" }), /invalid delegate reasoning effort/);
+  }
+  assert.throws(() => buildCodexExecArgs({ model: "unrecognized-model", effort: "medium", workspace: "/tmp/work", task: "fix it" }), /unsupported delegate model/);
+});
+
 test("Codex delegate can attach screenshots to a native visual-review pass", () => {
   const args = buildCodexExecArgs({
     model: "sol", effort: "high", workspace: "/tmp/work", task: "review it", images: ["/tmp/frame.png"],

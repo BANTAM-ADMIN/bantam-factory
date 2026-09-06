@@ -65,6 +65,15 @@ test("gauntlet registry exposes every non-hidden live Codex model as an alias", 
   assert.equal(spec.arms[0].model.effort, "low");
 });
 
+test("Astra gauntlet selection is explicit and leaves the historical default roster intact", () => {
+  const spec = createGauntletSpec({ root, models: ["astra"], quick: true });
+  assert.deepEqual(spec.arms[0].model, { runtime: "codex", name: "gpt-6-astra", effort: "medium" });
+  assert.deepEqual(modelOptionsForGauntletArm(spec.arms[0].model), {
+    apiUrl: null, apiKey: null, deepseek: false, codex: true, model: "gpt-6-astra", codexEffort: "medium",
+  });
+  assert.deepEqual(createGauntletSpec({ root }).arms.map(arm => arm.name), ["local", "sol", "terra"]);
+});
+
 test("quick selection and per-arm routing remain explicit and credential-free", () => {
   const spec = createGauntletSpec({
     root,

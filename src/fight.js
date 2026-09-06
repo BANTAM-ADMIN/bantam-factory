@@ -156,6 +156,42 @@ export const ARMS = {
       exe: "codex", args: ["exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "-m", "gpt-5.6-sol", task],
     }),
   },
+  "bantam-codex-astra": {
+    pool: "cloud",
+    corner: "BANTAM×ASTRA", sub: "bantam-constrained · Codex app-server · gpt-6-astra, medium", color: "#8ad4c2",
+    cmd: ({ task }) => ({
+      exe: "node",
+      args: [path.join(REPO, "bin", "bantam.js"), "run", "--task", task,
+        "--workspace", ".", "--autonomous", "--codex", "--model", "gpt-6-astra",
+        "--codex-effort", "medium", "--max-turns", "60", "--save-run=../run.json"],
+      env: {
+        BANTAM_PROMPT_TRAJECTORY: "extension", BANTAM_IMMUTABLE_HISTORY: "1",
+        BANTAM_DECISION_SNAPSHOT: "0", BANTAM_EXTENSION_WORKING_SET: "0", BANTAM_TEACHER: "0",
+      },
+    }),
+  },
+  "codex-astra": {
+    pool: "cloud",
+    corner: "CODEX ASTRA", sub: "native Codex CLI tools · gpt-6-astra, medium", color: "#6aa0e0",
+    cmd: ({ task }) => ({
+      exe: "codex",
+      args: ["exec", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config",
+        "--ignore-rules", "--model", "gpt-6-astra", "-c", 'model_reasoning_effort="medium"',
+        "-c", 'web_search="disabled"', "--sandbox", "workspace-write", "--json", task],
+    }),
+  },
+  "bantam-local-27b": {
+    pool: "local",
+    corner: "BANTAM 27B", sub: "local Qwen 27B · extension · no cloud teacher", color: "#e0a458",
+    cmd: ({ task }) => ({
+      exe: "node",
+      args: [path.join(REPO, "bin", "bantam.js"), "run", "--task", task,
+        "--workspace", ".", "--autonomous", "--endpoint", "http://127.0.0.1:8085", "--profile", "qwen",
+        "--max-turns", "60", "--save-run=../run.json"],
+      env: { BANTAM_PROMPT_TRAJECTORY: "extension", BANTAM_IMMUTABLE_HISTORY: "1",
+        BANTAM_DECISION_SNAPSHOT: "0", BANTAM_EXTENSION_WORKING_SET: "0", BANTAM_TEACHER: "0" },
+    }),
+  },
   "claude-sonnet": claudeArm({ model: "sonnet", corner: "CLAUDE", sub: "sonnet · claude code CLI", color: "#b98ad4" }),
   "claude-opus": claudeArm({ model: "opus", corner: "CLAUDE OPUS", sub: "opus · claude code CLI", color: "#a078c8" }),
   "claude-fable": claudeArm({ model: "fable", corner: "CLAUDE FABLE", sub: "fable · claude code CLI", color: "#8f68bc" }),
@@ -197,11 +233,11 @@ export async function armsRoster() {
   } catch { /* stays unavailable */ }
   return Object.entries(ARMS).map(([name, def]) => {
     let available = true, why = "";
-    if (name === "bantam" || name === "bantam-research") { available = local; why = local ? "" : "local 27B at :8085 not answering"; }
+    if (name === "bantam" || name === "bantam-research" || name === "bantam-local-27b") { available = local; why = local ? "" : "local 27B at :8085 not answering"; }
     else if (name === "hermes") { available = local && hasExe("hermes"); why = !hasExe("hermes") ? "hermes not on PATH" : (local ? "" : "local 27B at :8085 not answering"); }
     else if (name === "opencode") { available = local && hasExe("opencode"); why = !hasExe("opencode") ? "opencode not on PATH" : (local ? "" : "local 27B at :8085 not answering"); }
     else if (name.startsWith("bantam-codexapi")) { available = bridge; why = bridgeWhy; }
-    else if (name === "bantam-codex" || name.startsWith("codex")) { available = hasExe("codex"); why = available ? "" : "codex not on PATH"; }
+    else if (name === "bantam-codex" || name.startsWith("bantam-codex-") || name.startsWith("codex")) { available = hasExe("codex"); why = available ? "" : "codex not on PATH"; }
     else if (name.startsWith("claude")) { available = hasExe("claude"); why = available ? "" : "claude not on PATH"; }
     return { name, pool: def.pool, corner: def.corner, sub: def.sub, available, why };
   });
@@ -759,6 +795,18 @@ export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
     };
   }
   if (name.startsWith("codex")) {
+    // New native corners emit structured usage; retain historical text support.
+    const completed = rawLines.flatMap((line) => {
+      try { const row = JSON.parse(line); return row?.type === "turn.completed" && row.usage ? [row.usage] : []; }
+      catch { return []; }
+    });
+    if (completed.length) {
+      const sum = (key) => completed.reduce((n, u) => n + (num(u[key]) ?? 0), 0);
+      const input = sum("input_tokens"), hit = sum("cached_input_tokens"), output = sum("output_tokens");
+      return { source: "codex-jsonl", turns: completed.length, inputTokens: input,
+        outputTokens: output, cacheHitTokens: hit, reasoningTokens: sum("reasoning_output_tokens"),
+        totalTokens: input + output, prefixReuse: input ? hit / input : 0 };
+    }
     // `codex exec` ends with "tokens used" and the figure on the next line.
     const i = rawLines.findIndex((l) => /^\s*tokens used\s*$/i.test(l));
     const figure = i >= 0 ? rawLines.slice(i + 1).find((l) => /^\s*[\d,]+\s*$/.test(l)) : null;

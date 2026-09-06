@@ -68,49 +68,81 @@ function usedAsFile(text, token) {
     || new RegExp(`\\/${t}(?![\\w.])`).test(text);
 }
 
+// A software interface's effects are not build-time deliverables. Keep this
+// distinction local to the output clause/paragraph: merely mentioning a CLI
+// elsewhere in a task must not excuse an explicitly requested result file.
+// In particular, no filename/placeholder spelling (NAME, name, etc.) decides
+// whether a file is owed.
+function runtimeOutputClaim(scope, paragraph, pathIndex = scope.length) {
+  // A coordinated, independent instruction starts a new actor scope. The CLI
+  // in "... when invoked, and also write README.md" does not own the README.
+  const beforePath = scope.slice(0, pathIndex)
+    .split(/(?:[,;]\s*(?:and|but|also|then)\b|\band\s+(?:also|then)\b)/i).at(-1);
+  const verbs = [...beforePath.matchAll(new RegExp(OUTPUT_VERB.source, "gi"))];
+  const verb = verbs.at(-1);
+  if (!verb) return false;
+  const beforeVerb = beforePath.slice(0, verb.index);
+  // "Build a CLI that must write ...", "the function should save ...".
+  // An initial "Write a script at script.js" does NOT have a runtime actor
+  // before its output verb and remains an explicit source-file obligation.
+  if (/\b(?:cli|command|program|script|function|method|constructor|service|endpoint|handler)(?:\s+(?:in|at|called|named)\s+\S+)?\s+(?:(?:that|which)\s+)?(?:must|should|will|shall|to)\s*(?:(?:always|also|only|automatically|durably)\s+)?$/i.test(beforeVerb)) return true;
+  if (/\b(?:when|whenever|upon|during|on)\b[^.!?\n]{0,100}\b(?:invoked|called|executed|startup|requests?|invocation)\b[^.!?\n]*$/i.test(beforeVerb)) return true;
+
+  // Some interface specifications use imperatives in a paragraph defining the
+  // command's output: "Store each snapshot at ... . A successful `snapshot`
+  // prints ... on stdout and exits 0." Both the instance quantifier and the
+  // explicit command/result contract are required; an unrelated direct ask
+  // such as "Also write README.md" in the same paragraph still counts.
+  return /^\s*(?:[-*+•]|\d+[.)])?\s*(?:store|save|write|create|produce|emit|generate)\s+(?:each|every)\b/i.test(beforePath)
+    && /\b(?:successful|failed)\s+`[^`\n]+`[^.\n]{0,200}\b(?:stdout|stderr|exits?\s+\d+)\b/i.test(paragraph);
+}
+
 export function requiredOutputPaths(task) {
   const text = String(task ?? "");
   if (!text) return [];
   const out = [];
-  let inOutputList = false;
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine;
-    const isBullet = BULLET.test(line);
-    const hasVerb = OUTPUT_VERB.test(line);
-    // A bullet inherits the list context; any non-bullet line resets it unless
-    // it opens a new one.
-    if (!isBullet) inOutputList = hasVerb && /:\s*$/.test(line.trim());
-    const collect = hasVerb || (isBullet && inOutputList);
-    if (!collect) continue;
-    // Scope to the SENTENCE that carries the verb, not the whole line. tune-mjcf
-    // says "The initial model is at /app/model_ref.xml and should remain
-    // unchanged. Tuned mjcf should be saved as /app/model.xml." — line scope
-    // would demand the input file too. A bullet under an output list is already
-    // scoped by its list, so it keeps the whole line.
-    // A period inside "e.g." or "vs." is not a sentence end. count-dataset-tokens
-    // writes `(e.g. "1000000") to the file /app/answer.txt`, and splitting there
-    // severed the verb from the path, so require a capital letter after the break.
-    const sentences = line.split(/(?<=\.)\s+(?=[A-Z])/);
-    const scopes = (isBullet && inOutputList && !hasVerb)
-      ? [line]
-      : sentences.filter((sentence) => OUTPUT_VERB.test(sentence) && !PROVIDED.test(sentence));
-    for (const scope of scopes) {
-    PATH_RE.lastIndex = 0;
-    let m;
-    while ((m = PATH_RE.exec(scope)) !== null) {
-      const p = m[1];
-      // A bare extension-looking token that is really a module or a command
-      // ("numpy.random", "pip.conf") is not a deliverable path; require either
-      // a directory separator or a plainly file-ish extension.
-      // A BARE filename (no directory) needs a plainly file-ish extension, or
-      // "numpy.random" and "os.path" become deliverables. Kept as a curated
-      // whitelist rather than a pattern: a missed detection is silent, a false
-      // one costs a correct run two rejections.
-      if (!p.includes("/")
-        && !/\.(?:csv|tsv|txt|json|jsonl|xml|md|html|png|jpe?g|svg|yaml|yml|toml|ini|cfg|conf|log|out|bin|pdf|zip|gz|tar|parquet|sqlite|db|wav|mp4|fasta|fa|fastq|sql|tex|gcode|stl|obj|c|h|py|js|sh)$/i.test(p)
-        && !usedAsFile(text, p)) continue;
-      if (!out.includes(p)) out.push(p);
-    }
+  for (const paragraph of text.split(/\n\s*\n/)) {
+    let inOutputList = false;
+    for (const line of paragraph.split("\n")) {
+      const isBullet = BULLET.test(line);
+      const hasVerb = OUTPUT_VERB.test(line);
+      // A bullet inherits the list context; any non-bullet line resets it unless
+      // it opens a new one.
+      if (!isBullet) inOutputList = hasVerb && /:\s*$/.test(line.trim())
+        && !runtimeOutputClaim(line, paragraph);
+      const collect = hasVerb || (isBullet && inOutputList);
+      if (!collect) continue;
+      // Scope to the SENTENCE that carries the verb, not the whole line. tune-mjcf
+      // says "The initial model is at /app/model_ref.xml and should remain
+      // unchanged. Tuned mjcf should be saved as /app/model.xml." — line scope
+      // would demand the input file too. A bullet under an output list is already
+      // scoped by its list, so it keeps the whole line.
+      // A period inside "e.g." or "vs." is not a sentence end. count-dataset-tokens
+      // writes `(e.g. "1000000") to the file /app/answer.txt`, and splitting there
+      // severed the verb from the path, so require a capital letter after the break.
+      const sentences = line.split(/(?<=\.)\s+(?=[A-Z])/);
+      const scopes = (isBullet && inOutputList && !hasVerb)
+        ? [line]
+        : sentences.filter((sentence) => OUTPUT_VERB.test(sentence) && !PROVIDED.test(sentence));
+      for (const scope of scopes) {
+        PATH_RE.lastIndex = 0;
+        let m;
+        while ((m = PATH_RE.exec(scope)) !== null) {
+          const p = m[1];
+          if (runtimeOutputClaim(scope, paragraph, m.index)) continue;
+          // A bare extension-looking token that is really a module or a command
+          // ("numpy.random", "pip.conf") is not a deliverable path; require either
+          // a directory separator or a plainly file-ish extension.
+          // A BARE filename (no directory) needs a plainly file-ish extension, or
+          // "numpy.random" and "os.path" become deliverables. Kept as a curated
+          // whitelist rather than a pattern: a missed detection is silent, a false
+          // one costs a correct run two rejections.
+          if (!p.includes("/")
+            && !/\.(?:csv|tsv|txt|json|jsonl|xml|md|html|png|jpe?g|svg|yaml|yml|toml|ini|cfg|conf|log|out|bin|pdf|zip|gz|tar|parquet|sqlite|db|wav|mp4|fasta|fa|fastq|sql|tex|gcode|stl|obj|c|h|py|js|sh)$/i.test(p)
+            && !usedAsFile(text, p)) continue;
+          if (!out.includes(p)) out.push(p);
+        }
+      }
     }
   }
   return out;
@@ -196,7 +228,7 @@ export function missingOutputsObjection(turns, alreadyRejected = 0, opts = {}) {
   return (
     `You called done, but ${bad.length === 1 ? "a file" : "files"} the task names as output `
     + `${bad.length === 1 ? "is" : "are"} not there:\n  ${bad.join("\n  ")}\n`
-    + `The grader reads those paths. Computing the answer, or launching the job that would write it, is not the `
+    + `These paths are explicitly requested as outputs. Computing the answer, or launching the job that would write it, is not the `
     + `deliverable — the file is. Write ${bad.length === 1 ? "it" : "them"} now at exactly the path the task gives, `
     + `then \`ls -la\` each one and read its contents back before calling done again.`
     + (all ? ` (If the task genuinely asks for no files, ignore this and say so in your summary.)` : "")

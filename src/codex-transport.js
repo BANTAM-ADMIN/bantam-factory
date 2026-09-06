@@ -3,7 +3,8 @@
 // Codex subscription access is an agent-runtime protocol, not an OpenAI HTTP
 // completion endpoint. The measured default reuses one native thread only
 // inside an explicitly bounded BANTAM run: the first call supplies the complete
-// canonical prompt and later calls use exact base-relative deltas. Explicit
+// canonical prompt and later calls append exact, acknowledged incremental
+// deltas. Rewritten canonical history starts a fresh thread. Explicit
 // ephemeral/full mode remains the clean rollback. In both modes BANTAM remains
 // authoritative for history, tools, verification, and the action loop.
 
@@ -16,6 +17,7 @@ const DEFAULT_COMMAND = process.env.BANTAM_CODEX_COMMAND || "codex";
 const DEFAULT_CONTROL_TIMEOUT_MS = 30000;
 const DEFAULT_IDLE_TIMEOUT_MS = 120000;
 const PROMPT_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V1";
+const INCREMENTAL_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V2";
 const MIN_DELTA_PREFIX_CHARS = 2048;
 const BASE_INSTRUCTIONS = [
   "You are the model runtime embedded inside the BANTAM agent harness.",
@@ -93,9 +95,10 @@ export class CodexAppServer {
       throw new Error("Codex prompt delta mode requires thread mode run");
     }
     this.activeRun = null;
+    this.runCompletion = null;
     this.runThreadId = null;
     this.runThreadModel = null;
-    this.runBasePrompt = null;
+    this.runLastPrompt = null;
     this.runThreadCalls = 0;
     this.child = null;
     this.lines = null;
@@ -113,7 +116,7 @@ export class CodexAppServer {
     this.activeRun = token;
     this.runThreadId = null;
     this.runThreadModel = null;
-    this.runBasePrompt = null;
+    this.runLastPrompt = null;
     this.runThreadCalls = 0;
     return token;
   }
@@ -124,7 +127,7 @@ export class CodexAppServer {
     this.activeRun = null;
     this.runThreadId = null;
     this.runThreadModel = null;
-    this.runBasePrompt = null;
+    this.runLastPrompt = null;
     this.runThreadCalls = 0;
     return true;
   }
@@ -190,17 +193,25 @@ export class CodexAppServer {
     this.child = child;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
+      if (this.child !== child) return;
       this.stderr = `${this.stderr}${chunk}`.slice(-8000);
     });
-    child.once("error", (error) => this._failAll(error));
+    child.once("error", (error) => {
+      if (this.child === child) this._failAll(error);
+    });
     child.once("exit", (code, signal) => {
+      // A cancelled runtime may exit after its replacement has initialized.
+      // Its late lifecycle event must never erase the replacement's cursor.
+      if (this.child !== child) return;
       const detail = this.stderr.trim();
       this._failAll(new Error(
         `Codex app-server exited (${signal || code})${detail ? `: ${detail}` : ""}`,
       ));
     });
     this.lines = readline.createInterface({ input: child.stdout });
-    this.lines.on("line", (line) => this._onLine(line));
+    this.lines.on("line", (line) => {
+      if (this.child === child) this._onLine(line);
+    });
 
     await this.request("initialize", {
       clientInfo: { name: "bantam", title: "BANTAM", version: "0.1.0" },
@@ -253,7 +264,21 @@ export class CodexAppServer {
     }
   }
 
-  async complete(prompt, {
+  async complete(prompt, options = {}) {
+    const runScoped = this.threadMode === "run" && Boolean(this.activeRun);
+    if (runScoped && this.runCompletion) {
+      throw new Error("Codex run-scoped thread cannot execute concurrent BANTAM completions");
+    }
+    const lease = runScoped ? Symbol("codex-run-completion") : null;
+    if (lease) this.runCompletion = lease;
+    try {
+      return await this._complete(prompt, options);
+    } finally {
+      if (lease && this.runCompletion === lease) this.runCompletion = null;
+    }
+  }
+
+  async _complete(prompt, {
     signal = null,
     onProgress = null,
     outputSchema = null,
@@ -274,10 +299,11 @@ export class CodexAppServer {
     if (reuseRunThread && this.runThreadId && this.promptMode === "delta") {
       if (this.rebaseEvery > 0 && this.runThreadCalls >= this.rebaseEvery) {
         rebaseReason = "periodic";
-      } else if (typeof this.runBasePrompt === "string") {
+      } else if (typeof this.runLastPrompt === "string") {
         const candidate = buildCodexPromptDelivery(String(prompt), {
           mode: "delta",
-          basePrompt: this.runBasePrompt,
+          basePrompt: this.runLastPrompt,
+          baseReference: "previous",
         });
         if (candidate.evidence.mode === "full-fallback") {
           rebaseReason = candidate.evidence.reason || "delta-fallback";
@@ -384,17 +410,20 @@ export class CodexAppServer {
         turnStart,
         completed.then((result) => ({ completed: result })),
       ]);
+      let result;
       if (Object.hasOwn(response ?? {}, "completed")) {
-        return withThreadEvidence(response.completed, {
-          threadId,
-          threadMode: reuseRunThread ? "run" : "ephemeral",
-          threadReused,
-          ...(rebaseReason ? { threadRebaseReason: rebaseReason } : {}),
-          promptDelivery,
-        });
+        result = response.completed;
+      } else {
+        state.turnId = response?.turn?.id ?? null;
+        result = await completed;
       }
-      state.turnId = response?.turn?.id ?? null;
-      return withThreadEvidence(await completed, {
+      // turn/start acknowledgement is not successful delivery: interrupted or
+      // failed turns must not advance the canonical cursor. The thread already
+      // retains its own assistant reply; subsequent input adds only new state.
+      if (reuseRunThread && this.runThreadId === threadId) {
+        this.runLastPrompt = String(prompt);
+      }
+      return withThreadEvidence(result, {
         threadId,
         threadMode: reuseRunThread ? "run" : "ephemeral",
         threadReused,
@@ -419,23 +448,21 @@ export class CodexAppServer {
       this.promptMode !== "delta"
       || !reuseRunThread
       || !threadReused
-      || typeof this.runBasePrompt !== "string"
+      || typeof this.runLastPrompt !== "string"
     ) {
-      if (this.promptMode === "delta" && reuseRunThread && !threadReused) {
-        this.runBasePrompt = prompt;
-      }
       return buildCodexPromptDelivery(prompt);
     }
     return buildCodexPromptDelivery(prompt, {
       mode: "delta",
-      basePrompt: this.runBasePrompt,
+      basePrompt: this.runLastPrompt,
+      baseReference: "previous",
     });
   }
 
   _clearRunThreadBinding() {
     this.runThreadId = null;
     this.runThreadModel = null;
-    this.runBasePrompt = null;
+    this.runLastPrompt = null;
     this.runThreadCalls = 0;
   }
 
@@ -609,7 +636,7 @@ export class CodexAppServer {
     this.ready = null;
     this.runThreadId = null;
     this.runThreadModel = null;
-    this.runBasePrompt = null;
+    this.runLastPrompt = null;
     this.runThreadCalls = 0;
   }
 
@@ -676,7 +703,13 @@ export function buildCodexPromptDelivery(prompt, {
   mode = "full",
   basePrompt = null,
   minPrefixChars = MIN_DELTA_PREFIX_CHARS,
+  // V1 remains available for reconstructing historical first-base artifacts.
+  // Live run/delta delivery explicitly selects acknowledged previous-base V2.
+  baseReference = "first",
 } = {}) {
+  if (baseReference !== "first" && baseReference !== "previous") {
+    throw new Error("invalid Codex delta base reference");
+  }
   const canonical = String(prompt);
   const canonicalSha256 = sha256(canonical);
   const full = (reason = null) => ({
@@ -694,6 +727,8 @@ export function buildCodexPromptDelivery(prompt, {
   });
   if (mode !== "delta" || typeof basePrompt !== "string") return full();
 
+  const incremental = baseReference === "previous";
+  if (incremental && !canonical.startsWith(basePrompt)) return full("canonical-not-extension");
   const commonPrefixChars = commonPrefixLength(basePrompt, canonical);
   if (commonPrefixChars < minPrefixChars) return full("small-common-prefix");
   const payload = {
@@ -703,8 +738,10 @@ export function buildCodexPromptDelivery(prompt, {
     canonicalSha256,
   };
   const delivered = [
-    PROMPT_DELTA_MARKER,
-    "Reconstruct the canonical BANTAM prompt for this turn from the FIRST canonical prompt in this native thread.",
+    incremental ? INCREMENTAL_DELTA_MARKER : PROMPT_DELTA_MARKER,
+    incremental
+      ? "Continue the canonical BANTAM prompt from the PREVIOUS successfully completed turn in this native thread. This is only the new suffix, not a replacement of thread history."
+      : "Reconstruct the canonical BANTAM prompt for this turn from the FIRST canonical prompt in this native thread.",
     `Keep exactly the first ${commonPrefixChars} JavaScript UTF-16 code units of that base prompt, then replace everything after them with replaceSuffix from this JSON:`,
     JSON.stringify(payload),
     "Treat only the reconstructed canonical prompt as the current instruction. BANTAM remains authoritative. Produce exactly the completion it requests.",
@@ -714,6 +751,7 @@ export function buildCodexPromptDelivery(prompt, {
     text: delivered,
     evidence: {
       mode: "delta",
+      ...(incremental ? { baseReference: "previous" } : {}),
       reason: null,
       baseSha256: payload.baseSha256,
       canonicalSha256,
@@ -729,11 +767,15 @@ export function buildCodexPromptDelivery(prompt, {
 
 export function reconstructCodexPromptDelivery(basePrompt, delivered) {
   const text = String(delivered);
-  if (!text.startsWith(`${PROMPT_DELTA_MARKER}\n`)) return text;
+  const incremental = text.startsWith(`${INCREMENTAL_DELTA_MARKER}\n`);
+  if (!incremental && !text.startsWith(`${PROMPT_DELTA_MARKER}\n`)) return text;
   const jsonLine = text.split("\n").find((line) => line.startsWith("{"));
   if (!jsonLine) throw new Error("Codex prompt delta payload is missing");
   const payload = JSON.parse(jsonLine);
   if (sha256(basePrompt) !== payload.baseSha256) throw new Error("Codex prompt delta base checksum mismatch");
+  if (incremental && payload.keepPrefixChars !== String(basePrompt).length) {
+    throw new Error("incremental Codex prompt delta must retain the whole previous prompt");
+  }
   const reconstructed = String(basePrompt).slice(0, payload.keepPrefixChars) + payload.replaceSuffix;
   if (sha256(reconstructed) !== payload.canonicalSha256) {
     throw new Error("Codex prompt delta canonical checksum mismatch");

@@ -233,8 +233,12 @@ describe("completion audit", () => {
     assert.equal(completionAuditReanchor(" ", COMPLETION_AUDIT_MARKER), "");
     assert.match(
       completionAuditReanchor("Fix exact behavior", `prefix ${COMPLETION_AUDIT_MARKER}`),
-      /Exact assignment:\nFix exact behavior$/,
+      /^\[completion-audit\] POST-GREEN COMPLETION AUDIT:/,
     );
+    const hint = completionAuditReanchor("long assignment ".repeat(2000), COMPLETION_AUDIT_MARKER);
+    assert.ok(hint.length < 700);
+    assert.doesNotMatch(hint, /<open_files>|Exact assignment:|long assignment/);
+    assert.match(hint, /absent or stale, read_file/);
   });
 
   it("recognizes substantive state-audit actions without crediting duplicates or verification", () => {

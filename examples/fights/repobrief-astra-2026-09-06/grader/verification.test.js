@@ -1,0 +1,72 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { childArgs, cli, expectedCapture, failure, receipts, repository, write } from "../starter/test/helpers.js";
+
+test("external/verify: direct argv transport, root cwd, no shell interpolation, exact durable output", t => {
+  const root = repository(t, { files: { "nested/file.txt": "value\n" } });
+  const literal = "two words; $(touch MUST_NOT_EXIST) *";
+  const argv = childArgs('console.log(JSON.stringify({cwd:process.cwd(),arg:process.argv[1]})); console.error("separate stderr");', literal);
+  const result = cli(root, ["verify", "--repo", path.join(root, "nested"), "--label", "literal arguments", "--", ...argv]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { cwd: root, arg: literal });
+  assert.equal(result.stderr, "separate stderr\n");
+  assert.equal(fs.existsSync(path.join(root, "MUST_NOT_EXIST")), false);
+  const saved = receipts(root)[0];
+  assert.deepEqual(saved.argv, argv);
+  assert.equal(saved.stdout, result.stdout);
+  assert.equal(saved.stderr, result.stderr);
+  assert.equal(saved.current, true);
+  assert.equal(saved.passed, true);
+  assert.equal(saved.treeDigestBefore, expectedCapture(root, ["nested/file.txt"]).treeDigest);
+  assert.equal(saved.treeDigestAfter, saved.treeDigestBefore);
+  const disk = JSON.parse(fs.readFileSync(path.join(root, ".repobrief/receipts.json"), "utf8"));
+  assert.equal(disk.receipts.length, 1);
+  assert.equal(disk.receipts[0].id, saved.id);
+});
+
+test("external/verify: source changed by an exit-zero verifier is never a current receipt", t => {
+  const root = repository(t);
+  const before = expectedCapture(root, ["tracked.txt"]).treeDigest;
+  const argv = childArgs('require("node:fs").writeFileSync("tracked.txt","rewritten by verification\\n");');
+  const result = cli(root, ["verify", "--label", "mutating check", "--", ...argv]);
+  assert.equal(result.status, 0, result.stderr);
+  const saved = receipts(root)[0];
+  assert.equal(saved.exitCode, 0);
+  assert.equal(saved.passed, true);
+  assert.equal(saved.current, false);
+  assert.equal(saved.treeDigestBefore, before);
+  assert.equal(saved.treeDigestAfter, expectedCapture(root, ["tracked.txt"]).treeDigest);
+  assert.notEqual(saved.treeDigestBefore, saved.treeDigestAfter);
+  write(root, "tracked.txt", "original\n");
+  assert.equal(receipts(root)[0].current, false, "restoring the pre-state cannot make a changed-during-run receipt current");
+});
+
+test("external/receipts: ignored/mtime-only changes stay current; failures and spawn errors are durable", t => {
+  const root = repository(t, { files: { "tracked.txt": "fixed\n", ".gitignore": "ignored/\n" } });
+  const failed = cli(root, ["verify", "--label", "red", "--", ...childArgs('console.log("before failure"); console.error("failure detail"); process.exit(9);')]);
+  assert.equal(failed.status, 9);
+  const future = new Date(Date.now() + 7200000);
+  fs.utimesSync(path.join(root, "tracked.txt"), future, future);
+  write(root, "ignored/noise.txt", "unrelated\n");
+  write(root, ".repobrief/operator-note.txt", "metadata\n");
+  let saved = receipts(root);
+  assert.equal(saved[0].passed, false);
+  assert.equal(saved[0].current, true);
+  assert.equal(saved[0].stdout, "before failure\n");
+  assert.equal(saved[0].stderr, "failure detail\n");
+  const missing = cli(root, ["verify", "--label", "spawn failed", "--", path.join(root, "no-such-executable")]);
+  assert.equal(missing.status, 1);
+  assert.ok(missing.stderr.trim());
+  saved = receipts(root);
+  assert.deepEqual(saved.map(r => r.id), [1, 2]);
+  assert.equal(saved[1].exitCode, 1);
+  assert.equal(saved[1].passed, false);
+  assert.equal(saved[1].current, true);
+  assert.ok(saved[1].stderr.trim());
+  const count = saved.length;
+  failure(root, ["verify", "--label", "", "--", ...childArgs("process.exit(0)")]);
+  failure(root, ["verify", "--label", "missing command", "--"]);
+  assert.equal(receipts(root).length, count, "usage errors are not execution receipts");
+});

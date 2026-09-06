@@ -136,20 +136,58 @@ export function crossScopeUsageFooter({ action, ground, maxHits = 6 }) {
 // same-file peers. When an edit references a rarely-used KB symbol, surface the
 // OTHER functions that reference it (same file included), with a tight window
 // so adjacent operations (the cycle_key() beside the assignment) are visible.
+const FUNCTION_DECLARATION_RE = /^(\s*)(?:async\s+)?(?:def|function)\s+([A-Za-z_$][\w$]*)/;
+
 function enclosingFunction(lines, idx) {
   for (let i = idx; i >= 0; i--) {
-    const m = /^(\s*)(?:async\s+)?(?:def|function)\s+([A-Za-z_$][\w$]*)/.exec(lines[i]);
+    const m = FUNCTION_DECLARATION_RE.exec(lines[i]);
     if (m) return m[2];
   }
   return null;
 }
 
-export function peerFunctionFooter({ ground, action, editedFile, seen, maxRefs = 6, maxPeers = 2, window = 3 }) {
+export function peerFunctionFooter({ ground, action, editedFile, seen, readSource, maxRefs = 6, maxPeers = 2, window = 3 }) {
   const records = ground?.factIndex?.records;
-  if (!(records instanceof Map) || !ground?.db) return '';
+  if (!(records instanceof Map) || !ground?.db || typeof readSource !== 'function') return '';
   const text = editText(action);
   if (!text) return '';
   const edited = normalizeRel(editedFile);
+  // KB records locate candidates; they are not current source. An edit lands
+  // before the index refresh, so quoting record.source here replays pre-edit
+  // bytes as a peer. Resolve each candidate once through the caller's safe
+  // workspace reader and fail closed on unreadable/missing files.
+  const current = new Map();
+  const source = (file) => {
+    if (!current.has(file)) {
+      try { current.set(file, readSource(file)); } catch { current.set(file, null); }
+    }
+    return current.get(file);
+  };
+  const editedSource = source(edited);
+  const replacement = action?.a === 'replace' ? action.new : null;
+  const editedFunctions = new Set();
+  let sameFilePeersSafe = typeof editedSource === 'string' && typeof replacement === 'string' && replacement.length > 0;
+  if (sameFilePeersSafe) {
+    const currentLines = editedSource.split('\n');
+    let offset = editedSource.indexOf(replacement);
+    if (offset < 0) sameFilePeersSafe = false;
+    while (offset >= 0) {
+      const line = editedSource.slice(0, offset).split('\n').length - 1;
+      const fn = enclosingFunction(currentLines, line);
+      if (fn) editedFunctions.add(fn);
+      else sameFilePeersSafe = false;
+      // One replacement may add a helper and replace a second function, or
+      // start inside one function and cross into another. Both are edited
+      // code, not independent peers. The last character's line excludes an
+      // untouched declaration immediately after a trailing newline.
+      const endLine = editedSource.slice(0, offset + replacement.length - 1).split('\n').length - 1;
+      for (let i = line + 1; i <= endLine; i += 1) {
+        const declaration = FUNCTION_DECLARATION_RE.exec(currentLines[i]);
+        if (declaration) editedFunctions.add(declaration[2]);
+      }
+      offset = editedSource.indexOf(replacement, offset + replacement.length);
+    }
+  }
   const mentioned = [...new Set(text.match(IDENT_RE) ?? [])]
     .filter((n) => !GENERIC_NAMES.has(n) && n.length >= 4);
   for (const name of mentioned) {
@@ -165,7 +203,10 @@ export function peerFunctionFooter({ ground, action, editedFile, seen, maxRefs =
       const rel = normalizeRel(file);
       if (/(?:^|\/)tests?\//.test(rel) || /(?:^|\/|_)test[_.]/.test(rel) || /(?:^|\/)repro\.py$/.test(rel)) continue;
       if (typeof record?.source !== 'string' || !record.source.includes(name)) continue;
-      const lines = record.source.split('\n');
+      if (rel === edited && !sameFilePeersSafe) continue;
+      const currentSource = source(rel);
+      if (typeof currentSource !== 'string' || !currentSource.includes(name)) continue;
+      const lines = currentSource.split('\n');
       for (let i = 0; i < lines.length; i++) {
         if (!new RegExp(`\\b${name}\\b`).test(lines[i])) continue;
         total += 1;
@@ -195,6 +236,7 @@ export function peerFunctionFooter({ ground, action, editedFile, seen, maxRefs =
     for (const site of ranked) {
       const fn = enclosingFunction(site.lines, site.idx);
       if (!fn || seenFns.has(`${site.file}:${fn}`)) continue;
+      if (site.file === edited && editedFunctions.has(fn)) continue;
       // Once at least one write-peer is shown, stop at reads — the canonical
       // pattern is a write, and read sites add noise, not the missing step.
       if (sawWrite && !site.write) break;

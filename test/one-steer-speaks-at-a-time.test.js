@@ -44,6 +44,9 @@ test("a batch qualifying for paging AND shuffle draws exactly one steer", async 
   const events = [];
   const result = await runAgent({
     task: "Survey these modules.",
+    // Exercise real repeated reads, not panel/ledger skips. Skipped ops are
+    // not pages and must not manufacture either steer.
+    openFilesView: false,
     workspace,
     model,
     maxTurns: 8,

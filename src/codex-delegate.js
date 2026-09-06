@@ -19,6 +19,9 @@ import { runPreviewSync } from "./logic/preview.js";
 
 const KIND = "bantam-codex-delegate";
 const MODELS = Object.freeze({
+  astra: "gpt-6-astra",
+  "codex-astra": "gpt-6-astra",
+  "gpt-6-astra": "gpt-6-astra",
   sol: "gpt-5.6-sol",
   terra: "gpt-5.6-terra",
   "gpt-5.6-sol": "gpt-5.6-sol",
@@ -489,7 +492,7 @@ function requireArtifact(value) {
 function normalizeModel(value) {
   const key = String(value ?? "").trim().toLowerCase();
   const model = MODELS[key];
-  if (!model) throw new Error(`unsupported delegate model: ${value}; use sol or terra`);
+  if (!model) throw new Error(`unsupported delegate model: ${value}; use sol, terra, or astra`);
   return model;
 }
 

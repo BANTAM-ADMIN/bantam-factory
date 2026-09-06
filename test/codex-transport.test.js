@@ -118,25 +118,33 @@ test("prompt deltas reconstruct the exact canonical prompt and fall back when no
   assert.equal(reconstructCodexPromptDelivery(base, fallback.text), "completely different");
 });
 
-test("delta mode sends one full base then exact recorded deltas on the run thread", async (t) => {
+test("delta mode sends one full prompt then only acknowledged incremental suffixes", async (t) => {
   const codex = server({ threadMode: "run", promptMode: "delta" });
   t.after(() => codex.close());
   const token = codex.beginRun();
   const stable = "stable instructions\n".repeat(300);
   const firstPrompt = `${stable}turn one`;
-  const secondPrompt = `${stable}turn two with observation`;
+  const secondPrompt = `${firstPrompt}\nturn two with observation`;
+  const thirdPrompt = `${secondPrompt}\nturn three with new observation`;
 
   const first = await codex.complete(firstPrompt);
   const second = await codex.complete(secondPrompt);
+  const third = await codex.complete(thirdPrompt);
 
   assert.equal(first.codexPromptDelivery.mode, "full");
   assert.equal(second.codexPromptDelivery.mode, "delta");
+  assert.equal(second.codexPromptDelivery.baseReference, "previous");
   assert.ok(second.codexPromptDelivery.savedChars > 0);
   assert.equal(
     reconstructCodexPromptDelivery(firstPrompt, second.codexPromptDelivery.deliveredText),
     secondPrompt,
   );
   assert.equal(first.codexThread.threadId, second.codexThread.threadId);
+  assert.equal(third.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(reconstructCodexPromptDelivery(secondPrompt, third.codexPromptDelivery.deliveredText), thirdPrompt);
+  assert.throws(() => reconstructCodexPromptDelivery(firstPrompt, third.codexPromptDelivery.deliveredText), /base checksum mismatch/);
+  assert.ok(!third.codexPromptDelivery.deliveredText.includes("turn two with observation"));
+  assert.equal(codex.runLastPrompt, thirdPrompt);
   assert.equal(codex.endRun(token), true);
 });
 
@@ -147,9 +155,9 @@ test("delta mode periodically rebases onto a fresh canonical thread", async (t) 
   const stable = "stable checkpoint instructions\n".repeat(300);
 
   const first = await codex.complete(`${stable}turn one`);
-  const second = await codex.complete(`${stable}turn two`);
-  const third = await codex.complete(`${stable}turn three`);
-  const fourth = await codex.complete(`${stable}turn four`);
+  const second = await codex.complete(`${stable}turn one\nturn two`);
+  const third = await codex.complete(`${stable}turn one\nturn two\nturn three`);
+  const fourth = await codex.complete(`${stable}turn one\nturn two\nturn three\nturn four`);
 
   assert.equal(first.codexPromptDelivery.mode, "full");
   assert.equal(second.codexPromptDelivery.mode, "delta");
@@ -174,7 +182,7 @@ test("an inefficient delta rebases instead of retaining a stale base", async (t)
   );
 
   assert.equal(rebased.codexPromptDelivery.mode, "full");
-  assert.equal(rebased.codexPromptDelivery.rebaseReason, "small-common-prefix");
+  assert.equal(rebased.codexPromptDelivery.rebaseReason, "canonical-not-extension");
   assert.notEqual(rebased.codexThread.threadId, first.codexThread.threadId);
   assert.equal(continued.codexThread.threadId, rebased.codexThread.threadId);
   assert.equal(continued.codexPromptDelivery.mode, "delta");
@@ -238,7 +246,7 @@ test("a completion boundary can suppress only the optional low-savings rebase", 
   assert.equal(codex.endRun(token), true);
 });
 
-test("adaptive savings rebasing reduces long-horizon delivery without short fixed intervals", async (t) => {
+test("forty incremental turns deliver linear new context without history replay or forced rebases", async (t) => {
   const continuous = server({ threadMode: "run", promptMode: "delta" });
   const adaptive = server({
     threadMode: "run",
@@ -264,6 +272,13 @@ test("adaptive savings rebasing reduces long-horizon delivery without short fixe
     for (let index = 0; index < prompts.length; index++) {
       const result = await runtime.complete(prompts[index]);
       deliveredChars += result.codexPromptDelivery.deliveredChars;
+      if (index > 0) {
+        const wire = result.codexPromptDelivery.deliveredText;
+        assert.equal(reconstructCodexPromptDelivery(prompts[index - 1], wire), prompts[index]);
+        const payload = JSON.parse(wire.split("\n").find(line => line.startsWith("{")));
+        assert.equal(payload.replaceSuffix, prompts[index].slice(prompts[index - 1].length));
+        assert.ok(!payload.replaceSuffix.includes(`OBS${index - 1}:`));
+      }
       if (result.codexThread.threadRebaseReason) rebases.push(index + 1);
     }
     assert.equal(runtime.endRun(token), true);
@@ -274,8 +289,114 @@ test("adaptive savings rebasing reduces long-horizon delivery without short fixe
   const candidate = await exercise(adaptive);
 
   assert.deepEqual(baseline.rebases, []);
-  assert.deepEqual(candidate.rebases, [21]);
-  assert.ok(candidate.deliveredChars < baseline.deliveredChars * 0.6);
+  assert.deepEqual(candidate.rebases, []);
+  assert.equal(candidate.deliveredChars, baseline.deliveredChars);
+  // One copy of each new observation plus a bounded per-turn envelope. No
+  // O(N^2) suffix history and no periodic reset needed to achieve this bound.
+  assert.ok(baseline.deliveredChars < prompts.at(-1).length + prompts.length * 1000);
+  const legacyWire = prompts.reduce((chars, prompt, index) => chars + buildCodexPromptDelivery(prompt, {
+    mode: index ? "delta" : "full", basePrompt: prompts[0],
+  }).evidence.deliveredChars, 0);
+  assert.ok(baseline.deliveredChars < legacyWire * 0.15);
+});
+
+test("a rewritten canonical history rebases even when its static prefix is large", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const stable = "stable instructions\n".repeat(300);
+  const first = await codex.complete(`${stable}old file contents`);
+  const replacement = `${stable}current file contents`;
+  const second = await codex.complete(replacement, { adaptiveRebase: false });
+  assert.equal(second.codexPromptDelivery.mode, "full");
+  assert.equal(second.codexPromptDelivery.rebaseReason, "canonical-not-extension");
+  assert.notEqual(second.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(codex.runLastPrompt, replacement);
+  codex.endRun(token);
+});
+
+test("an acknowledged but interrupted delta never commits its cursor and recovers full", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = "stable cancellation instructions\n".repeat(300);
+  const first = await codex.complete(base);
+  const originalRequest = codex.request.bind(codex);
+  let acknowledge;
+  const acknowledged = new Promise(resolve => { acknowledge = resolve; });
+  codex.request = async (method, params) => {
+    if (method !== "turn/start") return originalRequest(method, params);
+    const response = await originalRequest(method, { ...params, input: [{ type: "text", text: "silent turn" }] });
+    acknowledge();
+    return response;
+  };
+  const controller = new AbortController();
+  const pending = codex.complete(`${base}uncommitted observation`, { signal: controller.signal });
+  await acknowledged;
+  assert.equal(codex.runLastPrompt, base);
+  await assert.rejects(codex.complete("concurrent rewritten canonical state"), /cannot execute concurrent/);
+  assert.equal(codex.runLastPrompt, base);
+  controller.abort();
+  await assert.rejects(pending, error => error.code === "aborted");
+  assert.equal(codex.runLastPrompt, null);
+  codex.request = originalRequest;
+  const recovered = await codex.complete(`${base}recovered observation`);
+  assert.equal(recovered.codexPromptDelivery.mode, "full");
+  assert.notEqual(recovered.codexThread.threadId, first.codexThread.threadId);
+  codex.endRun(token);
+});
+
+test("a failed incremental turn clears its cursor before the full retry", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = "stable failure instructions\n".repeat(300);
+  const first = await codex.complete(base);
+  const originalRequest = codex.request.bind(codex);
+  let failedWire;
+  codex.request = (method, params) => {
+    if (method !== "turn/start") return originalRequest(method, params);
+    failedWire = params.input[0].text;
+    return originalRequest(method, { ...params, input: [{ type: "text", text: "failed turn" }] });
+  };
+  const retryPrompt = `${base}new observation`;
+  await assert.rejects(codex.complete(retryPrompt), /synthetic turn failure/);
+  assert.match(failedWire, /^BANTAM_PROMPT_DELTA_V2\n/);
+  assert.equal(codex.runLastPrompt, null);
+  codex.request = originalRequest;
+  const recovered = await codex.complete(retryPrompt);
+  assert.equal(recovered.codexPromptDelivery.mode, "full");
+  assert.notEqual(recovered.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(codex.runLastPrompt, retryPrompt);
+  codex.endRun(token);
+});
+
+test("auxiliary image calls do not replace the acknowledged run context", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = "stable worker instructions\n".repeat(300);
+  const first = await codex.complete(base);
+  await codex.generateImage("synthetic image");
+  assert.equal(codex.runLastPrompt, base);
+  const second = await codex.complete(`${base}worker observation`);
+  assert.equal(second.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(second.codexPromptDelivery.mode, "delta");
+  codex.endRun(token);
+});
+
+test("a lost runtime forgets its cursor and resumes from the full canonical prompt", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = "stable recovery instructions\n".repeat(300);
+  const first = await codex.complete(base);
+  codex.close();
+  assert.equal(codex.runLastPrompt, null);
+  const recovered = await codex.complete(`${base}after process loss`);
+  assert.equal(recovered.codexPromptDelivery.mode, "full");
+  assert.notEqual(recovered.codexThread.threadId, first.codexThread.threadId);
+  codex.endRun(token);
 });
 
 test("a failed run-thread turn clears delta state and recovers from a full canonical prompt", async (t) => {

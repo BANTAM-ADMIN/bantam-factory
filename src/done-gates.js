@@ -98,7 +98,7 @@ export const DONE_GATES = [
   {
     name: "evidence",
     max: 1,
-    evaluate: (c) => unresolvedEvidenceObjection(c.turns, c.count("evidence")),
+    evaluate: (c) => unresolvedEvidenceObjection(c.turns, c.count("evidence"), { workspaceGeneration: c.workspaceGeneration }),
   },
   {
     // Beside `evidence`, and for the same reason: this one asks whether the

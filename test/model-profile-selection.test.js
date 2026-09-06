@@ -26,6 +26,24 @@ test("Codex defaults to the generic profile and relies on native reasoning", (t)
   assert.equal(client.metadata().codexRebaseMinSavings, 0);
 });
 
+test("explicit Astra uses native Codex reasoning without local sampling or Qwen's think rail", t => {
+  const client = new ModelClient({ codex: true, model: "gpt-6-astra", codexEffort: "medium" });
+  t.after(() => client.close());
+  assert.equal(client.profileName, "generic");
+  assert.equal(deriveThinkPrefills(client.assistantPrefill).canThink, false);
+  const request = client.buildRequest("Return the requested action.");
+  const body = JSON.parse(request.body);
+  assert.equal(request.url, "codex-app-server://local/gpt-6-astra");
+  assert.equal(body.model, "gpt-6-astra");
+  assert.equal(body.effort, "medium");
+  for (const key of ["temperature", "top_p", "top_logprobs", "logprobs"]) assert.equal(Object.hasOwn(body, key), false);
+  assert.equal(JSON.parse(client.buildRequest("Next action.", { codexEffort: "low" }).body).effort, "low");
+  client.switchTo("http://localhost:8085");
+  client.switchToCodex({ model: "gpt-6-astra", effort: "medium" });
+  assert.equal(client.modelName, "gpt-6-astra");
+  assert.equal(client.profileName, "generic");
+});
+
 test("explicit ephemeral Codex mode selects its compatible full-prompt rollback", (t) => {
   const client = new ModelClient({
     codex: true,

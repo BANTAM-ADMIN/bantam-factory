@@ -83,6 +83,9 @@ test("window-creep through inspect batches feeds the same paging counter", async
     workspace,
     model,
     maxTurns: 8,
+    // With a complete panel these broad reads are correctly redirected and
+    // never execute. This fixture exercises three actual window deliveries.
+    openFilesView: false,
     interactive: true,
     useGrammar: false,
     grounding: false,

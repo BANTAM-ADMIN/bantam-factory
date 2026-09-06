@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ARMS, buildArmCommand } from "../src/fight.js";
+import { ARMS, buildArmCommand, cornerUsage } from "../src/fight.js";
 import { parseArgs } from "../src/cli-args.js";
 
 test("every arm builds a command with an executable and arguments", () => {
@@ -64,4 +64,32 @@ test("a cloud-only card needs no local model at all", () => {
     const env = JSON.stringify(c.env ?? {});
     assert.doesNotMatch(env, /127\.0\.0\.1:8085/, `${name} points at the local server`);
   }
+});
+
+test("Astra corners pin equal model and effort without changing historical corners", () => {
+  const native = buildArmCommand("codex-astra", { task: "T" });
+  const wrapped = buildArmCommand("bantam-codex-astra", { task: "T" });
+  assert.equal(native.args[native.args.indexOf("--model") + 1], "gpt-6-astra");
+  assert.equal(wrapped.args[wrapped.args.indexOf("--model") + 1], "gpt-6-astra");
+  assert.ok(native.args.includes('model_reasoning_effort="medium"'));
+  assert.equal(wrapped.args[wrapped.args.indexOf("--codex-effort") + 1], "medium");
+  assert.equal(native.args[native.args.indexOf("--sandbox") + 1], "workspace-write");
+  assert.ok(!native.args.includes("--dangerously-bypass-approvals-and-sandbox"));
+  assert.equal(wrapped.env.BANTAM_PROMPT_TRAJECTORY, "extension");
+  assert.equal(wrapped.env.BANTAM_DECISION_SNAPSHOT, "0");
+  assert.ok(buildArmCommand("codex-sol", { task: "T" }).args.includes("gpt-5.6-sol"));
+});
+
+test("native JSONL usage is counted without mistaking output tokens for total tokens", () => {
+  const usage = cornerUsage("codex-astra", { rawLines: [
+    JSON.stringify({ type: "turn.completed", usage: { input_tokens: 100, cached_input_tokens: 70, output_tokens: 12, reasoning_output_tokens: 4 } }),
+    "not JSON",
+    JSON.stringify({ type: "turn.completed", usage: { input_tokens: 60, cached_input_tokens: 50, output_tokens: 8 } }),
+  ] });
+  assert.equal(usage.source, "codex-jsonl");
+  assert.equal(usage.inputTokens, 160);
+  assert.equal(usage.totalTokens, 180);
+  assert.equal(usage.cacheHitTokens, 120);
+  assert.equal(usage.prefixReuse, 0.75);
+  assert.equal(usage.reasoningTokens, 4);
 });

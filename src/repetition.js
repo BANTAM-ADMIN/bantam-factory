@@ -96,7 +96,7 @@ function readPaths(action) {
 function resultLocation(action) {
   const paths = readPaths(action);
   if (!paths.length) return "Its result is not repeated here.";
-  return `Its result is not repeated here — the current contents of ${paths.join(", ")} are in <open_files> above.`;
+  return `Its result is not repeated here — the requested current bytes for ${paths.join(", ")} are in <open_files> above.`;
 }
 
 export class RepetitionGuard {

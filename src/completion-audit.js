@@ -308,12 +308,12 @@ export function taskRequiresVisualAltAudit(task) {
     && /\b(?:image|artwork|photo|illustration|graphic)\b/i.test(source);
 }
 
-/** Keep the one-shot post-green audit beside current source without another model call. */
+/** Re-anchor the existing audit without duplicating the assignment or promising a panel. */
 export function completionAuditReanchor(task, observation) {
   if (!String(observation ?? "").includes(COMPLETION_AUDIT_MARKER)) return "";
   const assignment = String(task ?? "");
   if (!assignment.trim()) return "";
-  return `POST-GREEN COMPLETION AUDIT: read the exact assignment below beside the refreshed current source in <open_files>.\nExact assignment:\n${assignment}`;
+  return "[completion-audit] POST-GREEN COMPLETION AUDIT: compare every explicit requirement in the original assignment with the current implementation and the verification actually performed. A passing supplied suite does not establish untested requirements. Use current source already visible; if the needed bytes are absent or stale, read_file the exact path and range. Resolve concrete gaps before done; do not infer correctness merely because a branch or comment names the requirement.";
 }
 
 /** Did the model substantively engage with the specialized audit after it fired? */

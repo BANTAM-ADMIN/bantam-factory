@@ -33,6 +33,7 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
 
   const failures = [];
   const bases = new Map();
+  const previousPrompts = new Map();
   const seenThreads = new Set();
   let auditedCalls = 0;
   let exactCalls = 0;
@@ -99,7 +100,12 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
       bases.set(threadId, canonical);
     } else if (delivery.mode === "delta") {
       deltaCalls++;
-      const base = bases.get(threadId);
+      const incremental = Boolean(delivery.deliveredText?.startsWith("BANTAM_PROMPT_DELTA_V2\n"));
+      if (incremental !== (delivery.baseReference === "previous")) {
+        fail("delta_reference", callIndex, "delta reference evidence disagrees with its versioned wire envelope");
+        return;
+      }
+      const base = incremental ? previousPrompts.get(threadId) : bases.get(threadId);
       if (typeof base !== "string") {
         fail("delta_base", callIndex, "delta has no full canonical base for its native thread");
         return;
@@ -137,6 +143,7 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
     }
     exactCalls++;
     exactCallIndices.add(callIndex);
+    previousPrompts.set(threadId, canonical);
   });
 
   if (auditedCalls === 0) {

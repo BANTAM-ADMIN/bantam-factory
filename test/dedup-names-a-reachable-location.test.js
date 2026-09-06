@@ -34,7 +34,7 @@ function refusalFor(action) {
 
 test("a refused read is pointed at the panel, not at a turn number", () => {
   const observation = refusalFor(READ);
-  assert.match(observation, /current contents of src\/agent\.js are in <open_files> above/);
+  assert.match(observation, /requested current bytes for src\/agent\.js are in <open_files> above/);
   assert.doesNotMatch(observation, /remains at turn/);
 });
 
@@ -75,6 +75,6 @@ test("the escalated message keeps the same honest location", () => {
   guard.check(READ);
   const second = guard.check(READ).observation;
   assert.match(second, /attempted this identical action 2 times/);
-  assert.match(second, /current contents of src\/agent\.js are in <open_files> above/);
+  assert.match(second, /requested current bytes for src\/agent\.js are in <open_files> above/);
   assert.doesNotMatch(second, /remains at turn/);
 });

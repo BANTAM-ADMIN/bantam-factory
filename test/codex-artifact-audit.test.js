@@ -28,6 +28,29 @@ test("Codex artifact audit reconstructs a full base and exact delta calls", () =
   });
 });
 
+test("Codex artifact audit reads historical first-base and new previous-base chains", () => {
+  for (const baseReference of ["first", "previous"]) {
+    const artifact = exactArtifact();
+    const first = JSON.parse(artifact.modelCalls[0].request.body).prompt;
+    const second = `${first}\nsecond observation`;
+    const third = `${second}\nthird observation`;
+    artifact.modelCalls[1] = call(1, second, buildCodexPromptDelivery(second, {
+      mode: "delta", basePrompt: first, baseReference,
+    }), true);
+    artifact.modelCalls.push(call(2, third, buildCodexPromptDelivery(third, {
+      mode: "delta", basePrompt: baseReference === "first" ? first : second, baseReference,
+    }), true));
+    const report = auditCodexPromptDelivery(artifact);
+    assert.equal(report.status, "pass", JSON.stringify(report.failures));
+    assert.equal(report.exactCalls, 3);
+    assert.equal(report.deltaCalls, 2);
+    if (baseReference === "previous") {
+      artifact.modelCalls[1].response.normalized.codexPromptDelivery.baseReference = "first";
+      assert.equal(auditCodexPromptDelivery(artifact).status, "fail");
+    }
+  }
+});
+
 test("Codex artifact audit detects canonical, wire, and reuse tampering", () => {
   const canonicalTamper = structuredClone(exactArtifact());
   const body = JSON.parse(canonicalTamper.modelCalls[1].request.body);

@@ -1,0 +1,8 @@
+{
+  "id": "job-planner",
+  "title": "Repair deterministic dependency planning and failure propagation",
+  "kind": "repair",
+  "deliverables": ["job-plan.js"],
+  "protected": ["package.json", "test/job-plan.test.js"],
+  "groups": ["lexical-kahn-not-dfs-or-waves", "all-failed-ancestors-across-completed-nodes", "ready-is-current-not-simulated-and-identities-are-opaque", "all-graph-cycles-and-invalid-input", "cli-plan-and-errors"]
+}

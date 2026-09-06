@@ -68,3 +68,12 @@ test("unsafe workspace roots, injected mount separators, arbitrary subcommands, 
   assert.throws(() => buildDockerArgs({ ...base, name: "unowned-container" }), /container name/);
   assert.throws(() => buildDockerArgs({ ...base, args: ["login"] }), /only native exec/);
 });
+
+test("optional native session evidence is isolated from the candidate and never includes the auth directory", () => {
+  const args = buildDockerArgs({ ...base, sessionDirectory: '/tmp/astra-test/native-sessions' });
+  assert.ok(values(args,'--mount').includes('type=bind,src=/tmp/astra-test/native-sessions,dst=/home/ubuntu/.codex/sessions'));
+  assert.ok(!values(args,'--mount').some(m=>m.includes('dst=/home/ubuntu/.codex,')));
+  for (const sessionDirectory of ['/',os.homedir(),base.workspace,base.workspace+'/logs','/tmp/astra-test']) {
+    assert.throws(()=>buildDockerArgs({...base,sessionDirectory}),/separate/);
+  }
+});

@@ -17,7 +17,27 @@ The loop is: build prompt → request action → validate → execute → observ
 check → repeat. OpenAI-compatible API syntax alone does not guarantee constrained
 generation: use the matching adapter and inspect the startup constraint check.
 
-## Receipts, not benchmarks
+## Current factory fight cards
+
+Open the [September 6 offline Arena](docs/fights/factory-2026-09-06/fight-cards.html):
+three fresh build/change/repair cards, six systems, all 18 attempts retained.
+BANTAM and DeepSeek Harness both completed 3/3 using the same local 27B;
+BANTAM took 12.1 minutes total versus 22.7 minutes. These are single-attempt,
+recorded-configuration results, not a universal ranking or an out-of-box promise.
+
+The [full results](docs/FRESH-FACTORY-RESULTS-2026-09-06.md) also cover the six
+native Sol/Terra follow-ups, incomplete runs, unknown token totals and measured
+frontier advantages. The [private evidence package](docs/fights/factory-2026-09-06/README.md)
+contains the replay, machine-readable index and hash-verifiable receipts.
+It is **not privacy-redacted for public posting**. Read the
+[launch plan](docs/BANTAM-LAUNCH-PLAN.md) for the video storyboard, sharing checks
+and the proposed Workbench integration; this release does not implement that
+new Workbench.
+
+## Historical fight-night record
+
+The following board describes earlier builds and configurations, not the
+current factory series above.
 
 Open [`docs/fights/fight-night.html`](docs/fights/fight-night.html) — a fully
 self-contained replayable record of **35 cards, 297 corners**, where a local

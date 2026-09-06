@@ -1,5 +1,38 @@
 # Fight Night — the BANTAM bench
 
+## Current factory series
+
+Open the [packaged Arena replay](factory-2026-09-06/fight-cards.html).
+Its [package guide](factory-2026-09-06/README.md) links the machine-readable
+index, compressed evidence and checksum verification. The
+[native Sol/Terra follow-up](frontier-2026-09-06/README.md) is a separate six-run
+package, not part of the main 18. Both packages are **private and non-redacted**;
+review embedded content and downloads before any deliberate sharing.
+
+Read the [completed 18-run results](../FRESH-FACTORY-RESULTS-2026-09-06.md)
+and [context audit](../FRESH-FACTORY-CONTEXT-AUDIT-2026-09-06.md).
+The [launch plan](../BANTAM-LAUNCH-PLAN.md) separates the current Arena evidence
+from the proposed Workbench and community workflow, including private-sharing
+checks and the requirement to preserve independent jigs for every model.
+
+The [September 6 factory series](../FRESH-FACTORY-FIGHTS-2026-09-06.md)
+uses three new independent build/change/repair contracts and six current
+contenders. Its offline replay is generated with
+`node scripts/factory-fight-replay.mjs /absolute/fight-output`.
+It includes synchronized recorded clocks, context and tool evidence, separate
+fresh/cache accounting, candidate diffs, and independent acceptance results.
+The [portable exchange](../FIGHT-CARD-EXCHANGE.md) exports an inspectable JSON
+index and evidence hashes for another factory; it never installs or trusts
+foreign machinery automatically. Raw bundles remain local until deliberately
+reviewed and shared.
+
+The page and rules below describe the historical board. Historical results
+are not measurements of the current build. The new protocol retains failed
+attempts and identifies any corrected experiment separately; it does not
+replace losses or fabricate timestamps for untimed events.
+
+## Historical board
+
 `fight-night.html` in this directory is the whole benchmark: one
 self-contained static page (no server, no dependencies) holding every filed
 card — replayable bouts where the local 27B BANTAM harness, the same weights

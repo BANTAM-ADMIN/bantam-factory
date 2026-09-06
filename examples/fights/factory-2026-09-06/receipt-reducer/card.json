@@ -1,0 +1,8 @@
+{
+  "id": "receipt-reducer",
+  "title": "Reconstruct job attempts from unordered JSONL receipts",
+  "kind": "fresh-build",
+  "deliverables": ["receipt-report.js"],
+  "protected": ["package.json", "test/receipt-report.test.js"],
+  "groups": ["ordering-and-independent-attempts", "deduplication-and-opaque-identities", "invalid-fields-are-not-coerced", "invalid-lifecycles-are-rejected", "cli-report-and-errors"]
+}

@@ -15,6 +15,13 @@ Recorded measurements retain the date and configuration of their own artifacts.
 | Install and operate it | [Guide](GUIDE.md) | Current operator guide |
 | Watch it work, and grant/deny network | [The interactive experience](INTERACTIVE-EXPERIENCE.md) | Current: feed vs films, station-note visibility, network consent |
 | See the benchmark, or share it | [Fight Night](fights/README.md) | The static replayable bench: rules, protocols, regeneration |
+| Open the completed current Arena | [Packaged factory replay](fights/factory-2026-09-06/fight-cards.html) | All 18 results with embedded evidence; private and non-redacted |
+| Compare the current factory across six runtimes | [Fresh factory fight cards](FRESH-FACTORY-FIGHTS-2026-09-06.md) | New independent work orders, same-weights local comparisons, sealed evidence and replay |
+| Read the completed six-runtime comparison | [Fresh factory results](FRESH-FACTORY-RESULTS-2026-09-06.md) | All 18 V2 attempts; artifact correctness, completion, costs and limits kept separate |
+| Inspect the separate native Sol/Terra follow-up | [Frontier evidence package](fights/frontier-2026-09-06/README.md) | Six additional runs, not merged into the main series; private evidence and verification instructions |
+| Plan the product showcase and community launch | [BANTAM launch plan](BANTAM-LAUNCH-PLAN.md) | Strategy: familiar Workbench, evidence-backed Arena, private sharing and implementation prerequisites |
+| Exchange machine-readable fight evidence | [Portable fight-card observations](FIGHT-CARD-EXCHANGE.md) | Passive bounded validation, evidence hashes, and local qualification before trust |
+| Inspect measured context and verification overhead | [Fresh factory context audit](FRESH-FACTORY-CONTEXT-AUDIT-2026-09-06.md) | Reconstructed Astra deltas, batching, completion guards, local reasoning, and metering limits |
 | Choose local, Codex, or DeepSeek runtimes | [Model runtimes and improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md) | Current runtime guide; live catalogs and local registries remain authoritative |
 | Understand provider integration | [External API provider integration](EXTERNAL-API-PROVIDER-INTEGRATION.md) | Current provider boundary and repair history |
 | Understand the manufacturing thesis | [BANTAM as a factory](FACTORY-MODEL.md) | Evidence-derived design model |

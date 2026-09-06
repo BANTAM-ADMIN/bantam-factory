@@ -1,0 +1,8 @@
+{
+  "id": "snapshot-drift",
+  "title": "Extend a selected-file manifest with byte and permission drift checks",
+  "kind": "feature-addition",
+  "deliverables": ["snapshot.js"],
+  "protected": ["package.json", "test/snapshot.test.js"],
+  "groups": ["builder-bytes-order-and-empty", "all-drift-categories-and-source-binding", "non-symlink-components-and-missing-ancestors", "manifest-and-selection-validation", "cli-create-verify-drift-and-errors"]
+}

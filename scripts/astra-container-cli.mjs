@@ -38,7 +38,7 @@ function absolute(value, label) {
   return path.resolve(value);
 }
 
-export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds = 480, probe = false }) {
+export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds = 480, probe = false, sessionDirectory = null }) {
   const root = absolute(workspace, "workspace");
   if (["/", os.homedir(), REPO].includes(root)) throw new Error("use a disposable project workspace, not a home or harness root");
   if (!Array.isArray(args) || (!probe && !["exec", "app-server"].includes(args[0]))) {
@@ -51,6 +51,13 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
   }
   const mount = (source, target, readonly = true) => ["--mount",
     `type=bind,src=${absolute(source, "mount source")},dst=${absolute(target, "mount target")}${readonly ? ",readonly" : ""}`];
+  if (sessionDirectory) {
+    sessionDirectory = absolute(sessionDirectory, "session directory");
+    if (["/", os.homedir(), REPO, root].includes(sessionDirectory)
+      || sessionDirectory.startsWith(root + path.sep) || root.startsWith(sessionDirectory + path.sep)) {
+      throw new Error("session directory must be separate from the candidate workspace");
+    }
+  }
   const containerArgs = [
     "run", "--rm", "--pull", "never", "--init", "--interactive",
     "--name", name, "--cidfile", absolute(cidfile, "cidfile"),
@@ -62,6 +69,7 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
     ...mount(root, root, args[0] === "app-server"),
     ...mount(runtime.vendor, "/opt/codex"),
     ...mount(runtime.auth, "/home/ubuntu/.codex/auth.json"),
+    ...(sessionDirectory ? mount(sessionDirectory, "/home/ubuntu/.codex/sessions", false) : []),
     ...mount(runtime.certificates, "/etc/ssl/certs/ca-certificates.crt"),
     ...runtime.tools.flatMap((tool) => mount(tool, tool)),
     ...runtime.libraries.flatMap((library) => mount(fs.realpathSync(library), library)),
@@ -107,7 +115,14 @@ export async function main(args = process.argv.slice(2)) {
   const runtime = discoverRuntime();
   for (const file of [runtime.auth, path.join(runtime.vendor, "bin", "codex"), runtime.certificates]) fs.accessSync(file, fs.constants.R_OK);
   const timeoutSeconds = Number(process.env.ASTRA_CONTAINER_TIMEOUT_SECONDS || "480");
-  const dockerArgs = buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds, probe });
+  const sessionDirectory = process.env.ASTRA_CONTAINER_SESSION_DIR || null;
+  if (sessionDirectory) {
+    const stat = fs.lstatSync(absolute(sessionDirectory, "session directory"));
+    if (!stat.isDirectory() || stat.isSymbolicLink() || fs.realpathSync(sessionDirectory) !== path.resolve(sessionDirectory)) {
+      throw new Error("session directory must be an existing non-symlink directory");
+    }
+  }
+  const dockerArgs = buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds, probe, sessionDirectory });
   const child = spawn("docker", dockerArgs, { stdio: "inherit" });
   const cleanup = () => {
     try { execFileSync("docker", ["rm", "-f", name], { stdio: "ignore", timeout: 10000 }); } catch { /* --rm may have finished */ }

@@ -152,6 +152,7 @@ export function verificationEvidence({ execution, command, configuredCommand = n
     generation, exitCode, timedOut, interrupted,
     pipefail: typeof execution.pipefail === "boolean" ? execution.pipefail : null,
     scratchDirectory: execution.scratchDirectory ?? null,
+    cwd: typeof execution.cwd === "string" ? execution.cwd : null,
     workspaceReadOnly: typeof execution.workspaceReadOnly === "boolean" ? execution.workspaceReadOnly : null,
     statusScope: finalConfiguredScope ? (configured ? "final-configured-command" : "final-test-command") : "execution",
     statusCommand: finalConfiguredScope || execution.executedCommand || actualCommand,
@@ -178,9 +179,9 @@ export function verificationReceipt(evidence) {
 export function shellExecutionReceipt(execution, { generation, invalidated = false } = {}) {
   if (!execution) return null;
   const { command, executedCommand, exitCode, timedOut, interrupted, bufferExceeded,
-    error, blocked, sandbox, pipefail, scratchDirectory, workspaceReadOnly } = execution;
+    error, blocked, sandbox, pipefail, scratchDirectory, workspaceReadOnly, cwd } = execution;
   const rawOutput = String(execution.stdout ?? "") + "\n" + String(execution.stderr ?? "");
   return { command, executedCommand, exitCode, generation, timedOut, interrupted,
-    bufferExceeded, error, blocked, sandbox, pipefail, scratchDirectory, workspaceReadOnly, invalidated,
+    bufferExceeded, error, blocked, sandbox, pipefail, scratchDirectory, workspaceReadOnly, cwd, invalidated,
     outputSha256: crypto.createHash("sha256").update(rawOutput).digest("hex") };
 }

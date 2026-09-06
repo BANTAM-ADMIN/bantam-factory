@@ -122,6 +122,134 @@ test("a named Node test with a concrete file counts only when an actual case pas
   }
 });
 
+const auditWorkspace = "/tmp/bantam-contract-recovery-ws";
+const workspaceOptions = { ...options, workspace: auditWorkspace };
+function workspaceCheck(command, { cwd = auditWorkspace, generation = 1, ...executionChanges } = {}) {
+  const row = check(command, generation, { cwd, pipefail: true,
+    stdout: "# tests 12\n# pass 12\n# fail 0\n", ...executionChanges });
+  // Keep this command-recognition fixture independent of serializer tests.
+  // The runtime supplies this field; neither task text nor stdout is cwd proof.
+  row.shellExecution.cwd = cwd;
+  return row;
+}
+const workspaceFocused = () => workspaceCheck(`cd ${auditWorkspace} && node --test test/edge.test.js`, {
+  executedCommand: `cd ${auditWorkspace} && node --test --test-timeout=30000 test/edge.test.js`,
+});
+const workspaceProject = () => workspaceCheck(`cd ${auditWorkspace} && npm test`, {
+  stdout: "# tests 15\n# pass 15\n# fail 0\n",
+});
+
+test("repair7-style workspace-bound cd launches credit actual focused then project PASS receipts", () => {
+  const focused = workspaceFocused(), broad = workspaceProject();
+  assert.equal(focused.verificationEvidence.status, "pass");
+  assert.equal(focused.verificationEvidence.counts.passed, 12);
+  assert.equal(broad.verificationEvidence.status, "pass");
+  assert.equal(broad.verificationEvidence.counts.passed, 15);
+  assert.equal(pendingContractAudit([audit, focused], workspaceOptions)?.needsFocused, false);
+  assert.equal(pendingContractAudit([audit, focused], workspaceOptions)?.needsProject, true);
+  assert.equal(pendingContractAudit([audit, focused, broad], workspaceOptions), null);
+  assert.ok(pendingContractAudit([audit, broad], workspaceOptions), "the configured broad command is not focused");
+  assert.ok(pendingContractAudit([audit, broad, focused], workspaceOptions), "project PASS still must follow focused PASS");
+  assert.ok(pendingContractAudit([audit, focused, broad], options), "no current workspace means no cd normalization");
+});
+
+test("literal quoted absolute workspace paths qualify without interpreting shell expansion", () => {
+  const workspace = "/tmp/bantam contract recovery";
+  for (const directory of [`'${workspace}'`, `"${workspace}"`]) {
+    const focused = workspaceCheck(`cd ${directory} && node --test test/edge.test.js`, { cwd: workspace });
+    const broad = workspaceCheck(`cd ${directory} && npm test`, { cwd: workspace });
+    assert.equal(pendingContractAudit([audit, focused, broad], { ...options, workspace }), null, directory);
+  }
+});
+
+test("cd normalization requires current workspace and exact typed execution cwd, never missing or foreign metadata", () => {
+  for (const cwd of [undefined, null, "", "relative/workspace", "/tmp/other-workspace", `${auditWorkspace}/child`]) {
+    const row = workspaceFocused();
+    if (cwd === undefined) delete row.shellExecution.cwd;
+    else row.shellExecution.cwd = cwd;
+    assert.ok(pendingContractAudit([audit, row, workspaceProject()], workspaceOptions), `cwd ${JSON.stringify(cwd)}`);
+  }
+  for (const workspace of [undefined, null, "", "relative/workspace", "/tmp/other-workspace"]) {
+    assert.ok(pendingContractAudit([audit, workspaceFocused(), workspaceProject()], { ...options, workspace }),
+      `workspace ${JSON.stringify(workspace)}`);
+  }
+  const proofOnly = workspaceFocused(); delete proofOnly.shellExecution;
+  proofOnly.verificationEvidence.cwd = auditWorkspace;
+  assert.ok(pendingContractAudit([audit, proofOnly, workspaceProject()], workspaceOptions),
+    "proof text alone must not supply the bound shell execution cwd");
+  const conflictingCwd = workspaceFocused(); conflictingCwd.verificationEvidence.cwd = "/tmp/other-workspace";
+  assert.ok(pendingContractAudit([audit, conflictingCwd, workspaceProject()], workspaceOptions),
+    "a present verification cwd cannot contradict the actual shell cwd");
+  const badProject = workspaceProject(); badProject.shellExecution.cwd = "/tmp/other-workspace";
+  assert.equal(pendingContractAudit([audit, workspaceFocused(), badProject], workspaceOptions)?.needsProject, true);
+});
+
+test("cd recognition rejects another directory, substitutions, relative paths, opaque setup and status masks", () => {
+  const direct = "node --test test/edge.test.js";
+  const commands = [
+    `cd /tmp/other-workspace && ${direct}`,
+    `cd . && ${direct}`,
+    `cd ./bantam-contract-recovery-ws && ${direct}`,
+    `cd "$PWD" && ${direct}`,
+    String.raw`cd "/tmp/\bantam-contract-recovery-ws" && ${direct}`,
+    `cd "$(pwd)" && ${direct}`,
+    `cd \`pwd\` && ${direct}`,
+    `cd ${auditWorkspace}/../bantam-contract-recovery-ws && ${direct}`,
+    `env MODE=test cd ${auditWorkspace} && ${direct}`,
+    `command cd ${auditWorkspace} && ${direct}`,
+    `sh -c 'cd ${auditWorkspace} && ${direct}'`,
+    `cd ${auditWorkspace}; ${direct}`,
+    `cd ${auditWorkspace} || ${direct}`,
+    `true && cd ${auditWorkspace} && ${direct}`,
+    `cd ${auditWorkspace} && mkdir fixture && ${direct}`,
+    `cd ${auditWorkspace} && cd /tmp/other-workspace && ${direct}`,
+    `cd ${auditWorkspace} && ${direct}; echo EXIT=$?`,
+    `cd ${auditWorkspace} && ${direct} || true`,
+    `cd ${auditWorkspace} && ${direct} | tail -20`,
+    `cd ${auditWorkspace} && ${direct} && npm test`,
+  ];
+  for (const command of commands) {
+    const row = workspaceCheck(command);
+    assert.ok(pendingContractAudit([audit, row, workspaceProject()], workspaceOptions), command);
+  }
+});
+
+test("a rewritten proof command cannot launder an unrelated or unsafe actual cd execution", () => {
+  for (const actual of [
+    `cd /tmp/other-workspace && node --test test/edge.test.js`,
+    `cd ${auditWorkspace} && node --test test/edge.test.js; echo done`,
+    `cd ${auditWorkspace} && node --test test/other.test.js`,
+  ]) {
+    const row = workspaceFocused();
+    row.shellExecution.command = actual; row.shellExecution.executedCommand = actual;
+    assert.ok(pendingContractAudit([audit, row, workspaceProject()], workspaceOptions), actual);
+  }
+  const forgedScope = workspaceCheck(`cd /tmp/other-workspace && node --test test/edge.test.js`);
+  forgedScope.verificationEvidence.statusCommand = "node --test test/edge.test.js";
+  assert.ok(pendingContractAudit([audit, forgedScope, workspaceProject()], workspaceOptions),
+    "statusCommand must remain tied to actual execution, not an invented direct suffix");
+  for (const field of ["command", "executedCommand", "statusCommand"]) {
+    const row = workspaceFocused();
+    row.verificationEvidence[field] = `cd ${auditWorkspace} && node --test test/other.test.js`;
+    assert.ok(pendingContractAudit([audit, row, workspaceProject()], workspaceOptions), field);
+  }
+});
+
+test("workspace-bound named tests still need measured nonzero cases and clean current-generation execution", () => {
+  const command = `cd ${auditWorkspace} && node --test --test-name-pattern='one boundary' test/edge.test.js`;
+  const passed = workspaceCheck(command, { stdout: "# tests 12\n# pass 1\n# fail 0\n# skipped 11\n" });
+  assert.equal(pendingContractAudit([audit, passed, workspaceProject()], workspaceOptions), null);
+  for (const execution of [
+    { stdout: "" }, { stdout: "# tests 12\n# pass 0\n# fail 0\n# skipped 12\n" },
+    { exitCode: 1 }, { generation: 0 }, { timedOut: true }, { blocked: true },
+  ]) {
+    assert.ok(pendingContractAudit([audit, workspaceCheck(command, execution), workspaceProject()], workspaceOptions),
+      JSON.stringify(execution));
+  }
+  const rolledBack = workspaceFocused(); rolledBack.shellScopeRollback = { violations: ["test/protected.test.js"] };
+  assert.ok(pendingContractAudit([audit, rolledBack, workspaceProject()], workspaceOptions));
+});
+
 test("unavailable/state-only audits and unbound probe projections do not invent proof", () => {
   assert.equal(pendingContractAudit([{ contractStateAudit: { ...audit.contractStateAudit, status: "unavailable" } }], options), null);
   assert.equal(pendingContractAudit([{ contractStateAudit: { ...audit.contractStateAudit, focus: "state-boundaries" } }], options), null);

@@ -129,3 +129,39 @@ test("passive status echoes yield actual direct check receipts through audit com
   assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
   assert.equal(result.turns.at(-1).doneAccepted, true);
 });
+
+test("exact-workspace cd checks execute unchanged and retain measured cwd through completion evidence", async (t) => {
+  const workspace = fixture(t);
+  const focused = { a: "shell", c: `cd '${workspace}' && node --test test/edge.test.js` };
+  const project = { a: "shell", c: `cd '${workspace}' && npm test` };
+  const { result, audits, checkpoint } = await run(workspace, [edit(GOOD), VERIFY,
+    { a: "write_file", p: "test/edge.test.js", content: EXTRA }, focused, project, DONE],
+  { contractAssertionStation: "off",
+    shellSandbox: process.env.BANTAM_LIVE_SANDBOX_TEST === "1" ? "docker" : "host",
+    verificationWorkspaceReadOnly: process.env.BANTAM_LIVE_SANDBOX_TEST === "1" });
+  assert.equal(audits.length, 1);
+  assert.equal(result.turns.length, 6, "actual focused and project executions finish without additional repair turns");
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+  assert.equal(result.turns.at(-1).doneAccepted, true);
+  assert.equal(result.metrics.contractAssertionStations ?? 0, 0);
+  const film = JSON.parse(JSON.stringify(buildArtifact({ runId: "collection-audit-cwd", stamp: "test", result })));
+  const savedTurns = JSON.parse(JSON.stringify(checkpoint.turns()));
+  for (const [index, action, passed] of [[3, focused, 1], [4, project, 2]]) {
+    const turn = result.turns[index];
+    assert.equal(turn.shellExecution.command, action.c, "requested compound command is preserved");
+    assert.ok(turn.shellExecution.executedCommand.startsWith(`cd '${workspace}' && `), "the actual execution retains its cd prefix");
+    assert.equal(turn.shellExecution.exitCode, 0);
+    assert.equal(turn.shellExecution.cwd, fs.realpathSync(workspace));
+    assert.equal(turn.verificationEvidence.status, "pass");
+    assert.equal(turn.verificationEvidence.statusScope, "execution");
+    assert.equal(turn.verificationEvidence.counts.passed, passed, "the real test runner executed the expected assertions");
+    assert.equal(turn.verificationEvidence.counts.failed, 0);
+    assert.equal(turn.verificationEvidence.cwd, fs.realpathSync(workspace));
+    for (const stored of [film.turns[index], savedTurns[index]]) {
+      assert.deepEqual(stored.shellExecution, turn.shellExecution);
+      assert.deepEqual(stored.verificationEvidence, turn.verificationEvidence);
+      assert.equal(stored.shellExecution.cwd, fs.realpathSync(workspace));
+      assert.equal(stored.verificationEvidence.cwd, fs.realpathSync(workspace));
+    }
+  }
+});

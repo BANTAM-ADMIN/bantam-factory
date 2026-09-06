@@ -182,6 +182,10 @@ async/streaming behavior or arbitrary runtime objects.
 Recovery checks bind the measured case to its audit, source generation and
 input/specification hashes. A passing case is followed by fresh configured
 project verification; old or unrelated green results cannot substitute for it.
+The manual focused-check path also accepts a literal `cd ABS_WORKSPACE &&`
+prefix when the executor's recorded directory and complete command receipts
+bind it to the current workspace. It does not strip arbitrary setup, other
+directories, expansions or status masks; original execution evidence is kept.
 The station adds auxiliary work within the existing run limits, not worker
 action turns or automatic completion. The worker must still emit an accepted
 `done`. The first repair7 Snapshot run produced a passing artifact but no

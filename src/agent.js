@@ -2053,7 +2053,7 @@ async function runAgentCore({
     const recoveryEvidence = latestVerificationRecovery(turns);
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
-        configuredCommand: verificationScript, verificationWorkspaceReadOnly }) : null;
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
@@ -5292,7 +5292,7 @@ async function runAgentCore({
     }
     if (collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
       const pendingAudit = pendingContractAudit(turns, { generation: workspaceEditGeneration,
-        configuredCommand: verificationScript, verificationWorkspaceReadOnly });
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace });
       if (pendingAudit) {
         result.done = false;
         result.summary = undefined;

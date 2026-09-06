@@ -28,6 +28,45 @@ function sameCommand(actual, expected) {
   return Boolean(a && b && a.length === b.length && a.every((word, index) => word === b[index]));
 }
 
+// Recognition only: never rewrite or re-execute a shell program. A successful
+// `cd EXACT_WORKSPACE && DIRECT` has the direct child's status, but only if the
+// controller's actual cwd and complete execution receipt bind that workspace.
+// No relative paths, substitutions, setup programs, extra operators or masks.
+function workspacePrefixedCommand(command, workspace, cwd) {
+  if (typeof workspace !== "string" || !path.posix.isAbsolute(workspace)
+      || path.posix.normalize(workspace) !== workspace || cwd !== workspace
+      || typeof command !== "string" || !/^cd[ \t]+/.test(command)) return null;
+  let quote = null, separator = -1;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (ch === "\\" && quote !== "'") { i++; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; continue; }
+    if (ch === "&" && command[i + 1] === "&") { separator = i; break; }
+  }
+  if (separator < 0) return null;
+  const prefix = command.slice(0, separator), direct = command.slice(separator + 2).trim();
+  if (/[\\$`\r\n\0*?\[\]{}]/.test(prefix)) return null;
+  const words = wordsForDirectCommand(prefix);
+  if (!words || words[0] !== "cd") return null;
+  const target = words.length === 2 ? words[1] : words.length === 3 && words[1] === "--" ? words[2] : null;
+  return target === workspace && wordsForDirectCommand(direct) ? direct : null;
+}
+
+function commandForAuditReceipt(proof, shell, workspace) {
+  const receipt = proof ?? shell;
+  const command = receipt.statusCommand ?? receipt.executedCommand ?? receipt.command;
+  const executed = receipt.executedCommand ?? receipt.command;
+  // A claimed whole-execution status cannot silently select a different command.
+  if (proof?.statusScope === "execution" && command !== executed) return null;
+  if (wordsForDirectCommand(command)) return command;
+  if (!shell || (proof && (proof.statusScope !== "execution" || proof.source !== "shell"
+      || proof.command !== shell.command || proof.executedCommand !== shell.executedCommand
+      || (proof.cwd != null && proof.cwd !== shell.cwd)))
+      || command !== shell.executedCommand) return null;
+  return workspacePrefixedCommand(command, workspace, shell.cwd);
+}
+
 function nodeTestTargets(args) {
   const targets = [];
   for (let index = 1; index < args.length; index++) {
@@ -194,7 +233,7 @@ function validStationProject(proof, generation, configured, workspaceReadOnly) {
   return true;
 }
 
-export function pendingContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null } = {}) {
+export function pendingContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
   let auditIndex = -1;
   for (let index = turns.length - 1; index >= 0; index--) {
     const audit = turns[index]?.contractStateAudit;
@@ -235,8 +274,8 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
       focusedTurn = projectTurn = stationProjectTurn = null;
       continue;
     }
-    const receipt = proof ?? shell;
-    const command = receipt.statusCommand ?? receipt.executedCommand ?? receipt.command;
+    const command = commandForAuditReceipt(proof, shell, workspace);
+    if (!command) { focusedTurn = projectTurn = stationProjectTurn = null; continue; }
     const nameFiltered = wordsForDirectCommand(command)?.some(word => /^--test-name-pattern(?:=|$)/.test(word));
     // A zero-match filtered run can exit zero. It proves no assertion ran and
     // must not clear the review; absent counts are unknown, not success.

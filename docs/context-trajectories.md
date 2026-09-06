@@ -198,6 +198,27 @@ line, stop and use that line.
 
 ## 6. Standing summary
 
+### 2026-09-05 context-delivery follow-up
+
+The historical strictness scores above are not a general capability ranking:
+all eight extension misses were on the base task's unstated error-type rule;
+its explicit counterpart passed 15/15 in both modes. A later small pilot on
+two explicit-contract tasks found 4/4 final passes per mode and faster total
+time for extension. That does not establish equivalence on long repair runs.
+
+That pilot also found optional snapshots being clipped before model delivery.
+The [context-delivery repair](CONTEXT-DELIVERY-2026-09-05.md) separates bounded
+trusted source updates from command-output clipping, supplies fresh context at
+stale-edit failures, and records prepared-prompt inclusion separately from
+snapshot creation. Decision snapshots remain optional; no mode default changes.
+
+Fresh acceptance passed all eight runs and delivered all five generated snapshots
+intact. That proves the delivery repair, not a broader capability gain. Extension
+remains the user's saved default; rebuild remains the repository fallback. The
+recommendation below records the older experiment and is not a new mode ranking.
+
+### Historical standing summary (2026-08-28)
+
 - **Default: `rebuild`.** Freshness is a quality feature, and for a local
   27B it is the cheapest capability multiplier we have.
 - **Optional: `extension`**, first-class and banner-visible, for recon-heavy

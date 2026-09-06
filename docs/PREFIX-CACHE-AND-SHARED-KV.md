@@ -48,13 +48,15 @@ timed out in either arm. See `docs/context-trajectories.md` and
 The bare-history think remedy is default-on in extension mode, so the single
 flag `BANTAM_PROMPT_TRAJECTORY=extension` is the whole switch.
 
-**Mitigation path (to get speed AND accuracy):** extension's one named failure —
-repairs on stale self-knowledge — is jiggable. A `replace` with stale `old` text
-already fails its match and echoes the real bytes back (self-correcting); the
-flail-breaker catches repeated no-op edits; ground-facts catches building on a
-remembered value. Add a **fresh-file-view-before-repair** jig (fold a current
-slice of the target file into the newest observation before an edit) and extension
-becomes safe to default — speed everywhere, no accuracy penalty.
+**Mitigation path:** stale-edit failures need an authoritative current-file
+view, not merely advice to consult a panel extension does not display. The
+[2026-09-05 context-delivery repair](CONTEXT-DELIVERY-2026-09-05.md) supplies
+bounded typed source updates at that failure boundary and protects optional
+decision snapshots from ordinary observation clipping. Actual outgoing prompts
+must be checked: a snapshot-created counter alone previously overstated delivery.
+This is not a guarantee of speed everywhere or zero accuracy penalty. The newer
+small pilot favored extension; the older 30/30 versus 22/30 score is scoped to a
+fixture whose base wording omitted the error type required by its hidden grader.
 
 ---
 

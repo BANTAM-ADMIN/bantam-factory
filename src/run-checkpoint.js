@@ -110,7 +110,10 @@ export class RunCheckpoint {
     if (event.type === "observation_annotated") {
       const i = Number.isInteger(event.turn) ? event.turn : this._turns.length - 1;
       const target = this._turns[i];
-      if (target) target.observation = String(event.observation ?? target.observation ?? "");
+      if (target) {
+        target.observation = String(event.observation ?? target.observation ?? "");
+        if (Object.hasOwn(event, "contextUpdates")) target.contextUpdates = serializableCopy(event.contextUpdates);
+      }
       return;
     }
     if (event.type === "query" && this._pending) {
@@ -128,7 +131,7 @@ export class RunCheckpoint {
       // false: that would turn an unverified new film into a legacy prose proof.
       for (const key of [
         "verificationEvidence", "shellExecution", "editOutcome", "contractStateAudit",
-        "contextBasis",
+        "contextBasis", "contextUpdates",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ]) {

@@ -82,6 +82,62 @@ function scrubWith(pattern, s) {
   return String(s ?? "").replace(pattern, (m) => m.replace(/[<|>/]/g, ""));
 }
 
+const CONTEXT_UPDATE_TEXT_MAX = 3000;
+const CONTEXT_UPDATE_BLOCK_MAX = 3300;
+const CONTEXT_UPDATES_PER_TURN_MAX = 2;
+const CONTEXT_UPDATE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/;
+
+function contextUpdatePathValid(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const p = value.path;
+  if (typeof p !== "string" || !p || p.length > 240
+      || /^[A-Za-z]:/.test(p) || p.startsWith("/") || /[\\\x00-\x1f\x7f]/.test(p)
+      || p.split("/").some((part) => !part || part === "." || part === "..")) return false;
+  return typeof value.truncated === "boolean"
+    && typeof value.readTruncated === "boolean"
+    && Number.isSafeInteger(value.startLine) && value.startLine >= 1
+    && Number.isSafeInteger(value.endLine) && value.endLine >= value.startLine - 1
+    && Number.isSafeInteger(value.readBytes) && value.readBytes >= 0
+    && Number.isSafeInteger(value.fileBytes) && value.fileBytes >= value.readBytes;
+}
+
+/**
+ * The exact model-visible body of a typed controller update, or "" if invalid.
+ * A caller auditing delivery must search for this WHOLE body, not its marker.
+ * Source text is scrubbed with the active template just like observations.
+ * Untyped tool output never enters this independently bounded context channel.
+ */
+export function contextUpdatePromptText(update, template = CHATML_TEMPLATE) {
+  if (!update || typeof update !== "object" || Array.isArray(update)
+      || update.schema !== 1
+      || !["decision", "edit-recovery"].includes(update.kind)
+      || typeof update.id !== "string" || !CONTEXT_UPDATE_ID_RE.test(update.id)
+      || !Number.isSafeInteger(update.generation) || update.generation < 0
+      || typeof update.text !== "string" || !update.text.trim()
+      || update.text.length > CONTEXT_UPDATE_TEXT_MAX
+      || !Array.isArray(update.paths) || update.paths.length < 1 || update.paths.length > 4
+      || !Array.from(update.paths).every(contextUpdatePathValid)
+      || !(template?.control instanceof RegExp)) return "";
+  // A quoted source cannot terminate the metadata wrapper or forge a sibling
+  // update. Template tokens are neutralized separately with the normal scrub.
+  const text = scrubWith(template.control, update.text).replace(
+    /<\/?bantam-context-update\b[^>]*>/gi,
+    (match) => match.replace(/[<>]/g, ""),
+  );
+  const block = `<bantam-context-update id="${update.id}" kind="${update.kind}" generation="${update.generation}">\n${text}\n</bantam-context-update>\n`;
+  return block.length <= CONTEXT_UPDATE_BLOCK_MAX ? block : "";
+}
+
+function contextUpdatePromptBlocks(updates, template) {
+  if (!Array.isArray(updates) || updates.length > CONTEXT_UPDATES_PER_TURN_MAX) return [];
+  const blocks = Array.from(updates, (update) => contextUpdatePromptText(update, template));
+  // Reject malformed batches atomically: no partial body or partial receipt.
+  if (blocks.some((block) => !block)
+      || new Set(updates.map((update) => update.id)).size !== updates.length
+      || blocks.reduce((total, block) => total + block.length, 0) > 6600) return [];
+  return blocks;
+}
+
 // A replayed edit action carries its full body (write_file `content`, replace `old`/`new`, patch
 // `edits`) in EVERY subsequent prompt turn — the largest silent context sink, and stale the moment the
 // file is edited again. When the edited file is currently shown live in <open_files>, that body is
@@ -590,6 +646,12 @@ export function buildPrompt({
         ), preserveSlimmedControlAnnotations));
     if (rewriteSuperseded) stubbedTurns.add(recordedTurn);
     p += userTurn(`<observation>\n${scrub(resolvePointer(observation, stubbedTurns))}\n</observation>\n`);
+    // Fresh controller-owned source context must not compete with quoted tool
+    // output for OBS_MAX. Render whole validated records after that clipping,
+    // inside the same frozen fragment, so delivery and prefix stability agree.
+    for (const block of contextUpdatePromptBlocks(turn.contextUpdates, template)) {
+      p += userTurn(block);
+    }
     if (freezeKey != null) { renderCache.set(freezeKey, p.slice(fragStart)); frozenEnd = p.length; }
   }
   // The stable head: everything up to the last frozen fragment. The runtime

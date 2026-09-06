@@ -246,5 +246,8 @@ function turnSize(turn) {
   const action = turn.action ?? turn.parsedAction ?? null;
   return (action ? JSON.stringify(action).length : 0)
     + clipObservation(turn.observation).length
+    // Trusted context is outside observation clipping, not outside the history
+    // budget. Metadata pricing is conservative relative to its prompt wrapper.
+    + (Array.isArray(turn.contextUpdates) ? JSON.stringify(turn.contextUpdates).length + 300 : 0)
     + 96; // ChatML/observation wrapper overhead.
 }

@@ -1433,7 +1433,7 @@ export function replaceNotFoundDiagnosis(p, text, old) {
   // text copied from a frozen fixture carrying the same basename in the same
   // panel (gauntlet/fixtures/…/src/platform/agent.js vs src/agent.js), so name
   // the entry to copy from rather than the panel in general.
-  if (at === -1) return `${base} Not even its first line matches — copy the exact current text from the ${p} entry in <open_files>, checking it is that entry and not another file with the same name.`;
+  if (at === -1) return `${base} Not even its first line matches — use read_file on ${p} for the exact current text, checking the path rather than another file with the same name. A clipped current-source view is not the complete file.`;
   let i = 0;
   const oldStr = String(old);
   while (i < oldStr.length && at + i < text.length && oldStr[i] === text[at + i]) i++;
@@ -1447,7 +1447,7 @@ export function replaceNotFoundDiagnosis(p, text, old) {
   const note = invisible
     ? ` NOTE: the file has an INVISIBLE character (U+${fileChar.toString(16).toUpperCase().padStart(4, "0")}) at the divergence — do not spell it out as an escape sequence; replace a span that avoids it.`
     : "";
-  return `${base} Your text matches the file up to line ${line}, then DIVERGES: the file continues ${fileNext} but your "old" continues ${oldNext}.${note} Copy the exact current text (see <open_files>), or replace a shorter unique span.`;
+  return `${base} Your text matches the file up to line ${line}, then DIVERGES: the file continues ${fileNext} but your "old" continues ${oldNext}.${note} Use read_file on ${p} for current bytes beyond this clipped view, or replace a shorter unique span already shown exactly.`;
 }
 
 // Insert a per-test timeout into bare `node --test` commands (idempotent; only

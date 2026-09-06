@@ -37,7 +37,8 @@ import { detectSiblings } from "./logic/completeness-critic.js";
 import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-anchors.js";
 import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
-import { buildPrompt, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
+import { buildPrompt, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
+import { createContextUpdate } from "./context-updates.js";
 import { requiredOutputPaths } from "./logic/missing-outputs.js";
 import { deliverableNotice } from "./logic/deliverable-watch.js";
 import { providedOracleNotice } from "./logic/provided-oracle-watch.js";
@@ -1001,6 +1002,7 @@ async function runAgentCore({
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
+        ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
           workspaceCoherence: {
             fingerprints: { ...(t.workspaceCoherence.fingerprints ?? {}) },
@@ -1166,6 +1168,9 @@ async function runAgentCore({
 
   const metrics = {
     turns: 0,
+    contextUpdatesIncluded: 0,
+    contextUpdatesOmitted: 0,
+    contextUpdatePromptReceipts: [],
     invalid: 0,
     outputLimitRecoveries: 0,
     protocolViolations: 0,
@@ -1718,13 +1723,47 @@ async function runAgentCore({
     Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h,
     { charBudget: historyCharBudget, pinHead: extensionTrajectory },
   );
+  // Count the rendered bytes, not an annotation that might have been clipped.
+  // This boundary is the exact prompt passed to ModelClient, NOT evidence that
+  // a remote server accepted or attended to it. Raw request films independently
+  // establish transport delivery. Bound receipts and only record status changes.
+  const contextUpdateStatuses = new Map();
+  const includedContextUpdates = new Set();
+  const noteContextUpdatePrompt = (prompt) => {
+    let promptSha256 = null;
+    for (const turn of turns) {
+      for (const update of Array.isArray(turn.contextUpdates) ? turn.contextUpdates.slice(0, 2) : []) {
+        const block = contextUpdatePromptText(update, promptTemplate);
+        if (!block) continue;
+        const status = prompt.includes(block) ? "included" : "not-in-prompt";
+        if (contextUpdateStatuses.get(update.id) === status) continue;
+        contextUpdateStatuses.set(update.id, status);
+        if (status === "included" && !includedContextUpdates.has(update.id)) {
+          includedContextUpdates.add(update.id);
+          metrics.contextUpdatesIncluded++;
+        }
+        if (status !== "included") metrics.contextUpdatesOmitted++;
+        if (metrics.contextUpdatePromptReceipts.length >= 256) continue;
+        promptSha256 ??= crypto.createHash("sha256").update(prompt).digest("hex");
+        const receipt = {
+          id: update.id, kind: update.kind, generation: update.generation,
+          status, boundary: "prepared-prompt", chars: block.length, promptSha256,
+          modelCallIndex: typeof model.requestCursor === "function" ? model.requestCursor() : null,
+        };
+        metrics.contextUpdatePromptReceipts.push(receipt);
+        onEvent({ type: "context_update_prompt", ...receipt });
+      }
+    }
+  };
   const safeComplete = async (makePrompt, completeOpts) => {
     for (let shrink = 0; shrink < 8; shrink++) {
       try {
         const withPenalty = degeneratePenalty
           ? { ...completeOpts, presencePenalty: degeneratePenalty }
           : completeOpts;
-        const out = await model.complete(makePrompt(), signal ? { ...withPenalty, signal } : withPenalty);
+        const prompt = makePrompt();
+        noteContextUpdatePrompt(prompt);
+        const out = await model.complete(prompt, signal ? { ...withPenalty, signal } : withPenalty);
         // The server does not THROW when the prompt overruns the slot — it
         // silently trims the prompt to fit and returns a generation cut short,
         // flagged only by `truncated: true`. So the context_overflow shrink below
@@ -1864,7 +1903,13 @@ async function runAgentCore({
   // context — rebuild's panel supplies exactly that adjacency, and both its
   // runs caught the residual coercion where both extension runs missed it.
   const decisionSnapshot = envTruthy(process.env.BANTAM_DECISION_SNAPSHOT);
-  let lastSnapshotGeneration = null;
+  const restoredContextUpdates = turns.flatMap((turn) => Array.isArray(turn.contextUpdates) ? turn.contextUpdates : [])
+    .filter((update) => contextUpdatePromptText(update, promptTemplate));
+  let lastSnapshotGeneration = restoredContextUpdates
+    .filter((update) => update?.kind === "decision").at(-1)?.generation ?? null;
+  const recoverySnapshotKeys = new Set(restoredContextUpdates
+    .filter((update) => update?.kind === "edit-recovery")
+    .flatMap((update) => (update.paths ?? []).map((entry) => `${entry.path}:${update.generation}`)));
   while (turns.length < maxTurns && !done && !interrupted) {
     let executionShadowPhaseForTurn = null;
     let executionShadowBoundariesForTurn = [];
@@ -2249,7 +2294,7 @@ async function runAgentCore({
       const editRecoveryReanchor = lineEditRecoveryTurn
         ? [
             `EDIT RECOVERY ACTIVE: an exact-match edit to ${editRecoveryPath} failed even though the proposed semantic fix is retained in history.`,
-            "Do not reconstruct old text. Use edit_lines with line numbers from the current file panel, or use one intentional write_file rewrite if the correction spans multiple sections.",
+            "Do not reconstruct old text. Use the fresh line-numbered context update or current read_file output. If the required range is omitted, read_file that exact path and range before editing; never guess line numbers or overwrite unseen sections.",
             ...(lineEditSyntaxLine ? [lineEditSyntaxLine] : []),
             "This recovery stays active until a real edit lands.",
           ].join("\n")
@@ -2302,7 +2347,7 @@ async function runAgentCore({
       const externalMutationReanchor = pendingExternalChanges.size
         ? [
             "EXTERNAL WORKSPACE CHANGE: files BANTAM previously read changed outside this agent.",
-            "The current disk and <open_files> panel are authoritative; earlier read observations, test proofs, and edit assumptions for these paths are stale.",
+            "The current disk is authoritative; earlier read observations, test proofs, and edit assumptions for these paths are stale. Use a fresh read_file or a current displayed source view.",
             "Re-read a clipped changed path before editing it. If its current contents are fully visible, act from those exact bytes. Never overwrite it from remembered text.",
             ...[...pendingExternalChanges].map((changedPath) => `- ${changedPath}`),
           ].join("\n")
@@ -2317,21 +2362,45 @@ async function runAgentCore({
         .join("\n\n");
 
       if (extensionTrajectory) {
+        // A failed anchor is a specific freshness boundary. Supply actual disk
+        // bytes once per path/generation, not an instruction pointing to a panel
+        // extension does not display. Typed context bypasses tool-output clipping.
+        if (editRecoveryPath && turns.length) {
+          const key = `${editRecoveryPath}:${workspaceEditGeneration}`;
+          if (!recoverySnapshotKeys.has(key)) {
+            const focus = focusByPath.get(editRecoveryPath)?.[0];
+            const update = createContextUpdate(workspace, {
+              kind: "edit-recovery", paths: [editRecoveryPath], generation: workspaceEditGeneration,
+              focusLine: focus ? Math.floor((focus.start + focus.end) / 2) : undefined,
+            });
+            const last = turns.at(-1);
+            const existing = (Array.isArray(last.contextUpdates) ? last.contextUpdates : [])
+              .filter((entry) => contextUpdatePromptText(entry, promptTemplate));
+            if (update && existing.length < 2) {
+              last.contextUpdates = [...existing, update];
+              recoverySnapshotKeys.add(key);
+              metrics.editRecoverySnapshots = (metrics.editRecoverySnapshots ?? 0) + 1;
+              onEvent({ type: "context_update_created", id: update.id, kind: update.kind, paths: update.paths });
+            }
+          }
+        }
         // Verify-green is the moment before done decisions happen. Fold the
         // edited files' current bytes in front of that decision — once per
         // converged state — so the contract restatement below and the code it
         // constrains are adjacent again, as rebuild's panel made them.
         if (decisionSnapshot && turns.length) {
           const lastTurn = turns[turns.length - 1];
+          const existing = (Array.isArray(lastTurn.contextUpdates) ? lastTurn.contextUpdates : [])
+            .filter((entry) => contextUpdatePromptText(entry, promptTemplate));
           if (verificationVerdict(lastTurn) === "pass"
               && workspaceEditGeneration !== lastSnapshotGeneration
-              && !String(lastTurn.observation ?? "").includes("[review]")) {
-            const snapshot = renderDecisionSnapshot(workspace, turns);
+              && existing.length < 2) {
+            const snapshot = renderDecisionSnapshot(workspace, turns, workspaceEditGeneration);
             if (snapshot) {
-              lastTurn.observation = `${String(lastTurn.observation ?? "")}\n\n${snapshot.text}`;
+              lastTurn.contextUpdates = [...existing, snapshot];
               lastSnapshotGeneration = workspaceEditGeneration;
               metrics.decisionSnapshots = (metrics.decisionSnapshots ?? 0) + 1;
-              onEvent({ type: "decision_snapshot", paths: snapshot.paths });
+              onEvent({ type: "decision_snapshot", id: snapshot.id, paths: snapshot.paths.map((entry) => entry.path) });
             }
           }
         }
@@ -2350,6 +2419,11 @@ async function runAgentCore({
           const last = turns[turns.length - 1];
           last.observation = `${String(last.observation ?? "")}\n\n[guidance]\n${guidance}`;
           lastFoldedGuidance = guidance;
+        }
+        if (turns.length) {
+          const last = turns.at(-1);
+          onEvent({ type: "observation_annotated", turn: turns.length - 1, observation: last.observation,
+            ...(Object.hasOwn(last, "contextUpdates") ? { contextUpdates: last.contextUpdates } : {}) });
         }
       }
 
@@ -5729,7 +5803,7 @@ async function runAgentCore({
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
         "verificationEvidence", "shellExecution", "editOutcome", "contractStateAudit",
-        "contextBasis",
+        "contextBasis", "contextUpdates",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)
@@ -6090,7 +6164,7 @@ function formatEnvironmentVerificationFailure(proof, workspace) {
 // decision snapshot. Bounded: the four most recently edited files, 160
 // numbered lines each — enough to re-expose a residual defect beside the
 // folded contract without doubling the prompt.
-function renderDecisionSnapshot(workspace, turns, { maxFiles = 4, maxLines = 160 } = {}) {
+function renderDecisionSnapshot(workspace, turns, generation) {
   const ordered = [];
   for (const turn of turns) {
     if (!turnEditApplied(turn)) continue;
@@ -6100,27 +6174,7 @@ function renderDecisionSnapshot(workspace, turns, { maxFiles = 4, maxLines = 160
       ordered.push(edited);
     }
   }
-  const chosen = ordered.slice(-maxFiles);
-  const sections = [];
-  const paths = [];
-  for (const relative of chosen) {
-    let body;
-    try {
-      body = fs.readFileSync(path.join(workspace, relative), "utf8");
-    } catch {
-      continue;
-    }
-    const lines = body.split("\n");
-    const shown = lines.slice(0, maxLines);
-    const clipped = lines.length > maxLines ? `\n… (${lines.length - maxLines} more lines; read_file for the rest)` : "";
-    sections.push(`# ${relative} (current, ${lines.length} lines)\n${shown.map((line, i) => `${i + 1}\t${line}`).join("\n")}${clipped}`);
-    paths.push(relative);
-  }
-  if (!sections.length) return null;
-  return {
-    paths,
-    text: `[review] verification is green. Before finishing, re-check the CURRENT bytes you shipped against every clause of the task:\n${sections.join("\n\n")}`,
-  };
+  return createContextUpdate(workspace, { kind: "decision", paths: ordered.slice(-4), generation });
 }
 
 export const GATE_METRIC = {

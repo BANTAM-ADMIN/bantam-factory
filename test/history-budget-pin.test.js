@@ -34,3 +34,16 @@ test("pinHead is a no-op when everything fits, and on a single turn", () => {
   const one = budgetTurns(turns.slice(0, 1), { charBudget: 10, pinHead: true });
   assert.equal(one.length, 1);
 });
+
+test("typed context updates consume history budget without losing the newest update", () => {
+  const small = Array.from({ length: 4 }, (_, i) => ({ i, observation: `unique ${i}` }));
+  assert.equal(budgetTurns(small, { charBudget: 5000 }).length, 4);
+  const withUpdates = small.map((turn) => ({ ...turn,
+    contextUpdates: [{ schema: 1, id: `update-${turn.i}`, kind: "decision", generation: turn.i,
+      text: String(turn.i).repeat(2800), paths: [{ path: "source.js" }] }],
+  }));
+  const kept = budgetTurns(withUpdates, { charBudget: 5000 });
+  assert.deepEqual(kept.map((turn) => turn.i), [3]);
+  assert.deepEqual(kept[0].contextUpdates, withUpdates[3].contextUpdates);
+  assert.deepEqual(withUpdates.map((turn) => turn.contextUpdates[0].text.length), [2800, 2800, 2800, 2800]);
+});

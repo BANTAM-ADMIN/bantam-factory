@@ -48,7 +48,21 @@ This guide has two halves:
 `bantam setup` currently installs stock Qwen 3.8 27B Q4_K_M, requiring about
 24 GB VRAM for the default profile. The published fight board used a fine-tune
 and `extension` context mode, not those installation defaults. See the
-[configuration disclosure](../README.md#receipts-not-benchmarks).
+[configuration disclosure](../README.md#historical-fight-night-record).
+
+### Experimental local alternative: Tiel 35B-A3B
+
+Tiel IQ4_XS with integrated MTP has run BANTAM on a 24 GB RTX 4090 with
+72,192 allocated context tokens; one later Snapshot attempt passed all five
+independent groups with accepted completion in 94 seconds. It is not the setup
+default or a general qualification of Tiel. The 18.63 GB weight file still needs
+additional runtime/context memory; about 3B active parameters does not mean
+3 GB VRAM. Lower-VRAM offloading and multi-worker operation remain untested here.
+
+See [the local-worker strategy](LOCAL-WORKER-STRATEGY.md) for why this matters,
+and [the qualification record](TIEL-QUALIFICATION-2026-09-06.md) for the exact
+tested build, model hash, settings, accounting and failures. Do not replace a
+working server or its model without the operator's permission.
 
 ### One-time setup (from the BANTAM repo)
 

@@ -34,6 +34,24 @@ It is **not privacy-redacted for public posting**. Read the
 and the proposed Workbench integration; this release does not implement that
 new Workbench.
 
+## A faster local-worker path: 35B-A3B
+
+The 27B established the local baseline. Our Tiel 35B-A3B experiments explore
+a different trade-off: roughly 3B active parameters per token, faster inference,
+and the same obligation to deliver verifiable work. The initial recorded Tiel
+configuration decoded about 2.44× faster than the historical 27B configuration;
+that is not a task-speed or reliability ranking. A later fresh Snapshot run
+achieved **5/5 and accepted completion in 94 seconds**.
+
+The opportunity goes beyond one fast run: more responsive local work,
+lower-VRAM deployments through offloading, and several bounded workers sharing
+one loaded model. Those last two are qualification targets, not shipped profiles.
+Tiel remains experimental; its 18.63 GB weights are not a 3 GB memory footprint.
+Read [the local-worker strategy](docs/LOCAL-WORKER-STRATEGY.md) for the potential,
+measured progress and limits, and [the qualification record](docs/TIEL-QUALIFICATION-2026-09-06.md)
+for every retained attempt. These newer experiments are not merged into the
+packaged historical Arena.
+
 ## Historical fight-night record
 
 The following board describes earlier builds and configurations, not the

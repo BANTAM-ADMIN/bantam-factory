@@ -23,6 +23,8 @@ Recorded measurements retain the date and configuration of their own artifacts.
 | Exchange machine-readable fight evidence | [Portable fight-card observations](FIGHT-CARD-EXCHANGE.md) | Passive bounded validation, evidence hashes, and local qualification before trust |
 | Inspect measured context and verification overhead | [Fresh factory context audit](FRESH-FACTORY-CONTEXT-AUDIT-2026-09-06.md) | Reconstructed Astra deltas, batching, completion guards, local reasoning, and metering limits |
 | Choose local, Codex, or DeepSeek runtimes | [Model runtimes and improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md) | Current runtime guide; live catalogs and local registries remain authoritative |
+| Understand 35B-A3B versus the 27B local baseline | [Local-worker strategy](LOCAL-WORKER-STRATEGY.md) | Observed speed and useful work; proposed lower-VRAM and shared-worker profiles, not default promotion |
+| Audit the Tiel experiments and their limits | [Tiel qualification](TIEL-QUALIFICATION-2026-09-06.md) | Exact configuration, adaptive failures, repair8 PASS and remaining audit-coverage limits |
 | Understand provider integration | [External API provider integration](EXTERNAL-API-PROVIDER-INTEGRATION.md) | Current provider boundary and repair history |
 | Understand the manufacturing thesis | [BANTAM as a factory](FACTORY-MODEL.md) | Evidence-derived design model |
 | Build useful factory machinery through benchmark work orders | [The machinery program](FACTORY-MACHINERY-PROGRAM.md) | Proposal: mixed-model builds, independent qualification, measured adoption |

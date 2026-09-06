@@ -1,5 +1,10 @@
 # Tiel local-worker qualification — 2026-09-06
 
+For the accessible model comparison and product implications, start with
+[Local workers: the 27B baseline and the 35B-A3B opportunity](LOCAL-WORKER-STRATEGY.md).
+This document preserves the detailed experimental record rather than replacing
+it with a best-run summary.
+
 Tiel runs on the existing 4090/llama.cpp stack and is substantially faster at token generation in the earlier exploratory series. It is **not promoted to BANTAM's default**. The original, repair1, repair2, repair3 and repair4 series remain separately recorded below, with strict completion counts of 1/3, 2/3, 1/3, 0/3 and 1/3. Repair5's Snapshot-only run, all three repair6 cards and repair7's Snapshot-only run passed their frozen functional checks but exhausted their action budgets without accepted completion. Repair7's assertion station did not establish a completion improvement and ships disabled by default. These adaptive reruns do not establish reliability or complete correctness. The original 27B comparison remains unchanged; repair3 timings also include shared-endpoint contention.
 
 Repair8's fresh Snapshot run subsequently achieved **PASS: 5/5 independent groups, accepted completion in 30 turns and 93.738 seconds**. Its collection-audit branch did not engage, so this is not a live exercise or causal demonstration of the repaired focused-launch recognizer; that fix has separate executable regression coverage below.

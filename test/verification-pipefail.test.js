@@ -6,10 +6,32 @@ import { describe, it } from "node:test";
 
 import { classifyVerificationResult, runAgent } from "../src/agent.js";
 import { Executor, runShellProcess } from "../src/executor.js";
+import { verificationEvidence } from "../src/verification-evidence.js";
 
 const PIPELINE = 'node -e "process.exit(7)" | tail -1';
 
 describe("formal verification pipefail", () => {
+  it("preserves a custom verifier crash through an ordinary tail filter", async (t) => {
+    const workspace = temporaryWorkspace(t);
+    fs.writeFileSync(path.join(workspace, "verify.mjs"), 'throw new Error("invalid fixture");\n');
+    const executor = new Executor(workspace, { shellSandbox: "host" });
+    const result = await executor.execute({ a: "shell", c: "node verify.mjs 2>&1 | tail -20" });
+    assert.equal(result.shellExecution.exitCode, 1);
+    assert.equal(result.shellExecution.pipefail, true);
+    assert.equal(verificationEvidence({ execution: result.shellExecution, generation: 0 }).status, "fail");
+    assert.match(result.observation, /Error: invalid fixture/);
+  });
+
+  it("does not misclassify expected-error output from a successful custom check", async (t) => {
+    const workspace = temporaryWorkspace(t);
+    fs.writeFileSync(path.join(workspace, "verify.mjs"), 'console.log("Error: invalid fixture (expected and caught)");\n');
+    const executor = new Executor(workspace, { shellSandbox: "host" });
+    const result = await executor.execute({ a: "shell", c: "node verify.mjs 2>&1 | tail -20" });
+    assert.equal(result.shellExecution.exitCode, 0);
+    assert.equal(result.shellExecution.pipefail, true);
+    assert.equal(verificationEvidence({ execution: result.shellExecution, generation: 0 }).status, "pass");
+  });
+
   it("does not let a successful output filter hide a failing verifier", async (t) => {
     const workspace = temporaryWorkspace(t);
     const model = scriptedModel([

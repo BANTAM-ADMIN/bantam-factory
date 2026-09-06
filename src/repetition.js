@@ -13,6 +13,7 @@ import { isDeliverableRun } from "./logic/deliverable-signals.js";
 import { deliverableRunOutcome } from "./logic/runlog.js";
 import { shellFailureSignature } from "./logic/deliverable-signals.js";
 import { createHash } from "node:crypto";
+import { verificationEvidence } from "./verification-evidence.js";
 
 const READ_ONLY_ACTIONS = new Set(["read_file", "list_dir", "search", "inspect"]);
 
@@ -150,7 +151,25 @@ export class RepetitionGuard {
     this._failStreak = { sig: null, count: 0, steeredAt: 0 };
   }
 
-  record(action, observation, { turn = 0, shellWorkspaceUnchanged = false } = {}) {
+  record(action, observation, { turn = 0, shellWorkspaceUnchanged = false, result } = {}) {
+    // New callers provide execution-bound evidence. Explicit absence means the
+    // command did not run; a refused/deduplicated request is not another sample.
+    const typed = result !== undefined;
+    if (action?.a === "shell" && typed
+        && (!result?.shellExecution || result.shellExecution.blocked || result.shellExecution.error
+          || (result.shellExecution.command !== action.c && result.shellExecution.requestedCommand !== action.c))) return;
+    // A landing verifier may attach a separate npm-test PASS to this turn.
+    // Classify only the actual shell process, with its own status propagation.
+    const shellEvidence = action?.a === "shell" && typed ? verificationEvidence({
+      execution: result.shellExecution,
+      invalidated: Boolean(result.shellExecution.invalidated || result.shellScopeRollback?.violations?.length),
+    }) : null;
+    const outcome = action?.a === "shell"
+      ? (typed ? (["pass", "fail"].includes(shellEvidence?.status) ? shellEvidence.status : null)
+        : deliverableRunOutcome(action, observation)) : null;
+    const processObservation = action?.a === "shell" && typed
+      ? `exit ${result.shellExecution.exitCode}\n${result.shellExecution.stdout ?? ""}\n${result.shellExecution.stderr ?? ""}`
+      : observation;
     if (this.enabled && action?.a === "replace" && /^replaced /.test(String(observation ?? ""))) {
       const p = String(action.p ?? "");
       const pair = `${editHash(action.old)}>${editHash(action.new)}`;
@@ -161,7 +180,7 @@ export class RepetitionGuard {
       this._editPairs.set(p, pairs);
     }
     if (this.enabled && action?.a === "shell") {
-      const failSig = shellFailureSignature(observation);
+      const failSig = (!typed || outcome === "fail") ? shellFailureSignature(processObservation) : null;
       if (failSig) {
         this._failStreak = this._failStreak.sig === failSig
           ? { ...this._failStreak, count: this._failStreak.count + 1 }
@@ -174,25 +193,23 @@ export class RepetitionGuard {
       // the streak. Intervening edits do NOT reset it — an edit that leaves the
       // result unchanged is the signal, not an excuse to forget.
       if (isDeliverableRun(action.c)) {
-        const rsig = this._resultSig(observation);
-        this._resultStreak = this._resultStreak.sig === rsig
+        const rsig = this._resultSig(processObservation);
+        this._resultStreak = this._resultStreak.sig === rsig && this._resultStreak.outcome === outcome
           ? { ...this._resultStreak, count: this._resultStreak.count + 1 }
-          : { sig: rsig, count: 1, steeredAt: 0 };
+          : { sig: rsig, count: 1, steeredAt: 0, outcome };
       }
     }
     if (!this.enabled || !this._isReplayable(action, { shellWorkspaceUnchanged })) return;
     const key = actionKey(action);
-    const sig = this._sig(observation);
+    const sig = this._sig(processObservation);
     const prior = this._seen.get(key);
     // Consecutive runs that produced the SAME result build confidence the command is deterministic;
     // a different result (a flaky flip) resets the count so the command is never frozen.
-    const sameCount = prior && prior.sig === sig ? prior.sameCount + 1 : 1;
+    const sameCount = prior && prior.sig === sig && prior.outcome === outcome ? prior.sameCount + 1 : 1;
     // pass/fail is a property of a deliverable run only. Storing `false` for a
     // read made every deduplicated listing claim "its last real run FAILED".
-    const passed = action?.a === "shell" && isDeliverableRun(action.c)
-      ? deliverableRunOutcome(action, observation) === "pass"
-      : null;
-    this._seen.set(key, { turn, sig, sameCount, passed });
+    const passed = outcome === "pass" ? true : outcome === "fail" ? false : null;
+    this._seen.set(key, { turn, sig, sameCount, passed, outcome });
     for (const op of readOnlyOps(action)) this._seenOps.set(actionKey(op), turn);
   }
 
@@ -246,11 +263,13 @@ export class RepetitionGuard {
         const cmd = String(action.c ?? "");
         const shown = cmd.length > 80 ? `${cmd.slice(0, 80)}…` : cmd;
         return {
-          observation: `[no-progress] You have run \`${shown}\` ${rs.count} times and it has never`
-            + ` passed — editing between runs but getting the same result each time. Re-running the same`
-            + ` command after small tweaks is not converging: the outcome the run keeps reporting is the`
-            + ` clue. STOP tweaking details and change your APPROACH — pursue a fundamentally different`
-            + ` strategy than the one that has now failed identically ${rs.count} times.`,
+          observation: `[no-progress] The last ${rs.count} recorded deliverable runs produced the same normalized result.`
+            + ` Another run of \`${shown}\` is not adding evidence. `
+            + (rs.outcome === "fail"
+              ? `Those recorded checks failed. Inspect the failing assertion or process error and change your APPROACH before repeating them.`
+              : rs.outcome === "pass"
+                ? `Those recorded checks passed; repetition is not evidence of a defect. If requirements remain unchecked, test a DIFFERENT property with executable assertions; otherwise finish.`
+                : `Those checks remain UNVERIFIED, not failed. Assert the expected exit code, stdout and stderr in a direct executable check; do not change working code merely because evidence is inconclusive.`),
           duplicateOfTurn: -1,
         };
       }
@@ -331,7 +350,8 @@ export class RepetitionGuard {
     const what = prior.everyOp ? `every op in this ${subject}` : `this exact ${subject}`;
     const head = `${REPETITION_TAG} Deduplicated — not stale. You already ran ${what} on turn ${prior.turn} and ${state} `
       + `since, so it was not executed again.`
-      + (prior.passed === false ? " Its last real run FAILED and the workspace is unchanged, so that failure still stands — FIX the code before re-testing or calling done." : "")
+      + (prior.passed === false ? " Its last real run FAILED and the workspace is unchanged. Inspect the failing assertion or process status against the contract before deciding whether the code needs a fix." : "")
+      + (shell && prior.passed === null ? " Its last real check remains UNVERIFIED, not failed. Use a direct executable assertion of the expected exit code, stdout and stderr; inconclusive evidence is not a reason to change working code." : "")
       + ` ${resultLocation(action)}`;
     if (attempts === 1) {
       const mapSteer = this.mapAvailable
@@ -347,9 +367,14 @@ export class RepetitionGuard {
       // turn budget mid-solve. The polite "do something different" steer was
       // ignored. This tier names the mechanism bluntly and forbids the loop.
       const verifyish = shell && isDeliverableRun(action.c);
-      return `${REPETITION_TAG} LOOP DETECTED — you have run this identical ${subject} ${attempts} times and the workspace is byte-for-byte unchanged, so the result WILL be identical every time. This is a dead loop that is burning your turn budget.\n\n`
+      return `${REPETITION_TAG} LOOP DETECTED — you have requested this identical ${subject} ${attempts} additional times without a workspace change. These duplicate requests were not executed. Repeating the request is burning your turn budget.\n\n`
         + (verifyish
-          ? `You are re-running a TEST without changing what it tests. Re-running an unchanged program cannot make it pass. You MUST either (a) EDIT the program/code to fix the actual defect, or (b) test a DIFFERENT property — if you keep checking size, check CORRECTNESS instead (pipe your output through the real checker and diff against the expected result). Do not run this exact command again.`
+          ? (prior.passed === false
+            ? `The last check failed. Inspect its actual evidence: EDIT the code only if the check establishes a defect, or test a DIFFERENT CORRECTNESS property with assertions. `
+            : prior.passed === true
+              ? `The last check passed. Do not EDIT code merely because a passing check repeated. Test a DIFFERENT CORRECTNESS property if requirements remain, or finish when all are verified. `
+              : `The last check is UNVERIFIED, not failed. Do not EDIT code merely because its status is inconclusive. Test CORRECTNESS with direct assertions of expected exit code, stdout and stderr. `)
+            + `Do not run this exact command again.`
           : `STOP repeating it. Take a different action THIS turn: edit a file, inspect a different path, or if you truly have the answer, respond/done now.`);
     }
     return `${head}\n\nYou have now attempted this identical ${subject} ${attempts} times. Repeating it `

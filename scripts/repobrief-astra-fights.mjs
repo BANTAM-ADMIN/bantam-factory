@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { runProcess } from "../src/process-runner.js";
+import { wasControllerStopped } from "../src/controller-stop.js";
 import { runShellProcess } from "../src/executor.js";
 import { buildArmCommand, cornerUsage, listArtifacts } from "../src/fight.js";
 import { writeFightReplay, replayCardData, renderReplayHtml } from "../src/fight-replay.js";
@@ -45,8 +46,23 @@ export function changedSealedFiles(before, directory) {
 export function cardOrder(stage) { return stage === 2 ? [...ARMS].reverse() : [...ARMS]; }
 
 export function acceptedBantamCompletion(saved) {
-  return saved?.result?.reachedDone === true && saved?.result?.pass === true
-    && saved?.result?.interrupted !== true && !saved?.result?.modelFailure;
+  if (saved?.result?.reachedDone !== true || saved.result.pass !== true
+      || saved.result.interrupted === true || saved.result.modelFailure) return false;
+  // Older controllers also used `done` to stop a stalled loop before grading.
+  // Passing final tests therefore does not by itself establish model completion.
+  if (wasControllerStopped({ ...saved.result, metrics: saved.metrics })) return false;
+  // Keep the legacy explicit reachedDone/pass contract when no turn log was
+  // serialized. When a log exists, do not discard contradictory/missing evidence
+  // or mistake an earlier rejected done for the actual terminal action.
+  if (Object.hasOwn(saved, "turns")) {
+    if (!Array.isArray(saved.turns) || saved.turns.length === 0) return false;
+    const last = saved.turns.at(-1);
+    if (!last || typeof last !== "object" || Array.isArray(last) || last.doneAccepted === false) return false;
+    const action = Object.hasOwn(last, "parsedAction") ? last.parsedAction : last.action;
+    if (!action || typeof action !== "object" || Array.isArray(action) || action.a !== "done") return false;
+    if (last.action != null && last.action.a !== "done") return false;
+  }
+  return true;
 }
 
 export function gradeCandidate(workspace, stage, kitSeal = treeHashes(KIT)) {

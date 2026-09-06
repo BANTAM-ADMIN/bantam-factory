@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { runAgent } from "../agent.js";
 import { writeJsonAtomic } from "../atomic-file.js";
+import { wasControllerStopped } from "../controller-stop.js";
 import { ModelClient } from "../model.js";
 import { createShellScopeGuard, immutableEditReason } from "../scope-guard.js";
 import { ADVISORY_EXCLUDED_ACTIONS } from "../task-intent.js";
@@ -414,6 +415,7 @@ function emitWorkerPeck(emit, order, model, result) {
 }
 
 function modelDisposition(result, { allowResponded = false, requireText = false } = {}) {
+  if (wasControllerStopped(result)) return "fail";
   if (!result || result.modelFailure) return "infrastructure";
   if (result.interrupted || result.blocked) return "blocked";
   if (!(result.reachedDone || (allowResponded && result.responded))) return "fail";
@@ -439,7 +441,7 @@ function input(order, name) {
 
 function compactResult(result) {
   if (!result) return null;
-  return { reachedDone: Boolean(result.reachedDone), responded: Boolean(result.responded), interrupted: Boolean(result.interrupted), blocked: Boolean(result.blocked), modelFailure: result.modelFailure ?? null, summary: resultText(result).slice(0, 8_000), verification: result.verification ?? null, metrics: result.metrics ?? null, turns: Array.isArray(result.turns) ? result.turns.length : 0 };
+  return { reachedDone: Boolean(result.reachedDone), responded: Boolean(result.responded), interrupted: Boolean(result.interrupted), blocked: Boolean(result.blocked), modelFailure: result.modelFailure ?? null, controllerStop: result.controllerStop ?? null, summary: resultText(result).slice(0, 8_000), verification: result.verification ?? null, metrics: result.metrics ?? null, turns: Array.isArray(result.turns) ? result.turns.length : 0 };
 }
 
 function resultText(result) { return String(result?.summary ?? result?.response ?? "").trim(); }

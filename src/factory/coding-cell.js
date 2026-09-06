@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { runAgent } from "../agent.js";
 import { writeJsonAtomic } from "../atomic-file.js";
+import { wasControllerStopped } from "../controller-stop.js";
 import { ModelClient } from "../model.js";
 import { runShellProcess } from "../executor.js";
 import { shellSegments, splitShellWords } from "../shell-lex.js";
@@ -374,6 +375,7 @@ function chassisPort() {
 }
 
 function agentDisposition(result, focusedRequired) {
+  if (wasControllerStopped(result)) return "fail";
   if (!result) return "infrastructure";
   if (result.modelFailure) return "infrastructure";
   if (result.interrupted || result.blocked) return "blocked";
@@ -388,6 +390,7 @@ function compactAgentResult(result) {
     interrupted: Boolean(result.interrupted),
     blocked: Boolean(result.blocked),
     modelFailure: result.modelFailure ?? null,
+    controllerStop: result.controllerStop ?? null,
     summary: String(result.summary ?? "").slice(0, 8_000),
     verification: result.verification ?? null,
     metrics: result.metrics ?? null,

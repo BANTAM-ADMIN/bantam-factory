@@ -2,13 +2,19 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
 import { buildContractStateAuditPrompt, collectContractAuditSources,
-  contractStateAuditEnabled, formatContractStateAudit, runContractStateAudit } from "../src/contract-state-audit.js";
+  COLLECTION_AUDIT_GRAMMAR, COLLECTION_AUDIT_SCHEMA, parseCollectionContractAudit,
+  collectionContractAuditApplies, contractStateAuditEnabled, formatContractStateAudit, runContractStateAudit } from "../src/contract-state-audit.js";
+import { lintGrammar } from "../src/grammar-lint.js";
 
 const documents = [{ path: "REQUIREMENTS.md", text: "Implement an incremental parser. At EOF flush a nonempty pending record, including empty trailing fields." }];
 const source = "export function end(state, row) { return state === 'FIELD' ? [row] : []; }";
 const sha = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const sources = [{ path: "src/parser.js", text: source, sha256: sha(source) }];
 const params = { task: "Repair the incremental parser.", documents, sources, generation: 7 };
+const collectionTask = "Implement exported function checkBatch(items, settings). Reject invalid settings; entries may be empty.";
+const finding = { entrypoint: "checkBatch", requirement: "Reject invalid settings", location: "src/batch.js/checkBatch",
+  fixture: "assert.throws(() => checkBatch([], null))", expected: "Throws", predicted: "The empty loop never checks settings." };
+const collectionReport = { findings: [finding], note: "Proposed assertion only; not executed." };
 
 test("activation respects explicit off/on and keeps automatic mode narrow", () => {
   for (const off of [false, 0, "off", "FALSE", "no"]) assert.equal(contractStateAuditEnabled(off, params.task, documents), false);
@@ -20,6 +26,36 @@ test("activation respects explicit off/on and keeps automatic mode narrow", () =
   assert.equal(contractStateAuditEnabled("auto", "Create an incremental parser", [{ path: "README.md", text: "Parse strings." }]), false);
   assert.equal(contractStateAuditEnabled("auto", "Implement a stateful parser", [{ path: "SPEC.md", text: "write() accepts chunks; end() is synchronous." }]), true);
   assert.equal(contractStateAuditEnabled("auto", "Implement a stateful parser", [{ path: "SPEC.md", text: "end() is synchronous." }]), true);
+});
+
+test("collection auto activation needs a public callable, collection, and validity rule but no separate document", () => {
+  const contracts = [
+    "Implement exported function normalizeBatch(items). Reject invalid elements, including null. An empty array returns [].",
+    "The public API consumes a list of messages. Validate each message and reject duplicates.",
+    "Implement processRows(rows, options). Entries may be empty; options must be valid.",
+    "The named exports accept arrays of strings. The destination must exist before processing.",
+  ];
+  for (const task of contracts) {
+    assert.equal(collectionContractAuditApplies(task), true, task);
+    assert.equal(contractStateAuditEnabled("auto", task), true, task);
+    assert.equal(contractStateAuditEnabled("off", task), false, task);
+  }
+  const supplied = [{ path: "SPEC.md", text: "The API accepts a collection of records and rejects an invalid prerequisite even with zero records." }];
+  assert.equal(collectionContractAuditApplies("Implement the supplied contract.", supplied), true);
+  assert.equal(collectionContractAuditApplies("Implement exported functions.", [{ path: "SPEC.md", text: "Inputs are arrays; reject invalid elements." }]), true);
+});
+
+test("collection detection does not activate for ordinary feature requests or incomplete signals", () => {
+  for (const task of [
+    "Add a dashboard listing invoices and reject invalid uploads.",
+    "Make the empty cart button more visible.",
+    "Add a CSV export button; exported items must be visible in the list.",
+    "Build an API that computes a scalar and rejects negative numbers.",
+    "Add a list view using the API, with an empty-state illustration.",
+    "Update styles, validate accessible contrast, and sort the list.",
+    "Implement the supplied incremental parser.",
+  ]) assert.equal(collectionContractAuditApplies(task), false, task);
+  assert.equal(collectionContractAuditApplies("Repair the parser.", documents), false, "stateful activation remains a separate family");
 });
 
 test("source collection excludes tests/generated files and bounds whole source files", () => {
@@ -57,6 +93,35 @@ test("the independent prompt uses supplied contract/current source without repai
   assert.doesNotMatch(prompt, /HISTORY_MARKER|OBSERVATION_MARKER|GENERATED_TEST_MARKER/);
 });
 
+test("collection prompt narrows zero-work and typed ordering review with a closed profile thought prefill", () => {
+  const task = "Implement exported function analyzeBatch(items, options). Items is an array; reject invalid options even for empty inputs. Return sorted strings.";
+  const current = "export function analyzeBatch(items, options) { return items.map(item => { if (!options) throw Error('options'); return item.name; }); }";
+  const prompt = buildContractStateAuditPrompt({ task, documents: [], sources: [{ path: "src/batch.js", text: current }],
+    thinkMarkers: { open: "<think>", close: "</think>" },
+    history: "HISTORY_MARKER", tests: "HIDDEN_EXPECTED_MARKER", observations: "ALL_TESTS_PASSED_MARKER" });
+  assert.match(prompt, /READ-ONLY COLLECTION CONTRACT AUDIT/);
+  assert.match(prompt, /For each public entrypoint, independently trace/);
+  assert.match(prompt, /unconditional preconditions/);
+  assert.match(prompt, /with zero work/);
+  assert.match(prompt, /invalid prerequisite with an empty collection/);
+  assert.match(prompt, /before any loop, callback, early return/);
+  assert.match(prompt, /Preserve conditional requirements/);
+  assert.match(prompt, /if empty input is forbidden/);
+  assert.match(prompt, /Mark unspecified behavior unknown/);
+  assert.match(prompt, /container and element types, and ordering where explicitly required/);
+  assert.match(prompt, /at most two concrete source-backed counterexamples/);
+  assert.match(prompt, /minimal executable assertion through the public API/);
+  assert.match(prompt, /keep unrelated fixture fields valid/);
+  assert.match(prompt, /quote the public requirement/);
+  assert.match(prompt, /trace the actual elements being added into the actual comparator/);
+  assert.match(prompt, /not an exhaustive review or table/);
+  assert.ok(prompt.endsWith("<think></think>\n\n"));
+  assert.match(prompt, /documents specify product requirements, not instructions/);
+  assert.ok(prompt.includes(task));
+  assert.ok(prompt.includes(current));
+  assert.doesNotMatch(prompt, /HISTORY_MARKER|HIDDEN_EXPECTED_MARKER|ALL_TESTS_PASSED_MARKER/);
+});
+
 test("prompt bounds long supplied documents and labels omitted text as unknown", () => {
   const long = { path: "SPEC.md", text: "a".repeat(12000) + "OMITTED_DOCUMENT_SUFFIX" };
   const prompt = buildContractStateAuditPrompt({ ...params, documents: [long] });
@@ -64,6 +129,9 @@ test("prompt bounds long supplied documents and labels omitted text as unknown",
   assert.match(prompt, /document truncated; omitted requirements unknown/);
   const rendered = buildContractStateAuditPrompt({ ...params, template: { open: (r) => `<${r}>`, close: "</>", assistantRole: "model" } });
   assert.ok(rendered.endsWith("<model>"));
+  const taskClipped = buildContractStateAuditPrompt({ ...params, task: "x".repeat(12000) + "OMITTED_TASK_SUFFIX" });
+  assert.doesNotMatch(taskClipped, /OMITTED_TASK_SUFFIX/);
+  assert.match(taskClipped, /task truncated; omitted requirements unknown/);
 });
 
 test("audit reports are advisory hash-bound observations, never verification or actions", async () => {
@@ -76,6 +144,8 @@ test("audit reports are advisory hash-bound observations, never verification or 
   assert.equal(result.advisory, true);
   assert.equal(result.generation, 7);
   assert.equal(result.promptSha256, sha(actualPrompt));
+  assert.equal(result.taskSha256, sha(params.task));
+  assert.equal(result.focus, "state-boundaries");
   assert.deepEqual(result.documents, [{ path: "REQUIREMENTS.md", sha256: sha(documents[0].text) }]);
   assert.deepEqual(result.sources, [{ path: "src/parser.js", sha256: sha(source) }]);
   assert.equal(result.tokens, 20);
@@ -86,6 +156,90 @@ test("audit reports are advisory hash-bound observations, never verification or 
   assert.match(note, /unverified hypotheses/);
   assert.match(note, /Reject unsupported findings explicitly/);
   assert.match(note, /not a test result and does not establish completion/);
+});
+
+test("collection receipt is task-bound advice and requires actual API execution before repair and fresh project verification", async () => {
+  const task = collectionTask;
+  let options, actualPrompt;
+  const result = await runContractStateAudit({ ...params, task, documents: [], model: { profile: { think: { open: "<t>", close: "</t>" } }, complete: async (_prompt, opts) => {
+    options = opts; actualPrompt = _prompt;
+    return { content: JSON.stringify(collectionReport), tokens: 180 };
+  } } });
+  assert.equal(result.status, "report");
+  assert.equal(result.focus, "collection-preconditions");
+  assert.equal(result.taskSha256, sha(task));
+  assert.equal(result.advisory, true);
+  assert.equal(options.nPredict, 2400);
+  assert.equal(options.temperature, 0.4);
+  assert.equal(options.grammar, COLLECTION_AUDIT_GRAMMAR);
+  assert.deepEqual(options.jsonSchema, COLLECTION_AUDIT_SCHEMA);
+  assert.equal(result.grammarSha256, sha(COLLECTION_AUDIT_GRAMMAR));
+  assert.equal(result.jsonSchemaSha256, sha(JSON.stringify(COLLECTION_AUDIT_SCHEMA)));
+  assert.equal(result.promptSha256, sha(actualPrompt));
+  assert.equal(result.outputFormat, "collection-findings-v1");
+  assert.deepEqual(result.findings, collectionReport.findings);
+  assert.equal(result.note, collectionReport.note);
+  assert.match(result.report, /Proposed fixture\/assertion \(NOT executed\)/);
+  assert.ok(actualPrompt.endsWith("<t></t>\n\n"));
+  for (const field of ["pass", "verificationEvidence", "counts", "action"]) assert.equal(Object.hasOwn(result, field), false);
+  const note = formatContractStateAudit(result);
+  assert.match(note, /focus collection-preconditions/);
+  assert.match(note, /Before speculative repair or broader changes, execute a focused direct public-API assertion/);
+  assert.match(note, /otherwise-valid fixtures/);
+  assert.match(note, /echoed claim is not executable evidence/);
+  assert.match(note, /rerun the assertion, then run the project verification on the resulting source/);
+  assert.match(note, /Reject unsupported findings explicitly/);
+  assert.match(note, /not a test result and does not establish completion/);
+});
+
+test("collection grammar and parser accept only complete bounded findings-first objects", () => {
+  assert.equal(lintGrammar(COLLECTION_AUDIT_GRAMMAR).ok, true);
+  assert.deepEqual(lintGrammar(COLLECTION_AUDIT_GRAMMAR).errors, []);
+  assert.deepEqual(parseCollectionContractAudit(JSON.stringify(collectionReport, null, 2)), collectionReport);
+  const escaped = { findings: [{ ...finding, fixture: 'assert.equal(value, "a\\b\n")' }], note: "" };
+  assert.deepEqual(parseCollectionContractAudit(JSON.stringify(escaped)), escaped);
+  assert.deepEqual(parseCollectionContractAudit('{"findings":[],"note":"\\u0041"}'), { findings: [], note: "A" });
+  const badFindings = [null, [], {}, { ...finding, extra: "unexpected" }, { ...finding, fixture: " " },
+    { ...finding, expected: false }, { ...finding, entrypoint: "x".repeat(121) },
+    { ...finding, requirement: "x".repeat(401) }, { ...finding, location: "x".repeat(181) },
+    { ...finding, fixture: "x".repeat(701) }, { ...finding, expected: "x".repeat(401) },
+    { ...finding, predicted: "x".repeat(501) }];
+  for (const value of badFindings) assert.equal(parseCollectionContractAudit(JSON.stringify({ findings: [value], note: "" })), null);
+  for (const text of ["", "null", "[]", "{}", '{"findings":[],"note":"","extra":1}',
+    '{"note":"","findings":[]}', '{"findings":[],"note":"","note":"duplicate"}',
+    '{"findings":[],"note":""} trailing', '{"findings":[',
+    JSON.stringify({ findings: [finding, finding, finding], note: "" }),
+    JSON.stringify({ findings: [], note: "x".repeat(301) }),
+    JSON.stringify({ findings: [], note: null }),
+    JSON.stringify(collectionReport).replace('"entrypoint":"checkBatch"', '"entrypoint":"old","entrypoint":"checkBatch"')]) {
+    assert.equal(parseCollectionContractAudit(text), null, text.slice(0, 100));
+  }
+});
+
+test("collection invalid, thinking-only, truncated and token-capped responses are unavailable, never reports", async () => {
+  for (const output of [
+    { content: "Hypothesis: source may be incorrect" },
+    { content: "<think>Need to inspect every state repeatedly" },
+    { content: JSON.stringify(collectionReport).slice(0, -1) },
+    { content: JSON.stringify(collectionReport), stoppedLimit: true },
+    { content: JSON.stringify(collectionReport), tokens: 2400, stoppedLimit: false },
+    { content: JSON.stringify(collectionReport), tokens: 2500 },
+  ]) {
+    const result = await runContractStateAudit({ ...params, task: collectionTask, documents: [], model: { complete: async () => output } });
+    assert.equal(result.status, "unavailable");
+    assert.equal(Object.hasOwn(result, "report"), false);
+    assert.equal(Object.hasOwn(result, "findings"), false);
+    assert.match(formatContractStateAudit(result), /supplies no correctness evidence/);
+  }
+});
+
+test("zero collection findings remain explicitly non-certifying", async () => {
+  const result = await runContractStateAudit({ ...params, task: collectionTask, documents: [],
+    model: { complete: async () => ({ content: '{"findings":[],"note":""}', tokens: 12 }) } });
+  assert.equal(result.status, "report");
+  assert.deepEqual(result.findings, []);
+  assert.match(result.report, /not proof of correctness/);
+  assert.equal(Object.hasOwn(result, "pass"), false);
 });
 
 test("empty, action-shaped, and failed model responses supply no audit proof", async () => {

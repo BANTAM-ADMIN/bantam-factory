@@ -23,9 +23,12 @@ const FILE_EXT = new Set(("py c h cpp cc hpp rs go js mjs ts txt md csv tsv json
   + "toml ini cfg conf cbl dat pov pt pth ckpt npy npz pkl ics sh bash sql db sqlite html htm xml "
   + "png jpg pdf log lock cfg pyx").split(" "));
 // A file/path token: backticked, quoted, or a bare name that ENDS in a known extension.
-const FILE_TOKEN = /`([^`]+)`|"([^"]+)"|'([^']+)'|((?:\/|\.\/|~\/)?[\w/-]+\.[A-Za-z0-9]{1,6})\b/g;
+const FILE_TOKEN = /`([^`]+)`|"([^"]+)"|'([^']+)'|((?:\/|\.\/|~\/)?[\w/.-]+\.[A-Za-z0-9]{1,6})\b/g;
 const EDIT_VERB = /(?:edit|modif\w*|chang\w*|touch\w*|alter\w*)/i;
 const FORBID_RE = new RegExp(`\\b(?:do not|don'?t|must not|may not|cannot|without)\\s+${EDIT_VERB.source}`, "i");
+const NEGATIVE_PREFIX_RE = /\b(?:do not|don'?t|must not|may not|cannot|without)\s+/i;
+const COORDINATED_EDIT_RE = new RegExp(`(?:^|\\b(?:or|and)\\s+|,\\s*)${EDIT_VERB.source}\\b`, "i");
+const EXISTING_TESTS_RE = /\b(?:existing|supplied|provided|baseline|public)\s+(?:(?:existing|supplied|provided|baseline|public)\s+)?tests?(?:\s+files?)?\b/i;
 // Exclusive-edit: "only edit X" / "only edits you may make are ...". The "except" form counts ONLY when
 // the same sentence carries edit/modify language ("not modify ... except X") — bare "except for X"
 // ("tests should pass except for X") is not an edit-scope constraint and must NOT arm a check.
@@ -71,15 +74,38 @@ function sentences(text) {
 export function extractImmutable(instruction) {
   const forbidden = new Set();
   const editable = new Set();
-  let sentence = "";
+  let sentence = "", preserveExistingTests = false, existingTestExceptions = null;
   for (const s of sentences(instruction)) {
-    const isForbid = FORBID_RE.test(s);
+    // A negation can govern a coordinated verb: "Do not add dependencies or
+    // modify package.json or existing public tests." Stop before a positive
+    // contrast/permission rather than transferring the negation into it.
+    const negative = NEGATIVE_PREFIX_RE.exec(s);
+    const negativeTail = negative ? s.slice(negative.index + negative[0].length)
+      .split(/\b(?:but|however|instead|then|you may|you can)\b/i)[0] : "";
+    const coordinated = COORDINATED_EDIT_RE.exec(negativeTail);
+    const forbiddenClause = coordinated ? negativeTail.slice(coordinated.index)
+      .split(/\s+(?:to\s+(?:satisfy|pass|fix|make|ensure)|in order to|so that|because)\b/i)[0] : "";
+    const isForbid = Boolean(forbiddenClause) || FORBID_RE.test(s);
+    // This bounded class form is not the older exclusive-file form: an
+    // exception to protected tests permits that test, not every other file.
+    const classException = /\s+except(?:\s+for)?\s+/i.exec(forbiddenClause);
+    const classParts = classException
+      ? [forbiddenClause.slice(0, classException.index), forbiddenClause.slice(classException.index + classException[0].length)]
+      : [forbiddenClause];
+    if (isForbid && EXISTING_TESTS_RE.test(classParts[0])) {
+      preserveExistingTests = true; sentence ||= s;
+      const exceptions = new Set(classParts.length > 1 ? filesIn(classParts.slice(1).join(" ")) : []);
+      existingTestExceptions = existingTestExceptions === null ? exceptions
+        : new Set([...existingTestExceptions].filter(file => exceptions.has(file)));
+      filesIn(classParts[0]).forEach(file => forbidden.add(file));
+      continue;
+    }
     // Exclusive only when there's an edit-scope signal: "only edit ..." OR ("except" WITH edit/forbid
     // language in the same sentence). Bare "except for X" (no edit verb) is not edit-scope.
     const isExclusive = ONLY_EDIT_RE.test(s) || POSTPOSITIVE_ONLY_RE.test(s)
       || (EXCEPT_RE.test(s) && (isForbid || EDIT_VERB.test(s)));
     if (!isExclusive && !isForbid) continue;
-    const files = filesIn(s);
+    const files = filesIn(isForbid && !isExclusive && forbiddenClause ? forbiddenClause : s);
     if (!files.length) continue;                    // content-class / no concrete file -> arm nothing
     if (isForbid && !isExclusive) { files.forEach((f) => forbidden.add(f)); sentence ||= s; continue; }
     if (isExclusive) {
@@ -91,9 +117,11 @@ export function extractImmutable(instruction) {
   }
   // Forbidden always wins over editable for the same file.
   for (const f of forbidden) editable.delete(f);
-  if (!forbidden.size && !editable.size) return { mode: "none", forbidden: [], editable: [], sentence: "" };
-  if (editable.size) return { mode: "exclusive", forbidden: [...forbidden], editable: [...editable], sentence };
-  return { mode: "forbid", forbidden: [...forbidden], editable: [], sentence };
+  if (!forbidden.size && !editable.size && !preserveExistingTests) return { mode: "none", forbidden: [], editable: [], sentence: "" };
+  const classes = preserveExistingTests ? { preserveExistingTests: true,
+    ...(existingTestExceptions?.size ? { existingTestExceptions: [...existingTestExceptions] } : {}) } : {};
+  if (editable.size) return { mode: "exclusive", forbidden: [...forbidden], editable: [...editable], sentence, ...classes };
+  return { mode: "forbid", forbidden: [...forbidden], editable: [], sentence, ...classes };
 }
 
 // --- deterministic fact layer: hash the workspace ---
@@ -141,7 +169,26 @@ function snapshot(workspace, inv) {
       for (const m of matches) hashes[m] = sha(files.get(m));
     }
   }
+  for (const rel of inv.existingTests ?? []) {
+    const value = exactPathHash(workspace, rel);
+    if (value !== undefined) hashes[rel] = value;
+  }
   return { mode: inv.mode, hashes };
+}
+
+// Frozen class paths are exact, may be deeper than the legacy named-file walk,
+// and may include an in-workspace test-directory alias itself.
+function exactPathHash(workspace, rel) {
+  const root = path.resolve(workspace), full = path.resolve(root, rel);
+  if (!full.startsWith(root + path.sep)) return undefined;
+  try {
+    const stat = fs.lstatSync(full);
+    if (stat.isSymbolicLink()) return `symlink:${crypto.createHash("sha256").update(fs.readlinkSync(full)).digest("hex")}`;
+    if (!stat.isFile()) return undefined;
+    const real = fs.realpathSync(full), realRoot = fs.realpathSync(root);
+    if (!real.startsWith(realRoot + path.sep)) return "<outside>";
+    return sha(full);
+  } catch { return "<deleted>"; }
 }
 
 /**
@@ -157,9 +204,10 @@ export function immutableViolations(workspace, inv, snap) {
   const known = new Set(Object.keys(snap.hashes));
   for (const f of known) {
     // immutable(F): a file that existed at snapshot and is NOT in the allowed-edit set.
-    if (inv.mode === "exclusive" && editable.some((named) => matchesNamedPath(f, named))) continue;
+    const frozenTest = inv.existingTests?.includes(f);
+    if (!frozenTest && inv.mode === "exclusive" && editable.some((named) => matchesNamedPath(f, named))) continue;
     db.fact("immutable", f);
-    const now = current.has(f) ? sha(current.get(f)) : "<deleted>";
+    const now = frozenTest ? exactPathHash(workspace, f) : current.has(f) ? sha(current.get(f)) : "<deleted>";
     if (now !== snap.hashes[f]) db.fact("changed", f);   // changed OR deleted
   }
   db.rule("violation(F) :- immutable(F), changed(F)");

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { canonicalJson } from "../journal.js";
 import { snapshotTree } from "../scope-guard.js";
+import { wasControllerStopped } from "../controller-stop.js";
 import { compatibilityFactoryLine, gaugeRef } from "./compatibility-line.js";
 import { FactoryStore } from "./store.js";
 
@@ -20,6 +21,14 @@ const MATERIAL_EVENTS = new Set([
   "verification",
   "verification_skipped",
   "probe",
+  "numeric_contract_witness",
+  "verification_recovery_mask",
+  "contract_state_audit_start",
+  "contract_state_audit",
+  "contract_audit_recovery",
+  "contract_assertion_start",
+  "contract_assertion",
+  "edit_preservation_review",
   "integrity",
   "external_workspace_change",
   "infrastructure_blocked",
@@ -287,6 +296,7 @@ export function workspaceRevision(workspace) {
 }
 
 function agentGaugeStatus(result) {
+  if (wasControllerStopped(result)) return "fail";
   if (result?.modelFailure || result?.blocked?.kind === "infrastructure" || result?.blocked?.type === "infrastructure") {
     return "infrastructure";
   }
@@ -308,6 +318,7 @@ function factoryResultEvidence(result) {
     interrupted: Boolean(result?.interrupted),
     blocked: result?.blocked ?? null,
     modelFailure: result?.modelFailure ?? null,
+    controllerStop: result?.controllerStop ?? null,
     verification: result?.verification ?? null,
     integrity: result?.integrity ?? null,
     summary: result?.summary ?? null,

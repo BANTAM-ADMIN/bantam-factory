@@ -244,6 +244,7 @@ Headless print mode — runs a task without a REPL, suitable for scripts.
 Options:
   --workspace <dir>   workspace directory (default: current directory)
   --verify "<cmd>"    verification command to run after the task completes
+  --verify-workspace-read-only  run configured verification with source read-only (Docker; /tmp writable)
   --dangerously-allow-net   grant shell NETWORK access for the whole run without asking
                       (default: network is OFF; interactive sessions ask per request)
   --max-turns <n>     maximum agent turns (default: 30)
@@ -2169,6 +2170,7 @@ if (cmd === undefined || cmd === "chat") {
       model,
       maxTurns: runMaxTurns,
       verificationScript: args.verify || null,
+      verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
       // --no-edit: answer questions about a codebase without touching it. The
       // model's own prompt already says a QUESTION deserves an ANSWER rather
       // than a file change, and asked politely it still edited — on the joblog
@@ -5264,6 +5266,7 @@ async function repl() {
           // --max-turns or BANTAM_MAX_TURNS; Ctrl-C interrupts.
           maxTurns: args["max-turns"] ? Number(args["max-turns"]) : (Number(process.env.BANTAM_MAX_TURNS) || 60),
           verificationScript,
+          verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
           verificationPolicy: "after_edit",
           thinkMode, skills: skillsCfg, planMode,
           postVerifyIntegrity: skillSnapshot ? () => checkWorkspace(skillSnapshot, workspace, {}) : null,
@@ -6029,7 +6032,7 @@ bantam chat                       same as above (explicit)
 ./bin/run-dev.sh self-improve [--candidate ID] [--verify "npm test"] [--max-turns 120] [--no-apply]
 ./bin/run-dev.sh self-improve --plan
                                   inspect candidates; no model or controller/source writes
-bantam run --task "..." [--workspace . | --lane ID [--state-home DIR]] [--max-turns 30] [--verify "npm test"] [--autonomous] [--ground] [--tui] [--plan] [--skills] [--save-run[=path]]
+bantam run --task "..." [--workspace . | --lane ID [--state-home DIR]] [--max-turns 30] [--verify "npm test"] [--verify-workspace-read-only] [--autonomous] [--ground] [--tui] [--plan] [--skills] [--save-run[=path]]
            [--resume-run artifact.json [--through-turn N]] [--review-file evidence.txt] [--factory [--factory-home DIR]]
 bantam exec [options] "<task text>"   one-shot: run a task, verify, exit (headless, no TUI)
 bantam factory list|show|audit|report ...

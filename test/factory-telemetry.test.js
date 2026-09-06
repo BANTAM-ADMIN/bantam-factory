@@ -61,6 +61,53 @@ function memoryStream() {
 }
 
 describe("compatibility factory telemetry", () => {
+  it("never releases controller-stopped work despite legacy completion and green verification", () => {
+    const cases = [
+      { controllerStop: { kind: "artifact-verification-gate", turn: 9 } },
+      ...["progressGateTerminations", "artifactVerificationGateTerminations", "interactiveStopTerminations"]
+        .map(key => ({ metrics: { [key]: 1 } })),
+      { summary: "Stopped by progress gate; grading current workspace state." },
+      { summary: "Stopped by artifact verification gate; grading current workspace state." },
+      { summary: "Stopped: I kept investigating after being asked to wrap up." },
+    ];
+    for (const [index, stop] of cases.entries()) {
+      const { workspace, factoryHome } = fixture(), jobId = `controller-stop-${index}`;
+      const telemetry = new FactoryRunTelemetry({ root: factoryHome, jobId, workspace, task: "Repair safely." });
+      fs.writeFileSync(path.join(workspace, "index.js"), "export const answer = 42;\n");
+      const original = passingResult(stop);
+      telemetry.finish(original);
+      const store = new FactoryStore(factoryHome), events = store.load(jobId);
+      assert.equal(projectFactorySupervisor(events).status, "blocked");
+      assert.equal(events.some(event => event.type === "job.released"), false);
+      const agentGauge = events.find(event => event.type === "gauge.result" && event.payload.stationAttempt === "agent-1");
+      assert.equal(agentGauge.payload.status, "fail");
+      const evidence = store.getEvidence(agentGauge.payload.evidenceRefs[0]);
+      assert.equal(evidence.reachedDone, true, "retain contradictory source evidence rather than rewrite history");
+      assert.deepEqual(evidence.verification, original.verification);
+      assert.deepEqual(evidence.controllerStop, stop.controllerStop ?? null);
+      assert.deepEqual(evidence.metrics, original.metrics);
+    }
+  });
+
+  it("retains context witnesses and recovery/review decisions as inspectable evidence", () => {
+    const { workspace, factoryHome } = fixture();
+    const telemetry = new FactoryRunTelemetry({ root: factoryHome, jobId: "job-context-review", workspace, task: "Repair safely." });
+    const receipts = [
+      { type: "numeric_contract_witness", witness: { id: "witness-1", candidateVerified: false } },
+      { type: "verification_recovery_mask", evidence: { turn: 3, status: "unverified" } },
+      { type: "edit_preservation_review", turn: 4, review: { id: "edit-1", decision: "review-required" } },
+    ];
+    for (const receipt of receipts) assert.equal(telemetry.note(receipt), true);
+    telemetry.finish(passingResult({ verification: null }));
+    const store = new FactoryStore(factoryHome);
+    const events = store.load("job-context-review");
+    for (const receipt of receipts) {
+      const event = events.find((event) => event.type === "station.telemetry" && event.payload.sourceType === receipt.type);
+      assert.ok(event);
+      assert.deepEqual(store.getEvidence(event.payload.artifactRef), receipt);
+    }
+  });
+
   it("uses a stable, typed compatibility route", () => {
     const first = compatibilityFactoryLine();
     const second = compatibilityFactoryLine();

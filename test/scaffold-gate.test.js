@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import {
   isFullDeliverableRun,
   assessScaffold,
   createScaffoldState,
   SCAFFOLD_DEFAULTS,
+  workspaceOracleExists,
 } from "../src/scaffold-gate.js";
 
 const DELIVS = ["/app/gpt2.c"];
@@ -76,4 +80,62 @@ test("non-shell actions and non-runs are ignored", () => {
   assert.equal(assessScaffold({ a: "write_file", p: "/app/gpt2.c" }, { deliverables: DELIVS }, s).steer, false);
   assert.equal(assessScaffold({ a: "shell", c: "ls -la" }, { deliverables: DELIVS }, s).steer, false);
   assert.equal(s.deliverableRuns, 0, "neither counted as a deliverable run");
+});
+
+test("explicit absent, blocked and spawn-failed executions never count toward scaffold", () => {
+  const state = createScaffoldState(), action = { a: "shell", c: "./a.out" };
+  for (const execution of [null, { command: action.c, blocked: true },
+    { command: action.c, error: "spawn denied" }, { command: "different command", exitCode: 0 }]) {
+    for (let i = 0; i < 12; i++) {
+      assert.equal(assessScaffold(action, { deliverables: DELIVS, execution }, state).steer, false);
+    }
+  }
+  assert.equal(state.deliverableRuns, 0);
+});
+
+test("scaffold describes successful and unknown runs without inventing a defect", () => {
+  for (const outcome of ["pass", "fail", null]) {
+    const state = createScaffoldState(), action = { a: "shell", c: "./a.out" };
+    let result;
+    for (let i = 0; i < 8; i++) result = assessScaffold(action, {
+      deliverables: DELIVS, execution: { command: action.c, exitCode: outcome === "fail" ? 1 : 0 }, outcome,
+    }, state);
+    assert.equal(state.deliverableRuns, 8);
+    assert.equal(result.steer, true);
+    assert.doesNotMatch(result.message, /still not right|every wrong result|never passed/);
+    assert.match(result.message, outcome === "pass" ? /check passed/ : outcome === "fail" ? /latest check failed/ : /unverified, not a demonstrated failure/);
+  }
+});
+
+test("normalized executed commands still count through explicit requestedCommand", () => {
+  const state = createScaffoldState(), action = { a: "shell", c: 'node snapshot.js; echo "EXIT=$?"' };
+  assessScaffold(action, { deliverables: ["snapshot.js"],
+    execution: { requestedCommand: action.c, command: "node snapshot.js", executedCommand: "node snapshot.js", exitCode: 0 },
+    outcome: "pass",
+  }, state);
+  assert.equal(state.deliverableRuns, 1);
+});
+
+test("existing normal test directories count as verifier presence, without following aliases", t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-scaffold-tests-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-scaffold-outside-"));
+  t.after(() => {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+  fs.writeFileSync(path.join(workspace, "snapshot.js"), "// deliverable\n");
+  assert.equal(workspaceOracleExists(workspace, ["snapshot.js"]), false);
+  fs.writeFileSync(path.join(outside, "external.test.js"), "// not granted\n");
+  fs.symlinkSync(outside, path.join(workspace, "tests"));
+  assert.equal(workspaceOracleExists(workspace, ["snapshot.js"]), false);
+  fs.mkdirSync(path.join(workspace, "test", "unit"), { recursive: true });
+  fs.writeFileSync(path.join(workspace, "test", "unit", "public.test.js"), "// supplied tests\n");
+  assert.equal(workspaceOracleExists(workspace, ["snapshot.js"]), true);
+  const state = createScaffoldState(), action = { a: "shell", c: "node snapshot.js" };
+  for (let i = 0; i < 10; i++) {
+    assert.equal(assessScaffold(action, { deliverables: ["snapshot.js"],
+      oracleExists: () => workspaceOracleExists(workspace, ["snapshot.js"]),
+      execution: { command: action.c, exitCode: 0 }, outcome: "pass",
+    }, state).steer, false);
+  }
 });

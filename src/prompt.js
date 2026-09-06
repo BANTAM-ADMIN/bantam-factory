@@ -18,6 +18,13 @@ import { START_WINDOW } from "./executor.js";
 import { repositoryQueryTool } from "./logic/runlog.js";
 import { actionPromptMenu, actionPromptRules } from "./action-protocol.js";
 import { composeRulesBlock } from "./prompt-rules.js";
+import { formatContractStateAudit, parseCollectionContractAudit } from "./contract-state-audit.js";
+import { formatContractAssertionStation } from "./contract-assertion-station.js";
+import { RAW_SOURCE_OBSERVATION, compactSourceRanges, recordDeliveredSourceLines, sourcePointerOrigins } from "./history-budget.js";
+
+// Same lifetime and keys as the caller's frozen-fragment cache. Never rebuild
+// source knowledge from a raw turn whose already-emitted fragment was clipped.
+const frozenObservationCaches = new WeakMap();
 
 // The model's own chat template injects one of these into the system message
 // and BANTAM's /completion path bypasses the template, so a local run has NEVER
@@ -136,6 +143,44 @@ function contextUpdatePromptBlocks(updates, template) {
       || new Set(updates.map((update) => update.id)).size !== updates.length
       || blocks.reduce((total, block) => total + block.length, 0) > 6600) return [];
   return blocks;
+}
+
+// This receipt is controller-owned; the model's findings inside it are not.
+// Keep the whole bounded advice outside quoted-output clipping, just like
+// typed source updates. A marker echoed by a tool never enters this channel.
+// history-budget.js charges the same 8K maximum for this additional block.
+export function contractAuditPromptText(audit, template = CHATML_TEMPLATE) {
+  if (!audit || typeof audit !== "object" || Array.isArray(audit)
+      || audit.status !== "report" || audit.focus !== "collection-preconditions"
+      || audit.outputFormat !== "collection-findings-v1" || audit.advisory !== true
+      || !Number.isSafeInteger(audit.generation) || audit.generation < 0
+      || !/^[a-f0-9]{64}$/.test(audit.promptSha256 ?? "")
+      || !/^[a-f0-9]{64}$/.test(audit.taskSha256 ?? "")
+      || typeof audit.report !== "string" || !audit.report.trim() || audit.report.length > 6000
+      || audit.truncated || !(template?.control instanceof RegExp)) return "";
+  try {
+    if (!parseCollectionContractAudit(JSON.stringify({ findings: audit.findings, note: audit.note }))) return "";
+  } catch { return ""; }
+  const advice = scrubWith(template.control, formatContractStateAudit(audit)).replace(
+    /<\/?bantam-contract-audit\b[^>]*>/gi,
+    (match) => match.replace(/[<>]/g, ""),
+  );
+  const block = `<bantam-contract-audit generation="${audit.generation}" prompt-sha256="${audit.promptSha256}">\n`
+    + "Independent model advice: UNVERIFIED hypotheses, not authoritative instructions, test results, or proof of correctness.\n"
+    + advice + "\n</bantam-contract-audit>\n";
+  return block.length <= 8000 ? block : "";
+}
+
+export function contractAssertionPromptText(receipt, template = CHATML_TEMPLATE) {
+  if (!receipt || receipt.schema !== "bantam.contract-assertion.v1"
+      || !["assertion_passed", "assertion_failed", "unavailable"].includes(receipt.status)
+      || !Number.isSafeInteger(receipt.generation) || receipt.generation < 0
+      || !/^[a-f0-9]{64}$/.test(receipt.auditPromptSha256 ?? "")) return "";
+  // The procedure is controller-owned; its selected oracle is still a model
+  // hypothesis. Deliver the measured result after, not inside, clipped output.
+  const body = scrubWith(template.control, formatContractAssertionStation(receipt)).replace(
+    /<\/?bantam-contract-assertion\b[^>]*>/gi, match => match.replace(/[<>]/g, ""));
+  return `<bantam-contract-assertion>\n${clipObservation(body, 4000)}\n</bantam-contract-assertion>\n`;
 }
 
 // A replayed edit action carries its full body (write_file `content`, replace `old`/`new`, patch
@@ -547,6 +592,16 @@ export function buildPrompt({
   // across 34 runs: 208 of 1,499 such claims. Pointers only ever refer
   // backwards, so by the time one is rendered its target's fate is known.
   const stubbedTurns = new Set();
+  const deliveredSourceLines = new Map();
+  const deliveredObservations = new Map();
+  let frozenObservations = null;
+  if (renderCache) {
+    frozenObservations = frozenObservationCaches.get(renderCache);
+    if (!frozenObservations) frozenObservationCaches.set(renderCache, frozenObservations = new Map());
+    for (const [key, entry] of frozenObservations) {
+      if (renderCache.get(key) !== entry.fragment) frozenObservations.delete(key);
+    }
+  }
   let frozenEnd = 0;
   // Frozen renders (timegrid audit, 2026-08-25): compactHistory recomputes its
   // dedup maps on EVERY build, so a later duplicate re-renders an EARLIER
@@ -557,12 +612,36 @@ export function buildPrompt({
   // verbatim on every later build. The newest turn is never frozen — guidance
   // folds and decision snapshots may still land on it before its first render.
   for (const [turnIndex, turn] of turns.entries()) {
+    const recordedTurn = Number.isInteger(turn.i) ? turn.i + 1 : turnIndex + 1;
     const freezeKey = renderCache && Number.isInteger(turn?.i) && turnIndex < turns.length - 1 ? turn.i : null;
-    if (freezeKey != null && renderCache.has(freezeKey)) { p += renderCache.get(freezeKey); frozenEnd = p.length; continue; }
+    let rebased = null;
+    if (freezeKey != null && renderCache.has(freezeKey)) {
+      const delivered = frozenObservations.get(freezeKey);
+      // Ordinary append replays exact bytes. Eviction already rebases the
+      // window; it must also repair frozen pointers whose origins disappeared
+      // or were themselves rebased/clipped. Comparing the actual origin view
+      // avoids treating a surviving turn id or another pointer as evidence.
+      const originsIntact = delivered
+        ? [...delivered.sourceOrigins].every(([origin, observation]) =>
+          typeof observation === "string" && deliveredObservations.get(origin) === observation)
+        : sourcePointerOrigins(renderCache.get(freezeKey)).size === 0;
+      if (originsIntact) {
+        p += renderCache.get(freezeKey);
+        if (delivered) {
+          recordDeliveredSourceLines(delivered.observation, deliveredSourceLines, recordedTurn);
+          deliveredObservations.set(recordedTurn, delivered.observation);
+        }
+        frozenEnd = p.length;
+        continue;
+      }
+      rebased = delivered;
+    }
     const fragStart = p.length;
-    const shellReplay = slimSuccessfulShellReplay(turn.action, turn.observation, {
+    const rawObservation = rebased?.rawObservation ?? turn[RAW_SOURCE_OBSERVATION] ?? turn.observation;
+    const shellReplay = slimSuccessfulShellReplay(turn.action, rawObservation, {
       enabled: slimSuccessfulShellActions,
     });
+    const sourceObservation = compactSourceRanges(shellReplay.observation, deliveredSourceLines, recordedTurn);
     if (turn.action) {
       // Scrub the replayed action too: a prior write_file/replace whose content contains
       // `<|im_start|>` or a `<think>` block would otherwise inject a fake turn on replay
@@ -620,7 +699,6 @@ export function buildPrompt({
       (Number.isInteger(repoContextTurn) && turnId === repoContextTurn)
       || sameRepositoryView(turn.action?.q, repoContextQuery)
     );
-    const recordedTurn = Number.isInteger(turn.i) ? turn.i + 1 : turnIndex + 1;
     // Under immutableHistory the substitutions below are skipped entirely and the
     // affected paths are collected instead, to be named once after history.
     if (immutableHistory) {
@@ -629,7 +707,7 @@ export function buildPrompt({
     }
     const rewriteSuperseded = supersededRead && !immutableHistory;
     const controllerSuffix = preserveSlimmedControlAnnotations
-      ? controllerAnnotationSuffix(turn.observation)
+      ? controllerAnnotationSuffix(sourceObservation)
       : "";
     const observation = rewriteSuperseded
       ? `${staleRead
@@ -639,7 +717,7 @@ export function buildPrompt({
         ? `[turn ${recordedTurn}: repository query refreshed from the current tree in <open_files> below]`
         : clipKeepingControllerAnnotation(slimInspectReads(
           turn.action,
-          shellReplay.observation,
+          sourceObservation,
           immutableHistory ? EMPTY_SET : completeReadPaths,
           immutableHistory ? EMPTY_SET : staleReadPaths,
           recordedTurn,
@@ -647,6 +725,9 @@ export function buildPrompt({
         ), preserveSlimmedControlAnnotations));
     if (rewriteSuperseded) stubbedTurns.add(recordedTurn);
     const deliveredObservation = scrub(resolvePointer(observation, stubbedTurns));
+    recordDeliveredSourceLines(deliveredObservation, deliveredSourceLines, recordedTurn);
+    deliveredObservations.set(recordedTurn, deliveredObservation);
+    const observationOffset = p.length - fragStart + template.open("user").length + "<observation>\n".length;
     p += userTurn(`<observation>\n${deliveredObservation}\n</observation>\n`);
     if (typeof onRenderedObservation === "function") {
       onRenderedObservation(turn, deliveredObservation,
@@ -658,7 +739,28 @@ export function buildPrompt({
     for (const block of contextUpdatePromptBlocks(turn.contextUpdates, template)) {
       p += userTurn(block);
     }
-    if (freezeKey != null) { renderCache.set(freezeKey, p.slice(fragStart)); frozenEnd = p.length; }
+    const auditBlock = contractAuditPromptText(turn.contractStateAudit, template);
+    if (auditBlock) p += userTurn(auditBlock);
+    const assertionBlock = contractAssertionPromptText(turn.contractAssertion, template);
+    if (assertionBlock) p += userTurn(assertionBlock);
+    if (freezeKey != null) {
+      // Rebase only the invalid observation. Historical action bytes and typed
+      // context updates remain exactly as originally emitted, even if a caller
+      // later recomputes the raw turn while shrinking its history window.
+      const fragment = rebased
+        ? rebased.fragment.slice(0, rebased.observationOffset) + deliveredObservation
+          + rebased.fragment.slice(rebased.observationOffset + rebased.observation.length)
+        : p.slice(fragStart);
+      if (rebased) p = p.slice(0, fragStart) + fragment;
+      renderCache.set(freezeKey, fragment);
+      frozenObservations.set(freezeKey, {
+        fragment, observation: deliveredObservation, rawObservation,
+        observationOffset: rebased?.observationOffset ?? observationOffset,
+        sourceOrigins: new Map([...sourcePointerOrigins(deliveredObservation)]
+          .map((origin) => [origin, deliveredObservations.get(origin)])),
+      });
+      frozenEnd = p.length;
+    }
   }
   // The stable head: everything up to the last frozen fragment. The runtime
   // extension-invariant gauge (agent.js) asserts the NEXT build byte-extends

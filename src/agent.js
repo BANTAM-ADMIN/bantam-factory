@@ -17,6 +17,7 @@ import { formatEdgeSmoke } from "./edge-smoke.js";
 import { formatSpecExamples } from "./spec-examples.js";
 import { formatLexicalSmoke } from "./logic/lexical-smoke.js";
 import { formatTypeContractSmoke } from "./logic/type-contract-smoke.js";
+import { numericContractWitness, formatNumericContractWitness } from "./logic/numeric-contract-witness.js";
 import { GATE_ENGAGEMENT_METRIC } from "./logic/gate-engagement.js";
 import { ModelClient } from "./model.js";
 import { acquireModelLock } from "./model-lock.js";
@@ -27,9 +28,12 @@ import { isTestCommand, isDeliverableRun, isInlineEvalProbe } from "./logic/deli
 import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer, unicodeUnitGauge, shipTheGeneratorSteer, enumerateContractNote } from "./logic/probe-discipline.js";
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "./verification-evidence.js";
+import { latestVerificationRecovery, verificationRecoveryNote } from "./verification-recovery.js";
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
-import { contractStateAuditEnabled, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
+import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
+import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand } from "./contract-audit-recovery.js";
+import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
 import { impactFooter, familyFooter, familyFindings, familyBlocks, constantTableFooter, crossScopeUsageFooter, peerFunctionFooter, trimSiteList } from "./edit-context.js";
@@ -139,7 +143,7 @@ import { decideFileOperations } from "./file-op-policy.js";
 import { parseAction } from "./actions.js";
 import { editMadeNoChange, editPaths, editSucceeded, isEditAction, isSourcePath, shellWritesSourceFile, turnEditApplied } from "./edit-actions.js";
 import { namedDeliverables, assessDeliverable, createDeliverableState } from "./deliverable.js";
-import { assessScaffold, createScaffoldState } from "./scaffold-gate.js";
+import { assessScaffold, createScaffoldState, workspaceOracleExists } from "./scaffold-gate.js";
 import { assessBugStall, createBugStallState } from "./bug-stall.js";
 import { assessScriptChurn, createChurnState } from "./script-churn.js";
 import { assessBulkEdit, createBulkEditState } from "./bulk-edit-gate.js";
@@ -195,7 +199,7 @@ import { detectSpecGap, formatSpecGap } from "./logic/spec-gap-detector.js";
 import { workspaceExports } from "./logic/workspace-exports.js";
 import { promptVersion } from "./prompt-rules.js";
 import { asyncAssertionGuard } from "./async-test-guard.js";
-import { extractImmutable, immutableViolations } from "./logic/self-check.js";
+import { immutableViolations } from "./logic/self-check.js";
 import { buildGrounding, codeMap, groundAction, refreshGrounding } from "./logic/grounding.js";
 import { scopedVerifyPlan } from "./logic/scoped-verify.js";
 import { buildToolRegistry, historyTool } from "./logic/tools.js";
@@ -455,7 +459,7 @@ async function runAgentCore({
   onNetRequest = null,        // interactive net-access approval hook (executor.js)
   dockerImage = undefined,
   readOnlyWorkspacePaths = null,
-  verificationWorkspaceReadOnly = false,
+  verificationWorkspaceReadOnly = envTruthy(process.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY),
   shellEnvOverrides = null,
   // Subprocess dependency injection for embedders/tests. The same runner sees
   // implementation shells and harness-owned verifiers, while their mount
@@ -591,6 +595,7 @@ async function runAgentCore({
   // BANTAM_STATE_AUDIT=0/off remains the rollback.
   stateAudit = process.env.BANTAM_STATE_AUDIT ?? "auto",
   contractStateAudit = process.env.BANTAM_CONTRACT_STATE_AUDIT ?? "auto",
+  contractAssertionStation = process.env.BANTAM_CONTRACT_ASSERTION_STATION ?? "off",
   // Two bounded objections prevent an immediate second-done bypass while the
   // global turn budget remains a hard escape from a heuristic audit.
   stateAuditMaxDeferrals = positiveInt(process.env.BANTAM_STATE_AUDIT_MAX_DEFERRALS, 2),
@@ -780,9 +785,26 @@ async function runAgentCore({
   // Mirror the executor's sandbox resolution so the prompt teaches the physics
   // the shell will actually have (per-action docker container vs host shell).
   const sandboxedShell = (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker";
-  ({ editGuard, shellScopeGuard } = composeInstructionGuards({
+  if (typeof verificationWorkspaceReadOnly !== "boolean") throw new TypeError("verificationWorkspaceReadOnly must be a boolean");
+  if (verificationWorkspaceReadOnly && !sandboxedShell) {
+    throw new Error("read-only configured verification requires the Docker shell sandbox; host mode cannot enforce it");
+  }
+  const verificationEnvironmentMatches = proof => verificationWorkspaceReadOnly
+    ? proof?.workspaceReadOnly === true : proof?.workspaceReadOnly !== true;
+  const resumingContext = Array.isArray(resumeTurns) && resumeTurns.length > 0;
+  const savedContextBasis = resumingContext
+    ? resumeTurns.findLast((turn) => turn?.contextBasis?.schema === 1)?.contextBasis : null;
+  const instructionGuards = composeInstructionGuards({
     workspace, instruction: task, editGuard, shellScopeGuard,
-  }));
+    frozenTests: savedContextBasis?.frozenTests ?? null,
+  });
+  ({ editGuard, shellScopeGuard } = instructionGuards);
+  // Only exact invocation-frozen files, never the whole test directory: new
+  // worker tests stay writable, supplied tests are read-only in Docker too.
+  if (instructionGuards.protectedExistingTests?.length) {
+    readOnlyWorkspacePaths = [...new Set([...(readOnlyWorkspacePaths ?? []),
+      ...instructionGuards.protectedExistingTests])];
+  }
   const exec = new Executor(workspace, {
     probeEnabled,
     noopEditGuard,
@@ -797,11 +819,11 @@ async function runAgentCore({
   });
   // Self-check arm phase: snapshot instruction-named immutable files BEFORE the first write, so
   // the done-gate can prove they are untouched. Off (mode "none") for tasks that name none.
-  const immutableInv = extractImmutable(task);
+  const immutableInv = instructionGuards.invariants;
   const immutableSnap = immutableInv.mode !== "none" ? immutableViolations.snapshot(workspace, immutableInv) : null;
-  const resumingContext = Array.isArray(resumeTurns) && resumeTurns.length > 0;
-  const savedContextBasis = resumingContext
-    ? resumeTurns.find((turn) => turn?.contextBasis?.schema === 1)?.contextBasis : null;
+  if (immutableSnap && instructionGuards.frozenTestCheckpoint) {
+    Object.assign(immutableSnap.hashes, instructionGuards.frozenTestCheckpoint.hashes);
+  }
   const testProvenance = createTestProvenance(workspace, {
     protectedPath: (relative) => Boolean(editGuard?.(relative)),
     ...(resumingContext ? { snapshot: savedContextBasis?.testProvenance ?? null } : {}),
@@ -815,10 +837,20 @@ async function runAgentCore({
       .slice(0, 4).map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.truncated === true || document.text.length > 12000 }))
     : uneditedTaskSpecDocuments(task, [], exec).slice(0, 4)
       .map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.text.length > 12000 }));
-  const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments };
-  let contextBasisRecorded = Boolean(savedContextBasis);
+  const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments,
+    ...(instructionGuards.frozenTestCheckpoint ? { frozenTests: instructionGuards.frozenTestCheckpoint } : {}) };
+  let contextBasisRecorded = Boolean(savedContextBasis)
+    && (!instructionGuards.frozenTestCheckpoint || savedContextBasis.frozenTests?.instructionSha256 === instructionGuards.frozenTestCheckpoint.instructionSha256);
   const contractAuditEnabled = !interactive && !advisoryMode
     && contractStateAuditEnabled(contractStateAudit, task, suppliedTaskDocuments);
+  const collectionAuditEnabled = contractAuditEnabled
+    && collectionContractAuditApplies(task, suppliedTaskDocuments);
+  // Reuse the explicitly enabled, isolated probe machinery. This checkpoint
+  // owns the assertion procedure, never its model-designed expected outcome.
+  const assertionStationEnabled = collectionAuditEnabled && probeEnabled
+    && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker"
+    && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")
+    && !/^(?:0|false|no|off)$/i.test(String(contractAssertionStation));
   const diagnosticTaskContract = [String(task ?? ""),
     ...suppliedTaskDocuments.map((document) =>
       `SUPPLIED DOCUMENT ${document.path}:\n${document.text.slice(0, 12000)}${document.truncated || document.text.length > 12000 ? "\n[document truncated; do not infer omitted requirements]" : ""}`),
@@ -910,9 +942,13 @@ async function runAgentCore({
   // (2026-08-16, .bantam/runs/2026-08-16T17-22-16-517Z.json) made zero shell
   // calls across 60 turns: `node --test …` appears in none of its 82 prompts.
   // An instruction the model cannot follow is not an instruction.
+  const numericWitness = numericContractWitness(task);
+  const numericWitnessText = formatNumericContractWitness(numericWitness);
+  if (numericWitness) onEvent({ type: "numeric_contract_witness", witness: numericWitness });
   const withVerificationNote = (text) => (verificationScript
     ? `${text}\n\nVerification for this task — run it yourself with shell after an edit, do not wait to be told:\n  ${verificationScript}`
-    : text);
+      + (verificationWorkspaceReadOnly ? "\nConfigured acceptance verification runs in Docker with the entire source workspace READ-ONLY and a fresh writable /tmp. Tests must create temporary fixtures with the platform temp directory (for Node: os.tmpdir() + fs.mkdtempSync), not inside the source workspace, and must not depend on scratch files from earlier shell actions. Ordinary edits and manual shell commands remain writable; their green results do not substitute for this read-only configured check. The harness runs the configured check before accepting done." : "")
+    : text) + (numericWitnessText ? `\n\n${numericWitnessText}` : "");
   let env = withVerificationNote(map ? `${map}\n\n${safeListing(workspace)}` : safeListing(workspace));
   const thinkP = deriveThinkPrefills(model.assistantPrefill, model.thinkMarkers);
   // The bare assistant-turn opener for this template family (`<|im_start|>assistant\n`
@@ -995,6 +1031,8 @@ async function runAgentCore({
         queryTool: Object.prototype.hasOwnProperty.call(t, "queryTool") ? t.queryTool : repositoryQueryTool(t),
         ...(typeof t.queryExecuted === "boolean" ? { queryExecuted: t.queryExecuted } : {}),
         ...(typeof t.editApplied === "boolean" ? { editApplied: t.editApplied } : {}),
+        ...(typeof t.doneAccepted === "boolean" ? { doneAccepted: t.doneAccepted } : {}),
+        ...(t.controllerStop ? { controllerStop: structuredClone(t.controllerStop) } : {}),
         ...(t.sourceEditedByShell === true ? { sourceEditedByShell: true } : {}),
         ...(Array.isArray(t.shellChangedPaths) ? { shellChangedPaths: t.shellChangedPaths.slice() } : {}),
         ...(t.shellScopeRollback ? { shellScopeRollback: structuredClone(t.shellScopeRollback) } : {}),
@@ -1007,6 +1045,7 @@ async function runAgentCore({
         ...(t.preview ? { preview: t.preview } : {}),
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
+        ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
@@ -1210,6 +1249,7 @@ async function runAgentCore({
     patchActionPolicy,
     writeBatchEnabled: Boolean(writeBatch),
     probeEnabled: Boolean(probeEnabled),
+    contractAssertionStationEnabled: assertionStationEnabled,
     fileOperationPolicy,
     verificationPolicy,
     verificationTriggered: false,
@@ -1309,6 +1349,7 @@ async function runAgentCore({
   let summary = null;
   let responded = false;   // the run ended with a conversational `respond`, not a task `done`
   let blocked = null;      // structured environment/policy block; distinct from done/interrupted
+  let controllerStop = null; // a bounded controller stop is never accepted completion
   // Resilience: a model error must never crash the run. Transient errors are
   // retried in model.complete(); here we (a) shrink the included history on a
   // context-window overflow and retry, and (b) on any unrecoverable error end the
@@ -1632,6 +1673,7 @@ async function runAgentCore({
     }
   }
   let workspaceChangedDuringRun = false;
+  let hasAuthoredWork = false;
   const knownArtifacts = new Set(taskOutputPaths);
   // Frozen copy: what the TASK itself names as its output. knownArtifacts grows
   // as the run produces likely-artifact files, which is right for relevance
@@ -1650,7 +1692,10 @@ async function runAgentCore({
       ...(turnEditApplied(turn) ? editPaths(prior) : []),
       ...(Array.isArray(turn?.shellChangedPaths) ? turn.shellChangedPaths : []),
     ];
-    if (changedPaths.length) workspaceChangedDuringRun = true;
+    if (changedPaths.length) {
+      workspaceChangedDuringRun = true;
+      hasAuthoredWork = true;
+    }
     const changedDocuments = changedPaths
       .filter((candidate) => knownArtifacts.has(candidate) && isDocumentArtifactPath(candidate));
     if (changedDocuments.length) {
@@ -1997,6 +2042,7 @@ async function runAgentCore({
       autoForceEditAfter,
       progresslessTurns,
       sourceProvenanceRequired: Boolean(sourceProvenance),
+      hasAuthoredWork,
     });
     // A hard duplicate spiral (the SAME action deduped 3+ times in a row) engages the wrap-up mask
     // immediately — text steering escalated 13 times without effect in the observed case, and each
@@ -2004,7 +2050,22 @@ async function runAgentCore({
     // The 3-bounce duplicate breaker applies in BOTH modes: the autonomous
     // self-hosting runs looped on deduped repeats with the breaker gated
     // interactive-only (v2: 15 bounces; v3: 10 subrange re-reads).
+    const recoveryEvidence = latestVerificationRecovery(turns);
+    const auditRecovery = collectionAuditEnabled
+      ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly }) : null;
+    const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
+      && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
+    const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
+      && investigationActionCount >= callerInvestigationActionLimit;
+    const verificationRecoveryTurn = useGrammar && (consecutiveDuplicates >= 3 || stalledAfterAuthoredWork)
+      && Boolean(recoveryEvidence || auditRecovery) && !autoForceEdit && !forceBuildEdit
+      && !documentRevisionTurn && !documentReviewTurn
+      && !callerInvestigationLimitReached && !callerExcludedActions.includes("shell")
+      && !(interactive && interactiveReconStreak >= interactiveReconLimit)
+      && maskedVerbForTurn !== "shell";
     const forceWrapUp = (useGrammar && consecutiveDuplicates >= 3)
+      || verificationRecoveryTurn
       || (interactive && useGrammar && interactiveReconStreak >= interactiveReconLimit)
       // The last two turns of an interactive budget are for LANDING, not
       // looking. The typewriter PWA replay got six advisory countdown notes
@@ -2012,8 +2073,7 @@ async function runAgentCore({
       // "Next:" line (chat r1 @ 2026-08-17T23:24). Words steer 1/3 of the
       // time; the mask lands 3/3 — recon off, write/done/respond stay live.
       || (interactive && useGrammar && maxTurns - turns.length - 1 <= 1)
-      || (useGrammar && callerInvestigationActionLimit !== null
-        && investigationActionCount >= callerInvestigationActionLimit)
+      || callerInvestigationLimitReached
       || autoForceEdit;
     // Compose every active per-turn mask into one exclusion set (turn-mask.js). The composition is
     // pure and unit-tested there; the anti-trap invariant that keeps read_file available on
@@ -2022,6 +2082,7 @@ async function runAgentCore({
       useGrammar,
       baseExcludeVerbs: callerExcludedActions,
       forceWrapUp,
+      verificationRecoveryTurn,
       forceBuildEdit,
       documentRevisionTurn,
       documentReviewTurn,
@@ -2031,8 +2092,8 @@ async function runAgentCore({
     });
     // A fixture experiment is investigation, never an escape from edit-only,
     // source-review, or wrap-up masks. Keep this candidate opt-in and local.
-    if (useGrammar && (forceWrapUp || forceBuildEdit || documentRevisionTurn
-        || documentReviewTurn || lineEditRecoveryTurn)) requestedExclusions.push("probe");
+    if (useGrammar && ((forceWrapUp && !verificationRecoveryTurn) || forceBuildEdit || documentRevisionTurn
+        || documentReviewTurn || (lineEditRecoveryTurn && !verificationRecoveryTurn))) requestedExclusions.push("probe");
     // Caller policy is expressed against the complete protocol so dynamically
     // enabled verbs (patch/edit_lines/file ops) cannot escape it. Grammar/schema
     // generation is stricter: it rejects exclusions for verbs that are not
@@ -2067,6 +2128,11 @@ async function runAgentCore({
     if (forceWrapUp) {
       metrics.wrapUpMasks++;
       onEvent({ type: "wrap_up_mask" });
+    }
+    if (verificationRecoveryTurn) {
+      metrics.verificationRecoveryMasks = (metrics.verificationRecoveryMasks ?? 0) + 1;
+      onEvent({ type: "verification_recovery_mask", evidence: recoveryEvidence,
+        ...(auditRecovery ? { contractAudit: { turn: auditRecovery.turn, promptSha256: auditRecovery.promptSha256 } } : {}) });
     }
     const turnStart = nowMs();
     // Pull one valid action, allowing a few repair attempts.
@@ -2160,6 +2226,7 @@ async function runAgentCore({
     const workingNoteReanchor = formatWorkingNoteReanchor(temporalState, {
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
+      recoveryEvidence: recoveryEvidence ?? auditRecovery,
     });
     let repositoryText = "";
     let repositoryTurnId = null;
@@ -2294,7 +2361,9 @@ async function runAgentCore({
       const historyForPrompt = repairObs
         ? [...turns, { observation: repairObs }]
         : (forceWrapUp
-          ? [...turns, { observation: autoForceEdit
+          ? [...turns, { observation: verificationRecoveryTurn
+            ? [recoveryEvidence ? verificationRecoveryNote(recoveryEvidence) : "", contractAuditRecoveryNote(auditRecovery)].filter(Boolean).join("\n\n")
+            : autoForceEdit
             ? (extensionTrajectory ? AUTO_EDIT_NOTE_EXTENSION : AUTO_EDIT_NOTE)
             : WRAP_UP_NOTE }]
           : turns);
@@ -2332,10 +2401,10 @@ async function runAgentCore({
         : "";
       const editRecoveryReanchor = lineEditRecoveryTurn
         ? [
-            `EDIT RECOVERY ACTIVE: an exact-match edit to ${editRecoveryPath} failed even though the proposed semantic fix is retained in history.`,
+            `EDIT RECOVERY ACTIVE: an exact-match edit to ${editRecoveryPath} failed. That proposal was NOT APPLIED; it is neither the current file nor a verified fix.`,
             "Do not reconstruct old text. Use the fresh line-numbered context update or current read_file output. If the required range is omitted, read_file that exact path and range before editing; never guess line numbers or overwrite unseen sections.",
             ...(lineEditSyntaxLine ? [lineEditSyntaxLine] : []),
-            "This recovery stays active until a real edit lands.",
+            "This line-edit aid does not block executable verification. Repair a demonstrated defect using current bytes; do not make an unrelated edit just to clear recovery. If the current state needs no repair, verify it and finish accurately.",
           ].join("\n")
         : "";
       const documentReviewReanchor = documentReviewTurn
@@ -2925,6 +2994,7 @@ async function runAgentCore({
     let progressGate = progressAwareness && !sourceProvenance
       ? progressGateFor(action, {
           progresslessTurns,
+          hasAuthoredWork,
           threshold: progressNudgeAfter,
           knownArtifacts: [...knownArtifacts],
           pendingDocumentArtifacts: [...pendingDocumentArtifacts],
@@ -3014,7 +3084,18 @@ async function runAgentCore({
     // resident in this prompt. Prompt slimming may have replaced the old body
     // with a pointer after the path slid out of <open_files>; in that state a
     // duplicate/ledger rejection creates an information-deadlocked model.
-    const duplicate = !gateRejection && !interactiveStop && !groundReject
+    // A newly delivered audit requests a new execution receipt. Permit one
+    // execution of a required check after that audit even if this exact command
+    // was green beforehand. This is not a workspace mutation or blanket reset:
+    // reads, unrelated commands, subsequent repeats and caller guards stay put.
+    const auditCheckRepeat = auditRecovery && action.a === "shell"
+      && ((auditRecovery.needsFocused && isFocusedAuditCommand(action.c, verificationScript))
+        || (auditRecovery.needsProject && verificationScript && String(action.c).trim() === verificationScript.trim()))
+      && !turns.slice(Math.max(auditRecovery.turn,
+        auditRecovery.needsProject && String(action.c).trim() === String(verificationScript).trim()
+          ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
+        turn.shellExecution && (turn.shellExecution.command === action.c || turn.shellExecution.executedCommand === action.c));
+    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       ? repetition.check(action)
@@ -3073,16 +3154,16 @@ async function runAgentCore({
     if (externalMutationRejection) {
       result = { observation: externalMutationRejection };
     } else if (artifactGateTermination) {
-      result = { observation: artifactGateTermination, done: true, summary: "Stopped by artifact verification gate; grading current workspace state." };
+      result = { observation: artifactGateTermination, done: true, controllerStop: { kind: "artifact-verification-gate", turn: turns.length }, summary: "Stopped by artifact verification gate; grading current workspace state." };
     } else if (progressGateTermination) {
-      result = { observation: progressGateTermination, done: true, summary: "Stopped by progress gate; grading current workspace state." };
+      result = { observation: progressGateTermination, done: true, controllerStop: { kind: "progress-gate", turn: turns.length }, summary: "Stopped by progress gate; grading current workspace state." };
     } else if (interactiveStop) {
       consecutiveInteractiveStops++;
       if (consecutiveInteractiveStops >= interactiveStopMax) {
         // The model has ignored the investigation stop repeatedly. Hard-terminate so an
         // interactive session can't spin until maxTurns; hand control back to the user.
         metrics.interactiveStopTerminations++;
-        result = { observation: interactiveStop, done: true, summary: "Stopped: I kept investigating after being asked to wrap up. Re-steer with a more specific instruction, or say \"keep going\"." };
+        result = { observation: interactiveStop, done: true, controllerStop: { kind: "interactive-budget", turn: turns.length }, summary: "Stopped: I kept investigating after being asked to wrap up. Re-steer with a more specific instruction, or say \"keep going\"." };
         onEvent({ type: "interactive_budget_terminated", action, stops: consecutiveInteractiveStops });
       } else {
         result = { observation: interactiveStop };
@@ -3404,6 +3485,10 @@ async function runAgentCore({
         metrics.shellCreatedFileNotes = (metrics.shellCreatedFileNotes ?? 0) + 1;
       }
     }
+    for (const review of result.editOutcome?.preservationReviews ?? []) {
+      metrics.editPreservationReviews = (metrics.editPreservationReviews ?? 0) + 1;
+      onEvent({ type: "edit_preservation_review", turn: turns.length, review });
+    }
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
@@ -3518,6 +3603,7 @@ async function runAgentCore({
     }
     if (directEditSucceeded || shellChangedWorkspace) {
       workspaceChangedDuringRun = true;
+      hasAuthoredWork = true;
       workspaceEditGeneration++;
       if (previewFailureSequence) {
         previewFailureSequence = notePreviewFailureEdit(previewFailureSequence);
@@ -3527,6 +3613,7 @@ async function runAgentCore({
       editsSinceBestSnapshot += 1;   // the regression guard only judges runs that follow an edit
       outcomeCycles.noteWorkspaceChanged();
     }
+    if (result.shellExecution) result.shellExecution.workspaceReadOnly = false; // Ordinary worker shells keep their writable workspace.
     result.verificationEvidence = verificationEvidence({
       execution: result.shellExecution,
       configuredCommand: verificationScript,
@@ -3535,6 +3622,9 @@ async function runAgentCore({
       // describes the before or after tree. A separate verifier settles it.
       invalidated: shellChangedWorkspace || Boolean(result.shellScopeRollback?.violations?.length),
     });
+    if (result.verificationEvidence?.uncertainty) {
+      result.observation += `\n[verification uncertainty] ${result.verificationEvidence.uncertainty}. This is not a passing check. Run the executable check directly, without output filters or shell control that can mask its exit status.`;
+    }
     if (shellChangedWorkspace && result.verificationEvidence) {
       result.observation += "\n[verification-scope] This command also changed source files, so its test output is not proof of the final file state. Run the verifier separately, without source writes, to obtain current evidence.";
     }
@@ -3996,14 +4086,13 @@ async function runAgentCore({
       // deliverable over and over with no separate verifier — the exponential
       // guess-and-check trap. An oracle is ANY code/script file in the workspace
       // that is not itself a deliverable (a numpy reference, a stage-test .c).
-      const ORACLE_EXT = /\.(py|js|mjs|cjs|c|cc|cpp|rs|go|rb|pl|sh|lua)$/i;
-      const oracleExists = () => {
-        try {
-          const delivBases = new Set(deliverables.map((d) => String(d).split("/").pop()));
-          return fs.readdirSync(workspace).some((n) => ORACLE_EXT.test(n) && !delivBases.has(n));
-        } catch { return false; }
-      };
-      const sc = assessScaffold(action, { deliverables, oracleExists }, scaffoldState);
+      const oracleExists = () => workspaceOracleExists(workspace, deliverables);
+      const sc = assessScaffold(action, { deliverables, oracleExists,
+        execution: result.shellExecution ?? null,
+        outcome: verificationEvidence({ execution: result.shellExecution,
+          invalidated: Boolean(result.shellExecution?.invalidated || result.shellScopeRollback?.violations?.length),
+        })?.status ?? null,
+      }, scaffoldState);
       if (sc.steer) {
         metrics.scaffoldSteers = (metrics.scaffoldSteers ?? 0) + 1;
         result.observation += `\n\n${sc.message}`;
@@ -4416,7 +4505,7 @@ async function runAgentCore({
         });
         if (!r.aborted) {
           result.verificationEvidence = verificationEvidence({
-            execution: r, command: plan.command, configuredCommand: verificationScript,
+            execution: { ...r, workspaceReadOnly: verificationWorkspaceReadOnly }, command: plan.command, configuredCommand: verificationScript,
             generation: workspaceEditGeneration, source: "scoped",
           });
           verifyCadenceSentinel.note({ ranVerification: true });
@@ -4504,7 +4593,7 @@ async function runAgentCore({
       });
       if (!r.aborted) {
         result.verificationEvidence = verificationEvidence({
-          execution: r, command: verificationScript, configuredCommand: verificationScript,
+          execution: { ...r, workspaceReadOnly: verificationWorkspaceReadOnly }, command: verificationScript, configuredCommand: verificationScript,
           generation: workspaceEditGeneration, source: "automatic",
         });
         verifyCadenceSentinel.note({ ranVerification: true });
@@ -4702,14 +4791,16 @@ async function runAgentCore({
         const currentEvidence = result.verificationEvidence;
         const currentProof = currentEvidence?.generation === workspaceEditGeneration
           && currentEvidence.configuredCommand === verificationScript
+          && verificationEnvironmentMatches(currentEvidence)
           && (currentEvidence.status === "pass"
             || (currentEvidence.status === "fail" && currentEvidence.command === verificationScript))
-          ? { status: currentEvidence.status, exitCode: currentEvidence.exitCode,
+          ? { status: currentEvidence.status, exitCode: currentEvidence.exitCode, workspaceReadOnly: currentEvidence.workspaceReadOnly,
             detail: clip(currentEvidence.rawOutput) }
           : null;
         const cached = doneVerificationProof
           && doneVerificationProof.generation === workspaceEditGeneration
           && doneVerificationProof.command === verificationScript
+          && verificationEnvironmentMatches(doneVerificationProof.verification)
           ? doneVerificationProof
           : null;
         let proof = currentProof ?? cached?.verification;
@@ -4827,7 +4918,9 @@ async function runAgentCore({
           unverifiedEditSteerGiven = false;
         }
         landingNote += proof.status === "pass"
-          ? " The verify command PASSES on the current tree. Remove any scratch files you created, then emit done — an unlanded run scores zero even with working code."
+          ? (turnsRemaining <= 1
+            ? " The verify command PASSES on the current tree. Emit done now with the verified result and any remaining limitations. Do not spend the final action on optional cleanup; disclose leftover scratch in the summary. Any necessary edit still requires verification."
+            : " The verify command PASSES on the current tree. Finish any necessary cleanup now, preserving time for verification and done. Do not start optional changes.")
           : landingRestored
             ? ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nYou broke working code with edits you never re-verified, and the budget is nearly gone — I restored your best-passing version of ${[...bestSnapshot.keys()].join(", ")} (now shown in <open_files>). Run the verify command to confirm it is green, then emit done. Do NOT re-apply the change that broke it.`
             : proof.status === "unverified"
@@ -5113,16 +5206,25 @@ async function runAgentCore({
     }
     // A fresh, bounded auditor sees only the original contract and current code,
     // not accumulated failures, repair claims, or the primary agent's role.
-    // Run early, then at most once more after a changed generation reaches green.
+    // State-machine audits run early, then once more after changed code is green.
+    // Collection/API audits reserve the first review for green or proposed done:
+    // an incomplete initial edit must not spend the zero-work boundary review.
     const postEditGreen = result.verificationEvidence?.status === "pass"
       && result.verificationEvidence.generation === workspaceEditGeneration;
+    const contractAuditCheckpoint = collectionAuditEnabled
+      ? hasAuthoredWork && (postEditGreen || (action.a === "done" && result.done && !result.controllerStop))
+      : ((contractAudits === 0 && directEditSucceeded) || (contractAudits === 1 && postEditGreen));
     if (contractAuditEnabled && contractAudits < 2
         && workspaceEditGeneration !== lastContractAuditGeneration
-        && ((contractAudits === 0 && directEditSucceeded) || (contractAudits === 1 && postEditGreen))) {
+        && contractAuditCheckpoint) {
       const auditSources = collectContractAuditSources([...editedPathsThisRun, ...openList],
         (relative) => exec.safeReadText(exec.resolveExisting(relative)));
+      const previousAudit = turns.filter(turn => turn.contractStateAudit).at(-1)?.contractStateAudit;
+      const sameAuditedSources = collectionAuditEnabled && previousAudit
+        && JSON.stringify(previousAudit.sources) === JSON.stringify(auditSources.sources.map(({ path, sha256 }) => ({ path, sha256 })));
       if (auditSources.sources.some((source) => editedPathsThisRun.has(source.path))
-          && auditSources.sources.reduce((total, source) => total + source.text.length, 0) >= 400) {
+          && !sameAuditedSources
+          && auditSources.sources.reduce((total, source) => total + source.text.length, 0) >= (collectionAuditEnabled ? 1 : 400)) {
         contractAudits++;
         lastContractAuditGeneration = workspaceEditGeneration;
         onEvent({ type: "contract_state_audit_start", generation: workspaceEditGeneration, number: contractAudits });
@@ -5137,11 +5239,67 @@ async function runAgentCore({
         metrics.contractStateAudits = (metrics.contractStateAudits ?? 0) + 1;
         metrics.contractStateAuditTokens = (metrics.contractStateAuditTokens ?? 0) + (result.contractStateAudit.tokens ?? 0);
         onEvent({ type: "contract_state_audit", status: result.contractStateAudit.status, generation: workspaceEditGeneration });
+        if (assertionStationEnabled && result.contractStateAudit.status === "report"
+            && !excludeThisTurn.includes("probe") && !excludeThisTurn.includes("shell")
+            && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)
+            && auditSources.sources.some(source => /\.[cm]?js$/i.test(source.path))) {
+          onEvent({ type: "contract_assertion_start", generation: workspaceEditGeneration,
+            auditPromptSha256: result.contractStateAudit.promptSha256 });
+          try {
+            result.contractAssertion = await runContractAssertionStation({ workspace, model, task,
+              documents: suppliedTaskDocuments, sources: auditSources.sources,
+              audit: result.contractStateAudit, generation: workspaceEditGeneration,
+              signal, dockerImage, processRunner: shellProcessRunner });
+          } catch (error) {
+            if (signal?.aborted) { markInterrupted("contract_assertion"); break; }
+            throw error;
+          }
+          metrics.contractAssertionStations = (metrics.contractAssertionStations ?? 0) + 1;
+          metrics.contractAssertionTokens = (metrics.contractAssertionTokens ?? 0) + (result.contractAssertion.tokens ?? 0);
+          if (result.contractAssertion.probeEvidence) onEvent({ type: "probe",
+            probeEvidence: structuredClone(result.contractAssertion.probeEvidence) });
+          if (result.contractAssertion.status === "assertion_passed" && verificationScript) {
+            // A preceding green suite cannot establish the post-assertion
+            // checkpoint. Run the selected verifier now, on the same tree.
+            let evidence = null;
+            const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
+              doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
+              readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly,
+              processRunner: shellProcessRunner,
+              onExecution: execution => { evidence = verificationEvidence({ execution, command: verificationScript,
+                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" }); },
+            });
+            if (proof.interrupted || abortRequested()) markInterrupted("verification");
+            // A double-check can downgrade a first pass. Do not serialize the
+            // first execution's success as the combined acceptance result.
+            if (evidence && proof.status !== "pass") evidence = { ...evidence, status: proof.status };
+            result.contractAssertion.projectVerification = verificationReceipt(evidence);
+            result.contractAssertion.projectDetail = proof.detail;
+            if (evidence) result.verificationEvidence = evidence;
+            doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+              verification: evidence?.status === "pass" ? proof : { ...proof, status: evidence?.status ?? "unverified" }, evidence };
+          }
+          result.observation += `\n\n${formatContractAssertionStation(result.contractAssertion)}`;
+          onEvent({ type: "contract_assertion", contractAssertion: structuredClone(result.contractAssertion),
+            status: result.contractAssertion.status, generation: workspaceEditGeneration });
+        }
         if (result.done && result.contractStateAudit.status === "report") {
           result.done = false;
           result.summary = undefined;
           result.observation += "\nReview this newly supplied audit before requesting completion again.";
         }
+      }
+    }
+    if (collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
+      const pendingAudit = pendingContractAudit(turns, { generation: workspaceEditGeneration,
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly });
+      if (pendingAudit) {
+        result.done = false;
+        result.summary = undefined;
+        result.observation = contractAuditRecoveryNote(pendingAudit);
+        metrics.contractAuditRecoveryRejections = (metrics.contractAuditRecoveryRejections ?? 0) + 1;
+        onEvent({ type: "contract_audit_recovery", auditTurn: pendingAudit.turn,
+          promptSha256: pendingAudit.promptSha256, generation: workspaceEditGeneration });
       }
     }
     // Done-gates. The check runs in every mode; delivery decides whether to block an
@@ -5294,11 +5452,47 @@ async function runAgentCore({
       // evidence, so only a real red bounces. Reuses the gate's cached proof when
       // the workspace is unchanged (the terminal verify reuses it too).
       // BANTAM_VERIFY_DONE_GATE=0 disables.
+      // An operator-selected acceptance environment is authority, not a bounded
+      // advisory objection. A writable manual check (or exhausted verify_red
+      // budget) cannot certify this read-only configured verification.
+      if (result.done && verificationScript && verificationWorkspaceReadOnly) {
+        let cached = doneVerificationProof
+          && doneVerificationProof.generation === workspaceEditGeneration
+          && doneVerificationProof.command === verificationScript
+          && verificationEnvironmentMatches(doneVerificationProof.verification)
+          ? doneVerificationProof : null;
+        if (!cached) {
+          metrics.verifyDoneGateRuns++;
+          let evidence = null;
+          const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
+            doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
+            readOnlyWorkspacePaths, workspaceReadOnly: true, processRunner: shellProcessRunner,
+            onExecution: execution => { evidence = verificationEvidence({ execution, command: verificationScript,
+              configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" }); },
+          });
+          if (proof.interrupted || abortRequested()) markInterrupted("verification");
+          cached = doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+            verification: evidence?.status === "pass" ? proof : { ...proof, status: evidence?.status ?? "unverified" }, evidence };
+        }
+        if (cached.evidence) result.verificationEvidence = cached.evidence;
+        if (cached.verification.status !== "pass") {
+          result.done = false;
+          result.summary = undefined;
+          gateCounts.verify_red = (gateCounts.verify_red ?? 0) + 1;
+          metrics[GATE_METRIC.verify_red] = gateCounts.verify_red;
+          result.observation = `[verification environment] The configured read-only check did not pass: ${verificationScript}. `
+            + "The source workspace is read-only; create test fixtures in a fresh platform temporary directory (/tmp), not beside source files. "
+            + "Writable manual-shell results do not certify this environment. Fix the reported issue before requesting done.\n"
+            + cached.verification.detail;
+          onEvent({ type: "done_rejected", gate: "verify_red", reason: result.observation });
+        }
+      }
       await applyExpensiveDoneGate("verify_red", VERIFY_DONE_GATE_MAX, async () => {
         if (!verificationScript) return null;
         const cached = doneVerificationProof
           && doneVerificationProof.generation === workspaceEditGeneration
           && doneVerificationProof.command === verificationScript
+          && verificationEnvironmentMatches(doneVerificationProof.verification)
           ? doneVerificationProof.verification
           : null;
         let proof = cached;
@@ -5580,7 +5774,7 @@ async function runAgentCore({
     }
     const progress = classifyProgress(action, result.observation, {
       workspaceChanged: shellChangedWorkspace,
-      doneAccepted: action.a === "done" && result.done,
+      doneAccepted: action.a === "done" && result.done && !result.controllerStop,
       knownArtifacts: [...knownArtifacts],
       toolUsed: queryToolUsed,
       queryValidatesArtifact: verifyingArtifact,
@@ -5623,6 +5817,7 @@ async function runAgentCore({
       repetition.record(action, result.observation, {
         turn: metrics.turns + 1,
         shellWorkspaceUnchanged: action.a === "shell" && !shellChangedWorkspace,
+        result,
       });
     }
 
@@ -5636,7 +5831,7 @@ async function runAgentCore({
         threshold: progressNudgeAfter,
         cooldown: progressNudgeCooldown,
       })) {
-        const nudge = formatProgressNudge(progresslessTurns, { sourceProvenance });
+        const nudge = formatProgressNudge(progresslessTurns, { sourceProvenance, hasAuthoredWork });
         result.observation += nudge;
         lastProgressNudgeAt = progresslessTurns;
         metrics.progressNudges++;
@@ -5722,6 +5917,8 @@ async function runAgentCore({
       reasoning,
       action,
       parsedAction: action,
+      ...(action.a === "done" ? { doneAccepted: Boolean(result.done && !result.controllerStop) } : {}),
+      ...(result.controllerStop ? { controllerStop: result.controllerStop } : {}),
       ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
       ...(modelCallIndex !== null ? { modelCallIndex } : {}),
       protocolViolation,
@@ -5733,6 +5930,7 @@ async function runAgentCore({
       scopedVerify: result.scopedVerify,   // trusted harness-run verdict (undefined if none)
       verificationEvidence: verificationReceipt(result.verificationEvidence),
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
+      ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
       shellExecution: shellReceipt,
       ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
@@ -5837,8 +6035,8 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit",
-        "contextBasis", "contextUpdates",
+        "verificationEvidence", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
+        "contextBasis", "contextUpdates", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)
@@ -5867,6 +6065,13 @@ async function runAgentCore({
       break;
     }
 
+    // result.done also suppresses ordinary postprocessing on a settled stop
+    // turn above. It must not become worker completion, release, or learning.
+    if (result.controllerStop) {
+      controllerStop = result.controllerStop;
+      summary = result.summary;
+      break;
+    }
     if (result.done) { done = true; summary = result.summary; responded = Boolean(result.responded); }
 
     // Adaptive workflow: if the pinned plan keeps failing, reflect and revise it
@@ -5897,6 +6102,7 @@ async function runAgentCore({
   const gateProof = doneVerificationProof
     && doneVerificationProof.generation === workspaceEditGeneration
     && doneVerificationProof.command === verificationScript
+    && verificationEnvironmentMatches(doneVerificationProof.verification)
     ? doneVerificationProof.verification
     : null;
   const shouldVerify = verificationScript && !blocked
@@ -5992,6 +6198,7 @@ async function runAgentCore({
     responded,
     interrupted,
     blocked,
+    controllerStop,
     modelFailure: terminalModelFailure,
     warnings,
     reachedDone: done,
@@ -6172,6 +6379,7 @@ async function verifyWithEnvironmentPresent({
     timedOut: Boolean(shellResult.timedOut),
     interrupted: Boolean(shellResult.aborted),
     sandbox: shellResult.sandbox,
+    workspaceReadOnly,
     detail,
   };
 }
@@ -6422,6 +6630,7 @@ const WORKING_NOTE_EDIT_CARRY = 4;
 export function formatWorkingNoteReanchor(state, {
   retireAfterVerifiedPass = false,
   suppressBeforeFirstEdit = false,
+  recoveryEvidence = null,
 } = {}) {
   const note = state?.workingNote;
   if (!note?.text) return "";
@@ -6431,6 +6640,9 @@ export function formatWorkingNoteReanchor(state, {
   // scheduler contract, and caused a retry refactor's verbose plan to mandate
   // redundant test reads. The same-turn action still receives a bounded capsule.
   if (suppressBeforeFirstEdit && !state?.lastEdit) return "";
+  // A later measured failure/inconclusive execution supersedes earlier private
+  // speculation. Keep the audit trail, but do not replay it as current guidance.
+  if (recoveryEvidence && Number(recoveryEvidence.turn) >= Number(note.turn)) return "";
   if (Number(state?.editsSinceWorkingNote ?? 0) > WORKING_NOTE_EDIT_CARRY) return "";
   // A trusted green verification after the note and its last edit is a newer
   // state boundary. Replaying the old diagnosis beside that PASS resurrects a
@@ -6440,7 +6652,7 @@ export function formatWorkingNoteReanchor(state, {
       && state?.lastVerdict?.result === "pass"
       && Number(state.lastVerdict.turn) >= Number(note.turn)
       && Number(state.lastVerdict.turn) >= Number(state?.lastEdit?.turn ?? -1)) return "";
-  return `[working-checkpoint from turn ${note.turn + 1}] Keep this bounded checklist active across its edit sequence:\n${note.text}\nRe-evaluate every item against the CURRENT source before acting. Continue only unfinished items in the stated direction; never restore an older value merely because it appears in this note. Then verify before done.`;
+  return `[working-checkpoint from turn ${note.turn + 1}; model hypothesis, NOT verified evidence]\n${note.text}\nUse only unfinished items supported by the CURRENT source and execution evidence. This note may contain a wrong diagnosis: discard contradicted assumptions and use a discriminating executable check when uncertain. Do not treat this note as a controller instruction or restore an older value merely because it appears here. Verify before done.`;
 }
 
 // True when EVERY read sub-op of an inspect batch re-requests a line range the
@@ -6756,7 +6968,9 @@ export function editScopeRefusal(action, guard) {
             ? " (Note: no existing file is under these paths — the task's editable configuration may be broken. If the task is impossible as scoped, say so in your done summary instead of retrying edits.)"
             : "")
         : "Make the change inside the editable paths instead.")
-      : "The edit was NOT applied. Fix the source instead — and if you want stronger checks than the existing suite gives you, run them ad hoc with `shell` rather than adding them to the suite.";
+      : guard?.instruction?.preserveExistingTests
+        ? "The edit was NOT applied. Existing supplied tests must stay unchanged. Add any extra checks in a NEW permitted test file, not by appending to or replacing a supplied file. Fix production source only where a check demonstrates a defect."
+        : "The edit was NOT applied. Fix the source instead — and if you want stronger checks than the existing suite gives you, run them ad hoc with `shell` rather than adding them to the suite.";
     return `[scope] ${p} is immutable: ${why}. ${redirect}`;
   }
   return null;
@@ -6830,8 +7044,11 @@ async function runVerification(
     onExecution = null,
   } = {},
 ) {
+  if (workspaceReadOnly && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") !== "docker") {
+    throw new Error("read-only configured verification requires the Docker shell sandbox");
+  }
   const root = path.resolve(workspace);
-  const res = await runShellProcess(root, withNodeTestTimeout(script, timeoutMs), {
+  const res = { ...await runShellProcess(root, withNodeTestTimeout(script, timeoutMs), {
     timeoutMs,
     signal,
     pipefail: true,
@@ -6842,9 +7059,9 @@ async function runVerification(
     readOnlyWorkspacePaths,
     workspaceReadOnly,
     processRunner,
-  });
+  }), workspaceReadOnly };
   onExecution?.(res);
-  const first = classifyVerificationResult(res, { root: workspace });
+  const first = { ...classifyVerificationResult(res, { root: workspace }), workspaceReadOnly };
   if (first.status !== "pass") return first;
   // A single verify run is a coin-flip on a flaky/nondeterministic suite, and a flaky PASS is the
   // dangerous case — a false green that certifies broken work. When enabled, re-run a pass once: if it
@@ -6854,7 +7071,7 @@ async function runVerification(
     // Byte-identical command to the first run: a re-run without the per-test
     // timeout is a different verifier, and a hanging test would outlive the
     // bound the first run promised.
-    const res2 = await runShellProcess(root, withNodeTestTimeout(script, timeoutMs), {
+    const res2 = { ...await runShellProcess(root, withNodeTestTimeout(script, timeoutMs), {
       timeoutMs,
       signal,
       pipefail: true,
@@ -6865,13 +7082,14 @@ async function runVerification(
       readOnlyWorkspacePaths,
       workspaceReadOnly,
       processRunner,
-    });
+    }), workspaceReadOnly };
     onExecution?.(res2);
-    const second = classifyVerificationResult(res2, { root: workspace });
+    const second = { ...classifyVerificationResult(res2, { root: workspace }), workspaceReadOnly };
     if (second.status === "fail") {
       return {
         status: "unverified",
         flaky: true,
+        workspaceReadOnly,
         exitCode: second.exitCode,
         detail: clip(`verifier PASSED once but FAILED on a re-run — flaky/nondeterministic, not a trustworthy green.\n${second.detail}`),
       };

@@ -20,13 +20,15 @@
 // write-compressor ("cat data.comp | decomp gives exactly data.txt"). When the
 // target is stated, reproducing it IS the gauge; everything else is a proxy.
 
+import { turnEditApplied } from "../edit-actions.js";
+
 const act = (turn) => (turn && (turn.action || turn.parsedAction)) || null;
 
 // The task states an end state the deliverable must reproduce. Requires an
 // explicit equivalence, not merely the word "output" — plenty of tasks name an
 // output file without supplying its expected contents.
 const TARGET_RE = new RegExp(
-  "\\b(?:gives?|produces?|yields?|results? in|converts? .{0,40}\\binto\\b|so that .{0,60}\\bmatches?\\b)\\s+(?:exactly\\s+)?\\S"
+  "\\b(?:gives?|produces?|yields?|results? in)\\s+exactly\\s+\\S"
   + "|\\bdesired\\s+(?:output|result|state|plasmid|sequence|file)\\b"
   + "|\\bexpected\\s+(?:output|result|contents?)\\b"
   + "|\\bidentical to\\b|\\bexactly matches?\\b|\\bmust (?:equal|reproduce|round-?trip)\\b",
@@ -38,19 +40,40 @@ const TARGET_RE = new RegExp(
 // the target", not "compared it in a way I recognise".
 const COMPARISON_RE = new RegExp(
   "\\b(?:diff|cmp|assertEqual|assert_equal|filecmp|sha256sum|md5sum)\\b"
+  + "|\\bassert\\s*\\.\\s*(?:strict\\s*\\.\\s*)?(?:equal|strictEqual|deepEqual|deepStrictEqual)\\s*\\("
   + "|==\\s*(?:open|expected|target|desired|golden|reference)"
   + "|(?:expected|target|desired|golden|reference)\\w*\\s*==",
   "i",
 );
 
-/** Every shell command plus the source of anything the run authored. */
+/** Recorded commands and accepted source, not refused proposals or prose.
+ * This is evidence of a comparison step, not proof that it passed, ran every
+ * assertion, or established semantic equivalence. Other completion gates own
+ * execution outcome and freshness.
+ */
 function evidence(turns) {
   const parts = [];
   for (const turn of turns ?? []) {
     const a = act(turn);
     if (!a) continue;
-    if (a.a === "shell" && typeof a.c === "string") parts.push(a.c);
-    if (typeof a.content === "string") parts.push(a.content);
+    if (turn.interrupted || turn.shellScopeRollback?.violations?.length) continue;
+    if (a.a === "shell") {
+      if (Object.hasOwn(turn, "shellExecution")) {
+        const execution = turn.shellExecution;
+        if (!execution || execution.blocked || execution.error || execution.invalidated
+            || execution.interrupted || execution.aborted || execution.timedOut || execution.bufferExceeded
+            || !Number.isInteger(execution.exitCode)) continue;
+        if (typeof execution.command === "string") parts.push(execution.command);
+      } else if (typeof a.c === "string" && !/^\s*(?:ERROR:|\[)/.test(String(turn.observation ?? ""))) {
+        parts.push(a.c);
+      }
+      continue;
+    }
+    if (turn.editOutcome?.applied === false || !turnEditApplied(turn)) continue;
+    if (a.a === "write_file" && typeof a.content === "string") parts.push(a.content);
+    if (["replace", "edit_lines"].includes(a.a) && typeof a.new === "string") parts.push(a.new);
+    if (a.a === "patch") for (const edit of a.edits ?? []) if (typeof edit.new === "string") parts.push(edit.new);
+    if (a.a === "write_batch") for (const file of a.files ?? []) if (typeof file.content === "string") parts.push(file.content);
   }
   return parts.join("\n");
 }

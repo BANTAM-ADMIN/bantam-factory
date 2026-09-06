@@ -52,6 +52,8 @@ test("a real passing landing check on an edit permits done without a redundant m
   assert.equal(receipt.generation, 1);
   assert.equal(result.turns[0].scopedVerify.verdict, "pass");
   assert.equal(result.verification.status, "pass");
+  assert.match(result.turns[0].observation, /Emit done now/);
+  assert.doesNotMatch(result.turns[0].observation, /Remove any scratch files.*then emit done/);
 });
 
 test("landing caches raw-result identity and resets full-verification cadence", async (t) => {

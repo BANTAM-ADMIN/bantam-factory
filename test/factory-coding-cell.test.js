@@ -56,6 +56,35 @@ function sink() {
 }
 
 describe("BANTAMFACTORY isolated coding cell", () => {
+  it("contains typed and legacy controller stops even when completion and verification claim success", async () => {
+    const cases = [
+      { controllerStop: { kind: "progress-gate", turn: 12 } },
+      { metrics: { artifactVerificationGateTerminations: 1 } },
+      { summary: "Stopped: I kept investigating after being asked to wrap up." },
+    ];
+    for (const [index, stop] of cases.entries()) {
+      const { workspace, factoryRoot } = fixture();
+      let verifierCalls = 0;
+      const originalVerification = { status: "pass", exitCode: 0, detail: "candidate checks passed" };
+      const worker = successfulAgent({ focused: originalVerification });
+      const built = await runFactoryCodingCell({
+        workspace, root: factoryRoot, jobId: `cell-controller-stop-${index}`, task: "change old to new",
+        focusedVerificationScript: "focused-check", verificationScript: "final-check",
+        runAgentFn: async options => ({ ...await worker(options), ...stop }),
+        verifier: async () => { verifierCalls++; return { pass: true, status: "pass" }; },
+      });
+      assert.equal(built.line.supervisor.status, "blocked");
+      assert.equal(built.line.events.some(event => event.type === "job.released"), false);
+      assert.equal(built.line.supervisor.stations.find(station => station.stationAttempt === "implementation-1").gaugeStatus, "fail");
+      assert.equal(verifierCalls, 0, "a controller stop cannot be laundered through a downstream green gauge");
+      assert.equal(built.manifest.agent.reachedDone, true);
+      assert.deepEqual(built.manifest.agent.verification, originalVerification);
+      assert.deepEqual(built.manifest.agent.controllerStop, stop.controllerStop ?? null);
+      assert.equal(fs.readFileSync(path.join(workspace, "value.txt"), "utf8"), "old\n");
+      await assert.rejects(applyFactoryCodingCell({ manifestPath: built.manifestPath }), /not released/);
+    }
+  });
+
   it("manufactures and verifies a durable candidate without touching the source", async () => {
     const { workspace, factoryRoot } = fixture();
     const built = await runFactoryCodingCell({

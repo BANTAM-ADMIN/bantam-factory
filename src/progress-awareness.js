@@ -98,12 +98,13 @@ export function shouldNudgeProgress(progresslessTurns, lastNudgeAt, nudges, {
   return progresslessTurns - lastNudgeAt >= cooldown;
 }
 
-export function formatProgressNudge(progresslessTurns, { sourceProvenance = null } = {}) {
+export function formatProgressNudge(progresslessTurns, { sourceProvenance = null, hasAuthoredWork = false } = {}) {
   if (sourceProvenance) {
     const outputs = (sourceProvenance.outputs ?? []).map((value) => `\`${value}\``).join(", ");
     const sources = (sourceProvenance.sources ?? []).map((value) => `\`${value}\``).join(" -> ");
     return `\n${PROGRESS_TAG} You are ${progresslessTurns} turns into source derivation without a witnessed output value. This is an exact transcription task, not an approximation task: do NOT write a rough draft, filename-derived word, task noun, or best guess to ${outputs}. Keep computing against ${sources}. Use a real extractor, decoder, parser, solver, or bundled tool; make the recovered value visible in command output or a source-file read; only then copy those exact observed bytes to the output. A failed tool attempt is a reason to change derivation method, not a reason to invent the value. After a bounded search times out or finds no candidate, change a real search axis (mode/domain/wordlist/mask/algorithm); changing only timeout, forks, or threads repeats the same hypothesis. Enumerate supported modes and automate a bounded portfolio of untried axes.`;
   }
+  if (hasAuthoredWork) return `\n${PROGRESS_TAG} Work has already been authored; ${progresslessTurns} recent turns produced no new progress. Do not restart implementation or make an unrelated edit to satisfy this notice. Check the CURRENT artifact against the public contract. For an inconclusive shell check, run one direct executable witness without output filters, echoed exit codes, or status-masking suffixes. For an expected error, assert the expected exit/stdout/stderr in a small test whose own exit reports whether the assertion passed. Keep new tests in a new permitted file. Repair only a demonstrated defect, run project verification, and finish with the measured result.`;
   return `\n${PROGRESS_TAG} You are ${progresslessTurns} consecutive turns into reconnaissance without a successful edit, useful substrate query, produced artifact, or verification command. Stop expanding analysis now. Commit to a rough deliverable: create the required output file or first implementation, or for repair/sanitization/formatting tasks patch the implicated existing file. Run the shortest useful check, then iterate from concrete results. If details are still uncertain, make the best current assumption and ship a draft edit instead of continuing pure inspection.`;
 }
 
@@ -119,8 +120,9 @@ export function shouldForceDraftEdit({
   autoForceEditAfter = 0,
   progresslessTurns = 0,
   sourceProvenanceRequired = false,
+  hasAuthoredWork = false,
 } = {}) {
-  return !sourceProvenanceRequired
+  return !sourceProvenanceRequired && !hasAuthoredWork
     && !interactive
     && useGrammar
     && progressAwareness
@@ -128,13 +130,13 @@ export function shouldForceDraftEdit({
     && progresslessTurns >= autoForceEditAfter;
 }
 
-export function progressGateRejection(action, { progresslessTurns, threshold = 8, knownArtifacts = [] } = {}) {
+export function progressGateRejection(action, { progresslessTurns, threshold = 8, knownArtifacts = [], hasAuthoredWork = false } = {}) {
   if (!action || progresslessTurns < threshold) return null;
   if (action.a === "read_file" || action.a === "list_dir" || action.a === "search" || action.a === "inspect") {
-    return gateMessage(progresslessTurns, "read-only reconnaissance");
+    return gateMessage(progresslessTurns, "read-only reconnaissance", hasAuthoredWork);
   }
   if (action.a === "shell" && !isProductiveShellCommand(action.c, { knownArtifacts })) {
-    return gateMessage(progresslessTurns, "analysis-only shell command");
+    return gateMessage(progresslessTurns, "analysis-only shell command", hasAuthoredWork);
   }
   return null;
 }
@@ -146,11 +148,12 @@ export function progressGateFor(action, {
   pendingDocumentArtifacts = [],
   budgetSpent,
   needsVerification,
+  hasAuthoredWork = false,
 }) {
   if (needsVerification && isDocumentArtifactReviewAction(action, { knownArtifacts: pendingDocumentArtifacts })) {
     return null;
   }
-  const rejection = progressGateRejection(action, { progresslessTurns, threshold, knownArtifacts });
+  const rejection = progressGateRejection(action, { progresslessTurns, threshold, knownArtifacts, hasAuthoredWork });
   if (rejection) return rejection;
   if (needsVerification && isVerificationQueryAction(action, { knownArtifacts })) {
     return null;
@@ -812,7 +815,8 @@ export function formatArtifactVerificationGateTermination(rejections, turnsSince
   return `${PROGRESS_TAG} Artifact verification gate termination: ${rejections} consecutive attempts avoided validating the draft artifact after ${turnsSinceArtifact} turns. Stop the run now so the current workspace can be graded instead of burning the remaining budget without evidence.`;
 }
 
-function gateMessage(progresslessTurns, kind) {
+function gateMessage(progresslessTurns, kind, hasAuthoredWork) {
+  if (hasAuthoredWork) return `${PROGRESS_TAG} Progress gate: work has already been authored, but ${progresslessTurns} consecutive turns have made no measured progress. This ${kind} was not executed. Use current file bytes to repair a demonstrated defect, run a direct executable check with explicit expected results, or finish accurately if the current evidence supports completion. A rejected edit proposal did not change the file. Do not restart implementation or make an unrelated edit to clear this gate.`;
   return `${PROGRESS_TAG} Progress gate: you are ${progresslessTurns} consecutive turns into reconnaissance, and this ${kind} was not executed. Stop inspecting. Your next action must create or modify the deliverable (write_file/replace, or a shell command that writes the required output file), patch the implicated existing file for repair/sanitization/formatting tasks, or run a verification command against a draft you already produced.`;
 }
 

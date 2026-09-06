@@ -5,6 +5,11 @@ import { describe, it } from "node:test";
 import { BOOLEAN_FLAGS, parseArgs } from "../src/cli-args.js";
 
 describe("CLI argument parsing", () => {
+  it("readonly verification is a value-less opt-in and does not consume a positional task", () => {
+    assert.deepEqual(parseArgs(["run", "--verify-workspace-read-only", "task words"]),
+      { _: ["run", "task words"], "verify-workspace-read-only": true });
+    assert.throws(() => parseArgs(["run", "--verify-workspace-read-only=false"]), /takes no value/);
+  });
   it("keeps commands and task text positional while value options consume one token", () => {
     assert.deepEqual(
       parseArgs(["run", "--workspace", "project dir", "--task", "fix the parser"]),

@@ -12,6 +12,9 @@
 // unlit button. It fires once the model has run the full deliverable many times
 // with NO separate verifier file in the workspace, and points it at building one.
 
+import fs from "node:fs";
+import path from "node:path";
+
 export const SCAFFOLD_DEFAULTS = Object.freeze({
   // Full-deliverable runs allowed before the gate concludes the model is moving
   // the mountain with a shovel. A healthy decompose-first loop builds an oracle
@@ -28,6 +31,27 @@ export function createScaffoldState() {
 
 const COMPILE_RE = /\b(?:gcc|cc|clang|g\+\+|clang\+\+|rustc|go build|javac)\b/;
 const BINARY_RE = /(?:^|\s|\/|&|;)(?:\.\/)?(?:a\.out|dbg)\b/;
+const ORACLE_EXT = /\.(py|js|mjs|cjs|ts|tsx|jsx|c|cc|cpp|rs|go|rb|pl|sh|lua)$/i;
+
+/** A bounded presence check, not a claim that a test/oracle is correct or ran. */
+export function workspaceOracleExists(workspace, deliverables = []) {
+  const bases = new Set(deliverables.map(d => String(d).split("/").pop()));
+  let remaining = 1024;
+  function scan(directory, depth, root = false) {
+    let entries;
+    try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return false; }
+    for (const entry of entries) {
+      if (--remaining < 0) return false;
+      if (entry.isFile() && ORACLE_EXT.test(entry.name) && !bases.has(entry.name)) return true;
+      if (entry.isDirectory() && depth > 0
+          && (root ? /^(?:tests?|specs?|__tests__)$/i.test(entry.name)
+            : ![".git", ".bantam", "node_modules"].includes(entry.name))
+          && scan(path.join(directory, entry.name), depth - 1)) return true;
+    }
+    return false;
+  }
+  return scan(workspace, 3, true);
+}
 
 /** Does this shell command build or run the DELIVERABLE (the whole artifact)? */
 export function isFullDeliverableRun(command, deliverables = []) {
@@ -67,9 +91,13 @@ export function isFullDeliverableRun(command, deliverables = []) {
  * @param state         createScaffoldState(), mutated in place
  * @returns {steer:boolean, message?:string}
  */
-export function assessScaffold(action, { deliverables = [], oracleExists = () => false } = {}, state, defaults = SCAFFOLD_DEFAULTS) {
+export function assessScaffold(action, { deliverables = [], oracleExists = () => false, execution, outcome = null } = {}, state, defaults = SCAFFOLD_DEFAULTS) {
   const quiet = { steer: false };
   if (!action || action.a !== "shell") return quiet;
+  // Legacy callers count invocations. A modern caller supplies the actual
+  // receipt (or explicit null), so blocked/deduplicated requests never count.
+  if (execution !== undefined && (!execution || execution.blocked || execution.error
+      || (execution.command !== action.c && execution.requestedCommand !== action.c))) return quiet;
   if (!deliverables.length) return quiet; // no named deliverable → nothing to gate
   if (!isFullDeliverableRun(action.c, deliverables)) return quiet;
 
@@ -93,13 +121,12 @@ export function assessScaffold(action, { deliverables = [], oracleExists = () =>
   return {
     steer: true,
     message:
-      `[scaffold] You have built/run the whole program ${state.deliverableRuns} times and it is still not right, `
-      + `with no separate verifier in the workspace. That is moving the mountain with a shovel: every wrong result `
-      + `leaves the entire pipeline a suspect. STOP and build the wheelbarrow. (1) Write the cheapest trusted ORACLE `
-      + `you can — usually a small, un-optimized reference in python/numpy computed independently from the same inputs `
-      + `(this is your measuring instrument, not the answer). (2) Decompose ${target} into the smallest stages that each `
-      + `produce a checkable intermediate. (3) Verify each stage against the oracle or its intrinsic invariant `
-      + `(a normalization outputs mean~0/std~1; probabilities sum to 1; a round-trip is identity; sizes equal a computed total) `
-      + `BEFORE building the next. The first stage whose check fails is your bug — found in a couple of turns, not another hour of whole-program runs.`,
+      `[scaffold] You have built/run the whole program ${state.deliverableRuns} times; no separate verifier was found by the bounded workspace scan. `
+      + (outcome === "fail" ? `The latest check failed; inspect its actual assertion or process error. `
+        : outcome === "pass" ? `The latest recorded check passed. Repeated execution does not establish a defect or prove every requirement. `
+          : `The latest outcome is unverified, not a demonstrated failure. `)
+      + `If behavior remains uncertain, build the wheelbarrow: use a supplied reference ORACLE first, or add a small focused test `
+      + `for the exact public requirement in question. Assert intermediate behavior of ${target} or the child's expected exit code, stdout and stderr. `
+      + `A check's failure should identify a mismatch before you change code; if all requirements are already verified, finish.`,
   };
 }

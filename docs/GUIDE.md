@@ -97,6 +97,14 @@ Attach a **project verifier** to grade the resulting code explicitly:
 bantam --verify "npm test"
 ```
 
+If your acceptance environment mounts the project read-only, select the same
+policy for BANTAM's configured verifier with `--verify-workspace-read-only`
+or `BANTAM_VERIFY_WORKSPACE_READ_ONLY=1`. This requires the Docker sandbox.
+Ordinary editing and manual shells stay writable, but their success cannot
+replace read-only acceptance. Configured checks receive fresh writable `/tmp`;
+create fixtures with `os.tmpdir()` and `mkdtemp`, not inside the source tree or
+an earlier shell's scratch directory. This profile is opt-in, not the default.
+
 - **`verifier passed`** means the configured command passed. A completion icon
   by itself is not evidence that a configured verifier ran.
 - **`done with caveats`** lists remaining completion warnings.
@@ -151,6 +159,37 @@ bantam run \
 - `--save-run=<path>` writes a complete artifact: the full turn trajectory,
   metrics (turns, tokens, timings), sampling, and harness git provenance.
 - Exit code is non-zero if the verifier ends in `fail`.
+
+### Conditional public-API assertion station
+
+This experimental station is **off by default**. Select
+`BANTAM_CONTRACT_ASSERTION_STATION=on` to opt in; unattended collection-contract
+auditing, explicitly enabled probes (`BANTAM_PROBE=1`) and the Docker sandbox
+must also be active. Current caller policy must permit both probe and shell work.
+BANTAM can then run one bounded assertion station after a new audit. Leaving it
+off does not disable the audit or configured project verifier. The local-variant
+benchmark runner instead requires `--contract-assertion-station` because it
+cleans ambient BANTAM environment settings; the manifest records that choice.
+
+The model proposes one declarative fixture, public JavaScript export, arguments
+and expected JSON result or throw. Controller-owned code supplies the launcher,
+fixture witness and assertion through the existing isolated probe/Datalog
+machinery. The expected result remains a model-designed hypothesis: a passing
+case is not complete coverage, and a failed case does not establish that its
+expectation is correct. This station supports synchronous JSON/throw APIs, not
+async/streaming behavior or arbitrary runtime objects.
+
+Recovery checks bind the measured case to its audit, source generation and
+input/specification hashes. A passing case is followed by fresh configured
+project verification; old or unrelated green results cannot substitute for it.
+The station adds auxiliary work within the existing run limits, not worker
+action turns or automatic completion. The worker must still emit an accepted
+`done`. The first repair7 Snapshot run produced a passing artifact but no
+accepted completion: the model proposed a wrong assertion expectation, and
+later passing compound test launches did not qualify for focused recovery.
+No completion improvement is established. The default-off shipping guards were
+added after that sealed run; see the
+[Tiel qualification record](TIEL-QUALIFICATION-2026-09-06.md#repair7-completed-snapshot-result).
 
 ### Pointing at a specific model server
 
@@ -512,13 +551,12 @@ The action verbs: `read_file`, `list_dir`, `search`, `inspect`, `shell`, `write_
 | Observation clipper | `src/clip.js` | Keeps every model-facing observation within a stable char budget (head + bounded tail), so one noisy command can't exhaust context. |
 
 The shell path can run in a **Docker sandbox** (read-only rootfs, `--network none`,
-dropped capabilities, workspace-only read-write mount, `tmpfs /tmp`) or on the host.
+dropped capabilities, writable workspace and separate `/tmp` scratch) or on the host.
 Host toolchains are bind-mounted read-only into the sandbox — node/python/go install
 roots, plus a rustup-managed Rust toolchain via only its secret-free pieces
 (`~/.cargo/bin` and `~/.rustup`, never `~/.cargo` itself, where crates.io credentials
-live). Build artifacts are diverted to the container tmpfs (`GOCACHE`,
-`CARGO_HOME`, `CARGO_TARGET_DIR`) so a green build never litters the workspace —
-which also keeps the eval scope-guard from misreading compiler output as edits.
+live). Go/Rust caches and build outputs are directed to scratch through `GOCACHE`,
+`CARGO_HOME`, and `CARGO_TARGET_DIR`, reducing generated files in the workspace.
 
 Because Docker is offline by default, Bantam fail-fast rejects registry-backed installers
 (`npm install`, `pip install`, `npx`, and equivalents) before spawning them. Interactive mode
@@ -557,6 +595,35 @@ If Docker is installed but the image is missing, `docker run` fails the action
 with `exit 125: No such image` rather than falling back silently. That is
 deliberate: quietly downgrading an isolation boundary is worse than a loud stop.
 
+#### Persistent worker scratch
+
+Ordinary Docker shell actions share a private host directory mounted at `/tmp`,
+outside the deliverable tree. The default pool is
+`<host-temp>/bantam-shell-scratch-<uid>/`; each workspace gets a subdirectory keyed
+to its canonical path and directory identity. Reopening the same workspace
+preserves scratch across commands and harness restarts; deleting and recreating
+that workspace selects a new directory. Temporary fixtures therefore stay out
+of project test discovery and deliverable snapshots.
+
+Set `BANTAM_SCRATCH_ROOT=/absolute/private/directory` on the BANTAM process to
+choose another pool, including durable storage. It must be user-owned, private
+(`0700`), outside and not an ancestor of the workspace, and must not traverse
+symlinks. An invalid pool fails the action rather than silently changing storage.
+Set `BANTAM_SCRATCH_TMPFS=1` for ephemeral `/tmp` instead: its contents disappear
+after each command. Readonly verifiers use independent ephemeral scratch by
+default; fixture probes can explicitly bind their own controller-owned scratch.
+These settings do not relocate host-mode `/tmp`.
+
+Saved shell and verification receipts expose `scratchDirectory`, the exact host
+directory used for a persistent bind (`null` when no such bind exists). This is
+a locator, **not a contents archive or integrity hash**: saving a run does not
+automatically make its scratch portable. Preserve and inspect needed files
+separately before sharing evidence. The default host temporary directory may be
+cleaned by the OS or lost on reboot; use a durable pool when retention matters.
+BANTAM neither migrates old workspace `.bantam/scratch` directories nor
+automatically deletes historical or retired scratch. Existing files remain as
+evidence; operators manage retention deliberately.
+
 ### Verification and completion gates
 
 This is the product's spine. **`gate-policy.js`** decides whether a check
@@ -571,6 +638,7 @@ failures; they do not establish universal correctness or replace a verifier.
 | Done-guard | `src/done-guard.js` | The trajectory-scanning objections, plus the shared pass/fail verdict parser over runner output + exit codes. Objection strings avoid PASS/FAIL tokens so they can't be misread as a verdict. |
 | Evidence guard | `src/logic/evidence-guard.js` | Vetoes `done` once when the run's own last real verification hard-failed with no clean run since — precision over recall (never on ordinary `grep`/`test` non-zero exits). |
 | Immutable-file check | `src/logic/self-check.js` | Parses "do not edit X"/"only edit X" from the *task* and derives violations via a tiny Datalog rule over file-hash facts. |
+| Instruction-derived test protection | `src/instruction-guard.js` | When the task prohibits changing existing tests, freezes their exact paths before actions. Direct edits are refused; Docker mounts those files read-only and scoped shell rollback protects host execution. New test files remain writable. No hidden grader content is needed. |
 | Deliverable signals | `src/logic/deliverable-signals.js` | One shared classifier for "is this a real test run / deliverable run?" (unwraps `sudo`/`env`/`timeout`/`poetry run`, skips `--help`). Used by every verification-aware module. |
 | Completion audit | `src/completion-audit.js` | After tests go green, injects a one-shot hint to re-check each explicit requirement against *executed behavior* (not names/comments) before `done`. On by default. |
 | State-audit policy | `src/state-audit-policy.js` | Experimental companion: for async-lifecycle tasks, adds a stricter concurrency-counterexample audit. The default is `auto`, selected by a conservative task classifier; `BANTAM_STATE_AUDIT=0` / `off` is the rollback. |
@@ -589,6 +657,7 @@ validated against the live model.
 | Regression guard | `src/agent.js` (`regressionGuard`, default on) | Tracks the best-passing snapshot of every edited file; a severe regression (or any drop from fully-green) restores the snapshot and steers toward a different fix. Multi-file aware. |
 | Stuck-test diagnosis | `src/logic/test-focus.js` (`diagnoseStuckTests`) | When one test stays red through repeated focused feedback, a separate focused reasoning call decomposes just that test against the current implementation and injects the diagnosis (single-fire per test; re-diagnosis A/B'd null). |
 | Placeholder-echo guard | `src/agent.js` | Rejects an edit whose body is the history-slimming placeholder (the model copying its own collapsed history into a real file — would destroy it); slimming also carries the pointer in a non-emittable field so the temptation no longer exists. |
+| Additive-edit preservation review | `src/edit-preservation.js`, `src/executor.js` | Before direct JavaScript edits commit, compares complete staged source. Removing executable statements from existing functions while adding top-level functions prompts a bounded review with exact before/after hashes and source anchors. Corrected edits or an identical confirmed reissue can proceed. This is structural evidence, not semantic proof; arbitrary shell edits and other languages are outside its scope. |
 | Double-escape guard | `src/agent.js` | Rejects a whole-file write that is one giant line full of literal `\n` sequences (a double-escaped JSON string) with the exact fix, instead of letting a generic syntax error send the model into byte-level forensics. Once per path, so a deliberate one-liner stays writable. |
 | Flaky-aware dedup | `src/repetition.js` | A deliverable/test run re-executes until the same result is confirmed three times (a flaky flip resets the counter) — a nondeterministic suite can never freeze the loop on a stale failure. Read-only actions still dedup on the first repeat. |
 
@@ -599,7 +668,13 @@ These keep a run moving without a human.
 
 | Component | File | Role |
 | --- | --- | --- |
-| Progress awareness | `src/progress-awareness.js` | Classifies each turn as real progress vs pure recon; after N progressless turns it refuses read-only actions and forces a create/modify/verify, escalating to termination if the model keeps dodging validation. (Autonomous only.) |
+| Progress awareness | `src/progress-awareness.js` | Classifies real progress vs pure recon. First-draft forcing applies only before observed authoring; afterward nudges request current-artifact verification or a demonstrated repair, not unrelated edits. Read-only guards and the original turn budget still apply. (Autonomous only.) |
+| Verification recovery | `src/verification-recovery.js`, `src/turn-mask.js` | Typed failed/inconclusive checks can keep a bounded shell/probe recovery route open during duplicate or post-authoring stalls, including while failed-anchor line editing is active. Rejected proposals are not current source. Stronger caller restrictions still apply; neither uncertainty nor a review grants verification credit. |
+| API contract review | `src/contract-state-audit.js`, `src/contract-audit-recovery.js` | Explicit callable/collection/validation contracts can receive up to two independent, bounded reviews of the public contract and current source. Advice is delivered separately from clipped tool output and remains unverified: reviewers can be wrong. A focused executable check and fresh project verification must follow the review; review text, test-file edits, and broad-suite success alone are not that evidence. A named Node test qualifies only with a concrete file and a measured passing case, not zero matching tests. Receipt validation proves execution shape, not semantic completeness. `BANTAM_CONTRACT_STATE_AUDIT=off` disables the review. |
+| Declarative assertion station | `src/contract-assertion-spec.js`, `src/contract-assertion-station.js` | Default off; `BANTAM_CONTRACT_ASSERTION_STATION=on` additionally requires collection auditing, opt-in probes and Docker. Model-owned case data, fixed fixture/witness/assertion commands, existing probe/Datalog receipts. Recovery verifies exact source/audit/spec bindings and requires subsequent configured project verification. One synchronous JSON/throw API case is not oracle certification or complete coverage; no implicit `done`. Initial Tiel qualification did not improve accepted completion. |
+| Direct check status | `src/executor.js` | A single recognized direct check followed only by a passive `; echo "EXIT=$?"` runs once without that suffix, with the actual exit status and an explicit correction receipt. Setup, cleanup, arbitrary CLI probes and opaque compound commands are not inferred away. Echoed status is never proof. |
+| Truthful repetition feedback | `src/repetition.js`, `src/scaffold-gate.js` | Feedback distinguishes failed, passing and unverified executions. Blocked or deduplicated requests are not new runs, and an unrelated automatic verifier cannot label the requested shell successful. Repeating a check alone does not demonstrate a code defect. |
+| Controller-stop disposition | `src/controller-stop.js`, `src/agent.js`, `src/factory/` | A progress, artifact-verification, or interactive hard stop records `controllerStop` and leaves `reachedDone` false. Final verification is retained separately. Factory release also rejects contradictory legacy completion flags backed by stop counters or stop summaries; a passing workspace check cannot turn a stopped worker into completion. |
 | Interactive wrap-up | `src/agent.js` | The human-steered backstop: after a streak of investigative turns — reads, shell, **or `query`/`map` calls** — with no edit or answer, it masks the investigative verbs from the grammar so the model *must* `respond` or edit, and hard-stops if it keeps dodging. Stops "take a look and tell me what you think" from spiralling. |
 | Query budget | `src/query-budget.js` | Novel `query` actions count as progress up to a budget, then stop resetting the progress counter — interrogating the graph forever eventually hits the gate (autonomous), and a `query` also counts toward the interactive wrap-up above. |
 | Repetition guard | `src/repetition.js` | Replays the prior observation for an exact-duplicate read-only **or `query`** action (with a "deduplicated, not stale" notice) so a repeated look carries information and a repeated `map` query isn't re-shelled; an edit clears the cache. |

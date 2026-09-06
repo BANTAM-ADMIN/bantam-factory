@@ -159,6 +159,8 @@ export function buildArtifact({
       ...(t.toolOutcome !== undefined ? { toolOutcome: serializableCopy(t.toolOutcome) } : {}),
       ...(t.preview !== undefined ? { preview: serializableCopy(t.preview) } : {}),
       ...(typeof t.editApplied === "boolean" ? { editApplied: t.editApplied } : {}),
+      ...(typeof t.doneAccepted === "boolean" ? { doneAccepted: t.doneAccepted } : {}),
+      ...(t.controllerStop ? { controllerStop: serializableCopy(t.controllerStop) } : {}),
       // Presence is meaningful: explicit null means no execution proof; an
       // absent field belongs to a legacy film whose prose may be consulted.
       ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: serializableCopy(t.verificationEvidence) } : {}),
@@ -166,6 +168,7 @@ export function buildArtifact({
       ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: serializableCopy(t.probeEvidence) } : {}),
       ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),
       ...(Object.hasOwn(t, "contractStateAudit") ? { contractStateAudit: serializableCopy(t.contractStateAudit) } : {}),
+      ...(Object.hasOwn(t, "contractAssertion") ? { contractAssertion: serializableCopy(t.contractAssertion) } : {}),
       ...(Object.hasOwn(t, "contextBasis") ? { contextBasis: serializableCopy(t.contextBasis) } : {}),
       ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: serializableCopy(t.contextUpdates) } : {}),
       ...(t.scopedVerify !== undefined ? { scopedVerify: serializableCopy(t.scopedVerify) } : {}),
@@ -202,7 +205,9 @@ export function buildArtifact({
       ...(result.expectation ? { expectation: serializableCopy(result.expectation) } : {}),
       verifyDetail: verification ? (verification.detail ?? null) : null,
       exitCode: verification && verification.exitCode !== undefined ? verification.exitCode : null,
+      verificationWorkspaceReadOnly: typeof verification?.workspaceReadOnly === "boolean" ? verification.workspaceReadOnly : null,
       reachedDone: Boolean(result.reachedDone),
+      controllerStop: serializableCopy(result.controllerStop ?? null),
       interrupted: Boolean(result.interrupted),
       summary: result.summary ?? null,
       blocked: normalizeInfrastructureBlock(result.blocked),

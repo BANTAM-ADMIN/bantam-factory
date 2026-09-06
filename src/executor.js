@@ -54,11 +54,13 @@ const COLLATERAL_CONFIRM_MAX = 16;
 // 4096 still stops a fork bomb long before it reaches the host.
 const SANDBOX_PIDS_LIMIT = Math.max(256, Number(process.env.BANTAM_SANDBOX_PIDS) || 4096);
 const SANDBOX_MEMORY = process.env.BANTAM_SANDBOX_MEMORY || "4g";
-import { isTestCommand } from "./logic/deliverable-signals.js";
+import { isTestCommand, isDeliverableRun } from "./logic/deliverable-signals.js";
 import { collateralRefusal } from "./collateral.js";
 import { parseTestCounts, renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
+import { verificationShellStatusRisk } from "./verification-evidence.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
+import { createEditPreservationWitness, formatEditPreservationReview } from "./edit-preservation.js";
 import { editPaths } from "./edit-actions.js";
 import { runProbe } from "./probe.js";
 
@@ -280,19 +282,46 @@ export class Executor {
 
   executeEdit(action, operation) {
     const previous = this._activeEditResult;
-    const pending = { outcome: null };
+    const pending = { outcome: null, preservationReviews: [] };
     this._activeEditResult = pending;
+    const outcome = () => ({
+      ...(pending.outcome ?? { applied: false, reason: "other", paths: editPaths(action) }),
+      ...(pending.preservationReviews.length ? { preservationReviews: pending.preservationReviews } : {}),
+    });
     try {
       const observation = operation();
-      return { observation, editOutcome: pending.outcome ?? { applied: false, reason: "other", paths: editPaths(action) } };
+      return { observation, editOutcome: outcome() };
     } catch (error) {
       return {
         observation: `ERROR: ${error.message}`,
-        editOutcome: pending.outcome ?? { applied: false, reason: "other", paths: editPaths(action) },
+        editOutcome: outcome(),
       };
     } finally {
+      // Do not consume a confirmation until the whole transaction commits:
+      // two risky files in one batch must not bounce each other's approval.
+      if (pending.outcome?.applied) {
+        for (const review of pending.preservationReviews) this._preservationConfirm?.delete(review.witness.id);
+      }
       this._activeEditResult = previous;
     }
+  }
+
+  validateEditTransition(input) {
+    const syntax = validateSourceTransition(input);
+    if (!syntax.ok) return syntax;
+    const witness = createEditPreservationWitness(input);
+    if (!witness?.additiveReplacementRisk) return syntax;
+    this._preservationConfirm ??= new Map();
+    const confirmed = this._preservationConfirm.has(witness.id);
+    this._activeEditResult?.preservationReviews.push({
+      witness, decision: confirmed ? "confirmed" : "review-required",
+    });
+    if (confirmed) return syntax;
+    if (this._preservationConfirm.size >= COLLATERAL_CONFIRM_MAX) {
+      this._preservationConfirm.delete(this._preservationConfirm.keys().next().value);
+    }
+    this._preservationConfirm.set(witness.id, true);
+    return { ok: false, reason: "confirmation_required", message: formatEditPreservationReview(witness) };
   }
 
   /** Execute one validated action; observations retain their legacy string form. */
@@ -538,8 +567,8 @@ export class Executor {
 
     const next = [...lines.slice(0, start - 1), ...String(repl ?? "").split("\n"), ...lines.slice(last)];
     const output = next.join("\n");
-    const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
+    const syntax = this.validateEditTransition({ path: p, before: text, after: output, runtimePath: full });
+    if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [p]);
     // edit_lines overwrites the whole range — anything in it the model did not
     // retype is destroyed. Name what would vanish BEFORE it does. An identical
     // re-issue means the model meant it, and is allowed through.
@@ -603,8 +632,8 @@ export class Executor {
       return this.editObservation(`ERROR: "old" text appears more than once in ${p}. Include more surrounding context to make it unique.`, "ambiguous", [p]);
     }
     const output = text.slice(0, idx) + repl + text.slice(idx + old.length);
-    const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
+    const syntax = this.validateEditTransition({ path: p, before: text, after: output, runtimePath: full });
+    if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [p]);
     const refusal = this.collateralGate({
       path: p, classificationPath: full, removed: old, replacement: repl,
     });
@@ -634,8 +663,8 @@ export class Executor {
     }
     const match = matches[0];
     const output = text.slice(0, match) + repl + text.slice(match + old.length);
-    const syntax = validateSourceTransition({ path: p, before: text, after: output, runtimePath: full });
-    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
+    const syntax = this.validateEditTransition({ path: p, before: text, after: output, runtimePath: full });
+    if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [p]);
     const refusal = this.collateralGate({
       path: p, classificationPath: full, start: line, end: line, removed: old, replacement: repl,
     });
@@ -696,8 +725,8 @@ export class Executor {
     // temporarily unbalance a construct; only the final atomic patch matters.
     for (const file of files.values()) {
       const rel = [...file.paths][0];
-      const syntax = validateSourceTransition({ path: rel, before: file.text, after: file.output, runtimePath: file.full });
-      if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [rel]);
+      const syntax = this.validateEditTransition({ path: rel, before: file.text, after: file.output, runtimePath: file.full });
+      if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [rel]);
     }
 
     // Patch is atomic, so collateral checks happen before the first staged file
@@ -848,8 +877,8 @@ export class Executor {
       full = this.resolveWriteTarget(p);
       if (stat.isFile()) before = fs.readFileSync(full, "utf8");
     }
-    const syntax = validateSourceTransition({ path: p, before, after: content, runtimePath: lexical });
-    if (!syntax.ok) return this.editObservation(syntax.message, "syntax_invalid", [p]);
+    const syntax = this.validateEditTransition({ path: p, before, after: content, runtimePath: lexical });
+    if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [p]);
 
     full ??= this.resolveWriteTarget(p);
     if (this.noopEditGuard && fs.existsSync(full) && fs.readFileSync(full, "utf8") === content) {
@@ -893,13 +922,13 @@ export class Executor {
       const existingParent = nearestExisting(parent);
       this.assertInsideReal(fs.realpathSync(existingParent), item.p);
       const before = stat ? fs.readFileSync(full, "utf8") : null;
-      const syntax = validateSourceTransition({
+      const syntax = this.validateEditTransition({
         path: item.p,
         before,
         after: item.content,
         runtimePath: full,
       });
-      if (!syntax.ok) return this.editObservation(`${syntax.message}\n[write_batch] No files changed.`, "syntax_invalid", [item.p]);
+      if (!syntax.ok) return this.editObservation(`${syntax.message}\n[write_batch] No files changed.`, syntax.reason ?? "syntax_invalid", [item.p]);
 
       records.push({
         path: item.p,
@@ -1071,14 +1100,19 @@ export class Executor {
     if (cwdError) return cwdError;
     const discardError = discardsUncommittedWorkError(c);
     if (discardError) return discardError;
+    const directStatusCheck = stripPassiveTestStatusSuffix(c);
+    const statusCorrectionNote = directStatusCheck
+      ? `[status-guard] Ran the direct check WITHOUT the passive status-print suffix. The echo was not executed; the recorded process exit is the check's actual status, not an echoed claim. Command executed: ${directStatusCheck}\n`
+      : null;
+    if (directStatusCheck) c = directStatusCheck;
     const testPipeError = shellTestPipeError(c);
     if (testPipeError) {
-      const stripped = stripTestOutputFilter(c);
-      if (stripped && isTestCommand(stripped) && !hasShellControlOutsideQuotes(stripped.replace(/2>&1/g, ""))) {
+      const corrected = automaticTestPipeCorrection(c);
+      if (corrected) {
         // Perform the correction: run the same test bare and hand back the
         // digested output, plus the lesson.
-        c = stripped;
-        this._pipeAutoCorrected = `[pipe-guard] Ran your test WITHOUT the output filter (filters hide the verdict; grep exits 1 on no match). Command executed: ${stripped}\n`;
+        c = corrected;
+        this._pipeAutoCorrected = `[pipe-guard] Ran your test WITHOUT the output filter; stdout and stderr are captured separately (filters hide the verdict; grep exits 1 on no match). Command executed: ${corrected}\n`;
       } else {
         return testPipeError;
       }
@@ -1131,9 +1165,12 @@ export class Executor {
       }
     }
 
-    const pipeNote = this._pipeAutoCorrected ?? null;
+    const pipeNote = [statusCorrectionNote, this._pipeAutoCorrected].filter(Boolean).join("") || null;
     this._pipeAutoCorrected = null;
     const testCommand = isTestCommand(c);
+    // Ad-hoc executable checks deserve the same exit integrity as a named
+    // suite. A successful tail must not turn a crashed node/python script green.
+    const pipefail = testCommand || isDeliverableRun(c);
     const timeoutMs = testCommand
       ? Math.min(this.shellTimeoutMs, this.testTimeoutMs)
       : this.shellTimeoutMs;
@@ -1153,6 +1190,7 @@ export class Executor {
       signal,
       onOutput: this.onShellOutput,
       processRunner: this.processRunner,
+      pipefail,
     });
 
     // Preserve the process result before verdict narration, hints or clipping.
@@ -1165,6 +1203,8 @@ export class Executor {
       blocked: false, bufferExceeded: Boolean(res.bufferExceeded),
       signal: res.signal ?? null, error: res.error?.message ?? null,
       sandbox: res.sandbox ?? this.shellSandbox, cwd: this.realWorkspace,
+      pipefail: res.pipefail === true,
+      scratchDirectory: res.scratchDirectory ?? null,
     };
 
     const code = res.code ?? 1;
@@ -1489,6 +1529,11 @@ function pipeStages(command) {
   let backtick = false;
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
+    if (ch === "\\" && quote !== "'") {
+      current += ch;
+      if (i + 1 < text.length) current += text[++i];
+      continue;
+    }
     if (quote) {
       current += ch;
       if (ch === quote) quote = null;
@@ -1507,6 +1552,8 @@ function pipeStages(command) {
 }
 
 export function stripTestOutputFilter(command) {
+  // Syntactic compatibility helper only: its result may retain setup, redirects
+  // or status-masking suffixes. Never execute/recommend it without a safety check.
   const stages = pipeStages(command);
   if (stages.length < 2) return null;
   let end = stages.length;
@@ -1520,6 +1567,98 @@ export function stripTestOutputFilter(command) {
   if (end === stages.length) return null;      // nothing peeled
   if (end < 1) return null;
   return stages.slice(0, end).join(" | ").trim();
+}
+
+// Do not turn a syntactically stripped compound command into an instruction to
+// run it. Only suggest the FIRST test invocation: taking a later segment could
+// silently discard required cd/export/fixture setup. Output captures may be
+// omitted in a suggestion, never in an automatic compound-command rewrite.
+function directTestSuggestion(command) {
+  const text = String(command ?? "").trim();
+  let quote = null, end = text.length;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "\\" && quote !== "'") { i++; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; continue; }
+    if (/[;|&<>\n\r]/.test(ch)) { end = i; break; }
+    if (/[`(){}#]/.test(ch)) return null;
+  }
+  if (quote || text[end] === "<" || text.slice(end, end + 2) === "&>") return null;
+  if (text[end] === ">") {
+    // Keep actual arguments, but exclude a bare fd directly adjoining `>`.
+    const fd = /(?:^|\s)(\d+)$/.exec(text.slice(0, end));
+    if (fd) end -= fd[1].length;
+    let tail = text.slice(end);
+    // Bounded common stdout/stderr captures only. A later argument, input
+    // redirect, expansion, or unfamiliar fd means no equivalent was established.
+    const capture = /^(?:[12]?>&[12]|[12]?>>?[ \t]*(?:'[^'\r\n]*'|"(?:[^"\\$`\r\n]|\\.)*"|(?:\\[^\r\n]|[^\s;&|<>()'"$`#])+))[ \t]*/;
+    let count = 0, match;
+    while ((match = capture.exec(tail))) { tail = tail.slice(match[0].length); count++; }
+    if (!count || (tail && !/^[;|&\n\r]/.test(tail))) return null;
+  }
+  const candidate = text.slice(0, end).trim();
+  if (!candidate || !isTestCommand(candidate) || hasShellControlOutsideQuotes(candidate)
+      || verificationShellStatusRisk(candidate, { pipefail: true })) return null;
+  return candidate;
+}
+
+function automaticTestPipeCorrection(command) {
+  const stages = pipeStages(command), candidate = directTestSuggestion(stages[0]);
+  if (!candidate || stages.length < 2) return null;
+  // A stderr merge changes only capture presentation; the executor retains both
+  // streams. Do not remove file redirects, compound setup, or status suffixes.
+  const first = stages[0].trim();
+  if (first !== candidate && first !== `${candidate} 2>&1`) return null;
+  // awk/sed programs, rg --pre, sort -o and similar filter stages can perform
+  // work of their own. Do not silently discard them as allegedly pure filters.
+  const passive = new Set(["head", "tail", "grep", "egrep", "fgrep", "wc", "cut"]);
+  for (const stage of stages.slice(1)) {
+    if (!passive.has(path.basename(splitShellWords(stage)[0] ?? ""))
+        || hasShellControlOutsideQuotes(stage)
+        || verificationShellStatusRisk(stage, { pipefail: true })) return null;
+  }
+  return candidate;
+}
+
+// Execute one already-requested check exactly once, with its own exit status.
+// This is NOT a compound-shell simplifier: only a trailing literal echo of $?
+// may be omitted. In particular, never remove required setup or cleanup, expand
+// an inferred command, or turn an expected-negative CLI call into an assertion.
+export function stripPassiveTestStatusSuffix(command) {
+  const text = String(command ?? "").trim();
+  let quote = null, separator = -1;
+  for (let index = 0; index < text.length; index++) {
+    const ch = text[index];
+    if (ch === "\\" && quote !== "'") { index++; continue; }
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; continue; }
+    if (ch === "#" && (index === 0 || /\s/.test(text[index - 1]))) return null;
+    if (ch === ";") { separator = index; break; }
+  }
+  if (separator < 0 || quote) return null;
+  const direct = text.slice(0, separator).trim(), suffix = text.slice(separator + 1).trim();
+  // No shell expansion in the primary, even inside quoted arguments. The sole
+  // permitted variable expansion is the printed exit code in the discarded echo.
+  if (!direct || /[$`\r\n]/.test(direct) || hasShellControlOutsideQuotes(direct)
+      || verificationShellStatusRisk(direct) !== null) return null;
+  const status = String.raw`(?:[A-Za-z_][A-Za-z0-9_ -]{0,39}[=:][ \t]*)?\$\?`;
+  if (!new RegExp(`^echo[ \\t]+(?:"${status}"|${status})$`).test(suffix)) return null;
+  const words = splitShellWords(direct), executable = path.basename(words[0] ?? "");
+  if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) return null;
+  // A recognized direct runner may retain its exact selector arguments.
+  const runners = new Set(["node", "nodejs", "npm", "yarn", "pnpm", "bun", "deno",
+    "pytest", "py.test", "jest", "vitest", "mocha", "ctest", "tox", "nox", "rspec", "phpunit", "prove",
+    "go", "cargo", "dotnet", "gradle", "gradlew", "mvn", "mvnw", "make"]);
+  if (runners.has(executable) && isTestCommand(direct)) return direct;
+  // An ad-hoc check must name a concrete script, not an arbitrary product CLI,
+  // inline eval, help request, or interpreter syntax-only/preload operation.
+  if (!/^(?:node|nodejs|python(?:3(?:\.\d+)?)?|ruby)$/.test(executable)
+      || words.slice(1).some(word => /^(?:--help|--version|-h|-V|--check|-c|-e|-p|--eval|--print)$/.test(word))) return null;
+  const script = words[1] ?? "";
+  if (/[$*?\[\]{}]/.test(script) || !/\.(?:[cm]?js|py|rb)$/.test(script)
+      || !/(?:^|[\/_.-])(?:test|check|verify|witness|probe|assert|regression)(?:[\/_.-]|$)/i.test(script)) return null;
+  return direct;
 }
 
 function shellTestPipeError(command) {
@@ -1538,14 +1677,10 @@ function shellTestPipeError(command) {
   // exits 1 with empty output — a PASSING suite becomes indistinguishable
   // from a broken run. (Observed: 17 consecutive `| grep 'not ok'` runs
   // against a green suite, 2026-07-13 self-hosting v2.)
-  // Name the command to send instead. The harness has already computed it, and
-  // a refusal that only states a rule costs a turn the run may not have: tb10
-  // (2026-08-16) reached its FIRST verification at turn 57 of 60, was refused
-  // here for a trailing `| tail -20`, and had no budget left to retry.
-  const corrected = stripTestOutputFilter(command);
+  const corrected = directTestSuggestion(command);
   const instruction = corrected
-    ? `\nSend exactly this instead:\n  ${corrected}`
-    : "";
+    ? `\nNothing was executed. If the first test invocation already has its required setup and inputs, run it directly:\n  ${corrected}\nThis suggestion omits output captures and the rest of the compound command; it is not an equivalent rewrite of that program. Preserve any required setup, environment, cwd and argument selection explicitly.`
+    : "\nNothing was executed. No safe standalone test invocation was established. Preserve required setup, environment, cwd and argument selection; do not silently drop them. Run the test directly after persistent setup, or use a verifier script that preserves same-shell setup and propagates the test failure.";
   return "ERROR: run test commands directly, with no pipe. Bantam already digests long test output and preserves the failure summary; a filter like grep hides the pass/fail verdict (grep exits 1 with no output when nothing matches, so a passing suite looks like a failure)."
     + instruction;
 }
@@ -1661,17 +1796,69 @@ export async function runShellProcess(workspace, command, {
     // run` can leave its named container consuming resources after the REPL returns.
     await processRunner("docker", ["rm", "-f", runner.cleanupName], { timeoutMs: 5000 });
   }
-  return { ...res, sandbox: runner.sandbox };
+  return { ...res, sandbox: runner.sandbox, pipefail: pipefail === true,
+    scratchDirectory: runner.scratchDirectory ?? null };
 }
 
 export function scratchMountArgs(workspace, env = process.env) {
   if (env.BANTAM_SCRATCH_TMPFS === "1" || !workspace) {
     return ["--tmpfs", "/tmp:rw,exec,nosuid,nodev"];
   }
-  const dir = path.join(workspace, ".bantam", "scratch");
-  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* fall through */ }
-  if (!fs.existsSync(dir)) return ["--tmpfs", "/tmp:rw,exec,nosuid,nodev"];
-  return ["-v", `${fs.realpathSync(dir)}:/tmp:rw`];
+  const realWorkspace = fs.realpathSync(path.resolve(workspace));
+  const uid = process.getuid?.() ?? 1000;
+  const configured = env.BANTAM_SCRATCH_ROOT;
+  if (configured !== undefined && (typeof configured !== "string" || !path.isAbsolute(configured))) {
+    throw new Error("BANTAM_SCRATCH_ROOT must be an absolute private directory outside the workspace");
+  }
+  const root = configured === undefined
+    ? path.join(fs.realpathSync(os.tmpdir()), `bantam-shell-scratch-${uid}`)
+    : path.resolve(configured);
+  if (root.includes(":") || root.includes("\0") || root === realWorkspace
+      || root.startsWith(realWorkspace + path.sep) || realWorkspace.startsWith(root + path.sep)) {
+    throw new Error("persistent shell scratch must be separate from the workspace and have no mount separators");
+  }
+  // Never let a candidate's .bantam/scratch symlink choose a host bind. The
+  // private pool is outside the deliverable, keyed to the canonical directory
+  // identity so deleting/recreating a workspace does not inherit its old /tmp.
+  const existing = nearestExisting(root);
+  if (fs.realpathSync(existing) !== path.resolve(existing)) {
+    throw new Error("persistent shell scratch must not traverse a symlink");
+  }
+  ensurePrivateScratchDirectory(root, uid);
+  const stat = fs.statSync(realWorkspace);
+  const key = crypto.createHash("sha256")
+    .update(JSON.stringify([realWorkspace, stat.dev, stat.ino, stat.birthtimeMs]))
+    .digest("hex");
+  const dir = path.join(root, key);
+  ensurePrivateScratchDirectory(dir, uid);
+
+  // When the workspace itself is under /tmp, Docker nests that workspace bind
+  // inside this /tmp bind. Create those mountpoint directories as our uid,
+  // rather than leaving root-owned directories that cannot be cleaned up.
+  // A prior worker must not redirect the next mount through a scratch symlink.
+  if (realWorkspace.startsWith("/tmp/")) {
+    let target = dir;
+    for (const component of path.relative("/tmp", realWorkspace).split(path.sep)) {
+      target = path.join(target, component);
+      try { fs.mkdirSync(target, { mode: 0o700 }); }
+      catch (error) { if (error.code !== "EEXIST") throw error; }
+      const entry = fs.lstatSync(target);
+      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.uid !== uid) {
+        throw new Error("persistent scratch workspace mountpoint must be an owned directory, not a symlink");
+      }
+    }
+  }
+  return ["-v", `${dir}:/tmp:rw`];
+}
+
+function ensurePrivateScratchDirectory(directory, uid) {
+  try { fs.mkdirSync(directory, { recursive: true, mode: 0o700 }); }
+  catch (error) { if (error.code !== "EEXIST") throw error; }
+  const stat = fs.lstatSync(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== uid || (stat.mode & 0o077) !== 0
+      || fs.realpathSync(directory) !== directory) {
+    throw new Error("persistent shell scratch must be a private user-owned directory, not a symlink");
+  }
 }
 
 function dockerShellRunner(workspace, image, command, {
@@ -1686,6 +1873,8 @@ function dockerShellRunner(workspace, image, command, {
   const name = `bantam-shell-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const rust = rustSandboxExtras();
   const containerWorkspace = fixtureScratch ? "/probe" : workspace;
+  const scratch = fixtureScratch ? ["-v", `${fixtureScratch}:/tmp:rw`]
+    : scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env);
   return {
     file: "docker",
     args: [
@@ -1701,17 +1890,18 @@ function dockerShellRunner(workspace, image, command, {
       // /tmp is the worker's scratch bench. A tmpfs here discarded every probe
       // dump and test coupon with the container (2026-08-18 bake-off: arm-B's
       // real-file KV/tensor dumps were unrecoverable swarf) AND its pages
-      // counted against the container's memory cap. Bind-mounting a per-run
-      // host dir preserves the swarf into the run bundle and returns that RAM
-      // to real work. suid risk is covered by --no-new-privileges + cap-drop;
+      // counted against the container's memory cap. A private, per-workspace
+      // host directory preserves scratch across commands without putting it
+      // under the project tree, where test discovery would treat temporary
+      // fixtures (including absolute /tmp symlinks) as deliverables. suid risk
+      // is covered by --no-new-privileges + cap-drop;
       // BANTAM_SCRATCH_TMPFS=1 restores the old ephemeral behavior.
       // Readonly verifiers need temporary scratch, not a persistent artifact
       // bench. A /tmp bind with a workspace also under /tmp causes Docker to
       // create root-owned nested mountpoints inside the host scratch directory.
       // Ephemeral scratch avoids that leak and keeps private factory workspaces
       // removable after verification.
-      ...(fixtureScratch ? ["-v", `${fixtureScratch}:/tmp:rw`]
-        : scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env)),
+      ...scratch,
       "-e", `PATH=${process.env.PATH ?? "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}`,
       "-e", "HOME=/tmp",
       "-e", "TMPDIR=/tmp",
@@ -1729,6 +1919,7 @@ function dockerShellRunner(workspace, image, command, {
     env: process.env,
     sandbox: `docker:${image}${network ? ":network" : ""}`,
     cleanupName: name,
+    scratchDirectory: scratch[0] === "-v" ? scratch[1].slice(0, -":/tmp:rw".length) : null,
   };
 }
 

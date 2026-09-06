@@ -82,6 +82,39 @@ function result(overrides) {
 }
 
 describe("async keyed lifecycle production cell", () => {
+  it("controller-stopped diagnosis or assembly cannot release a green-looking product", async () => {
+    const cases = [
+      { station: "diagnosis", stop: { controllerStop: { kind: "interactive-budget", turn: 7 } } },
+      { station: "pool", stop: { metrics: { artifactVerificationGateTerminations: 1 } } },
+      { station: "plan", stop: { summary: "Stopped by progress gate; grading current workspace state." } },
+    ];
+    for (const { station, stop } of cases) {
+      const { source, factoryRoot } = workspace();
+      const worker = fakeWorkers([]), verification = { status: "pass", exitCode: 0, detail: "worker check passed" };
+      let verifierCalls = 0;
+      const built = await runLifecycleFactoryCell({
+        workspace: source, root: factoryRoot, jobId: `lifecycle-controller-${station}`, task: spec.task,
+        publicVerificationScript: "public-check", verificationScript: "final-check", maxReworkCycles: 0,
+        runAgentFn: async options => {
+          const response = await worker(options);
+          const current = options.task.includes("[LIFECYCLE DIAGNOSIS STATION]") ? "diagnosis"
+            : options.task.includes("[KEYED POOL ASSEMBLY STATION]") ? "pool" : "plan";
+          return current === station ? { ...response, reachedDone: true, verification, ...stop } : response;
+        },
+        verifier: async () => { verifierCalls++; return { pass: true, status: "pass" }; },
+      });
+      assert.equal(built.line.supervisor.status, "blocked");
+      assert.equal(built.line.events.some(event => event.type === "job.released"), false);
+      assert.equal(built.line.supervisor.stations.find(row => row.stationAttempt === `${station}-1`).gaugeStatus, "fail");
+      assert.equal(verifierCalls, 0);
+      const receipt = station === "diagnosis" ? built.manifest.agents.diagnosis : built.manifest.agents.assembly[station];
+      assert.equal(receipt.reachedDone, true);
+      assert.deepEqual(receipt.verification, verification);
+      assert.deepEqual(receipt.controllerStop, stop.controllerStop ?? null);
+      await assert.rejects(applyFactoryCodingCell({ manifestPath: built.manifestPath }), /not released/);
+    }
+  });
+
   it("compiles the hand-authored S0-S9 route with one file jig per assembly worker", () => {
     const { route, assets } = lifecycleCellLine();
     assert.equal(route.stations.length, 10);

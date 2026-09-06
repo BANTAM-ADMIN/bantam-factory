@@ -39,6 +39,13 @@ function isChatDialect(dialect) {
   return String(dialect ?? process.env.BANTAM_API_DIALECT ?? "").trim().toLowerCase() === "chat";
 }
 
+// Native llama.cpp revisions may emit stop_type instead of stopped_limit.
+// A declared limit is incomplete even if the legacy boolean is absent/false;
+// EOS and configured stop-word termination are not output-limit events.
+function nativeStoppedLimit(data) {
+  return Boolean(data?.stopped_limit) || data?.stop_type === "limit";
+}
+
 export class ModelClient {
   constructor(opts = {}) {
     const explicitProfile = opts.profile ?? process.env.BANTAM_PROFILE;
@@ -616,7 +623,7 @@ export class ModelClient {
         content: stripChatPrefill(extractCompletionText(data), request.chatTransport ? request.chatPrefill : ""),
         tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
         stoppedEos: Boolean(data.stopped_eos),
-        stoppedLimit: Boolean(data.stopped_limit),
+        stoppedLimit: nativeStoppedLimit(data),
         // llama.cpp sets `truncated` when the PROMPT overran the slot's context
         // and was cut to fit. That is silent — no error, no stopped_limit — and
         // it is exactly the failure that sat invisible under tune-mjcf: a 47.8k
@@ -700,7 +707,7 @@ export class ModelClient {
             content: extractCompletionText(data),
             tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
             stoppedEos: Boolean(data.stopped_eos),
-            stoppedLimit: Boolean(data.stopped_limit),
+            stoppedLimit: nativeStoppedLimit(data),
             timings: data.timings ?? {},
             usage: usageFromResponse(data, {
               provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
@@ -721,7 +728,7 @@ export class ModelClient {
         content,
         tokens: final?.tokens_predicted ?? chunks,
         stoppedEos: Boolean(final?.stopped_eos),
-        stoppedLimit: Boolean(final?.stopped_limit),
+        stoppedLimit: nativeStoppedLimit(final),
         truncated: Boolean(final?.truncated),
         promptTokens: Number(final?.tokens_evaluated ?? usageSource?.prompt_tokens ?? 0) || 0,
         timings: final?.timings ?? {},

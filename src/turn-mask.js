@@ -43,6 +43,7 @@ export function composeExcludeVerbs({
   useGrammar = true,
   baseExcludeVerbs = [],
   forceWrapUp = false,
+  verificationRecoveryTurn = false,
   forceBuildEdit = false,
   documentRevisionTurn = false,
   documentReviewTurn = false,
@@ -53,7 +54,12 @@ export function composeExcludeVerbs({
   const exclude = [...baseExcludeVerbs];
   const add = (verb) => { if (!exclude.includes(verb)) exclude.push(verb); };
   if (forceWrapUp) {
-    for (const verb of WRAP_UP_MASK) add(verb);
+    // Break repeated reading without making an outstanding executable check
+    // impossible. Caller policy and stronger document/build masks still win.
+    for (const verb of WRAP_UP_MASK) {
+      if (verificationRecoveryTurn && verb === "shell") continue;
+      add(verb);
+    }
   }
   // After the build-first veto: one turn where respond is masked too, so an edit is the only exit.
   if (forceBuildEdit && useGrammar) {

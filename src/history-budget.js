@@ -8,6 +8,31 @@
 import { clipText as clipObservation } from "./clip.js";
 
 const SOURCE_HEADER = /(?:^|\n)(?:#\s+)?([A-Za-z0-9_.@+/-]+\.(?:js|mjs|cjs|jsx|ts|tsx|mts|cts|py|go|rs|rb|java|kt|c|cc|cpp|cxx|h|hpp|hh|cs|php|swift|scala|m|mm|sh|sql))\s+\((?:current,\s*)?(\d+)\s+lines(?:,\s*showing\s+(\d+)-(\d+))?\):?\n/gim;
+// Prompt-only provenance: a budgeted view must not permanently erase the source
+// needed to repair a pointer after the final renderer clips its target. This
+// non-enumerable field is neither saved evidence nor an extra prompt block.
+export const RAW_SOURCE_OBSERVATION = Symbol("bantam.rawSourceObservation");
+const CLIPPED_LINE = /(?:\.\.\.|…)\s*\[[^\]\n]*(?:chars|characters)[^\]\n]*clipped[^\]\n]*\]/;
+
+// Dependencies of a rendered source view, not new source evidence. Frozen
+// fragments may retain these pointers after the history window evicts an
+// origin, so the renderer must validate them before reusing those bytes.
+export function sourcePointerOrigins(observation) {
+  return new Set([...String(observation ?? "").matchAll(
+    /\[source range [^\]\n]+:L\d+(?:-L\d+)? unchanged from turn (\d+); omitted\]/g,
+  )].map((match) => Number(match[1])));
+}
+
+function historyView(turn, observation) {
+  if (observation === turn.observation) return turn;
+  const view = { ...turn, observation };
+  const raw = turn[RAW_SOURCE_OBSERVATION] ?? turn.observation;
+  SOURCE_HEADER.lastIndex = 0;
+  const containsSource = SOURCE_HEADER.test(raw);
+  SOURCE_HEADER.lastIndex = 0;
+  if (containsSource) Object.defineProperty(view, RAW_SOURCE_OBSERVATION, { value: raw });
+  return view;
+}
 
 export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
@@ -124,13 +149,14 @@ export function compactHistory(turns) {
     observation = compactShellMetadata(observation, shellMetadata, turnNumber);
     const origin = firstSeen.get(observation);
     if (origin !== undefined) {
-      return {
-        ...turn,
-        observation: `[history compacted at turn ${turnNumber}: exact observation remains at turn ${origin}]`,
-      };
+      return historyView(turn, `[history compacted at turn ${turnNumber}: exact observation remains at turn ${origin}]`);
     }
     firstSeen.set(observation, turnNumber);
-    return observation === turn.observation ? turn : { ...turn, observation };
+    // Budget estimation uses the ordinary observation cap. The prompt renderer
+    // repeats this accounting against its exact delivered (possibly annotated,
+    // scrubbed or frozen) view before emitting any source pointer.
+    recordDeliveredSourceLines(clipObservation(observation), sourceLines, turnNumber);
+    return historyView(turn, observation);
   });
 }
 
@@ -169,7 +195,7 @@ function compactShellMetadata(observation, priorLines, turnNumber) {
 // an identical line—the later executed read is itself proof that those bytes
 // survived. Distinct files that share an import remain untouched. Partially
 // overlapping reads keep every new line and point at each covered range.
-function compactSourceRanges(observation, sourceLines, turnNumber) {
+export function compactSourceRanges(observation, sourceLines, turnNumber) {
   const text = String(observation ?? "");
   const matches = [...text.matchAll(SOURCE_HEADER)];
   SOURCE_HEADER.lastIndex = 0;
@@ -186,7 +212,6 @@ function compactSourceRanges(observation, sourceLines, turnNumber) {
     const path = normalizeSourcePath(match[1]);
     const known = sourceLines.get(path) ?? new Map();
     const lines = text.slice(bodyStart, bodyEnd).match(/[^\n]*(?:\n|$)/g) ?? [];
-    const additions = [];
     let duplicate = null;
 
     const flushDuplicate = () => {
@@ -219,15 +244,40 @@ function compactSourceRanges(observation, sourceLines, turnNumber) {
         flushDuplicate();
         output += line;
       }
-      additions.push([lineNumber, { value, turn: prior?.value === value ? prior.turn : turnNumber }]);
     }
     flushDuplicate();
-    for (const [lineNumber, value] of additions) known.set(lineNumber, value);
-    sourceLines.set(path, known);
     cursor = bodyEnd;
   }
   output += text.slice(cursor);
   return output;
+}
+
+// Only literal, complete source lines in the delivered observation can become
+// pointer targets. A clipping gap may cross a file header: after a gap, discard
+// numbered tail lines until another complete header establishes their owner.
+// Likewise the line immediately before a gap may have been cut mid-byte. Source
+// pointers themselves never establish a new origin (no pointer-to-pointer).
+export function recordDeliveredSourceLines(observation, sourceLines, turnNumber) {
+  const text = String(observation ?? "");
+  const matches = [...text.matchAll(SOURCE_HEADER)];
+  SOURCE_HEADER.lastIndex = 0;
+  for (let index = 0; index < matches.length; index++) {
+    const match = matches[index], sourcePath = normalizeSourcePath(match[1]);
+    const from = Number(match[3] ?? 1), to = Number(match[4] ?? match[2]);
+    const lines = text.slice(match.index + match[0].length, matches[index + 1]?.index ?? text.length).split("\n");
+    const known = sourceLines.get(sourcePath) ?? new Map();
+    for (let at = 0; at < lines.length; at++) {
+      if (CLIPPED_LINE.test(lines[at])) break;
+      if (at + 1 >= lines.length || CLIPPED_LINE.test(lines[at + 1])) continue;
+      const numbered = /^(\d+)\t(.*)$/.exec(lines[at]);
+      if (!numbered) continue;
+      const number = Number(numbered[1]);
+      if (number < from || number > to) continue;
+      const value = numbered[2], prior = known.get(number);
+      if (prior?.value !== value) known.set(number, { value, turn: turnNumber });
+    }
+    sourceLines.set(sourcePath, known);
+  }
 }
 
 function normalizeSourcePath(value) {
@@ -241,13 +291,20 @@ function turnSize(turn) {
   if (!turn || typeof turn !== "object") return 0;
   // buildPrompt replays the parsed action and clips each observation to 4K;
   // raw model output and private reasoning are evidence-only fields. Price the
-  // same representation instead of over/under-counting whichever artifact
-  // generation happened to supply.
+  // intermediate replay view, not arbitrary raw artifact fields. This is not
+  // an exact bound on final prompt bytes: annotation-aware/frozen rendering may
+  // restore a source range whose apparent origin was clipped. That rescue
+  // remains inside the same final 4K observation cap; system/context blocks and
+  // previously frozen fragments are also accounted separately by the caller.
   const action = turn.action ?? turn.parsedAction ?? null;
   return (action ? JSON.stringify(action).length : 0)
     + clipObservation(turn.observation).length
     // Trusted context is outside observation clipping, not outside the history
     // budget. Metadata pricing is conservative relative to its prompt wrapper.
     + (Array.isArray(turn.contextUpdates) ? JSON.stringify(turn.contextUpdates).length + 300 : 0)
+    // Collection advice is delivered whole after observation clipping. Charge
+    // its full render cap conservatively, including its separate chat wrapper.
+    + (turn.contractStateAudit?.focus === "collection-preconditions" && turn.contractStateAudit.status === "report" ? 8100 : 0)
+    + (turn.contractAssertion?.schema === "bantam.contract-assertion.v1" ? 4300 : 0)
     + 96; // ChatML/observation wrapper overhead.
 }

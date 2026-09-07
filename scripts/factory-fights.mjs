@@ -148,22 +148,24 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
   if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
   const selectedKit=factoryKit(kitId),kitRoot=selectedKit.root;if(cards===undefined)cards=selectedKit.cards;
   const plan=fightPlan({arms,cards,kitId,repetitions});
-  const model=await inspectLocalModel(endpoint);
+  const needsLocal=arms.some(arm=>LOCAL.has(arm));
+  const model=needsLocal?await inspect(endpoint):null;
   const kitSeal=treeHashes(kitRoot),runtimeSeal=sourceSeal();
   for(const card of cards){const meta=JSON.parse(fs.readFileSync(path.join(kitRoot,card,'card.json'),'utf8'));if(meta.id!==card||!Array.isArray(meta.groups)||!meta.groups.length)throw Error('invalid card descriptor');}
   fs.mkdirSync(output,{recursive:true,mode:0o700});
   write(path.join(output,'local-model.json'),model);
   const manifest={schema:'bantam.factory-fights.v1',kitId,startedAt:new Date().toISOString(),
+    presentation:{selectedParticipantsOnly:true},
     design:`Exploratory system regression/demo on the frozen ${kitId} kit: fresh contender workspaces on already-seen adaptive development tasks, identical starter/task bytes per contender, rotated order within queues. No teacher or manual repairs. Native sampling/tool/resource differences are recorded, not a pure context ablation or held-out evaluation. One repeat is not a statistical ranking. Historical cards remain unchanged.`,
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
-    sourceSeal:runtimeSeal,kitSeal,modelId:model.id,modelFileSha256:null,endpoint,
+    sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,codexModel:'gpt-6-astra',codexEffort:'medium',
       verificationWorkspaceReadOnly,terminalClosure,
@@ -173,8 +175,8 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
       cache:'shared warm server, no server restart or KV erase; prior-run prefix carryover possible',
       isolation:'BANTAM project commands in offline Docker; peer agents in disposable Docker. Local peers use host networking solely configured for the loopback model; this is not enforced network egress confinement. Codex requires provider network and readonly mounted saved CLI authentication. No hidden grader is mounted during generation.',
       evidence:'All local HTTP bodies recorded without Authorization headers; BANTAM run/checkpoint/factory evidence; native Codex session rollouts; peer native records. No claim to capture provider-side hidden context.'},plan,results:[]};
-  const modelFile=model.props.model_path;
-  if(modelFile&&path.isAbsolute(modelFile)&&fs.statSync(modelFile).isFile()){
+  const modelFile=model?.props?.model_path;
+  if(modelFile&&path.isAbsolute(modelFile)&&fs.existsSync(modelFile)&&fs.statSync(modelFile).isFile()){
     const hash=crypto.createHash('sha256');for await(const chunk of fs.createReadStream(modelFile))hash.update(chunk);manifest.modelFileSha256=hash.digest('hex');
   }
   const save=()=>{write(path.join(output,'manifest.json'),manifest);fs.writeFileSync(path.join(output,'RESULTS.md'),markdown(manifest));};
@@ -182,8 +184,10 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   const runQueue=async(queue)=>{for(const item of queue){
     if(fs.existsSync(path.join(output,'STOP_AFTER_CURRENT'))){manifest.stoppedEarly='Operator requested stop at a clean contender boundary; no active run was interrupted.';break;}
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or kit changed after freeze');
-    const current=await inspectLocalModel(endpoint,{requireIdle:LOCAL.has(item.arm)});
-    if(current.id!==model.id||current.props.build_info!==model.props.build_info||current.props.default_generation_settings.n_ctx!==model.props.default_generation_settings.n_ctx)throw Error('local server identity/settings changed');
+    if(LOCAL.has(item.arm)){
+      const current=await inspect(endpoint);
+      if(current.id!==model.id||JSON.stringify(current.props.build_info)!==JSON.stringify(model.props.build_info)||current.props.default_generation_settings.n_ctx!==model.props.default_generation_settings.n_ctx)throw Error('local server identity/settings changed');
+    }
     const {card,arm,repeat}=item,kit=path.join(kitRoot,card),dir=path.join(output,`repeat-${repeat}`,card,arm),workspace=path.join(dir,'ws');
     fs.mkdirSync(dir,{recursive:true});fs.cpSync(path.join(kit,'starter'),workspace,{recursive:true,dereference:false});
     const materials=treeHashes(path.join(kit,'starter'));
@@ -192,18 +196,18 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     fs.mkdirSync(path.join(dir,'native-sessions'));
     const recorder=LOCAL.has(arm)?await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')}):null;
     const countersBefore=recorder?await optionalServerCounters(endpoint):null;
-    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure});
+    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
     let result,wireUsage;
-    try {result=await executeContender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs,events:[],arm});}
+    try {result=await contender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs,events:[],arm});}
     finally {wireUsage=recorder?await recorder.close():null;}
     const countersAfter=recorder?await optionalServerCounters(endpoint):null;
     const serverUsage=recorder?counterDelta(countersBefore,countersAfter):null;
     if(recorder)write(path.join(dir,'server-usage.json'),{before:countersBefore,after:countersAfter,delta:serverUsage});
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during contender run; no score issued');
     const tampered=changedSealedFiles(Object.fromEntries(Object.entries(materials).filter(([p])=>p==='package.json'||p.startsWith('test/'))),workspace);
-    const grading=await gradeFactoryFight(workspace,card,{kitId});
+    const grading=await grade(workspace,card,{kitId});
     for(const [label,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
       fs.writeFileSync(path.join(dir,`${label}.stdout.log`),record.stdout);fs.writeFileSync(path.join(dir,`${label}.stderr.log`),record.stderr);
     }
@@ -241,6 +245,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const args=process.argv.slice(2),value=flag=>{const i=args.indexOf(flag);return i<0?null:args[i+1];};
   runFactoryFights({output:args[0],...(value('--arms')?{arms:value('--arms').split(',')}:{}),
+    ...(value('--endpoint')?{endpoint:value('--endpoint')}:{}),
     ...(value('--kit')?{kitId:value('--kit')}:{}),
     ...(value('--cards')?{cards:value('--cards').split(',')}:{}),...(value('--repetitions')?{repetitions:Number(value('--repetitions'))}:{}),
     ...(value('--timeout-seconds')?{timeoutMs:Number(value('--timeout-seconds'))*1000}:{}),

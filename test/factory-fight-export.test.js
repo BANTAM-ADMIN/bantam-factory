@@ -14,6 +14,21 @@ const ARMS = ['bantam-local-27b', 'deepseek-local-27b', 'opencode', 'hermes', 'c
 const CARDS = ['receipt-reducer', 'snapshot-drift', 'job-planner'];
 const clone = value => JSON.parse(JSON.stringify(value));
 
+test('real wire coverage records export without treating their metric labels as numeric counters',t=>{
+ const f=fixture(t),row=f.manifest.results[0];
+ row.usage.coverage=Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens','freshInputTokens'].map(key=>[key,{measuredRequests:3,totalRequests:3,complete:true,missingRequestIndices:[]}]));
+ write(path.join(f.root,'manifest.json'),f.manifest);
+ write(path.join(f.root,'repeat-1',row.card,row.arm,'result.json'),row);
+ writeFightCardExport(f.root);const card=JSON.parse(fs.readFileSync(path.join(f.root,'fight-card.json')));
+ assert.equal(card.results[0].usage.coverage.inputTokens.complete,true);
+ const bad=clone(card);bad.results[0].usage.coverage.inputTokens.measuredRequests=4;
+ assert.throws(()=>validateFightCard(bad),/coverage/);
+ const malformed=clone(card);malformed.results[0].usage.inputTokens={measuredRequests:3};
+ assert.throws(()=>validateFightCard(malformed),/counter/);
+ const incomplete=clone(card);incomplete.results[0].usage.coverage.inputTokens={measuredRequests:2,totalRequests:3,complete:false,missingRequestIndices:[2]};
+ assert.doesNotThrow(()=>validateFightCard(incomplete));
+});
+
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-exchange-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

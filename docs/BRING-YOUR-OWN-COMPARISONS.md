@@ -1,8 +1,65 @@
 # Compare with the tools you already use
 
-Status: September 7, 2026. Existing adapters are implemented; a unified end-user
-comparison-registration wizard is **planned, not implemented**. Model setup
-does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Code.
+Status: September 7, 2026. `bantamfactory cards` now provides a guided front door
+to the frozen factory cards, participant selection, prerequisite checks, explicit
+execution consent and automatic local replay/export generation. Persistent
+installation-folder registration and generic agent-API adapters remain planned.
+Model setup does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Code.
+
+## Start a card
+
+```bash
+bantamfactory cards --list
+bantamfactory cards
+# Inspect a plan without inference, Docker execution or output-directory creation:
+bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
+# Explicit unattended authorization for these participants and this task:
+bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
+```
+
+The default kit is `factory-2026-09-07`: context-packet, patch-transaction and
+stream-framer. Select a card, participants and an endpoint; inspect the plan;
+then approve it. Enter at the final confirmation cancels. Listing and dry runs
+do not execute participants or contact a model. Interactive server discovery is
+bounded loopback model metadata only. Discovery is not a readiness certificate.
+
+Results go into a fresh `.bantam/fight-cards/<timestamp>/` directory (override
+with `--out`). Each contender gets a fresh starter workspace, not your project.
+The command preserves failed attempts and produces `fight-cards.html`,
+`fight-card.json` and raw evidence locally. The HTML embeds recorded source and
+transcripts: **inspect before sharing**. Nothing is uploaded automatically.
+Exit 0 means the requested series completed and every participant passed;
+failed/incomplete outcomes return 1, setup/command errors return 2.
+
+Rebuild presentation from existing evidence without any model calls:
+
+```bash
+bantamfactory cards --replay /absolute/path/to/recorded-run
+```
+
+This regenerates the derived export and HTML; it does not rerun candidates,
+change grades or hide a failed attempt. If export validation fails, the command
+still attempts a readable replay and returns an error rather than claiming a
+successful portable export.
+
+Select cloud IDs explicitly (`codex-astra`, `bantam-codex-astra`); `--yes` also
+requires explicit `--arms` and `--card`. Cloud-only execution no longer requires
+a local model. The current isolated Codex benchmark runtime still requires Linux
+x64, uid/gid 1000 and its expected npm installation layout; ordinary BANTAM
+Codex setup is separate. The front door does not remove these adapter limits.
+
+Local recorded cards currently need a credential-free loopback llama.cpp origin
+with `/health`, `/v1/models`, `/props` and `/slots`. A saved llama.cpp connection
+is offered; a server on another loopback port can be selected directly. Remote
+servers and generic OpenAI-compatible APIs work through BANTAM setup but still
+need additional adaptation for this recorded comparison flow. The historical
+lane ID `bantam-local-27b` is retained for evidence compatibility, not a check
+that the user's selected model has 27B parameters.
+
+Preflight checks selected executables and Docker/image availability; it does not
+pull images or prove compatibility of every harness version. Missing runtime
+prerequisites fail before contender execution. All local inference contenders
+run serially. Frontier work may overlap; use `--serial` to serialize everything.
 
 ## What works today
 
@@ -25,11 +82,13 @@ Supply a disposable workspace, task file, new output directory, exact model ID
 and local recording endpoint. An executable outside PATH can be exposed using
 a command-scoped PATH; pointing at an arbitrary folder or remote agent URL is
 not currently a supported generic registration mechanism. These are advanced
-runner interfaces, not a one-click comparison experience.
+runner interfaces beneath the guided `cards` command.
 
-## Product flow to build next
+## Remaining product flow
 
-Keep comparison setup separate from the initial model chooser:
+The guided entry point is implemented. Complete its portability, installed-folder
+registration and agent-API support while keeping comparison setup separate from
+the initial model chooser:
 
 1. Offer “Compare with my tools” after BANTAM's own readiness check. Detect
    executable availability without launching tasks or reading account secrets.
@@ -76,3 +135,13 @@ schema/hash validation, inspection, isolated tests, local holdouts and explicit
 promotion. Never automatically import another machine's prompts, credentials,
 project files or executable hooks. Community learning is a governed qualification
 process, not an automatic skill-install side effect of viewing a fight card.
+
+## Claude Code boundary
+
+Claude Code is only a direct CLI agent contender, explicitly requested by name
+or number. It is not used as BANTAM's model backend, teacher, planner or judge.
+The REPL's implicit `:fight` and the legacy picker's Enter/“all” selection now
+stay local; the legacy local BANTAM lane no longer enables a cloud teacher.
+The legacy command `bantam fight --arms bantam,claude-sonnet --task "..."` is
+available for a deliberate direct comparison. Its execution/isolation/grading
+protocol differs from the frozen `cards` runner; do not label them equivalent.

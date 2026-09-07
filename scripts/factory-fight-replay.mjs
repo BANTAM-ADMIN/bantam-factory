@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import {factoryKit} from './factory-card-catalog.mjs';
+import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
@@ -404,13 +404,19 @@ export function renderFactoryReplay({manifest,cards,payloads,presentation={}}) {
   const interrupted=presentation.interruption!=null;
   const total=cards.reduce((n,c)=>n+c.lanes.filter(l=>l.result).length,0);
   const passed=cards.reduce((n,c)=>n+c.lanes.filter(l=>l.result?.pass).length,0);
+  const selectedOnly=manifest.presentation?.selectedParticipantsOnly===true;
+  const laneCount=new Set(cards.flatMap(c=>c.lanes.map(l=>l.arm))).size;
+  const localCount=new Set(cards.flatMap(c=>c.lanes.filter(l=>l.family==='local').map(l=>l.arm))).size;
+  const workCount=new Set(cards.map(c=>c.card)).size;
   const brandAsset=fs.readFileSync(path.join(REPO,'docs/brand/bantam-mark.svg'),'utf8').replace('<svg ','<svg style="color:#e8a33d" ');
   const brandImage='data:image/svg+xml;base64,'+Buffer.from(brandAsset).toString('base64');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
-<title>BANTAM / Factory fight cards</title><style>${STYLES}${POLISH_STYLES}</style></head><body>
-<div class="scanline" aria-hidden="true"></div><header class="masthead"><div class="brand"><span class="brand-mark" aria-hidden="true"><img src="${brandImage}" alt="" width="82" height="82"></span><div><p class="eyebrow">THE FACTORY FLOOR / BANTAM SYSTEM TRIALS</p><h1>Same silicon.<br><em>Different process.</em></h1><p class="subhead">Four harnesses on one local 27B. Two Astra systems alongside them.<br>Three useful machines to build. Every result attached to its evidence.</p></div></div><div class="edition"><span class="live-dot"></span> ${interrupted?'INTERRUPTED / DIAGNOSTIC ONLY':manifest.complete?'SERIES RECORDED':'PARTIAL SERIES'}<br><span>${escape(String(manifest.startedAt??'Date not recorded').slice(0,10))}</span><div class="edition-number" aria-hidden="true">06<span> / 03</span></div><span>PRODUCTION LINES / WORK ORDERS</span></div></header>
-<main>${interrupted?`<aside class="interrupted-notice"><b>INTERRUPTED SERIES / NOT A COMPLETED COMPARISON</b><p>Individual receipts are preserved as diagnostic evidence. This abandoned partial series does not promote comparative BANTAM wins or support a system ranking.</p><details><summary>Read exact INTERRUPTED.md · SHA-256 ${escape(presentation.interruption.sha256)}</summary><pre>${escape(presentation.interruption.content)}</pre></details></aside>`:''}<section class="overview" aria-label="Series facts"><div><span class="kicker">ACCEPTED COMPLETIONS</span><strong>${passed}<small> / ${total}</small></strong></div><div><span class="kicker">LOCAL COMPARISON</span><strong>4 <small>harnesses · 27B</small></strong><p>Same configured local model; different native working loops.</p></div><div><span class="kicker">FRONTIER COMPARISON</span><strong>2 <small>systems · Astra</small></strong><p>Native Codex and Codex inside BANTAM.</p></div><div><span class="kicker">THE STANDARD</span><strong>Evidence<small>, not confidence.</small></strong><p>Independent acceptance is separate from an agent saying “done”.</p></div></section>
+<title>BANTAM / Factory fight cards</title><style>${STYLES}${POLISH_STYLES}
+.selected-participants .lanes{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+</style></head><body${selectedOnly?' class="selected-participants"':''}>
+<div class="scanline" aria-hidden="true"></div><header class="masthead"><div class="brand"><span class="brand-mark" aria-hidden="true"><img src="${brandImage}" alt="" width="82" height="82"></span><div><p class="eyebrow">THE FACTORY FLOOR / BANTAM SYSTEM TRIALS</p><h1>${selectedOnly?'Your tools.<br><em>Same work order.</em>':'Same silicon.<br><em>Different process.</em>'}</h1><p class="subhead">${selectedOnly?`${laneCount} selected participants. ${workCount} frozen work orders.<br>Recorded outcomes, including failures. Every result attached to its evidence.`:'Four harnesses on one local 27B. Two Astra systems alongside them.<br>Three useful machines to build. Every result attached to its evidence.'}</p></div></div><div class="edition"><span class="live-dot"></span> ${interrupted?'INTERRUPTED / DIAGNOSTIC ONLY':manifest.complete?'SERIES RECORDED':'PARTIAL SERIES'}<br><span>${escape(String(manifest.startedAt??'Date not recorded').slice(0,10))}</span><div class="edition-number" aria-hidden="true">${selectedOnly?String(laneCount).padStart(2,'0'):'06'}<span> / ${selectedOnly?String(workCount).padStart(2,'0'):'03'}</span></div><span>PRODUCTION LINES / WORK ORDERS</span></div></header>
+<main>${interrupted?`<aside class="interrupted-notice"><b>INTERRUPTED SERIES / NOT A COMPLETED COMPARISON</b><p>Individual receipts are preserved as diagnostic evidence. This abandoned partial series does not promote comparative BANTAM wins or support a system ranking.</p><details><summary>Read exact INTERRUPTED.md · SHA-256 ${escape(presentation.interruption.sha256)}</summary><pre>${escape(presentation.interruption.content)}</pre></details></aside>`:''}<section class="overview" aria-label="Series facts"><div><span class="kicker">ACCEPTED COMPLETIONS</span><strong>${passed}<small> / ${total}</small></strong></div><div><span class="kicker">LOCAL COMPARISON</span><strong>${selectedOnly?localCount:4} <small>${selectedOnly?'selected local systems':'harnesses · 27B'}</small></strong><p>Same configured local model; different native working loops.</p></div><div><span class="kicker">FRONTIER COMPARISON</span><strong>${selectedOnly?laneCount-localCount:2} <small>${selectedOnly?'selected frontier systems':'systems · Astra'}</small></strong><p>${selectedOnly?'Only explicitly selected cloud participants are run.':'Native Codex and Codex inside BANTAM.'}</p></div><div><span class="kicker">THE STANDARD</span><strong>Evidence<small>, not confidence.</small></strong><p>Independent acceptance is separate from an agent saying “done”.</p></div></section>
 <aside class="method-note"><b>Read this as an exploratory comparison, not a leaderboard.</b> ${escape(manifest.design??'Design metadata is missing.')} <span class="privacy">PRIVATE EVIDENCE · This portable file contains task/source/transcripts when recorded. Inspect before sharing. Nothing is automatically published.</span><a class="export-card" href="./fight-card.json" download>↓ Machine-readable fight card <span>metadata + evidence hashes · inspect before sharing</span></a></aside>
 <div id="interactive" hidden><nav id="cards" class="card-tabs" aria-label="Fight cards"></nav><section class="arena-head"><div><p id="card-kind" class="eyebrow"></p><h2 id="card-title"></h2><p id="card-subtitle"></p></div><div class="arena-actions"><button class="outline" id="focus-button">Focus card ⤢</button><button class="outline" id="task-button">Read work order ↗</button></div></section>
 <div class="view-bar"><div class="view-switch" role="group" aria-label="Presentation view"><button id="results-view" aria-pressed="false">Results</button><button id="replay-view" aria-pressed="false">Replay</button></div><p id="view-note"></p></div>
@@ -452,12 +458,15 @@ export function writeFactoryReplay(outputRoot) {
   for(const item of identities){
     if(!Number.isInteger(item.repeat)||item.repeat<1||!/^[a-z0-9-]+$/.test(item.card??''))throw Error('invalid card identity in manifest');
     const key=`${item.repeat}/${item.card}`;if(seen.has(key))continue;seen.add(key);
-    const card={id:`repeat-${item.repeat}-${item.card}`,card:item.card,repeat:item.repeat,title:TITLES[item.card]??item.card,lanes:[]};
+    const metadata=PUBLIC_FACTORY_CARDS[item.card];
+    const card={id:`repeat-${item.repeat}-${item.card}`,card:item.card,repeat:item.repeat,title:metadata?.title??TITLES[item.card]??item.card,kind:metadata?.kind??'',description:metadata?.description??'',lanes:[]};
     const directory=path.join(root,`repeat-${item.repeat}`,item.card);
     let outer='';try{outer=fs.readFileSync(path.join(directory,'events.ndjson'),'utf8');}catch{}
-    for(const arm of ARMS){
+    for(const arm of ARMS.filter(a=>!manifest.presentation?.selectedParticipantsOnly||identities.some(i=>i.repeat===item.repeat&&i.card===item.card&&i.arm===a))){
       const result=results.find(r=>r.repeat===item.repeat&&r.card===item.card&&r.arm===arm)??null;
-      const built=buildReplayLane({directory:path.join(directory,arm),result,arm,card:item.card,repeat:item.repeat,outer,kitSeal:manifest.kitSeal??{}});
+      const built=buildReplayLane({directory:path.join(directory,arm),result,arm,card:item.card,repeat:item.repeat,outer,kitSeal:manifest.kitSeal??{},kitId:manifest.kitId??'factory-2026-09-06',
+        identity:manifest.presentation?.selectedParticipantsOnly&&arm==='bantam-local-27b'?{family:'local',label:'BANTAM · selected model'}:null});
+      if(manifest.presentation?.selectedParticipantsOnly&&arm==='bantam-local-27b')built.lane.label='BANTAM · selected model';
       card.lanes.push(built.lane);
       payloads.push({id:built.lane.id,data:gzipSync(Buffer.from(JSON.stringify(built.payload)),{level:9}).toString('base64')});
     }
@@ -650,13 +659,13 @@ function browserApp() {
   function selectCard(index){
     selected=index;time=0;playing=false;lastFrame=null;
     const card=activeCard();$('card-title').textContent=card.title;$('card-kind').textContent=`CARD ${index+1} / ${data.cards.length} · REPEAT ${card.repeat}`;
-    $('card-subtitle').textContent=card.card==='receipt-reducer'?'FRESH BUILD · reconstruct an auditable job-attempt report':card.card==='snapshot-drift'?'FEATURE ADDITION · bind selected files to a byte-and-mode manifest':'REPAIR · make dependency ordering and failure propagation deterministic';
+    $('card-subtitle').textContent=[card.kind,card.description].filter(Boolean).join(' · ');
     [...$('cards').children].forEach((b,i)=>b.setAttribute('aria-selected',String(i===index)));
     $('seek').max=String(duration());$('duration').textContent=clock(duration());
     $('lanes').replaceChildren();
     for(const lane of card.lanes){
       const node=el('article',undefined,`lane ${lane.arm.startsWith('bantam')?'bantam':''} ${lane.family==='astra'?'astra':''}`);node.dataset.lane=lane.id;
-      const head=el('div',undefined,'lane-head');append(head,el('div',lane.family==='local'?'LOCAL 27B · SAME CONFIGURED WEIGHTS':'GPT-6-ASTRA · MEDIUM','lane-family'),el('h3',lane.label));
+      const head=el('div',undefined,'lane-head');append(head,el('div',lane.family==='local'?(data.manifest.presentation?.selectedParticipantsOnly?'LOCAL · SELECTED MODEL':'LOCAL 27B · SAME CONFIGURED WEIGHTS'):'GPT-6-ASTRA · MEDIUM','lane-family'),el('h3',lane.label));
       const status=el('div',undefined,'status-line');append(status,el('span',lane.outcome,`badge ${statusClass(lane.outcome)}`),el('span',lane.duration===null?'time unknown':clock(lane.duration),'lane-time'));head.append(status);
       const progress=el('div',undefined,'progress');progress.append(el('i'));const metrics=el('div',undefined,'metrics');
       for(const [key,label,kind] of [['inputTokens','INPUT',''],['outputTokens','OUTPUT',''],['cacheHitTokens','CACHED INPUT','cached'],['freshInputTokens','FRESH INPUT','fresh']]){
@@ -760,7 +769,7 @@ function browserApp() {
   function focusCard(){
     if(document.body.classList.contains('focus-card'))return;
     document.body.classList.add('focus-card');const banner=el('div',undefined,'focus-banner');
-    append(banner,el('span','FACTORY FLOOR / PRIVATE RECORDED EVIDENCE · Four local 27B systems; two Astra systems.'),
+    append(banner,el('span',data.manifest.presentation?.selectedParticipantsOnly?'FACTORY FLOOR / PRIVATE RECORDED EVIDENCE · Your selected participants.':'FACTORY FLOOR / PRIVATE RECORDED EVIDENCE · Four local 27B systems; two Astra systems.'),
       button('Show full report',()=>{document.body.classList.remove('focus-card');banner.remove();},'outline'));
     $('interactive').prepend(banner);
   }

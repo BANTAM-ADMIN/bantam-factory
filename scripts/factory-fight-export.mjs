@@ -80,6 +80,19 @@ function validateMetrics(value) {
   if (!object(value)) fail('invalid metric object');
   const walk = item => {
     for (const [key, child] of Object.entries(item)) {
+      if (key === 'coverage') {
+        if (!object(child)) fail('invalid coverage');
+        for (const [metric, record] of Object.entries(child)) {
+          if (!['inputTokens','outputTokens','cacheHitTokens','freshInputTokens'].includes(metric)
+              || !object(record) || !integer(record.measuredRequests) || !integer(record.totalRequests)
+              || record.measuredRequests > record.totalRequests || typeof record.complete !== 'boolean'
+              || !Array.isArray(record.missingRequestIndices)
+              || record.missingRequestIndices.length !== record.totalRequests-record.measuredRequests
+              || record.missingRequestIndices.some(index=>index!==null&&!integer(index))
+              || (record.complete && (record.totalRequests===0 || record.measuredRequests!==record.totalRequests))) fail('invalid metric coverage');
+        }
+        continue; // Metric names here label coverage records, not numeric counters.
+      }
       if (/(?:Tokens|Bytes|Requests|Ms)$/.test(key) || ['turns', 'requests', 'measuredRequests'].includes(key)) {
         if (child !== null && !integer(child)) fail(`invalid counter ${key}`);
       }
@@ -183,10 +196,12 @@ export function validateFightCard(card) {
     'endpoint', 'limits', 'configuration', 'sourceSeal', 'kitSeal', 'sourceMismatches', 'kitMismatches', 'operatorEvidence'], 'run');
   if (!object(card.run) || typeof card.run.complete !== 'boolean' || !hex(card.run.manifestSha256)) fail('invalid run metadata');
   if (card.run.modelFileSha256 !== null && !hex(card.run.modelFileSha256)) fail('invalid model digest');
-  if (typeof card.run.modelId !== 'string' || typeof card.run.design !== 'string' || !object(card.run.configuration)) fail('invalid model/configuration metadata');
+  const cloudOnly = Array.isArray(card.plan) && card.plan.length>0 && card.plan.every(row=>['codex-astra','bantam-codex-astra'].includes(row?.arm));
+  const noLocalIdentity = cloudOnly && card.run.modelId===null && card.run.endpoint===null && card.run.modelFileSha256===null;
+  if ((!noLocalIdentity && typeof card.run.modelId !== 'string') || typeof card.run.design !== 'string' || !object(card.run.configuration)) fail('invalid model/configuration metadata');
   if (!timestamp(card.run.startedAt) || (card.run.finishedAt !== null && !timestamp(card.run.finishedAt))
       || typeof card.run.baseCommit !== 'string' || !/^[0-9a-f]{40,64}$/.test(card.run.baseCommit)
-      || typeof card.run.endpoint !== 'string' || !object(card.run.limits)) fail('invalid run identity/time');
+      || (!noLocalIdentity && typeof card.run.endpoint !== 'string') || !object(card.run.limits)) fail('invalid run identity/time');
   validateMetrics(card.run.limits); relativeList(card.run.sourceMismatches); relativeList(card.run.kitMismatches); relativeList(card.run.operatorEvidence);
   validateSeal(card.run.sourceSeal); validateSeal(card.run.kitSeal);
   if (!Array.isArray(card.plan) || !card.plan.length || card.plan.length > LIMITS.results || !Array.isArray(card.results)

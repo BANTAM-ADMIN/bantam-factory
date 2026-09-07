@@ -154,9 +154,11 @@ than DavidAU's; actual speed depends on offloading and CPU memory bandwidth.
 Managed startup requires a tiny constrained inference, not just a health reply.
 
 Rival harnesses are optional, not installed by setup. See
-[compare with your existing tools](docs/BRING-YOUR-OWN-COMPARISONS.md) for current
-adapters and the planned comparison wizard; existing model APIs and full agent
+[compare with your existing tools](docs/BRING-YOUR-OWN-COMPARISONS.md) for the new
+`bantamfactory cards` chooser and remaining adapter limits; model APIs and full agent
 APIs are different interfaces.
+The [launch-readiness checklist](docs/LAUNCH-READINESS.md) separates verified
+behavior from remaining portability, hardware and comparison work.
 
 Then, from any project directory:
 

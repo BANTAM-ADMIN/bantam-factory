@@ -190,6 +190,12 @@ if (savedApi?.presets) {
   cliModelOptions.__presets = savedApi.presets;
 }
 const cmd = args._[0];
+if (cmd === 'cards') {
+  try {
+    const {factoryCardsCommand}=await import('../src/factory-cards-command.js');
+    process.exit(await factoryCardsCommand(args,{ask:askSetup}));
+  } catch(error) { console.error(`Fight cards: ${error.message}`); process.exit(2); }
+}
 if (args["shell-network"] === true) process.env.BANTAM_SHELL_NETWORK = "1";
 // First-class trajectory choice (operator, 2026-08-18): rebuild stays the
 // quality default (the 08-12 preregistered ruling — stale panels poison
@@ -1867,14 +1873,15 @@ if (cmd === undefined || cmd === "chat") {
       if (a.pool !== lastPool) { console.error(`  [${a.pool}]`); lastPool = a.pool; }
       console.error(`   ${String(i + 1).padStart(2)}. ${a.available ? "●" : "✖"} ${a.name.padEnd(24)} ${a.sub}${a.why ? `   ← ${a.why}` : ""}`);
     });
-    console.error("  Numbers (e.g. 1 3 5), names, 'a' = all available, Enter = all available same-weights + defaults:");
+    console.error("  Numbers or names select explicit participants. 'a' / Enter = available local participants only.");
+    console.error("  Cloud participants send task/context to their provider and use your account. Claude Code must be selected by name or number for a direct agent comparison.");
     const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
     const answer = String(await new Promise((res) => rl.question("  corners> ", res))).trim();
     rl.close();
     const avail = roster.filter((a) => a.available).map((a) => a.name);
     if (!answer || answer === "a") {
-      arms = answer === "a" ? avail : ["bantam", "hermes", "opencode"].filter((n) => avail.includes(n));
-      if (!arms.length) arms = avail;
+      arms = ["bantam", "hermes", "opencode"].filter((n) => avail.includes(n));
+      if (!arms.length) fail('No local participants available. Select a cloud participant explicitly or configure a local server.');
     } else {
       arms = answer.split(/[\s,]+/).filter(Boolean).map((tok) => {
         if (/^\d+$/.test(tok)) return roster[Number(tok) - 1]?.name;
@@ -4718,7 +4725,10 @@ async function repl() {
       const { startFight, composeFightBrief } = await import("../src/fight.js");
       const { haltState } = await import("../src/logic/governor.js");
       const halted = haltState(process.cwd()).halted;
-      const arms = armsArg ?? (halted ? ["bantam", "hermes"] : ["bantam", "hermes", "codex-sol", "claude-sonnet"]);
+      const arms = armsArg ?? ["bantam", "hermes", "opencode"];
+      if (halted && arms.some(a=>!['bantam','hermes','opencode','bantam-local-27b'].includes(a))) {
+        console.log('  Governor halt: explicit cloud participants cannot run until the halt is cleared.'); continue;
+      }
       if (halted) console.log("  ⛔ governor halt is on — cloud corners sit out; local-only fight.");
       const brief = composeFightBrief({ sessionLog, request: q });
       console.log(`  🐓 FIGHT CARD: ${arms.join(" vs ")}`);

@@ -46,21 +46,6 @@ function bridgeArm({ model, effort, corner, sub, color }) {
   };
 }
 
-/**
- * A teacher over the codexapi bridge: reads the diagnosis prompt on stdin,
- * asks sol:high once, prints the cause. Card 7's anatomy showed the stuck-test
- * SELF-diagnosis firing and the 27B still treadmilling ~230 s on its render
- * test; the measured escalation for exactly that residual is a stronger model
- * (teacher-assist, 2/5 -> 5/5 on gbnf-reach), and no fight arm had one armed.
- */
-function bridgeTeacherCmd(cfg) {
-  const script = 'let b="";process.stdin.on("data",c=>b+=c).on("end",async()=>{' +
-    `const r=await fetch(${JSON.stringify(`${cfg.url}/chat/completions`)},{method:"POST",headers:{Authorization:${JSON.stringify(`Bearer ${cfg.key ?? ""}`)},"Content-Type":"application/json"},` +
-    'body:JSON.stringify({model:"gpt-5.6-sol:high",chat_preamble:false,messages:[{role:"system",content:"You are a precise debugging teacher. State the root cause and the exact fix, tersely."},{role:"user",content:b}]})});' +
-    'const j=await r.json();const t=j.choices?.[0]?.message?.content;if(t)process.stdout.write(t);});';
-  return `node -e '${script.replace(/'/g, "'\''")}'`;
-}
-
 export const ARMS = {
   bantam: {
     pool: "local",
@@ -77,7 +62,8 @@ export const ARMS = {
         // checkpoint on 6 of 8 calls (45% reuse) — a harness setting, not the model.
         env: {
           BANTAM_ENDPOINT: "http://127.0.0.1:8085", BANTAM_PROMPT_TRAJECTORY: "extension",
-          BANTAM_TEACHER: "1", BANTAM_TEACHER_CMD: bridgeTeacherCmd(cfg),
+          // A local comparison must not silently consume a cloud account.
+          BANTAM_TEACHER: "0", BANTAM_TEACHER_CMD: "",
           // Wall decomposition, cards 16/17: green-path thinks cost 8.6 s of a
           // 33.4 s run; one failure think burned its full 4,096-token allowance
           // for 45.8 s. TRIM is the measured-safe dial; the cap bounds repair

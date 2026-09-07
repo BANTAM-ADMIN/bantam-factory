@@ -48,7 +48,7 @@ test("the opencode corner runs the same local 27B headlessly from its own arena 
   assert.match(c.env.XDG_CACHE_HOME, /opencode[\/\\]cache$/);
 });
 
-test("the local bantam corner has a bridge teacher armed for stuck tests", () => {
+test("the local bantam corner never silently enables a cloud teacher", () => {
   // Card 7 anatomy (2026-08-25): the stuck-test self-diagnosis FIRED and the
   // model still treadmilled ~230 s on its render test. The code's own A/B
   // says more self-diagnosis is null-to-negative and the validated escalation
@@ -60,10 +60,8 @@ test("the local bantam corner has a bridge teacher armed for stuck tests", () =>
   process.env.BANTAM_CODEXAPI_KEY = "k";
   try {
     const c = buildArmCommand("bantam", { task: "t" });
-    assert.equal(c.env.BANTAM_TEACHER, "1");
-    assert.match(c.env.BANTAM_TEACHER_CMD, /http:\/\/bridge:8787\/v1\/chat\/completions/);
-    assert.match(c.env.BANTAM_TEACHER_CMD, /gpt-5\.6-sol:high/);
-    assert.match(c.env.BANTAM_TEACHER_CMD, /chat_preamble/);
+    assert.equal(c.env.BANTAM_TEACHER, "0");
+    assert.equal(c.env.BANTAM_TEACHER_CMD, "");
   } finally {
     for (const [k, v] of [["BANTAM_CODEXAPI_URL", prev.url], ["BANTAM_CODEXAPI_KEY", prev.key]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }

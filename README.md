@@ -19,11 +19,18 @@ generation: use the matching adapter and inspect the startup constraint check.
 
 ## Current factory fight cards
 
-Open the [September 6 offline Arena](docs/fights/factory-2026-09-06/fight-cards.html):
-three fresh build/change/repair cards, six systems, all 18 attempts retained.
+Open the **[public launch fight card](docs/fights/launch/public/index.html)**:
+three build/change/repair cards, six systems, all 18 comparison attempts retained,
+plus a separate latest Tiel qualification. It includes recorded replay,
+shareable image/data exports and selected earlier local-attempt history.
 BANTAM and DeepSeek Harness both completed 3/3 using the same local 27B;
 BANTAM took 12.1 minutes total versus 22.7 minutes. These are single-attempt,
 recorded-configuration results, not a universal ranking or an out-of-box promise.
+
+The [public-package guide](docs/fights/launch/README.md) identifies the exact
+directory safe to stage for public hosting. The older
+[full-evidence Arena](docs/fights/factory-2026-09-06/fight-cards.html) remains a
+private, non-redacted archive; do not publish the repository around the card.
 
 The [full results](docs/FRESH-FACTORY-RESULTS-2026-09-06.md) also cover the six
 native Sol/Terra follow-ups, incomplete runs, unknown token totals and measured
@@ -41,7 +48,10 @@ a different trade-off: roughly 3B active parameters per token, faster inference,
 and the same obligation to deliver verifiable work. The initial recorded Tiel
 configuration decoded about 2.44× faster than the historical 27B configuration;
 that is not a task-speed or reliability ranking. A later fresh Snapshot run
-achieved **5/5 and accepted completion in 94 seconds**.
+achieved **5/5 and accepted completion in 94 seconds**. The latest Snapshot
+qualification achieved **5/5 with accepted completion in 223.6 seconds** after
+the subsequent recovery-context fixes. Both timings remain separately recorded;
+neither single attempt establishes a reliability rate.
 
 The opportunity goes beyond one fast run: more responsive local work,
 lower-VRAM deployments through offloading, and several bounded workers sharing

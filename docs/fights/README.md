@@ -1,6 +1,13 @@
 # Fight Night — the BANTAM bench
 
-## Latest Arena showcase
+## Public launch card
+
+Start with **[the public fight card](launch/public/index.html)** for the clean,
+shareable comparison and recorded replay. The [publication guide](launch/README.md)
+defines the public-only deployment boundary. The detailed engineering archive
+below remains intact; its private pages are not public deployment assets.
+
+## Engineering Arena showcase
 
 Open the [public-summary Arena](showcase/public/index.html) for the original
 comparison and the separately recorded Tiel confirmation1, partial repair9,

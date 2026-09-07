@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { ACTION_DEFINITIONS, LINE_EDIT_FEATURE, actionPromptMenuLine } from "./action-protocol.js";
+import { ACTION_DEFINITIONS, LINE_EDIT_FEATURE, PATCH_ACTION_FEATURE, actionPromptMenuLine } from "./action-protocol.js";
 
 export const CONTEXT_UPDATE_MAX_CHARS = 3000;
 const MAX_FILES = 4;
@@ -21,20 +21,24 @@ export function createActionContractUpdate({ generation, turn, availableVerbs, r
       || availableVerbs.length > KNOWN_ACTIONS.size
       || availableVerbs.some(verb => !KNOWN_ACTIONS.has(verb))
       || new Set(availableVerbs).size !== availableVerbs.length
-      || !availableVerbs.includes("edit_lines")
-      || !["edit-recovery", "document-revision"].includes(reason)
+      || !availableVerbs.includes(reason === 'verification-repair' ? 'patch' : 'edit_lines')
+      || !["edit-recovery", "document-revision", "verification-repair"].includes(reason)
       || (recoveryPath !== null && !safeRelativePath(recoveryPath))) return null;
   const text = [
     `ACTION INTERFACE FOR TURN ${turn + 1} (generation ${generation}). Later turn interfaces supersede this one.`,
     reason === "edit-recovery"
       ? `EDIT RECOVERY ACTIVE${recoveryPath ? `: ${recoveryPath}` : ""}. The failed exact-match proposal was NOT APPLIED. Use actual current bytes, not that proposal.`
-      : "DOCUMENT REVISION: use the current document and its audited requirements.",
+      : reason === 'verification-repair'
+        ? 'TEST REPAIR: the current executed suite reports multiple failures after an authored test edit. If you have already diagnosed independent corrections, apply them together; do not invent changes to fill a batch.'
+        : "DOCUMENT REVISION: use the current document and its audited requirements.",
     `Available actions on this turn: ${availableVerbs.join(", ")}.`,
-    "Line-pointer edit syntax (all fields required; start/end are positive, inclusive line numbers):",
-    actionPromptMenuLine("edit_lines", { features: [LINE_EDIT_FEATURE] }),
+    reason === 'verification-repair' ? 'Atomic patch syntax (exact CURRENT old bytes; all edits land or none):' : "Line-pointer edit syntax (all fields required; start/end are positive, inclusive line numbers):",
+    reason === 'verification-repair'
+      ? actionPromptMenuLine('patch', { features: [PATCH_ACTION_FEATURE] })
+      : actionPromptMenuLine("edit_lines", { features: [LINE_EDIT_FEATURE] }),
     availableVerbs.includes("read_file")
       ? "If the required current range is omitted or clipped, read_file that exact path/range before editing. Otherwise use the already delivered numbered bytes."
-      : "read_file is unavailable on this turn. Use already delivered current numbered bytes for edit_lines; do not guess omitted lines. A write_file rewrite is appropriate only when the complete current file is known and write_file is available. If required bytes are missing, do not overwrite unseen content.",
+      : "read_file is unavailable on this turn. Use already delivered current bytes for the available edit action; do not guess omitted content. A write_file rewrite is appropriate only when the complete current file is known and write_file is available. If required bytes are missing, do not overwrite unseen content.",
     "Repair only a demonstrated implementation or fixture defect. This interface grants no protected-file permission and is not verification evidence. Existing scope and completion checks still apply.",
   ].join("\n");
   if (text.length > CONTEXT_UPDATE_MAX_CHARS) return null;

@@ -227,9 +227,12 @@ function renderActionField(field, index) {
 
 function renderRecordArrayRules(definitions) {
   const rules = [];
+  const seen = new Set();
   for (const definition of definitions) {
     for (const field of definition.fields) {
       if (field.type !== "recordArray") continue;
+      if (seen.has(field.grammarRule)) continue;
+      seen.add(field.grammarRule);
       const requiredItems = Array.from(
         { length: Math.max(0, field.minItems - 1) },
         () => ` ws "," ws ${field.itemGrammarRule}`,

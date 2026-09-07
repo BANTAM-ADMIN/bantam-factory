@@ -7,6 +7,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import {fileURLToPath} from "node:url";
 
 const FOCUS_TAG = "[fix-tests]";
 const TEST_PROVENANCES = new Set(["protected", "baseline", "baseline-context-changed", "generated", "self-authored", "added-or-modified", "unknown"]);
@@ -488,7 +489,7 @@ function parseNodeFailures(output) {
     if (!m) continue;
     const name = m[1].trim();
     if (/^# /.test(name) || name.length > 200) continue;
-    let file = null, line = null, expected = null, actual = null, message = null;
+    let file = null, line = null, expected = null, actual = null, message = null, assertionLine = null;
     const diff = [];
     for (let j = i + 1; j < lines.length && j < i + 45; j++) {
       const L = lines[j];
@@ -511,6 +512,15 @@ function parseNodeFailures(output) {
       if (/^\s*(?:not )?ok \d+ - /.test(L)) break;          // next test block
       const loc = L.match(/location:\s*'([^']+):(\d+):\d+'/);
       if (loc) { file = loc[1]; line = Number(loc[2]); continue; }
+      // `location` names the test declaration, NOT the failed assertion.
+      // Accept only a frame in that same file, within this uninterrupted block.
+      const frame = L.match(/^\s+(?:at\s+)?[^\n]*?\(([^()]+):(\d+):\d+\)\s*$/);
+      if (assertionLine === null && frame) {
+        try {
+          const frameFile = frame[1].startsWith('file:') ? fileURLToPath(frame[1]) : frame[1];
+          if (frameFile === file) assertionLine = Number(frame[2]);
+        } catch { /* Malformed URL is not a source location. */ }
+      }
       const exp = L.match(/^\s*expected:\s*(.+?)\s*$/);      // single-line "expected: X"
       if (exp && exp[1]) { expected = exp[1]; continue; }
       const act = L.match(/^\s*actual:\s*(.+?)\s*$/);
@@ -536,7 +546,7 @@ function parseNodeFailures(output) {
       const minus = diff.find((d) => /^-\s/.test(d));
       if (minus) expected = minus.replace(/^-\s*/, "");
     }
-    fails.push({ name, file, line, expected, actual, message, diff });
+    fails.push({ name, file, line, expected, actual, message, diff, ...(assertionLine !== null ? { assertionLine } : {}) });
   }
   return fails;
 }

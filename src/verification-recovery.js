@@ -1,5 +1,6 @@
 // Only typed execution evidence can select recovery. Error-looking prose in
 // task text, a model checkpoint, or a refused action is not a process result.
+import { canonicalAuditCommand } from "./verification-command.js";
 import { isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { canonicalEncode } from "./factory/fact-fabric.js";
 
@@ -83,7 +84,7 @@ export function latestUnresolvedFocusedFailure(turns = [], { generation = null, 
     for (const entry of reminderEntries(turns[index], index)) {
       const shell = reminderExecution(entry, { generation, workspace, configuredCommand });
       if (!shell) continue;
-      const key = `${shell.cwd}\0${shell.executedCommand}`;
+      const key = `${shell.cwd}\0${canonicalAuditCommand(shell.executedCommand) ?? shell.executedCommand}`;
       if (shell.exitCode === 0) {
         if (pending.has(key) && shell.generation >= pending.get(key).generation) pending.delete(key);
       } else {

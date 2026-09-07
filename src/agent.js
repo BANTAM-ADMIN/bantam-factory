@@ -28,12 +28,14 @@ import { isTestCommand, isDeliverableRun, isInlineEvalProbe } from "./logic/deli
 import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer, unicodeUnitGauge, shipTheGeneratorSteer, enumerateContractNote } from "./logic/probe-discipline.js";
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "./verification-evidence.js";
+import { verificationCadenceEffect } from "./verification-cadence.js";
+import { createRepairHandoff, repairHandoffContext, repairHandoffOffer } from "./repair-handoff.js";
 import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedFocusedFailure, focusedFailureReminder } from "./verification-recovery.js";
 import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote } from "./terminal-closure.js";
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
-import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, sameAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, sameAuditCommand, existingFocusedCheck, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { contractAuditMeasuredFacts } from "./contract-audit-measured-facts.js";
 import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
 import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
@@ -43,7 +45,7 @@ import { collectObjectConstructionFacts, formatObjectConstructionFacts } from ".
 import { directNodeCheckScript, nodeCheckSelfSpawnRefusal } from "./node-check-self-spawn.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { deriveCliContract } from "./contract-cli-assertion-spec.js";
-import { runContractCliStation, formatContractCliStation } from "./contract-cli-station.js";
+import { runContractCliStation, formatContractCliStation, createCliProposalCache } from "./contract-cli-station.js";
 import { cliVerificationPassed, cliVerificationDecisionContext } from "./contract-cli-verification.js";
 import { collectNodeCliRoutingFacts, formatNodeCliRoutingFacts } from "./node-cli-routing-facts.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
@@ -1076,6 +1078,7 @@ async function runAgentCore({
         ...(t.preview ? { preview: t.preview } : {}),
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
+        ...(t.repairHandoff ? { repairHandoff: structuredClone(t.repairHandoff) } : {}),
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
         ...(t.cliVerification ? { cliVerification: structuredClone(t.cliVerification) } : {}),
@@ -1820,6 +1823,7 @@ async function runAgentCore({
   // Obtain a fresh isolated receipt on the current invocation/tree.
   let cliVerification = null;
   const cliStationGenerations = new Set();
+  const cliProposalCache = createCliProposalCache();
   const auditRecoveryVerifications = new Set(turns.flatMap(turn =>
     (Array.isArray(turn.verificationReceipts?.entries) ? turn.verificationReceipts.entries : []).flatMap(entry => {
       const proof = entry?.verificationEvidence;
@@ -2118,6 +2122,8 @@ async function runAgentCore({
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
+    if (auditRecovery?.needsFocused) auditRecovery.checkCandidate = existingFocusedCheck([...editedPathsThisRun],
+      p => exec.safeReadText(exec.resolveExisting(p)), { generation: workspaceEditGeneration });
     const cliDecision = cliContract ? cliVerificationDecisionContext(cliContract, cliVerification, {
       generation: workspaceEditGeneration,
     }) : null;
@@ -2131,6 +2137,13 @@ async function runAgentCore({
     const currentFailure = currentConfiguredFailure(turns, {
       generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
     });
+    const lastAppliedAction = turns.findLast(turnEditApplied)?.action ?? turns.findLast(turnEditApplied)?.parsedAction;
+    const batchRepairTurn = patchActionPolicy.mode === 'auto' && currentFailure?.counts?.failed > 1
+      && lastAppliedAction && editPaths(lastAppliedAction).length > 0
+      && editPaths(lastAppliedAction).every(isTestPath)
+      && !documentRevisionTurn && !documentReviewTurn && !lineEditRecoveryTurn
+      && !callerExcludedActions.includes('patch');
+    if (batchRepairTurn && !turnActionFeatures.includes(PATCH_ACTION_FEATURE)) turnActionFeatures.push(PATCH_ACTION_FEATURE);
     // Measured failure outranks model hypotheses, even hypotheses written later.
     // Structural facts explain current source only: they supply no expected
     // values, candidate edits, successful evidence, or completion authority.
@@ -2149,6 +2162,8 @@ async function runAgentCore({
     const currentCliFailed = cliVerification?.generation === workspaceEditGeneration && cliVerification?.status === "failed";
     let verificationWorkflow = currentFailure && !currentCliFailed
       ? { ...verificationFailureContext(currentFailure, {
+          workspace: exec.realWorkspace,
+          readSource: p => exec.safeReadText(exec.resolveExisting(p)),
           facts: [cliSourceNote, ...failureSourceFacts.map(formatObjectConstructionFacts)].filter(Boolean),
         }), sourceFacts: [...failureSourceFacts, ...(cliSourceFact ? [cliSourceFact] : [])] }
       : cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
@@ -2191,7 +2206,7 @@ async function runAgentCore({
       documentReviewTurn,
       lineEditRecoveryTurn,
       maskedVerbForTurn,
-      patchEnabled: patchActionPolicy.enabled,
+      patchEnabled: turnActionFeatures.includes(PATCH_ACTION_FEATURE),
     });
     // A fixture experiment is investigation, never an escape from edit-only,
     // source-review, or wrap-up masks. Keep this candidate opt-in and local.
@@ -2337,7 +2352,13 @@ async function runAgentCore({
     const panelOptions = { focusByPath, mutationFocusByPath, editedPaths: editedPathsThisRun };
     const temporalState = stateAsOf(recordTurns(turns), turns.length);
     const repositoryState = tools?.get("map") ? temporalState.repositoryQuery : null;
-    const workingNoteReanchor = formatWorkingNoteReanchor(temporalState, {
+    const repairContext = repairHandoffContext(turns, { generation: workspaceEditGeneration, workspace: exec.realWorkspace,
+      readSource: p => exec.safeReadText(exec.resolveExisting(p)) })
+      || repairHandoffOffer(turns.at(-1), { generation: workspaceEditGeneration, workspace: exec.realWorkspace });
+    // A long task restatement can clip ordinary guidance. Carry the bounded
+    // receipt-linked advice with the current typed decision, not only prose.
+    if (verificationWorkflow && repairContext) verificationWorkflow = { ...verificationWorkflow, repairContext };
+    const workingNoteReanchor = repairContext || formatWorkingNoteReanchor(temporalState, {
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
@@ -2592,15 +2613,16 @@ async function runAgentCore({
       // block's 700-character clip, losing syntax after a long task restatement.
       // Reserve one existing typed-context slot before optional source views;
       // render/record the whole exact interface after ordinary output clipping.
-      if (turns.length && (lineEditRecoveryTurn || documentRevisionTurn)
-          && enabledTurnVerbs.has("edit_lines") && !excludeThisTurn.includes("edit_lines")
-          && !callerExcludedActions.includes("edit_lines")) {
+      const recoveryVerb = batchRepairTurn ? 'patch' : 'edit_lines';
+      if (turns.length && (lineEditRecoveryTurn || documentRevisionTurn || batchRepairTurn)
+          && enabledTurnVerbs.has(recoveryVerb) && !excludeThisTurn.includes(recoveryVerb)
+          && !callerExcludedActions.includes(recoveryVerb)) {
         const last = turns.at(-1);
         const update = createActionContractUpdate({ generation: workspaceEditGeneration,
           turn: turns.length,
           availableVerbs: [...enabledTurnVerbs].filter(verb => !excludeThisTurn.includes(verb)
             && !callerExcludedActions.includes(verb)),
-          reason: documentRevisionTurn ? "document-revision" : "edit-recovery",
+          reason: batchRepairTurn ? 'verification-repair' : documentRevisionTurn ? "document-revision" : "edit-recovery",
           recoveryPath: documentRevisionTurn ? null : editRecoveryPath,
         });
         const existing = (Array.isArray(last.contextUpdates) ? last.contextUpdates : [])
@@ -3288,7 +3310,7 @@ async function runAgentCore({
     const auditCheckRepeat = auditRecovery && action.a === "shell"
       && ((auditRecovery.needsFocused && isFocusedAuditCommand(action.c, verificationScript))
         || (auditRecovery.needsProject && verificationScript && isConfiguredAuditCommand(action.c, verificationScript)))
-      && !turns.slice(Math.max(auditRecovery.turn,
+      && !turns.slice(Math.max(auditRecovery.turn, auditRecovery.invalidatedAfterTurn ?? auditRecovery.turn,
         auditRecovery.needsProject && isConfiguredAuditCommand(action.c, verificationScript)
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
         turn.shellExecution && (sameAuditCommand(turn.shellExecution.command, action.c)
@@ -3865,12 +3887,34 @@ async function runAgentCore({
       schema: VERIFICATION_RECEIPTS_SCHEMA, authority: "controller-execution-order",
       turn: turns.length, entries: [],
     };
+    const applyVerificationCadence = evidence => {
+      const effect = verificationCadenceEffect(evidence, { generation: workspaceEditGeneration, configuredCommand: verificationScript });
+      if (!effect) return;
+      blindEditStreak = probeStreak = 0;
+      if (effect.full || !verificationScript) {
+        turnsSinceVerify = editsSinceFullVerify = 0;
+        unverifiedEditSteerGiven = false;
+      }
+      verifyCadenceSentinel.note({ ranVerification: true });
+      repourSentinel.note({ ranVerification: true, verificationRed: effect.status === "fail" });
+    };
     const recordVerification = (evidence, shell = null) => {
       if (!evidence && !shell) return;
       verificationReceipts.entries.push({ sequence: verificationReceipts.entries.length,
         verificationEvidence: verificationReceipt(evidence), shellExecution: shell });
+      applyVerificationCadence(evidence);
     };
     recordVerification(result.verificationEvidence, shellReceipt);
+    result.repairHandoff = createRepairHandoff(action, turns, { generation: workspaceEditGeneration,
+      workspace: exec.realWorkspace, editApplied: directEditSucceeded,
+      readApplied: action.a === 'read_file' && result.observation?.startsWith(`${action.p} (`) && !result.controllerStop,
+      readSource: p => exec.safeReadText(exec.resolveExisting(p)) });
+    if (result.repairHandoff) onEvent({ type: "repair_handoff", repairHandoff: structuredClone(result.repairHandoff) });
+    if (action.repair && !result.repairHandoff) result.observation += "\n[repair handoff] Proposal was not admitted: it needs bounded complete records linked to an actual earlier failed execution and an applied edit or successful source-bound read. The action result above is unchanged; this proposal supplies no verification evidence.";
+    const handoffOffer = repairHandoffOffer({ shellExecution: shellReceipt,
+      verificationEvidence: result.verificationEvidence, shellScopeRollback: result.shellScopeRollback },
+      { generation: workspaceEditGeneration, workspace: exec.realWorkspace });
+    if (handoffOffer) result.observation += `\n${handoffOffer}`;
     const currentAuditState = () => pendingContractAudit([...turns, {
       verificationEvidence: verificationReceipt(result.verificationEvidence),
       shellExecution: shellReceipt,
@@ -4202,15 +4246,6 @@ async function runAgentCore({
         // Maze films: sub-function patch chains at full context cost while
         // the suite stays red. See src/logic/repour.js for the shape.
         const verificationRed = result.verificationEvidence?.status === "fail";
-        const repourNote = repourSentinel.note({
-          replacedPath: (action.a === "replace" && editApplied) ? (action.p ?? null) : null,
-          ranVerification, verificationRed,
-        });
-        steerDelivery("regenerate-from-formula", repourNote, (n) => {
-          result.observation = `${result.observation ?? ""}\n\n${n}`;
-          metrics.repourSteers = (metrics.repourSteers ?? 0) + 1;
-          onEvent({ type: "repour_steer", path: action.p });
-        });
         // Falsefriend (card 27): weakening a red self-authored assertion is
         // either the correct arbitration or the classic oracle-tamper — the
         // pin demands the ruling be stated. See src/logic/contract-arbitration.js.
@@ -4778,7 +4813,6 @@ async function runAgentCore({
     // the threshold, run the configured verify ourselves and inject the real result so the next edit is
     // guided. Candidate, off by default; needs no code graph (unlike scoped verify).
     if (directEditSucceeded) editsSinceFullVerify += 1;   // what the CONFIGURED verifier has not seen
-    if (action.a === "shell" && isDeliverableRun(action.c)) { blindEditStreak = 0; probeStreak = 0; turnsSinceVerify = 0; editsSinceFullVerify = 0; unverifiedEditSteerGiven = false; }
     // A scoped verify answers "you have edited without running anything", so it
     // clears the edit and probe streaks. It does NOT clear the staleness clock:
     // scoped-verify.js promises a scoped green "is always a genuine subset of a
@@ -4788,7 +4822,7 @@ async function runAgentCore({
     // never obtained the comparable pass counts it protects with — so turning on
     // per-edit feedback silently disabled the thing that restores a broken tree.
     // BANTAM_SCOPED_VERIFY=1 broke test/agent.test.js on exactly that.
-    else if (result.scopedVerify) { blindEditStreak = 0; probeStreak = 0; }
+    if (result.scopedVerify) { blindEditStreak = 0; probeStreak = 0; }
     else if (directEditSucceeded) blindEditStreak += 1;
     // Inline-eval probes (`python -c`, `node -e`) are NOT verification — they
     // test the cases the model already thought of. A streak of them without a
@@ -4796,6 +4830,9 @@ async function runAgentCore({
     // 13 probes, zero suite runs, red baseline suite at the turn cap).
     else if (action.a === "shell" && !gateRejection && isInlineEvalProbe(action.c)) probeStreak += 1;
     turnsSinceVerify += 1; // counts every turn; only matters once an unverified edit exists
+    // Account for this turn's edits before projecting its ordered executions.
+    // Late stations use the same recorder and therefore update the next turn.
+    for (const entry of verificationReceipts.entries) applyVerificationCadence(entry.verificationEvidence);
     const blindTrigger = autoVerifyBlindEdits > 0 && blindEditStreak >= autoVerifyBlindEdits;
     const probeTrigger = autoVerifyProbes > 0 && probeStreak >= autoVerifyProbes;
     // Staleness trigger: edits the CONFIGURED verifier has not seen exist, and it
@@ -4827,6 +4864,7 @@ async function runAgentCore({
     }
     if ((blindTrigger || probeTrigger || staleTrigger) && verificationScript && !result.scopedVerify
         && !interrupted && !result.done) {
+      const cadenceTrigger = { edits: blindEditStreak, turns: turnsSinceVerify, probes: probeStreak };
       onEvent({ type: "activity", label: "verifying" });
       const r = await runShellProcess(path.resolve(workspace), withNodeTestTimeout(verificationScript, verificationTimeoutMs), {
         timeoutMs: verificationTimeoutMs,
@@ -4871,10 +4909,10 @@ async function runAgentCore({
         }
         const out = `${digest}${clip(rawOut)}`;
         const reason = blindTrigger
-          ? `You have made ${blindEditStreak} edits without running the tests`
+          ? `You have made ${cadenceTrigger.edits} edits without running the tests`
           : staleTrigger && !probeTrigger
-            ? `You have edited but not run the tests in ${turnsSinceVerify} turns — reading and reasoning is not verification`
-            : `You have run ${probeStreak} one-off eval probes without running the tests — probes only exercise the cases you already thought of`;
+            ? `You have edited but not run the tests in ${cadenceTrigger.turns} turns — reading and reasoning is not verification`
+            : `You have run ${cadenceTrigger.probes} one-off eval probes without running the tests — probes only exercise the cases you already thought of`;
         // Verdict-aware close: a PASS means the model can LAND (the migreduce
         // spiral reached green mid-run but kept editing); only a non-pass says "fix".
         const close = r.code === 0
@@ -4890,11 +4928,8 @@ async function runAgentCore({
         if (result.verificationEvidence?.status !== "unverified") result.scopedVerify = { verdict: result.verificationEvidence.status, command: verificationScript, tests: [] };
         metrics.autoVerifies = (metrics.autoVerifies ?? 0) + 1;
         const verifyTrigger = blindTrigger ? "edits" : (staleTrigger && !probeTrigger ? "stale" : "probes");
-        onEvent({ type: "auto_verify", command: verificationScript, verdict, streak: blindTrigger ? blindEditStreak : (staleTrigger ? turnsSinceVerify : probeStreak), trigger: verifyTrigger });
-        blindEditStreak = 0;
-        probeStreak = 0;
-        turnsSinceVerify = 0;
-        editsSinceFullVerify = 0;
+        onEvent({ type: "auto_verify", command: verificationScript, verdict, streak: blindTrigger ? cadenceTrigger.edits : (staleTrigger ? cadenceTrigger.turns : cadenceTrigger.probes), trigger: verifyTrigger });
+        applyVerificationCadence(result.verificationEvidence);
       }
     }
 
@@ -5043,7 +5078,7 @@ async function runAgentCore({
           && currentEvidence.configuredCommand === verificationScript
           && verificationEnvironmentMatches(currentEvidence)
           && (currentEvidence.status === "pass"
-            || (currentEvidence.status === "fail" && currentEvidence.command === verificationScript))
+            || (currentEvidence.status === "fail" && sameAuditCommand(currentEvidence.command, verificationScript)))
           ? { status: currentEvidence.status, exitCode: currentEvidence.exitCode, workspaceReadOnly: currentEvidence.workspaceReadOnly,
             detail: clip(currentEvidence.rawOutput) }
           : null;
@@ -5108,7 +5143,7 @@ async function runAgentCore({
         // fully green snapshot, edited again, and spent its last turn without
         // re-verifying, preserve the known-good work instead of ending red.
         const landingComparable = bestCommand !== null && landingEvidence
-          && (landingEvidence.command === bestCommand
+          && (landingEvidence.command === bestCommand || sameAuditCommand(landingEvidence.command, bestCommand)
             || (embeddedBaselineScope && shellContainsExactCommandSegment(landingEvidence.command, bestCommand)));
         const landingRegression = landingEvidence?.status === "fail"
           && landingComparable
@@ -5347,11 +5382,11 @@ async function runAgentCore({
       const embeddedBaseline = counts
         && embeddedBaselineScope
         && bestCommand !== null
-        && thisCommand !== bestCommand
+        && !sameAuditCommand(thisCommand, bestCommand)
         && shellContainsExactCommandSegment(thisCommand, bestCommand);
       const comparable = counts && (
         bestCommand === null
-        || thisCommand === bestCommand
+        || thisCommand === bestCommand || sameAuditCommand(thisCommand, bestCommand)
         || embeddedBaseline
       );
       if (counts && counts.total > 0 && !comparable) {
@@ -5457,6 +5492,61 @@ async function runAgentCore({
             regressionRevertsThisRun += 1;
             onEvent({ type: "regression_revert", from: bestPassed, to: counts.passed, files: [...bestSnapshot.keys()] });
           }
+        }
+      }
+    }
+    // CLI and API are separate surfaces. A successful API assertion or suite
+    // must not silently replace the explicitly requested process contract.
+    // Reuse the existing isolated probe/fact machinery; no candidate code is
+    // imported by this controller and no fixture/expected value comes from a
+    // hidden judge. One station attempt per current workspace generation.
+    // An authored edit can trigger diagnostics before the project goes green:
+    // otherwise a failing import/CLI can block both the station and DONE.
+    if (cliContract && hasAuthoredWork && !interrupted && !result.controllerStop
+        && (directEditSucceeded || result.sourceEditedByShell
+          || result.verificationEvidence?.status === "pass" || action.a === "done")
+        && !cliStationGenerations.has(workspaceEditGeneration)
+        && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)) {
+      const sources = collectContractAuditSources([cliContract.module, ...editedPathsThisRun, ...openList],
+        relative => exec.safeReadText(exec.resolveExisting(relative))).sources;
+      if (sources.some(source => source.path === cliContract.module)) {
+        cliStationGenerations.add(workspaceEditGeneration);
+        onEvent({ type: "contract_cli_start", generation: workspaceEditGeneration, module: cliContract.module });
+        try {
+          cliVerification = await runContractCliStation({ workspace, model, task, documents: suppliedTaskDocuments,
+            sources, generation: workspaceEditGeneration, signal, dockerImage,
+            processRunner: shellProcessRunner, contract: cliContract, proposalCache: cliProposalCache });
+        } catch (error) {
+          if (signal?.aborted) { markInterrupted("contract_cli"); break; }
+          throw error;
+        }
+        result.cliVerification = cliVerification;
+        metrics.cliVerificationRuns = (metrics.cliVerificationRuns ?? 0) + 1;
+        metrics.cliVerificationTokens = (metrics.cliVerificationTokens ?? 0) + (cliVerification.tokens ?? 0);
+        if (cliVerification.probeEvidence) onEvent({ type: "probe", probeEvidence: structuredClone(cliVerification.probeEvidence) });
+        result.observation += `\n\n${formatContractCliStation(cliVerification)}`;
+        onEvent({ type: "contract_cli", cliVerification: structuredClone(cliVerification),
+          generation: workspaceEditGeneration, status: cliVerification.status });
+        if (cliVerificationPassed(cliContract, cliVerification, { generation: workspaceEditGeneration }) && verificationScript) {
+          // Record a new configured execution AFTER this additional station.
+          // A preceding green suite is not a substitute for this ordering.
+          let evidence = null;
+          const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
+            doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
+            readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly, processRunner: shellProcessRunner,
+            onExecution: execution => {
+              evidence = verificationEvidence({ execution, command: verificationScript,
+                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "automatic" });
+              recordVerification(evidence);
+            },
+          });
+          if (proof.interrupted || abortRequested()) markInterrupted("verification");
+          if (evidence && proof.status !== "pass") evidence = { ...evidence, status: proof.status };
+          cliVerification.projectVerification = verificationReceipt(evidence);
+          result.verificationEvidence = evidence;
+          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+            verification: { ...proof, status: evidence?.status ?? "unverified" }, evidence };
+          result.observation += `\n[cli-project-check] The configured verifier ran after the CLI station: ${evidence?.status ?? "unverified"}.\n${clip(proof.detail ?? "")}`;
         }
       }
     }
@@ -5600,60 +5690,15 @@ async function runAgentCore({
           + " No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.";
       }
     }
-    // CLI and API are separate surfaces. A successful API assertion or suite
-    // must not silently replace the explicitly requested process contract.
-    // Reuse the existing isolated probe/fact machinery; no candidate code is
-    // imported by this controller and no fixture/expected value comes from a
-    // hidden judge. One station attempt per current workspace generation.
-    // An authored edit can trigger diagnostics before the project goes green:
-    // otherwise a failing import/CLI can block both the station and DONE.
-    if (cliContract && hasAuthoredWork && !interrupted && !result.controllerStop
-        && (directEditSucceeded || result.sourceEditedByShell
-          || result.verificationEvidence?.status === "pass" || action.a === "done")
-        && !cliStationGenerations.has(workspaceEditGeneration)
-        && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)) {
-      const sources = collectContractAuditSources([cliContract.module, ...editedPathsThisRun, ...openList],
-        relative => exec.safeReadText(exec.resolveExisting(relative))).sources;
-      if (sources.some(source => source.path === cliContract.module)) {
-        cliStationGenerations.add(workspaceEditGeneration);
-        onEvent({ type: "contract_cli_start", generation: workspaceEditGeneration, module: cliContract.module });
-        try {
-          cliVerification = await runContractCliStation({ workspace, model, task, documents: suppliedTaskDocuments,
-            sources, generation: workspaceEditGeneration, signal, dockerImage,
-            processRunner: shellProcessRunner, contract: cliContract });
-        } catch (error) {
-          if (signal?.aborted) { markInterrupted("contract_cli"); break; }
-          throw error;
-        }
-        result.cliVerification = cliVerification;
-        metrics.cliVerificationRuns = (metrics.cliVerificationRuns ?? 0) + 1;
-        metrics.cliVerificationTokens = (metrics.cliVerificationTokens ?? 0) + (cliVerification.tokens ?? 0);
-        if (cliVerification.probeEvidence) onEvent({ type: "probe", probeEvidence: structuredClone(cliVerification.probeEvidence) });
-        result.observation += `\n\n${formatContractCliStation(cliVerification)}`;
-        onEvent({ type: "contract_cli", cliVerification: structuredClone(cliVerification),
-          generation: workspaceEditGeneration, status: cliVerification.status });
-        if (cliVerificationPassed(cliContract, cliVerification, { generation: workspaceEditGeneration }) && verificationScript) {
-          // Record a new configured execution AFTER this additional station.
-          // A preceding green suite is not a substitute for this ordering.
-          let evidence = null;
-          const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
-            doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
-            readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly, processRunner: shellProcessRunner,
-            onExecution: execution => {
-              evidence = verificationEvidence({ execution, command: verificationScript,
-                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "automatic" });
-              recordVerification(evidence);
-            },
-          });
-          if (proof.interrupted || abortRequested()) markInterrupted("verification");
-          if (evidence && proof.status !== "pass") evidence = { ...evidence, status: proof.status };
-          cliVerification.projectVerification = verificationReceipt(evidence);
-          result.verificationEvidence = evidence;
-          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
-            verification: { ...proof, status: evidence?.status ?? "unverified" }, evidence };
-          result.observation += `\n[cli-project-check] The configured verifier ran after the CLI station: ${evidence?.status ?? "unverified"}.\n${clip(proof.detail ?? "")}`;
-        }
-      }
+    // All same-turn controller checks have now updated the sentinel. Do not
+    // append a stale red-suite rewrite instruction before a late green check.
+    if (directEditSucceeded && action.a === 'replace') {
+      const repourNote = repourSentinel.note({ replacedPath: action.p ?? null });
+      steerDelivery('regenerate-from-formula', repourNote, n => {
+        result.observation = `${result.observation ?? ''}\n\n${n}`;
+        metrics.repourSteers = (metrics.repourSteers ?? 0) + 1;
+        onEvent({ type: 'repour_steer', path: action.p });
+      });
     }
     if (landingPassNote !== null) {
       const pending = collectionAuditEnabled ? currentAuditState() : null;
@@ -6361,6 +6406,7 @@ async function runAgentCore({
       verificationEvidence: verificationReceipt(result.verificationEvidence),
       ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
+      ...(result.repairHandoff ? { repairHandoff: result.repairHandoff } : {}),
       ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
       ...(result.cliVerification ? { cliVerification: structuredClone(result.cliVerification) } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
@@ -6467,7 +6513,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "repairHandoff",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

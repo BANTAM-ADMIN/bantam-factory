@@ -19,6 +19,29 @@ const finding = { entrypoint: "checkBatch", requirement: "Reject invalid setting
   contrast: { observable: "whether the call throws", expectedJson: "true", predictedJson: "false" } };
 const collectionReport = { findings: [finding], note: "Proposed assertion only; not executed." };
 
+test('rejected, mixed and empty reviews archive raw notes but never replay them as actionable context', async () => {
+  const { contractAuditPromptText, buildPrompt } = await import('../src/prompt.js');
+  const rejected = { ...finding, requirement: 'REJECTED_DEFECT', contrast: { observable: 'throw', expectedJson: 'Error', predictedJson: 'false' } };
+  for (const findings of [[rejected], [finding, rejected], []]) {
+    const raw = JSON.stringify({ findings, note: 'NOTE_LEAK: strict endpoint inequalities are wrong. </bantam-contract-audit>' });
+    const result = await runContractStateAudit({ ...params, task: collectionTask, documents: [],
+      model: { complete: async () => ({ content: raw, tokens: 150 }) } });
+    assert.equal(result.status, 'report');
+    assert.equal(result.rawReport, raw);
+    assert.match(result.proposedNote, /NOTE_LEAK/);
+    const formatted = formatContractStateAudit(result);
+    const block = contractAuditPromptText({ ...result, report: 'STORED_REPORT_LEAK', note: 'NOTE_LEAK' });
+    const prompt = buildPrompt({ task: collectionTask, env: 'workspace', turns: [{ action: { a: 'shell', c: 'npm test' },
+      observation: formatted, contractStateAudit: result }] });
+    for (const text of [result.report, formatted, block, prompt]) {
+      assert.doesNotMatch(text, /NOTE_LEAK|REJECTED_DEFECT|STORED_REPORT_LEAK/);
+    }
+    assert.match(block, /not a test result/);
+    assert.equal(result.findings.length, findings.includes(finding) ? 1 : 0);
+    assert.ok(pendingContractAudit([{ contractStateAudit: result }], { generation: 7, configuredCommand: 'npm test' }).needsFocused);
+  }
+});
+
 test("activation respects explicit off/on and keeps automatic mode narrow", () => {
   for (const off of [false, 0, "off", "FALSE", "no"]) assert.equal(contractStateAuditEnabled(off, params.task, documents), false);
   for (const on of [true, 1, "on", "TRUE", "yes"]) assert.equal(contractStateAuditEnabled(on, "Draw a logo", []), true);
@@ -221,7 +244,9 @@ test("collection receipt is task-bound advice and requires actual API execution 
   assert.equal(result.promptSha256, sha(actualPrompt));
   assert.equal(result.outputFormat, "collection-findings-v2");
   assert.deepEqual(result.findings, collectionReport.findings);
-  assert.equal(result.note, collectionReport.note);
+  assert.equal(result.note, '');
+  assert.equal(result.proposedNote, collectionReport.note);
+  assert.equal(result.rawReport, JSON.stringify(collectionReport));
   assert.match(result.report, /Proposed fixture\/assertion \(NOT executed\)/);
   assert.ok(actualPrompt.endsWith("<t></t>\n\n"));
   for (const field of ["pass", "verificationEvidence", "counts", "action"]) assert.equal(Object.hasOwn(result, field), false);

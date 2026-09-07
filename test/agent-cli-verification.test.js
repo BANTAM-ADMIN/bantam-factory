@@ -21,6 +21,65 @@ const GOOD = BASE + "if (process.argv[1] && import.meta.url === pathToFileURL(pr
 const BAD = BASE + "if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv.length === 3) main();\n";
 const SPEC = { module: "tool.mjs", input: { value: 3 } };
 
+test('CLI project green triggers its audit immediately and names the remaining focused check', { skip: process.env.BANTAM_LIVE_SANDBOX_TEST !== '1' }, async t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-cli-audit-order-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'tool.mjs'), API);
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ type: 'module', scripts: { test: 'node --test' } }));
+  fs.writeFileSync(path.join(workspace, 'test/public.test.js'), "import test from 'node:test'; import assert from 'node:assert/strict'; import {transform} from '../tool.mjs'; test('API',()=>assert.deepEqual(transform(3),{value:3}));");
+  const actions = [{ a: 'write_file', p: 'tool.mjs', content: GOOD },
+    { a: 'shell', c: "node --input-type=module -e \"import assert from 'node:assert/strict'; import {transform} from './tool.mjs'; assert.throws(()=>transform([])); assert.deepEqual(transform(3),{value:3});\"" },
+    { a: 'done', summary: 'Implemented and verified.' }];
+  let audits = 0, workerCalls = 0;
+  const result = await runAgent({ workspace, task: TASK + ' Reject arrays, including empty arrays.', maxTurns: 6, maxInvalidPerTurn: 0,
+    model: { assistantPrefill: '', async complete(prompt, options) {
+      if (options.recordLabel === 'contract-cli-assertion') return { content: JSON.stringify(SPEC), tokens: 1 };
+      if (prompt.includes('You are a source-code state-machine auditor.')) {
+        audits++;return { content: JSON.stringify({ findings: [], note: '' }), tokens: 1 };
+      }
+      if (workerCalls === 1) {
+        assert.equal(audits, 1, 'audit happens before asking the worker for another action');
+        assert.match(prompt.slice(prompt.lastIndexOf('[verification workflow: current decision]')), /focused/);
+        assert.ok(!options.jsonSchema.properties.a.enum.includes('done'));
+      }
+      workerCalls++;assert.ok(actions.length);return { content: JSON.stringify(actions.shift()), tokens: 1 };
+    } }, useGrammar: true, interactive: false, grounding: false, shellSandbox: 'docker', shellNetwork: false, probeEnabled: true,
+    verificationScript: 'npm test', verificationWorkspaceReadOnly: true, contractStateAudit: 'auto', contractAssertionStation: 'off',
+    completionAudit: false, stateAudit: 'off', testFocus: false, regressionGuard: false,
+    autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
+  });
+  assert.equal(result.turns[0].cliVerification.projectVerification.status, 'pass');
+  assert.equal(result.turns[0].contractStateAudit.status, 'report');
+  assert.equal(result.turns[1].verificationWorkflow.phase, 'ready');
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+});
+
+test('a late CLI project execution resets cadence before the following worker turns', { skip: process.env.BANTAM_LIVE_SANDBOX_TEST !== '1' }, async t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-cli-cadence-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'tool.mjs'), API);
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ type: 'module', scripts: { test: 'node --test' } }));
+  fs.writeFileSync(path.join(workspace, 'test/public.test.js'), "import test from 'node:test'; import assert from 'node:assert/strict'; import {transform} from '../tool.mjs'; test('API',()=>assert.deepEqual(transform(3),{value:3}));");
+  const actions = [{ a: 'write_file', p: 'tool.mjs', content: GOOD },
+    { a: 'read_file', p: 'tool.mjs' }, { a: 'read_file', p: 'package.json' },
+    { a: 'list_dir', p: 'test' }, { a: 'done', summary: 'Implemented and verified.' }];
+  const result = await runAgent({ workspace, task: TASK, maxTurns: 20, maxInvalidPerTurn: 0,
+    model: { assistantPrefill: '', async complete(prompt, options) {
+      if (options.recordLabel === 'contract-cli-assertion') return { content: JSON.stringify(SPEC), tokens: 1 };
+      assert.ok(actions.length, 'no unexpected worker calls'); return { content: JSON.stringify(actions.shift()), tokens: 1 };
+    } }, useGrammar: true, interactive: false, grounding: false, shellSandbox: 'docker', shellNetwork: false, probeEnabled: true,
+    verificationScript: 'npm test', verificationWorkspaceReadOnly: true, contractStateAudit: 'off',
+    completionAudit: false, stateAudit: 'off', testFocus: false, regressionGuard: false,
+    autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 2,
+  });
+  assert.equal(result.turns[0].cliVerification.projectVerification.status, 'pass');
+  assert.equal(result.metrics.autoVerifies ?? 0, 0, 'the real late station check prevents a false stale trigger');
+  assert.doesNotMatch(result.turns.map(t => t.observation).join('\n'), /not run the tests in/);
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+});
+
 test("real CLI subprocess evidence blocks API-green DONE, binds generation, and permits repaired completion", {
   skip: process.env.BANTAM_LIVE_SANDBOX_TEST !== "1" ? "requires explicit live Docker opt-in" : false,
   timeout: 90000,
@@ -62,9 +121,10 @@ test("real CLI subprocess evidence blocks API-green DONE, binds generation, and 
     onEvent(event) { events.push(event); checkpoint.note(event); },
   });
   const stations = result.turns.filter(turn => turn.cliVerification).map(turn => turn.cliVerification);
-  assert.equal(stationPrompts.length, 4, JSON.stringify({ cliEnabled: result.metrics?.cliVerificationEnabled,
+  assert.equal(stationPrompts.length, 3, JSON.stringify({ cliEnabled: result.metrics?.cliVerificationEnabled,
     turns: result.turns.map(turn => ({ a: turn.parsedAction?.a, obs: turn.observation?.slice(0, 200), status: turn.cliVerification?.status })) }));
   assert.deepEqual(stations.map(station => station.status), ["failed", "complete", "failed", "complete"]);
+  assert.equal(stations[3].designReused, true, 'only unchanged successful proposal bytes are reused; all four stations execute');
   assert.equal(result.turns[2].doneAccepted, false, "API-green cannot discharge a failed CLI obligation");
   assert.equal(result.turns[6].doneAccepted, false, "an edit invalidates a previous CLI proof");
   assert.equal(result.turns.at(-1).doneAccepted, true, result.turns.at(-1).observation);

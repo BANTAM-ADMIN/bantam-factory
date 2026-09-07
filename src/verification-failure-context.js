@@ -1,6 +1,7 @@
-import {hasShellControlOutsideQuotes,splitShellWords} from './shell-lex.js';
+import {canonicalAuditCommand,isConfiguredAuditCommand} from './verification-command.js';
 import {canonicalEncode} from './factory/fact-fabric.js';
 import {workspacePrefixedCommand} from './contract-audit-recovery.js';
+import path from 'node:path';
 
 const HASH=/^[a-f0-9]{64}$/;
 const SOURCES=new Set(['shell','automatic','scoped','landing','completion']);
@@ -10,45 +11,13 @@ const clean=v=>!FLAGS.some(key=>Boolean(v?.[key]));
 const integer=v=>Number.isSafeInteger(v)&&v>=0;
 const command=v=>typeof v==='string'&&v.trim().length>0&&v.length<=4096;
 
-function words(value){
-  if(!command(value)||hasShellControlOutsideQuotes(value))return null;
-  const result=splitShellWords(value);return result.length?result:null;
+function same(a,b) { return isConfiguredAuditCommand(a,b); }
+const configuredExecution = isConfiguredAuditCommand;
+function shellVerifierCommand(value,workspace,cwd) {
+  if (!command(value)) return null;
+  return canonicalAuditCommand(value) ?? workspacePrefixedCommand(value,workspace,cwd);
 }
-function same(a,b){const x=words(a),y=words(b);return Boolean(x&&y&&x.length===y.length&&x.every((v,i)=>v===y[i]));}
-function configuredExecution(actual,configured){
-  if(same(actual,configured))return true;
-  const a=words(actual),b=words(configured);
-  if(!a||!b||a.length!==b.length+1||b[1]!=='--test'||!/^(?:node|nodejs)$/.test(b[0]?.split('/').at(-1)??'')
-      ||b.some(v=>/^--test-timeout(?:=|$)/.test(v)))return false;
-  const timeout=/^--test-timeout=([1-9]\d*)$/.exec(a[2]??'');
-  return Boolean(timeout&&Number(timeout[1])>=5000&&Number(timeout[1])<=60000
-    &&a.filter((_,i)=>i!==2).every((v,i)=>v===b[i]));
-}
-// Advisory recognition only: no shell rewriting or proof promotion. Reuse the
-// acceptance module's existing exact-workspace cd shape, after recognizing only
-// terminal whitespace and a literal stderr-to-stdout merge. Neither changes the
-// command's status. Required setup, extra commands, masks and file redirects are
-// deliberately not normalized.
-function shellVerifierCommand(value,workspace,cwd){
-  if(!command(value))return null;
-  let text=value.trim(),quote=null;
-  if(/[\0\r\n$`]/.test(text))return null;
-  const merge=/[ \t]+2>&1$/.exec(text);
-  for(let i=0;i<text.length;i++){
-    const ch=text[i];
-    if(ch==='\\'&&quote!=="'"){i++;continue;}
-    if(quote){if(ch===quote)quote=null;continue;}
-    if(ch==="'"||ch==='"'){quote=ch;continue;}
-    if(merge&&i===merge.index){
-      const backslashes=/\\+$/.exec(text.slice(0,i))?.[0].length??0;
-      if(backslashes%2)return null;
-      text=text.slice(0,i).trimEnd();break;
-    }
-  }
-  if(quote)return null;
-  return words(text)?text:workspacePrefixedCommand(text,workspace,cwd);
-}
-function entries(turn,index){
+export function verificationExecutionEntries(turn,index){
   if(!record(turn)||turn.controllerStop||turn.shellScopeRollback?.violations?.length)return [];
   if(!Object.hasOwn(turn,'verificationReceipts'))return [{verificationEvidence:turn.verificationEvidence??null,shellExecution:turn.shellExecution??null}];
   const e=turn.verificationReceipts;
@@ -93,6 +62,9 @@ function measured(entry,{generation,configuredCommand,workspace}){
   const observedCounts=counts(p.counts,p.status);
   if(observedCounts===false||(observedCounts&&p.countsScope!=='single-execution'))return null;
   return {status:p.status,command:p.executedCommand,generation,exitCode:p.exitCode,counts:observedCounts,
+    failureSites:(Array.isArray(p.failureSites)?p.failureSites:[]).filter(v=>record(v)
+      && typeof v.file==='string' && v.file.length<=2048 && !/[\x00-\x1f\x7f]/.test(v.file)
+      && integer(v.line) && v.line>0).slice(0,4),
     failingTests:(Array.isArray(p.failingTests)?p.failingTests:[]).filter(v=>typeof v==='string').slice(0,4)
       .map(v=>v.replace(/[\x00-\x1f\x7f]/g,' ').slice(0,160))};
 }
@@ -105,7 +77,7 @@ export function currentConfiguredFailure(turns=[],{generation,configuredCommand,
   const settings={generation,configuredCommand:configuredCommand.trim(),workspace};
   let failure=null;
   for(let index=Math.max(0,turns.length-128);index<turns.length;index++){
-    for(const entry of entries(turns[index],index)){
+    for(const entry of verificationExecutionEntries(turns[index],index)){
       const p=measured(entry,settings);if(!p)continue;
       if(p.status==='pass')failure=null;
       else{const {status,...fields}=p;failure={...fields,turn:index};}
@@ -124,7 +96,7 @@ function quoted(value,limit){
   return {text,truncated:end<clean.length};
 }
 
-export function verificationFailureContext(failure,{facts=[]}={}){
+export function verificationFailureContext(failure,{facts=[],readSource,workspace}={}){
   if(!record(failure)||!integer(failure.generation)||!integer(failure.turn)||!integer(failure.exitCode)
     ||failure.exitCode<1||failure.exitCode>255||!command(failure.command))return null;
   const shown=quoted(failure.command,640);
@@ -134,6 +106,27 @@ export function verificationFailureContext(failure,{facts=[]}={}){
   if(c)text+=` Recorded tests: ${c.passed} passed, ${c.failed} failed, ${c.total} total.`;
   const instruction=' A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish.';
   let remaining=2400-text.length-instruction.length;
+  // Bind the current failure to the actual stack location before adding
+  // hypotheses. A nearby passing assertion is not a reproduction of this one.
+  for(const site of (Array.isArray(failure.failureSites)?failure.failureSites:[]).slice(0,2)){
+    if(!record(site)||typeof site.file!=='string'||site.file.length>2048
+      ||/[\x00-\x1f\x7f]/.test(site.file)||!integer(site.line)||site.line<1
+      ||typeof workspace!=='string'||typeof readSource!=='function')continue;
+    const relative=path.relative(workspace,path.resolve(workspace,site.file));
+    if(!relative||relative.startsWith('../')||path.isAbsolute(relative))continue;
+    try{
+      const source=readSource(relative);
+      if(typeof source!=='string'||source.length>256*1024)continue;
+      const lines=source.split('\n');
+      if(site.line>lines.length)continue;
+      const excerpt=lines.slice(Math.max(0,site.line-3),site.line)
+        .map((s,i)=>`${Math.max(1,site.line-2)+i}${Math.max(1,site.line-2)+i===site.line?' >':'  '} ${s}`).join('\n');
+      if(excerpt.length>650)continue;
+      const rendered=`\nFailing stack site: ${JSON.stringify(relative)}:${site.line}. Current source (\">\" marks that line):\n${excerpt}\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure.`;
+      if(rendered.length>remaining)continue;
+      text+=rendered;remaining-=rendered.length;
+    }catch{ /* Missing/unsafe source never changes execution state. */ }
+  }
   // Preserve complete bounded structural facts before optional case names.
   // Truncating a fact can remove the important distinction or its limitations.
   for(const fact of Array.isArray(facts)?facts.slice(0,4):[]){

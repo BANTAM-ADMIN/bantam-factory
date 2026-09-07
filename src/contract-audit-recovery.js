@@ -5,7 +5,7 @@
 import { parse } from "acorn";
 import crypto from "node:crypto";
 import path from "node:path";
-import { hasShellControlOutsideQuotes, splitShellWords, shellSegments } from "./shell-lex.js";
+import { splitShellWords, shellSegments } from "./shell-lex.js";
 import { verificationShellStatusRisk } from "./verification-evidence.js";
 import { projectProbeEvidence } from "./probe-evidence.js";
 import { canonicalEncode } from "./factory/fact-fabric.js";
@@ -17,104 +17,9 @@ export const VERIFICATION_RECEIPTS_SCHEMA = "bantam.verification-receipts.v1";
 const record = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const badFlags = value => ["blocked", "invalidated", "interrupted", "aborted", "timedOut", "bufferExceeded", "error", "signal", "uncertainty"].some(key => Boolean(value?.[key]));
 
-// Recognition/recorder matching only: never rewrite the executed program or
-// compare argv reconstructed by the deliberately small shell lexer. Remove
-// only outer, unquoted, unescaped POSIX whitespace. In particular an escaped
-// terminal blank/newline, an open quote, or a different quoted argument is not
-// the verification recorder's harmless trimming of the requested command.
-function recordedCommandText(command) {
-  if (typeof command !== "string") return null;
-  const start = command.search(/[^ \t\n]/);
-  if (start < 0) return null;
-  let quote = null, end = start, escapedTail = false;
-  for (let i = start; i < command.length; i++) {
-    const ch = command[i];
-    if (ch === "\\" && quote !== "'") {
-      if (i + 1 === command.length) return null;
-      escapedTail = /[ \t\r\n]/.test(command[++i]);
-      end = i + 1;
-      continue;
-    }
-    if (quote) {
-      if (ch === quote) quote = null;
-      end = i + 1; escapedTail = false;
-      continue;
-    }
-    if (ch === "'" || ch === '"') quote = ch;
-    else if (/[ \t\n]/.test(ch)) continue;
-    end = i + 1; escapedTail = false;
-  }
-  return quote || escapedTail ? null : command.slice(start, end);
-}
-
-function sameRecordedCommand(a, b) {
-  const normalized = recordedCommandText(a);
-  return normalized !== null && normalized === recordedCommandText(b);
-}
-
-// Recognition/dedup identity only; receipts and executed bytes stay untouched.
-// One terminal literal stderr merge changes neither argv nor exit status. It
-// is not a pipeline, a file redirect, or permission to normalize a compound
-// command. Locate its whitespace delimiter outside quotes AND escapes before
-// removing it; quoted "2>&1" remains an argument and open quotes fail closed.
-export function canonicalAuditCommand(command) {
-  let text = recordedCommandText(command);
-  if (!text) return null;
-  const merge = /[ \t]+2>&1$/.exec(text);
-  if (merge) {
-    let quote = null;
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (ch === "\\" && quote !== "'") { i++; continue; }
-      if (quote) { if (ch === quote) quote = null; continue; }
-      if (ch === "'" || ch === '"') { quote = ch; continue; }
-      if (i === merge.index) {
-        text = recordedCommandText(text.slice(0, i));
-        break;
-      }
-    }
-  }
-  return text && !hasShellControlOutsideQuotes(text)
-    && verificationShellStatusRisk(text) === null ? text : null;
-}
-
-export function sameAuditCommand(a, b) {
-  const normalized = canonicalAuditCommand(a);
-  return normalized !== null && normalized === canonicalAuditCommand(b);
-}
-
-function wordsForDirectCommand(command) {
-  const normalized = canonicalAuditCommand(command);
-  if (!normalized) return null;
-  const words = splitShellWords(normalized);
-  return words.length ? words : null;
-}
-
-function sameCommand(actual, expected) {
-  const a = wordsForDirectCommand(actual), b = wordsForDirectCommand(expected);
-  return Boolean(a && b && a.length === b.length && a.every((word, index) => word === b[index]));
-}
-
-// The executor may inject exactly one bounded per-test timeout immediately
-// after a bare Node --test. Retain every other token, including test selection;
-// do not normalize arbitrary options, wrappers, masks or caller-set timeouts.
-function sameConfiguredExecution(actual, configured) {
-  if (sameCommand(actual, configured)) return true;
-  const a = wordsForDirectCommand(actual), b = wordsForDirectCommand(configured);
-  if (!a || !b || a.length !== b.length + 1 || b[1] !== "--test"
-      || !/^(?:node|nodejs)$/.test(b[0]?.split("/").at(-1) ?? "")
-      || b.some(word => /^--test-timeout(?:=|$)/.test(word))) return false;
-  const timeout = /^--test-timeout=([1-9]\d*)$/.exec(a[2] ?? "");
-  if (!timeout || Number(timeout[1]) < 5000 || Number(timeout[1]) > 60000) return false;
-  return a.filter((_, index) => index !== 2).every((word, index) => word === b[index]);
-}
-
-// Used by the pending-audit repeat exception as well as receipt recognition.
-// A matching string alone is not execution proof or completion authority.
-export function isConfiguredAuditCommand(actual, configured) {
-  return typeof configured === "string" && Boolean(configured.trim())
-    && sameConfiguredExecution(actual, configured);
-}
+import { recordedCommandText, sameRecordedCommand, canonicalAuditCommand, sameAuditCommand,
+  wordsForDirectCommand, sameCommand, sameConfiguredExecution, isConfiguredAuditCommand } from "./verification-command.js";
+export { canonicalAuditCommand, sameAuditCommand, isConfiguredAuditCommand } from "./verification-command.js";
 
 // Recognition only: never rewrite or re-execute a shell program. A successful
 // `cd EXACT_WORKSPACE && DIRECT` has the direct child's status, but only if the
@@ -431,13 +336,16 @@ function focusedCheckRecovery(turns, auditIndex, generation, workspace) {
           || badFlags(shell) || !HASH.test(shell.outputSha256 ?? "")
           || (workspace != null && shell.cwd !== workspace)
           || typeof shell.executedCommand !== "string" || shell.executedCommand.length > 16000) continue;
-      if (proof && (proof.schema !== 1 || proof.source !== "shell" || !["fail", "unverified"].includes(proof.status)
+      if (proof && (proof.schema !== 1 || proof.source !== "shell" || !["pass", "fail", "unverified"].includes(proof.status)
           || !HASH.test(proof.outputSha256 ?? "") || !sameRecordedCommand(proof.command, shell.command)
           || ["executedCommand", "generation", "exitCode", "cwd", "workspaceReadOnly", "sandbox"]
             .some(key => (proof[key] ?? null) !== (shell[key] ?? null))
           || ["blocked", "invalidated", "interrupted", "aborted", "timedOut", "bufferExceeded", "error", "signal"]
             .some(key => Boolean(proof[key])))) continue;
-      if (!proof && shell.exitCode === 0 && verificationShellStatusRisk(shell.executedCommand) === null) continue;
+      // A successful process can still have an unrecognized assertion shape.
+      // Count that as a transport/admission attempt, not as accepted proof.
+      if (shell.exitCode === 0 && verificationShellStatusRisk(shell.executedCommand) === null
+          && isFocusedAuditCommand(shell.executedCommand) && (!proof || proof.status === 'pass')) continue;
       const segments = shellSegments(shell.executedCommand);
       if (segments.length > 128 || !segments.some(segment => {
         const words = splitShellWords(segment);
@@ -448,6 +356,76 @@ function focusedCheckRecovery(turns, auditIndex, generation, workspace) {
       })) continue;
       if (++attempts >= 2) return "standalone-node-file";
     }
+  }
+  return null;
+}
+
+// Context only: distinguish actual process execution from proof admission.
+// Never recover acceptance from printed PASS, a proposed command, or raw prose.
+function focusedAdmissionDiagnostic(turns, auditIndex, generation, configured, workspace) {
+  for (let index = turns.length - 1; index > Math.max(auditIndex, turns.length - 65); index--) {
+    const turn = turns[index];
+    if (!turn || turn.controllerStop || turn.shellScopeRollback?.violations?.length) continue;
+    const entries = Object.hasOwn(turn, 'verificationReceipts') ? orderedTurnReceipts(turn, index)
+      : turn.shellExecution ? [turn] : null;
+    for (const entry of [...(entries ?? [])].reverse()) {
+      const shell = entry.shellExecution, proof = entry.verificationEvidence;
+      if (!record(shell) || shell.generation !== generation || shell.cwd !== workspace
+          || badFlags(shell) || shell.cached || !HASH.test(shell.outputSha256 ?? '')
+          || !Number.isInteger(shell.exitCode) || shell.exitCode < 0 || shell.exitCode >= 125
+          || typeof shell.command !== 'string' || typeof shell.executedCommand !== 'string'
+          || shell.executedCommand.length > 16000) continue;
+      if (proof && (proof.schema !== 1 || proof.source !== 'shell'
+          || !['pass','fail','unverified'].includes(proof.status) || !HASH.test(proof.outputSha256 ?? '')
+          || !sameRecordedCommand(proof.command, shell.command)
+          || ['executedCommand','generation','exitCode','cwd','workspaceReadOnly','sandbox']
+            .some(k => (proof[k] ?? null) !== (shell[k] ?? null))
+          || ['blocked','invalidated','timedOut','interrupted','aborted','bufferExceeded','error','signal','cached'].some(k => proof[k]))) continue;
+      const requested = wordsForDirectCommand(shell.command), words = wordsForDirectCommand(shell.executedCommand);
+      const nodeAttempt = shellSegments(shell.executedCommand).some(segment => {
+        const w = splitShellWords(segment);
+        return /^(?:node|nodejs)$/.test(w[0]?.split('/').at(-1) ?? '')
+          && w.slice(1).some(s => ['-e','--eval','--test'].includes(s) || /\.[cm]?js$/.test(s));
+      });
+      if (!nodeAttempt && !isFocusedAuditCommand(shell.executedCommand, configured)) continue;
+      if (configured && sameConfiguredExecution(shell.executedCommand, configured)) continue;
+      const admitted = orderedReceiptCommand(proof, shell, { generation, workspace });
+      let reason;
+      if (shell.exitCode !== 0 || proof?.status === 'fail') reason = 'execution-failed';
+      else if (!words || !requested || verificationShellStatusRisk(shell.executedCommand)) reason = 'non-direct-or-status-opaque';
+      else if (words.some(w => w === '-e' || w === '--eval') && !isFocusedAuditCommand(shell.executedCommand, configured)) reason = 'inline-assertion-not-recognized';
+      else if (!admitted || !isFocusedAuditCommand(admitted, configured)) reason = 'execution-evidence-incomplete';
+      else return null; // most recent attempt is already recognized; do not replay an older rejection
+      return { schema: 1, generation, turn: index, exitCode: shell.exitCode,
+        outputSha256: shell.outputSha256, admission: 'not-admitted', reason };
+    }
+  }
+  return null;
+}
+
+// Locate a small existing authored check from CURRENT bytes, not filenames
+// mentioned in a model note. This is a launcher suggestion, never a coverage
+// claim or verification receipt. It does not execute/import candidate code.
+export function existingFocusedCheck(paths, readSource, { generation } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0 || typeof readSource !== 'function') return null;
+  for (const p of [...new Set(Array.isArray(paths) ? paths : [])].reverse().slice(0,16)) {
+    if (typeof p !== 'string' || p.length > 240 || !/^[\w./-]+\.[cm]?js$/.test(p)
+        || p.startsWith('/') || p.split('/').includes('..')) continue;
+    try {
+      const source = readSource(p);
+      if (typeof source !== 'string' || Buffer.byteLength(source) > 32000 || !inlineNodeAssertion(source)) continue;
+      const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', allowAwaitOutsideFunction: true });
+      const imports = ast.body.filter(n => n.type === 'ImportDeclaration').map(n => n.source.value);
+      // Require a literal local subject import. Unknown dynamic/CJS layouts
+      // fall back to a minimal witness; never guess their entrypoint.
+      if (!imports.some(s => /^\.{1,2}\//.test(s))) continue;
+      const nodeTest = imports.some(s => /^(?:node:)?test$/.test(s));
+      const command = `node ${nodeTest ? '--test ' : ''}${p}`;
+      if (!isFocusedAuditCommand(command)) continue;
+      return { schema: 1, generation, path: p, command,
+        sourceSha256: crypto.createHash('sha256').update(source).digest('hex'),
+        authority: 'current-source-launcher-hint', verified: false };
+    } catch { /* Missing, changed, unparsable or unbounded sources supply no hint. */ }
   }
   return null;
 }
@@ -465,8 +443,9 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
   const audit = turns[auditIndex].contractStateAudit;
   const configured = String(configuredCommand ?? "").trim();
   let focusedTurn = null, projectTurn = null, focusedOrder = null, projectOrder = null, order = 0;
-  let focusedWitness = null, projectWitnessValid = false;
-  const clear = () => {
+  let focusedWitness = null, projectWitnessValid = false, invalidatedAfterTurn = null;
+  const clear = (index = auditIndex) => {
+    if (focusedTurn !== null || projectTurn !== null) invalidatedAfterTurn = index;
     focusedTurn = projectTurn = focusedOrder = projectOrder = null;
     focusedWitness = null; projectWitnessValid = false;
   };
@@ -474,7 +453,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
     const turn = turns[index];
     if (turn?.contractAssertion) {
       const station = turn.contractAssertion;
-      clear();
+      clear(index);
       if (!turn.controllerStop && !turn.shellScopeRollback?.violations?.length
           && validContractAssertion(station, audit, generation)) {
         focusedTurn = index;
@@ -491,11 +470,11 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
     if (index === auditIndex) continue;
     if (turn && Object.hasOwn(turn, "verificationReceipts")) {
       const entries = orderedTurnReceipts(turn, index);
-      if (!entries || turn.controllerStop || turn.shellScopeRollback?.violations?.length) { clear(); continue; }
+      if (!entries || turn.controllerStop || turn.shellScopeRollback?.violations?.length) { clear(index); continue; }
       for (const entry of entries) {
         const at = order++, proof = entry.verificationEvidence, shell = entry.shellExecution;
         const command = orderedReceiptCommand(proof, shell, { generation, workspace });
-        if (!command) { clear(); continue; }
+        if (!command) { clear(index); continue; }
         if (isFocusedAuditCommand(command, configured)) {
           focusedTurn = index; focusedOrder = at;
           focusedWitness = { command, turn: index, generation };
@@ -505,7 +484,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
           if ((proof.configuredCommand !== configured && (controller || proof.configuredCommand != null))
               || (controller && (!sameCommand(proof.command, configured) || !sameConfiguredExecution(proof.executedCommand, configured)))
               || (controller && typeof verificationWorkspaceReadOnly === "boolean"
-                && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(); continue; }
+                && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(index); continue; }
           projectTurn = index; projectOrder = at; projectWitnessValid = true;
         }
       }
@@ -519,11 +498,11 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
     if (turn.controllerStop || turn.shellScopeRollback?.violations?.length
         || (proof && !validReceipt(proof, generation, { verification: true }))
         || (shell && !validReceipt(shell, generation))) {
-      clear();
+      clear(index);
       continue;
     }
     const command = commandForAuditReceipt(proof, shell, workspace);
-    if (!command) { clear(); continue; }
+    if (!command) { clear(index); continue; }
     const at = order++;
     const nameFiltered = wordsForDirectCommand(command)?.some(word => /^--test-name-pattern(?:=|$)/.test(word));
     // A zero-match filtered run can exit zero. It proves no assertion ran and
@@ -555,6 +534,8 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
   return { pending: { turn: auditIndex, promptSha256: audit.promptSha256 ?? null,
     report: String(audit.report ?? ""), sources: audit.sources ?? [], focusedTurn, projectTurn,
     configuredCommand: configured || null,
+    ...(invalidatedAfterTurn !== null ? { invalidatedAfterTurn } : {}),
+    ...(focusedTurn === null ? { admissionDiagnostic: focusedAdmissionDiagnostic(turns, auditIndex, generation, configured, workspace) } : {}),
     staleFocus: focusedTurn === null ? staleFocusedCheck(turns, auditIndex, generation, configured, workspace) : null,
     focusedCheckRecovery: focusedTurn === null ? focusedCheckRecovery(turns, auditIndex, generation, workspace) : null,
     generation: Number.isSafeInteger(generation) && generation >= 0 ? generation : null,

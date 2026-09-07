@@ -70,6 +70,7 @@ function validateField(value, field, path) {
 }
 
 function validateRecordArray(value, field, path) {
+  if (field.optional && value[field.key] == null) return { ok: true, present: false };
   const checked = validateArrayBounds(value[field.key], field, [...path, field.key]);
   if (!checked.ok) return checked;
   const data = [];

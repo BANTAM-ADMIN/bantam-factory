@@ -46,7 +46,11 @@ const recordArray = (key, {
 
 const define = (verb, fields, prompt, { groups = [], feature = null, rules = [] } = {}) => ({
   verb,
-  fields,
+  fields: ['read_file', 'replace', 'edit_lines', 'patch', 'write_file', 'write_batch'].includes(verb)
+    ? [...fields, { ...recordArray('repair', {
+      fields: ['evidenceSha256', 'fixture', 'priorExpected', 'proposedExpected', 'requirement', 'nextCheck'].map(key => string(key)),
+      minItems: 1, maxItems: 4, grammarRule: 'repair-handoff', itemGrammarRule: 'repair-proposal', inlineGrammar: true,
+    }), optional: true }] : fields,
   prompt,
   groups,
   feature,

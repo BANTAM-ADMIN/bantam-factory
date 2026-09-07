@@ -150,6 +150,10 @@ export function recordTurns(turns, { workspaceGeneration } = {}) {
     if (reasoning) {
       log.add("run", "working-note", clipText(reasoning, WORKING_NOTE_MAX_CHARS), i);
     }
+    if (['bantam.repair-handoff.v1', 'bantam.repair-handoff.v2', 'bantam.repair-handoff.v3'].includes(tn.repairHandoff?.schema)) {
+      // An archived proposal, deliberately not the verdict/proof attribute.
+      log.add(`turn:${i}`, 'repair-proposal', tn.repairHandoff, i);
+    }
     if (a.a) {
       log.add(`turn:${i}`, "action", a.a, i);
       if (a.a === "query") {

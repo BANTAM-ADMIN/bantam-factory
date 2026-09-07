@@ -15,6 +15,14 @@ const same=(a,b)=>canonicalEncode(a)===canonicalEncode(b);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const HASH=/^[a-f0-9]{64}$/;
 const TOKENS=1800;
+// Invocation-owned opaque token. Cache proposal bytes only; each station still
+// copies current inputs and executes every probe stage and project check anew.
+const proposalCaches=new WeakMap();
+export function createCliProposalCache(){const token=Object.freeze({});proposalCaches.set(token,new WeakMap());return token;}
+function proposalMap(token,model){
+  const models=proposalCaches.get(token);if(!models)return null;
+  if(!models.has(model))models.set(model,new Map());return models.get(model);
+}
 
 function promptFor({model,task,documents,sources,contract}){
   const template=model.template??CHATML_TEMPLATE,control=template.control instanceof RegExp?template.control:CHATML_TEMPLATE.control;
@@ -30,7 +38,7 @@ function promptFor({model,task,documents,sources,contract}){
 }
 
 export async function runContractCliStation({workspace,model,task,documents=[],sources=[],generation,signal=null,
-  dockerImage,processRunner,contract=null,runExperiment=runProbe,timeoutMs=35000}={}){
+  dockerImage,processRunner,contract=null,runExperiment=runProbe,timeoutMs=35000,proposalCache=null}={}){
   signal?.throwIfAborted();
   const receipt={schema:'bantam.contract-cli-station.v2',status:'unavailable',generation,taskSha256:sha(String(task??'')),
     contract:null,contractSha256:null,sources:[],tokens:null,candidateVerified:false,scope:'declared-cli-api-coherence',
@@ -59,17 +67,25 @@ export async function runContractCliStation({workspace,model,task,documents=[],s
     receipt.limits={outputTokens:TOKENS,promptBytes:56000,modelTimeoutMs:timeoutMs,probeStageTimeoutMs:10000,
       childTimeoutMs:2000,maxChildOutputBytes:16384,cases:derived.arity?3:1,apiReferenceCalls:1,maxChildCalls:derived.arity?4:2};
     if(receipt.promptBytes>56000)return unavailable('CLI assertion prompt exceeds its byte limit');
+    const proposals=proposalMap(proposalCache,model);
+    const proposalKey=digest({prompt:receipt.promptSha256,contract:receipt.contractSha256,
+      inputs:receipt.inputDigest,grammar:receipt.grammarSha256,schema:receipt.jsonSchemaSha256,
+      policy:{temperature:0,nPredict:TOKENS,topP:model.topP??null,topK:model.topK??null,
+        modelId:model.modelId??null,profileName:model.profileName??null,endpoint:model.endpoint??null}});
+    const cached=proposals?.get(proposalKey);
     const deadline=new AbortController(),timer=setTimeout(()=>deadline.abort(Error('CLI assertion model time limit reached')),timeoutMs);
     const callSignal=signal?AbortSignal.any([signal,deadline.signal]):deadline.signal;
     let output,onAbort;
     try{
       const canceled=new Promise((_,reject)=>{onAbort=()=>reject(callSignal.reason);callSignal.addEventListener('abort',onAbort,{once:true});if(callSignal.aborted)onAbort();});
-      output=await Promise.race([model.complete(prompt,{grammar:CLI_ASSERTION_SPEC_GRAMMAR,jsonSchema:CLI_ASSERTION_SPEC_SCHEMA,
+      output=cached ? {content:cached.content,tokens:0} : await Promise.race([model.complete(prompt,{grammar:CLI_ASSERTION_SPEC_GRAMMAR,jsonSchema:CLI_ASSERTION_SPEC_SCHEMA,
         nPredict:TOKENS,temperature:0,retries:0,signal:callSignal,recordLabel:'contract-cli-assertion'}),canceled]);
       callSignal.throwIfAborted();
     }finally{clearTimeout(timer);if(onAbort)callSignal.removeEventListener('abort',onAbort);}
     receipt.tokens=Number.isSafeInteger(output?.tokens)&&output.tokens>=0?output.tokens:null;
     receipt.responseSha256=sha(String(output?.content??''));
+    receipt.designReused=Boolean(cached);
+    if(cached)receipt.designOrigin={generation:cached.generation,responseSha256:cached.responseSha256,promptSha256:receipt.promptSha256};
     if(output?.stoppedLimit||output?.truncated||receipt.tokens>=TOKENS)return unavailable('CLI assertion proposal was truncated');
     const spec=parseCliAssertionSpec(output?.content,{contract:derived,sourcePaths:sources.map(s=>s.path)});
     if(!spec)return unavailable('no valid bounded CLI data assertion returned');
@@ -97,6 +113,10 @@ export async function runContractCliStation({workspace,model,task,documents=[],s
     if(!['assertion_passed','assertion_failed'].includes(projection.status))return unavailable(`CLI assertion unresolved: ${projection.reason}`);
     const status=projection.status==='assertion_passed'?'complete':'failed';
     if(!validateCliCaseMeasurements(raw.stages[2]?.stdout,{contract:derived,spec,status}))return unavailable('CLI child measurements incomplete or inconsistent with the fixed case');
+    if(proposals && status==='complete' && !cached){
+      proposals.set(proposalKey,{content:String(output.content),generation,responseSha256:receipt.responseSha256});
+      if(proposals.size>4)proposals.delete(proposals.keys().next().value);
+    }
     return {...receipt,status,reason:projection.reason,sourceUnchanged:true};
   }catch(error){if(signal?.aborted)throw error;return unavailable(error?.message??error);}
 }

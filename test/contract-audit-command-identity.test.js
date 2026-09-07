@@ -91,7 +91,8 @@ test('the actual green merged check receives current focused credit without chan
 
 test('exact merged project execution can bind a null configured label only for an actual shell receipt',()=>{
   const broad=execution('npm test 2>&1\n');
-  assert.equal(broad.verificationEvidence.configuredCommand,null,'matches the real recorder shape');
+  assert.equal(broad.verificationEvidence.configuredCommand,'npm test','producer shares the gate command identity');
+  broad.verificationEvidence.configuredCommand=null; // historical artifacts remain readable
   assert.equal(pendingContractAudit([audit(),ordered([execution('node check-contract.mjs 2>&1'),broad])],options),null);
   for(const patch of [{configuredCommand:'npm run other'},{statusCommand:'npm test'},{executedCommand:'npm test'},
     {cwd:'/tmp/foreign'},{generation:7},{status:'fail'},{exitCode:1},{timedOut:true},{outputSha256:'invalid'}]){

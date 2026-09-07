@@ -107,17 +107,17 @@ function admittedCollectionReport(parsed) {
     if (reason) deferred.push({ index, reason }); else findings.push(finding);
   }
   const noteIncomplete = parsed.note.length >= 300;
-  return { findings, note: noteIncomplete ? "" : parsed.note,
+  return { findings, note: "",
     quality: { status: deferred.length ? "deferred" : "bounded", deferred, noteIncomplete,
       candidateVerified: false, scope: "source-hypothesis-with-declared-observable-contrast" } };
 }
 
-function collectionAuditReport({ findings, note, quality }) {
+function collectionAuditReport({ findings, quality }) {
   const body = findings.length ? findings.map((finding, index) =>
     `${index + 1}. ${finding.entrypoint} — ${finding.location}\nPublic requirement: ${finding.requirement}\nProposed fixture/assertion (NOT executed): ${finding.fixture}\nExpected: ${finding.expected}\nPredicted from source: ${finding.predicted}`).join("\n\n")
     : quality?.deferred.length ? "The proposed findings were incomplete or lacked a differing observable. No proposed defect was admitted. This is NOT a clean review; an executed public-contract assertion and project verification are still required."
       : "No supported counterexample reported. This is not proof of correctness.";
-  return `${body}${note ? `\n\nAudit note: ${note}` : ""}`
+  return body
     + (quality?.deferred.length ? `\n\nDeferred hypotheses (not repair instructions): ${quality.deferred.map(item => `${item.index + 1}: ${item.reason}`).join("; ")}.` : "")
     + (quality?.noteIncomplete ? "\n[Audit note reached its field limit and was omitted; its completeness is unknown.]" : "");
 }
@@ -361,7 +361,7 @@ export async function runContractStateAudit({ model, task, documents, sources, o
       // Keep the general executed-focus/project obligation on a deferred review,
       // without converting malformed prose into a specific defect to repair.
       return { ...receipt, status: "report", ...admitted,
-        rawReportSha256: digest(report), proposedFindings: parsed.findings,
+        rawReportSha256: digest(report), rawReport: report, proposedFindings: parsed.findings, proposedNote: parsed.note,
         report: collectionAuditReport(admitted), truncated: false, tokens: output.tokens ?? 0 };
     }
     // An action-shaped reply is not a completed audit and is never executed.
@@ -379,7 +379,15 @@ export async function runContractStateAudit({ model, task, documents, sources, o
 
 export function formatContractStateAudit(audit) {
   if (audit.status !== "report") return `[contract-state-audit] No audit result: ${audit.reason}. This supplies no correctness evidence.`;
-  return `[contract-state-audit; unverified hypotheses; source generation ${audit.generation}${audit.focus ? `; focus ${audit.focus}` : ""}]\n${audit.report}`
+  // Render actionable collection context from freshly admitted structured
+  // proposals. Raw notes/reports remain in the artifact, never this channel.
+  const parsed = audit.focus === "collection-preconditions"
+    ? parseCollectionContractAudit(JSON.stringify({ findings: audit.findings, note: "" })) : null;
+  const report = audit.focus === "collection-preconditions"
+    ? parsed ? collectionAuditReport(admittedCollectionReport(parsed))
+      : "No bounded structured finding available. This is not a clean review; focused public-contract assertions and project verification are still required."
+    : audit.report;
+  return `[contract-state-audit; unverified hypotheses; source generation ${audit.generation}${audit.focus ? `; focus ${audit.focus}` : ""}]\n${report}`
     + `${audit.truncated ? "\n[Audit output truncated; no completeness claim.]" : ""}`
     + (audit.focus === "collection-preconditions"
       ? "\nCheck these hypotheses against the public contract and current source. An already-observed mismatch on a task-valid API/CLI call takes priority over this unverified review; turn that diagnostic into an assertion before choosing a repair. Before speculative repair or broader changes, execute a focused direct public-API assertion for each proposed counterexample, using otherwise-valid fixtures and expectations derived only from the public requirement. Assert the result, do not merely console.log a boolean. For a CLI, launch the real entry file as a child process and assert its exit/output; an API import or node -e argument-layout surrogate does not exercise that route. Retain the actual execution result; a proposed test, source inspection, or echoed claim is not executable evidence. For a supported counterexample, preserve that focused regression, repair the code, rerun the assertion, then run the project verification on the resulting source. Reject unsupported findings explicitly, with the observed result and public-contract reason. This audit is not a test result and does not establish completion."

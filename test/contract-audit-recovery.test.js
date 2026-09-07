@@ -115,9 +115,12 @@ test("standalone-file advice ignores prose, old generations, pre-audit checks, b
     orderedCheck(check(command, 1, { blocked: true }), 1),
     orderedCheck(check(command, 1, { timedOut: true }), 1),
     orderedCheck(check("python check_api.py; echo PASS"), 1),
-    orderedCheck(check("node -e 'console.log(1)'"), 1),
   ]) assert.equal(pendingContractAudit([audit, row, second], options).focusedCheckRecovery, null);
   const foreign = orderedCheck(check(command), 1);
+  const unrecognized = orderedCheck(check("node -e 'console.log(1)'"), 1);
+  const pending = pendingContractAudit([audit, unrecognized, second], options);
+  assert.equal(pending.focusedCheckRecovery, 'standalone-node-file', 'successful but unrecognized checks now count as admission attempts, never proof');
+  assert.equal(pending.needsFocused, true);
   foreign.verificationEvidence.command = "node check-foreign.mjs; echo PASS";
   assert.equal(pendingContractAudit([audit, foreign, second], options).focusedCheckRecovery, null);
   assert.equal(pendingContractAudit([check(command), { ...audit, ...check(command) }, check(command)], options).focusedCheckRecovery, null);

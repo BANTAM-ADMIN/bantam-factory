@@ -169,6 +169,7 @@ export function buildArtifact({
       ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: serializableCopy(t.probeEvidence) } : {}),
       ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),
       ...(Object.hasOwn(t, "contractStateAudit") ? { contractStateAudit: serializableCopy(t.contractStateAudit) } : {}),
+      ...(Object.hasOwn(t, "repairHandoff") ? { repairHandoff: serializableCopy(t.repairHandoff) } : {}),
       ...(Object.hasOwn(t, "contractAssertion") ? { contractAssertion: serializableCopy(t.contractAssertion) } : {}),
       ...(Object.hasOwn(t, "cliVerification") ? { cliVerification: serializableCopy(t.cliVerification) } : {}),
       ...(Object.hasOwn(t, "contextBasis") ? { contextBasis: serializableCopy(t.contextBasis) } : {}),

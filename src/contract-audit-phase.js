@@ -2,6 +2,30 @@
 // They supply neither executable proof nor additional work/authority.
 const STANDALONE_NODE_CHECK = "Next: use a permitted file-edit action (e.g. write_file) to create a new workspace check script, e.g. check-contract.mjs. Import the real production API and assert public-contract expectations with node:assert/strict. Temporary fixture DATA goes under os.tmpdir(); the check SCRIPT stays in the workspace. In a separate permitted shell action run only node check-contract.mjs (substitute its actual relative path): no cd, bash -c, setup, echo, filters or cleanup. Keep the check; printed pass messages are not proof.";
 
+function focusedWorkOrder(pending) {
+  const d = pending?.admissionDiagnostic, c = pending?.checkCandidate;
+  const reasons = {
+    'inline-assertion-not-recognized': 'The inline check has no recognized node:assert binding/call. A custom assert helper or if/exit check is not admitted by this bounded recognizer.',
+    'non-direct-or-status-opaque': 'The launcher is compound or its status is opaque; an outer zero does not establish the required direct assertion result.',
+    'execution-evidence-incomplete': 'The receipt does not establish a recognized focused assertion with complete execution evidence; zero matched tests and printed PASS are not proof.',
+    'execution-failed': 'The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying.',
+  };
+  const diagnostic = d?.schema === 1 && d.generation === pending.generation && d.admission === 'not-admitted'
+    && Number.isSafeInteger(d.turn) && d.turn >= 0 && Number.isInteger(d.exitCode) && d.exitCode >= 0 && d.exitCode < 125
+    && /^[a-f0-9]{64}$/.test(d.outputSha256 ?? '') && Object.hasOwn(reasons, d.reason)
+    ? `Execution: turn ${d.turn + 1} ran and exited ${d.exitCode}. Focused-proof admission: NOT ADMITTED. ${reasons[d.reason]} ` : '';
+  const candidate = c?.schema === 1 && c.generation === pending.generation && c.verified === false
+    && c.authority === 'current-source-launcher-hint' && /^[a-f0-9]{64}$/.test(c.sourceSha256 ?? '')
+    && typeof c.path === 'string' && c.path.length <= 240 && /^[\w./-]+\.[cm]?js$/.test(c.path)
+    && !c.path.startsWith('/') && !c.path.split('/').includes('..')
+    && [ `node ${c.path}`, `node --test ${c.path}` ].includes(c.command);
+  if (!diagnostic && !candidate) return '';
+  return diagnostic + (candidate
+    ? `Existing authored check located in CURRENT source: ${JSON.stringify(c.path)} (sha256 ${c.sourceSha256}). Next: run exactly ${JSON.stringify(c.command)} directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. `
+    : `${STANDALONE_NODE_CHECK} Start with one discriminating fixture/assertion and execute it before expanding coverage. `)
+    + 'A successful admitted focused check still requires fresh configured project verification. No completion gate is waived.';
+}
+
 export function contractAuditPhaseState(pending, {
   useGrammar = true, interactive = false, advisoryMode = false,
   writeBatch = false, callerExcludedActions = [],
@@ -21,8 +45,8 @@ export function contractAuditPhaseState(pending, {
   const next = pending.needsCli === true
     ? "The separate public CLI process check is still missing, stale, or failing. Repair a demonstrated source or fixture defect and run the configured verifier; the controller will execute its fixed real-CLI check. API-only green cannot substitute for CLI evidence."
     : pending.needsFocused === true
-    ? pending.focusedCheckRecovery === "standalone-node-file" ? STANDALONE_NODE_CHECK
-      : "Next: run a direct assertion against the actual API or CLI and the public contract. Prefer an existing focused check or one minimal witness for the hypothesis. Use node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion; a final 2>&1 stderr merge is allowed. Create or repair the check separately if needed. Printouts and broad-suite green do not replace focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
+    ? focusedWorkOrder(pending) || (pending.focusedCheckRecovery === "standalone-node-file" ? STANDALONE_NODE_CHECK
+      : "Next: run a direct assertion against the actual API or CLI and the public contract. Prefer an existing focused check or one minimal witness for the hypothesis. Use node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion; a final 2>&1 stderr merge is allowed. Start with one discriminating fixture/assertion and execute it before expanding coverage. Create or repair the check separately if needed. Printouts and broad-suite green do not replace focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review.")
     : `Focused proof is accepted for the current tree. Next: run ${commandText ? `exactly the configured project verifier ${commandText}` : "the exact configured project verifier"}, directly, on that unchanged tree. Do not repeat the focused check.`;
   return { active: true, excludeVerbs, note: [
     "CONTRACT AUDIT PHASE: completion is not yet available; required current execution evidence is missing.",
@@ -51,6 +75,11 @@ export function contractAuditDecisionContext(pending, witness = null) {
       + " There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up.";
   } else if (pending.needsFocused === true) {
     phase = "focused";
+    const workOrder = focusedWorkOrder(pending);
+    if (workOrder) return { schema: 1, phase, generation,
+      text: `CONTRACT AUDIT PHASE: completion is not yet available; generation ${generation} still needs focused proof. ${workOrder} The audit is a hypothesis, not an oracle.`,
+      ...(pending.admissionDiagnostic ? { admissionDiagnostic: pending.admissionDiagnostic } : {}),
+      ...(pending.checkCandidate ? { checkCandidate: pending.checkCandidate } : {}) };
     if (pending.focusedCheckRecovery === "standalone-node-file") {
       text = `CONTRACT AUDIT PHASE: completion is not yet available; generation ${generation} still needs focused proof. ${STANDALONE_NODE_CHECK} The audit is a hypothesis, not an oracle.`;
       return { schema: 1, phase, generation, text };
@@ -63,7 +92,7 @@ export function contractAuditDecisionContext(pending, witness = null) {
     if (removed.length) text += ` Removed files: ${removed.map(p => literal(p)).join(", ")}. Recreate the assertion check or use a direct inline assertion against the public API; do not rerun a missing file.`;
     else if (command) text += ` Next: rerun ${command} directly against the current tree. If it fails, repair the demonstrated defect and rerun it.`;
     else text += " Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not.";
-    text += " Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away.";
+    text += " Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away.";
   } else if (pending.needsProject === true) {
     phase = "project";
     text = `CONTRACT AUDIT PHASE: focused proof is current (generation ${generation}); only configured project verification remains. Next: run ${literal(pending.configuredCommand) ?? "the exact configured project command"} directly. Do not repeat the focused check, delete its script, or emit DONE yet.`;
@@ -78,5 +107,8 @@ export function verificationWorkflowPromptText(value) {
       || !value.text.startsWith(value.phase === "cli" ? "CLI VERIFICATION REQUIRED:"
         : value.phase === "failure" ? "EXECUTION FAILURE:"
         : value.phase === "ready" ? "VERIFICATION READY:" : "CONTRACT AUDIT PHASE:")) return "";
-  return `[verification workflow: current decision]\n${value.text}\n`;
+  const repair = typeof value.repairContext === 'string' && value.repairContext.length <= 8000
+    && /^\[repair (?:context\]|handoff; advisory, NOT verification evidence\])/.test(value.repairContext)
+    ? `${value.repairContext}\n` : '';
+  return `${repair}[verification workflow: current decision]\n${value.text}\n`;
 }

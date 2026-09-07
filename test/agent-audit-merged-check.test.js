@@ -9,6 +9,34 @@ const GOOD="export function collectItems(token, items) { if (typeof token !== 's
 const CHECK="import assert from 'node:assert/strict';\nimport {collectItems} from './src/items.js';\nassert.throws(()=>collectItems('', []));\nassert.deepEqual(collectItems('ok', [2,1]),[2,1]);\nconsole.log('check-contract: all assertions passed');\n";
 const VERIFY='npm test 2>&1';
 
+test('revoked focused proof permits one real repeat instead of deadlocking against duplicate protection',async t=>{
+  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-revoked-focus-'));
+  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+  fs.mkdirSync(path.join(workspace,'src'));fs.mkdirSync(path.join(workspace,'test'));
+  fs.writeFileSync(path.join(workspace,'package.json'),JSON.stringify({type:'module',scripts:{test:'node --test'}}));
+  fs.writeFileSync(path.join(workspace,'src/items.js'),'export function collectItems() { throw Error("TODO"); }');
+  fs.writeFileSync(path.join(workspace,'test/public.test.js'),"import test from 'node:test';import assert from 'node:assert/strict';import {collectItems} from '../src/items.js';test('API',()=>assert.deepEqual(collectItems('ok',[1]),[1]));");
+  const actions=[{a:'write_file',p:'src/items.js',content:GOOD},{a:'write_file',p:'check-contract.mjs',content:CHECK},
+    {a:'shell',c:'npm test'},{a:'shell',c:'node check-contract.mjs'},
+    {a:'shell',c:'node -e "console.log(1)"; echo "exit=$?"'},
+    {a:'shell',c:'node check-contract.mjs'},{a:'done',summary:'Implemented and verified.'}];
+  const result=await runAgent({workspace,task:'Implement public API collectItems(token, items). Reject an empty token and non-array items. Return a copy of the items array in input order. Run npm test.',
+    model:{assistantPrefill:'',async complete(prompt){
+      if(prompt.includes('You are a source-code state-machine auditor.'))return {content:JSON.stringify({findings:[],note:''}),tokens:1};
+      assert.ok(actions.length);return {content:JSON.stringify(actions.shift()),tokens:1};
+    }},maxTurns:7,maxInvalidPerTurn:0,useGrammar:true,interactive:false,grounding:false,promptTrajectory:'extension',
+    shellSandbox:'host',verificationScript:'npm test',contractStateAudit:'auto',contractAssertionStation:'off',
+    completionAudit:false,stateAudit:'off',testFocus:false,regressionGuard:false,diagnoseStuckTests:false,
+    autoVerifyBlindEdits:0,autoVerifyProbes:0,autoVerifyStaleTurns:0,
+  });
+  assert.equal(result.turns[3].verificationWorkflow.phase,'ready');
+  assert.equal(result.turns[4].shellExecution.exitCode,0,'outer success does not prove the masked inner command');
+  assert.equal(result.turns[4].verificationWorkflow.phase,'focused','uncertain execution still revokes proof');
+  assert.equal(result.turns[5].shellExecution.executedCommand,'node check-contract.mjs','required retry actually executes');
+  assert.equal(result.turns[5].verificationWorkflow.phase,'ready');
+  assert.equal(result.reachedDone,true,result.turns.at(-1).observation);
+});
+
 test('actual merged focus and one post-audit project repeat reopen DONE without gratuitous edits',async t=>{
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-audit-merged-agent-'));
   t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));

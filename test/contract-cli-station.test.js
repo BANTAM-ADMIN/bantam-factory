@@ -7,7 +7,7 @@ import test from 'node:test';
 import {canonicalEncode} from '../src/factory/fact-fabric.js';
 import {CHATML_TEMPLATE,GEMMA_TEMPLATE} from '../src/profiles.js';
 import {deriveCliContract,CLI_ASSERTION_SPEC_GRAMMAR} from '../src/contract-cli-assertion-spec.js';
-import {runContractCliStation,formatContractCliStation} from '../src/contract-cli-station.js';
+import {runContractCliStation,formatContractCliStation,createCliProposalCache} from '../src/contract-cli-station.js';
 import {cliVerificationPassed} from '../src/contract-cli-verification.js';
 
 const sha=v=>crypto.createHash('sha256').update(v).digest('hex'),digest=v=>`sha256:${sha(canonicalEncode(v))}`;
@@ -62,6 +62,33 @@ test('one constrained CLI data proposal binds public process contract/current so
   assert.equal(worker.calls[0].options.retries,0);assert.equal(runner.calls[0].options.maxBuffer,262144);
   assert.equal(cliVerificationPassed(r.contract,r,{generation:2}),true);
   assert.match(formatContractCliStation(r),/Measured child extra-argument: passed; actual exit 2/);
+});
+
+test('proposal reuse avoids only the model call, never a fresh execution or its failure',async t=>{
+  const args=fixture(t),worker=model(),runner=experiment(),proposalCache=createCliProposalCache();
+  const first=await runContractCliStation({...args,model:worker,runExperiment:runner.run,proposalCache});
+  const failedRunner=experiment({failed:true});
+  const second=await runContractCliStation({...args,generation:3,model:worker,runExperiment:failedRunner.run,proposalCache});
+  assert.equal(first.status,'complete');assert.equal(first.designReused,false);
+  assert.equal(second.designReused,true);assert.equal(second.tokens,0);assert.equal(second.generation,3);
+  assert.equal(second.status,'failed');assert.equal(cliVerificationPassed(second.contract,second,{generation:3}),false);
+  assert.equal(second.designOrigin.generation,2);assert.equal(second.designOrigin.responseSha256,first.responseSha256);
+  assert.equal(worker.calls.length,1);assert.equal(runner.calls.length,1);assert.equal(failedRunner.calls.length,1);
+});
+
+test('proposal reuse is invocation/model/input/policy bound',async t=>{
+  const args=fixture(t),worker=model(),runner=experiment(),proposalCache=createCliProposalCache();
+  const run=patch=>runContractCliStation({...args,model:worker,runExperiment:runner.run,proposalCache,...patch});
+  await run({});await run({generation:3});assert.equal(worker.calls.length,1);
+  await run({task:TASK+' Preserve all keys.'});assert.equal(worker.calls.length,2);
+  fs.appendFileSync(path.join(args.workspace,'package.json'),'\n');
+  await run({});assert.equal(worker.calls.length,3);
+  worker.topP=0.9;await run({});assert.equal(worker.calls.length,4);
+  await run({proposalCache:createCliProposalCache()});assert.equal(worker.calls.length,5);
+  const other=model();await run({model:other});assert.equal(other.calls.length,1);
+  const code=CODE+'\n// new source';fs.writeFileSync(path.join(args.workspace,'convert.js'),code);
+  await run({sources:[{path:'convert.js',text:code,sha256:sha(code)}]});assert.equal(worker.calls.length,6);
+  assert.equal(runner.calls.length,8);
 });
 
 test('failed child status is preserved despite forged cached PASS and remains coherence scoped',async t=>{

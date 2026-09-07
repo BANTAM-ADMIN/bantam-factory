@@ -1,6 +1,40 @@
 # DavidAU NEO-CODER MTP versus the current BANTAM 27B
 
-Status: initial matched comparison complete; latest adaptive stream rerun passed 5/5, 2026-09-07. One adaptive pass does not establish launch-wide reliability.
+Status: fresh matched comparison at `ff6616c` complete: control 3/3, DavidAU 2/3, 2026-09-07. The earlier adaptive 5/5 remains recorded; it did not establish repeatable reliability.
+
+## Fresh comparison on the repaired harness
+
+Both stacks reran all three cards once at `ff6616c`, with fresh server starts,
+the same launch settings, unchanged graders, and no candidate intervention.
+DavidAU ran first, then control; this fixed order and single repetition limit
+inference. The original checkout's source and kit seals match throughout both
+suites. Onboarding development occurred in a separate worktree; lightweight
+tests/editing overlapped on the host, but full-suite testing waited until the
+comparison finished. Treat wall time as this pilot's observed time, not a
+noise-free hardware benchmark. All request-token measurements are complete.
+
+| Stack / card | Independent result | Seconds | Input | Output | Cached input | Fresh input |
+|---|---|---:|---:|---:|---:|---:|
+| DavidAU / context-packet | 5/5 PASS | 77.191 | 158186 | 5156 | 135384 | 22802 |
+| Control / context-packet | 5/5 PASS | 96.601 | 236459 | 6523 | 206490 | 29969 |
+| DavidAU / patch-transaction | 5/5 PASS | 72.972 | 130700 | 3118 | 105202 | 25498 |
+| Control / patch-transaction | 5/5 PASS | 94.284 | 211695 | 4997 | 181865 | 29830 |
+| DavidAU / stream-framer | 3/5 FAIL | 282.230 | 514027 | 13148 | 464649 | 49378 |
+| Control / stream-framer | 5/5 PASS | 580.848 | 1358882 | 30723 | 1220808 | 138074 |
+| DavidAU / all attempts | 2/3 cards | 432.393 | 802913 | 21422 | 705235 | 97678 |
+| Control / all attempts | 3/3 cards | 771.733 | 1807036 | 42243 | 1609163 | 197873 |
+
+DavidAU used fewer tokens and less time on both mutually successful cards. Its
+lower overall spend does **not** establish equal-quality productivity: it failed
+field parsing/frame dispatch and termination/finalization on the third card,
+despite an accepted completion receipt. Control passed that card after a long
+repair trajectory. No failed outcome was replaced with the earlier 169.707s pass.
+The requested DavidAU easy-mode download is a product default, not a claim that
+this comparison proves it more reliable. Unsloth was not tested in this comparison.
+
+Private evidence: `.bantam/benchmarks/factory-matched-ff6616c-20260907/`.
+
+## Earlier adaptive follow-ups
 
 Latest follow-up: `stream-obligations6` independently passed all five groups
 in 169.707 seconds with accepted completion and no operator intervention.

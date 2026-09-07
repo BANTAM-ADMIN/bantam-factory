@@ -16,6 +16,7 @@ import readline from "node:readline";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { managedRegistryPath } from './stock-model.js';
 
 // No built-in models: a fresh machine must register its own (via
 // `bantam doctor`, `BANTAM_MODELS`, or the repository's .bantam/models.json). Hardcoding one
@@ -43,8 +44,11 @@ function loadRegistry() {
   }
   // 3) Resolve repo root from the script's own location (works from any cwd)
   const src = defaultModelRegistryPath();
-  try { if (fs.existsSync(src)) return JSON.parse(fs.readFileSync(src, "utf8")); } catch { /* fall back */ }
-  return DEFAULT_MODELS;
+  let local=DEFAULT_MODELS,managed=[];
+  try { if (fs.existsSync(src)) local=JSON.parse(fs.readFileSync(src, "utf8")); } catch { /* fall back */ }
+  try { managed=JSON.parse(fs.readFileSync(managedRegistryPath(),'utf8')); }catch{}
+  if(!Array.isArray(local))local=[];
+  return [...local,...(Array.isArray(managed)?managed:[]).filter(m=>!local.some(x=>x.name===m.name))];
 }
 
 /**

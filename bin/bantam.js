@@ -17,6 +17,8 @@ import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { detectCodex } from "../src/logic/codex-detect.js";
+import { loadConnection, saveConnection, confirmCodexConsent } from '../src/first-run.js';
+import { setupWizard, startManagedStock } from '../src/setup-wizard.js';
 
 // The over-the-ceiling note, once per process. The agent emits grounding_state
 // on EVERY request, and in the REPL the same too-large grounding object is
@@ -773,6 +775,29 @@ if (cmd === "addons") {
   console.log(renderAddons());
   process.exit(0);
 }
+if (cmd === 'setup' && !args.legacy && !args['api-url']) {
+  if (!(process.stdin.isTTY && process.stderr.isTTY) && !(args.yes && typeof args['stock-profile']==='string')) {
+    fail('Interactive setup requires a terminal. For explicit unattended stock installation: bantam setup --stock-profile 72k-cpu-vision --yes. Existing APIs: bantam doctor --api-url URL.');
+  }
+  const choice=typeof args['stock-profile']==='string'
+    ? await setupWizard({...setupWizardOptions(),profile:args['stock-profile'],yes:Boolean(args.yes)})
+    : await promptStartupModelChoice(new ModelClient({}));
+  if(choice?.kind==='local'){
+    const endpoint=choice.model.managed?await startManagedStock(choice.model):await startRegisteredModel(choice.model);
+    if(!endpoint)fail('Stock model did not start. Inspect its log; no existing server was stopped.');
+    // A previous saved cloud/API choice must not hide the newly selected local profile.
+    saveConnection({kind:'local',name:choice.name});
+    console.log(`Ready at ${endpoint}. Run bantamfactory in your project.`);
+  }else if(choice?.kind==='codex'){
+    const c=new ModelClient({codex:true,model:choice.model,codexEffort:choice.effort});
+    if(!await c.health())fail('Codex is unavailable or not signed in. Run codex login, then retry setup.');
+    saveConnection({kind:'codex',model:choice.model,effort:choice.effort,consent:'cloud-context-v1'});
+    console.log('Codex selected. Run bantamfactory in your project.');
+  }else if(choice&&choice.kind!=='api'){
+    fail('This advanced backend is available from the ordinary bantam model menu; setup did not change your connection.');
+  }
+  process.exit(0);
+}
 if (cmd === "doctor" || cmd === "setup") {
   const isHealthy = async (ep) => {
     try { return (await fetch(`${ep}/health`, { signal: AbortSignal.timeout(1500) })).ok; }
@@ -1079,6 +1104,11 @@ let modelOptions = explicitApiRequested || explicitCodexRequested
       apiDialect: undefined,
       deepseek: false,
     });
+const rememberedConnection=loadConnection();
+if (!explicitApiRequested && !explicitCodexRequested && !args.endpoint && !process.env.BANTAM_ENDPOINT) {
+  if(rememberedConnection?.kind==='api')modelOptions={...modelOptions,apiUrl:rememberedConnection.apiUrl,apiKey:args['api-key']??process.env.BANTAM_API_KEY??rememberedConnection.apiKey,model:args.model??rememberedConnection.model,apiDialect:args['api-dialect']??rememberedConnection.dialect,deepseek:false};
+  if(rememberedConnection?.kind==='codex')modelOptions={...modelOptions,codex:true,model:args.model??rememberedConnection.model,codexEffort:args['codex-effort']??rememberedConnection.effort,apiUrl:null};
+}
 let usingCodex = modelOptions.codex === true;
 let usingApi = !usingCodex && modelOptions.apiUrl !== null
   && Boolean(modelOptions.apiUrl || process.env.BANTAM_API_URL);
@@ -1090,12 +1120,17 @@ if (!modelOptions.endpoint && !usingApi && !usingCodex) modelOptions.endpoint = 
 // turns byte-for-byte — see src/chat-transport.js.
 if (args["chat-transport"] === true || envTruthy("BANTAM_CHAT_TRANSPORT")) modelOptions.chatTransport = true;
 let model = new ModelClient(modelOptions);
-// Saved APIs are presets, never startup defaults. When no local server is up,
-// present one explicit choice: start a registered local model, use DeepSeek,
-// or continue without selecting either.
-if (!usingApi && !(await model.health()) && canOfferStartupChoice(cmd)) {
+// Legacy workspace APIs remain presets; first-run user selections are explicit
+// cross-workspace defaults. If the selected backend is unavailable, offer setup.
+if (canOfferStartupChoice(cmd) && (!rememberedConnection || !(await model.health()))) {
   let selection = await promptStartupModelChoice(model);
+  if(!selection)process.exit(0);
   while (selection) {
+    if(selection.kind==='api'){
+      const c=selection.config;
+      modelOptions={...modelOptions,codex:false,apiUrl:c.apiUrl,apiKey:c.apiKey,model:c.model,apiDialect:c.dialect,deepseek:false,endpoint:undefined};
+      model=new ModelClient(modelOptions);usingApi=true;usingCodex=false;break;
+    }
     if (selection.kind === "codex") {
       model.switchToCodex({ model: selection.model, effort: selection.effort });
       if (await model.health()) {
@@ -1108,6 +1143,7 @@ if (!usingApi && !(await model.health()) && canOfferStartupChoice(cmd)) {
         };
         usingCodex = true;
         usingApi = false;
+        saveConnection({kind:'codex',model:selection.model,effort:selection.effort,consent:'cloud-context-v1'});
         saveModelPreference({
           kind: "codex",
           name: selection.name,
@@ -1121,15 +1157,18 @@ if (!usingApi && !(await model.health()) && canOfferStartupChoice(cmd)) {
       continue;
     }
     if (selection.kind === "local") {
-      const started = await startRegisteredModel(selection.model);
+      const started = selection.model.managed?await startManagedStock(selection.model):await startRegisteredModel(selection.model);
       if (started) {
         modelOptions = {
           ...modelOptions,
+          codex: false,
           endpoint: started,
           apiUrl: null,
           deepseek: false,
         };
         model = new ModelClient(modelOptions);
+        usingApi=false;usingCodex=false;
+        saveConnection({kind:'local',name:selection.name});
         // A registry entry may pin the chat profile its model needs (Gemma 4
         // does not speak ChatML). An explicit --profile still outranks it.
         if (selection.model.profile) model.switchTo(started, { profile: selection.model.profile });
@@ -6080,7 +6119,9 @@ bantam models add <name> --script /path/to/launch.sh [--endpoint URL] [--vision]
                                   [--priority N] [--warn "..."] [--notes "..."] [--replace]   (--priority ranks the startup picker)
                                   register a llama.cpp model so the startup picker can launch it (run bare for prompts)
 bantam models remove <name>       unregister a model    ·    bantam models path   print the registry file
-bantam setup [--yes]               one command: install llama-server, download the model, scaffold, launch (= doctor --setup)
+bantam setup                       guided: existing server, Codex, or opt-in DavidAU 24GB stock
+bantam setup --stock-profile 72k-cpu-vision|92k-cpu-vision|72k-gpu-vision [--yes]
+                                  managed Linux/NVIDIA profile; --yes authorizes download and launch
 bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding) with sizes — nothing optional is bundled
 bantam supervise [film.json] [--json]
                                   read a saved run back and draft findings with evidence (see docs/SUPERVISOR.md)
@@ -6139,6 +6180,8 @@ function envTruthy(name) {
 
 function canOfferStartupChoice(command) {
   return Boolean(process.stdin.isTTY && process.stderr.isTTY)
+    && !envTruthy('BANTAM_NO_ONBOARDING')
+    && !args.codex && !args.deepseek && !args['api-url'] && !process.env.BANTAM_API_URL
     && typeof args.endpoint !== "string"
     && !process.env.BANTAM_ENDPOINT
     && (command === undefined || command === "chat" || command === "run");
@@ -6162,8 +6205,21 @@ function deepSeekFallbackOptions() {
   };
 }
 
+function askSetup(question) {
+  const rl=readline.createInterface({input:process.stdin,output:process.stderr});
+  return new Promise(resolve=>rl.question(question,answer=>{rl.close();resolve(answer);}));
+}
+function setupWizardOptions(){
+  return {ask:askSetup,out:s=>process.stderr.write(s),hidden:promptHidden,advanced:true,
+    installLlama:async()=>{execFileSync(process.execPath,[path.join(repoRoot(),'bin','bantam.js'),'doctor','--install-llama','--yes'],{stdio:'inherit'});}};
+}
 async function promptStartupModelChoice(client) {
   if (!process.stdin.isTTY || !process.stderr.isTTY) return null;
+  let first;
+  try{first=await setupWizard(setupWizardOptions());}catch(e){fail(`Setup: ${e.message}`);}
+  if(!first)return null;
+  if(first.kind!=='advanced'&&first.kind!=='choose-codex')return first;
+  const onlyCodex=first.kind==='choose-codex';
   const locals = listModels();
   let catalog = [];
   try { catalog = await client?.listCodexModels?.(); } catch { /* offline fallback */ }
@@ -6171,14 +6227,14 @@ async function promptStartupModelChoice(client) {
   // selecting it can start it. Same models as the app-server, over HTTP, with
   // sessions held open — and reachable from any box on the LAN.
   const bridgeConfig = resolveCodexapiConfig({ env: process.env, settings: loadUserSettings() });
-  if (!bridgeConfig.dir) bridgeConfig.dir = findCodexapiCheckout({ repoRoot: repoRoot(), home: os.homedir() });
-  const bridge = await bridgeStatus(bridgeConfig.url, bridgeConfig.key);
+  if (!onlyCodex && !bridgeConfig.dir) bridgeConfig.dir = findCodexapiCheckout({ repoRoot: repoRoot(), home: os.homedir() });
+  const bridge = onlyCodex ? {reachable:false,models:[]} : await bridgeStatus(bridgeConfig.url, bridgeConfig.key);
   const choices = startupModelChoices({
-    locals,
+    locals: onlyCodex ? [] : locals,
     catalog,
     preference: loadModelPreference(),
     codexapi: codexapiChoices({ status: bridge, config: bridgeConfig, preference: loadModelPreference() }),
-  });
+  }).filter(entry=>!onlyCodex||entry.kind==='codex');
   process.stderr.write("\nNo local model is running. Choose a model:\n");
   choices.forEach((entry, index) => {
     const badges = [
@@ -6197,7 +6253,9 @@ async function promptStartupModelChoice(client) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
   const answer = await new Promise((resolve) => rl.question(lit ? `Select [${choices.indexOf(lit) + 1}]: ` : "Select: ", resolve));
   rl.close();
-  return resolveStartupModelChoice(choices, answer, { enterSelectsRecommended: Boolean(lit) });
+  const selected=resolveStartupModelChoice(choices, answer, { enterSelectsRecommended: Boolean(lit) });
+  if(selected?.kind==='codex'&&!await confirmCodexConsent({ask:askSetup,out:s=>process.stderr.write(s),model:selected.model}))return null;
+  return selected;
 }
 
 async function promptHidden(question) {

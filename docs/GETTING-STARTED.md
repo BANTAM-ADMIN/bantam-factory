@@ -58,6 +58,12 @@ Read both results: a reachable server is not proof that it enforces a grammar
 or schema. A failed constraint check means the generation guarantee is absent.
 See the [runtime guide](MODEL-RUNTIMES-AND-IMPROVEMENT.md) for provider selection.
 
+For a guided connection remembered across project folders, run
+`node bin/bantam.js setup` and choose **Use an existing model server**. It scans
+common localhost ports or accepts your IP/port, asks for the backend/model, and
+requests consent before a tiny compatibility inference. An installed Codex CLI
+is a separate option. See [First-run setup](FIRST-RUN-SETUP.md).
+
 ## Path B — you have a GPU and nothing else
 
 ```bash
@@ -65,13 +71,17 @@ npm ci                # if you haven't already
 node bin/bantam.js setup
 ```
 
-One command, with consent at every step: prebuilt llama.cpp (~50 MB, no
-compiler needed), the stock Apache-2.0 Qwen 3.8 27B (~19 GB, resumable
-download), and a start script using our **measured** launch configuration —
-every flag annotated with why. Needs ~24 GB VRAM for the default model.
+Choose **Easy mode** to install the community-tuned DavidAU 27B Q4_K_S and its
+matching vision projector (18.47 GB decimal), with revision/hash verification
+and explicit download consent. Managed installation currently requires Linux
+and a detected NVIDIA GPU of approximately 24GB or more. It reuses an existing
+llama-server or offers the prebuilt runtime installer.
 
-`node bin/bantam.js addons` shows the optional extras (vision input, faster
-generation) with sizes. Nothing optional ever downloads silently.
+Choose 72K/CPU vision (baseline), 92K/CPU vision, or 72K/GPU vision. The latter
+two require machine-specific fit qualification; they are not universal 24GB
+guarantees. MTP is embedded; do not install the legacy add-on sidecar for this
+model. No existing model/server is replaced. See the first-run guide for runtime,
+disk-space and platform limits. Bring-your-own servers remain the primary path.
 
 ## Your first task
 

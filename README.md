@@ -90,8 +90,8 @@ median is 45s against 137s, and it is the faster of the two on 32 of 34; the
 two it loses are on the board.
 
 **What the board was fought on.** The BANTAM corners ran a Qwen 3.8 27B
-fine-tune (Apache-2.0, Q4_K_M) rather than the stock `ggml-org` conversion
-`bantam setup` installs, and in `--context-mode extension`, which is **not**
+fine-tune (Apache-2.0, Q4_K_M) rather than the DavidAU Q4_K_S easy-mode bundle
+now offered by `bantam setup`, and in `--context-mode extension`, which is **not**
 the shipped default. The harness is model-agnostic — any Qwen 3.x GGUF, or any
 OpenAI-compatible endpoint, drives the same loop — but a different model or a
 different mode will not reproduce these exact numbers. Extension in particular
@@ -127,14 +127,24 @@ node bin/bantam.js doctor --api-url http://HOST:PORT/v1
 node bin/bantam.js                                 # interactive REPL
 ```
 
-**Starting from nothing but a GPU?** One command installs the add-ons
-(prebuilt llama.cpp ~50 MB + stock Apache-2.0 Qwen 3.8 27B, ~19 GB — sizes
-shown, consent asked, downloads resumable), scaffolds the certified launch
-profile, and starts the server:
+**First use:** setup offers an existing server first (bounded localhost scan
+or manual IP/port), an installed Codex CLI, or an optional DavidAU 27B easy-mode
+bundle for Linux with a 24GB NVIDIA GPU. First interactive startup asks even
+when a server is already running. Nothing is downloaded or granted cloud access
+merely by opening the chooser. Codex has a separate context-sharing/quota consent
+step. Approved connections are remembered across project folders.
 
 ```bash
 node bin/bantam.js setup
 ```
+
+Easy mode downloads revision-pinned, SHA-256-checked DavidAU Q4_K_S weights and
+their BF16 vision projector (18.47 GB decimal combined), and offers a runtime
+install if needed. Choose **72K / CPU vision** (baseline), **92K / CPU vision**,
+or **72K / GPU vision**. The latter two require a machine-specific fit check;
+24GB capacity alone is not a promise of fit. MTP is embedded in these weights.
+Existing model files, launch configurations, and serving processes are not
+replaced. See [First-run setup](docs/FIRST-RUN-SETUP.md) for requirements and limits.
 
 Then, from any project directory:
 
@@ -143,13 +153,13 @@ node /path/to/bantam/bin/bantam.js run --task "fix the failing test" \
   --verify "npm test" --autonomous --save-run=.bantam/runs/first-repair.json
 ```
 
-`bantam addons` lists everything optional — vision input and the MTP
-speculative-decoding sidecar — with sizes and install commands.
-Nothing optional is ever bundled.
+`bantam addons` lists legacy optional add-ons; those separate MTP/projector
+downloads are not companions for the managed DavidAU bundle. Nothing is vendored.
 
 The harness ships with **no model, no weights, no bundled inference server**.
-Optional add-ons (installed on request by `doctor --setup`, never vendored):
-a llama.cpp build with a measured, certified launch profile for local models.
+Easy-mode components are installed only on request. Advanced `doctor --setup`
+and `doctor --provision` retain the older generic provisioning path; they do
+not install this managed DavidAU profile.
 With a local model and local tools, inference stays on your machine. Choosing a
 hosted model or an external image tool sends the relevant prompts and context
 to that provider. Docker shell network access is **off by default**; interactive

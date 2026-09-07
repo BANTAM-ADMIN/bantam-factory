@@ -1,5 +1,6 @@
 import path from "node:path";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
+import { canonicalAuditCommand } from "./contract-audit-recovery.js";
 
 // This is a pre-execution workflow guard, not assertion recognition or proof
 // promotion. The caller supplies a CURRENT settled audit witness and inventories
@@ -33,7 +34,11 @@ function literalFlatSequence(command) {
 }
 
 function directWitnessScript(command) {
-  if (typeof command !== "string" || command.length > 4096 || !literalFlatSequence(command)
+  if (typeof command !== "string" || command.length > 4096) return null;
+  // Only the locator is normalized. The proof-backed witness returned below
+  // retains its exact executed command, including benign stderr redirection.
+  command = canonicalAuditCommand(command);
+  if (!command || !literalFlatSequence(command)
       || hasShellControlOutsideQuotes(command)) return null;
   const words = splitShellWords(command);
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) words.shift();

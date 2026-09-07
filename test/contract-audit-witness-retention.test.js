@@ -65,6 +65,19 @@ test("the witness must be one known direct script launcher, not inline code or a
   }
 });
 
+test("a proof-backed merged launcher retains its new check without rewriting the original witness", () => {
+  for (const command of ["node final-check.mjs 2>&1", " \nnode final-check.mjs\t2>&1 \n"]) {
+    const witness = { ...options.witness, command }, input = { ...options, witness };
+    const before = JSON.stringify(input), result = protectedAuditWitnessCleanupRefusal("rm -f final-check.mjs", input);
+    assert.equal(result?.path, "final-check.mjs");
+    assert.deepEqual(result.witness, witness);
+    assert.equal(JSON.stringify(input), before);
+  }
+  for (const command of ["node final-check.mjs 2>&1; echo PASS", "node final-check.mjs | tail 2>&1",
+    "node final-check.mjs 2>&1 2>&1", "node 'final-check.mjs 2>&1", "node final-check.mjs\\ 2>&1"])
+    assert.equal(protectedAuditWitnessCleanupRefusal("rm -f final-check.mjs", { ...options, witness: { ...options.witness, command } }), null, command);
+});
+
 test("opaque deletion paths and shell setup are not guessed, while literal redirection in a later suffix is harmless", () => {
   for (const command of ["cd /tmp && rm -f final-check.mjs", "eval 'cd /tmp'; rm -f final-check.mjs",
     "source setup.sh; rm -f final-check.mjs", "sh -c 'rm -f final-check.mjs'", "rm -f $CHECK", "rm -f *.mjs",

@@ -22,7 +22,7 @@ export function contractAuditPhaseState(pending, {
     ? "The separate public CLI process check is still missing, stale, or failing. Repair a demonstrated source or fixture defect and run the configured verifier; the controller will execute its fixed real-CLI check. API-only green cannot substitute for CLI evidence."
     : pending.needsFocused === true
     ? pending.focusedCheckRecovery === "standalone-node-file" ? STANDALONE_NODE_CHECK
-      : "Next: execute a direct assertion against the actual API or CLI and the public contract. Create or repair the check separately if needed; printouts and broad-suite green do not replace this focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
+      : "Next: run a direct assertion against the actual API or CLI and the public contract. Prefer an existing focused check or one minimal witness for the hypothesis. Use node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion; a final 2>&1 stderr merge is allowed. Create or repair the check separately if needed. Printouts and broad-suite green do not replace focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
     : `Focused proof is accepted for the current tree. Next: run ${commandText ? `exactly the configured project verifier ${commandText}` : "the exact configured project verifier"}, directly, on that unchanged tree. Do not repeat the focused check.`;
   return { active: true, excludeVerbs, note: [
     "CONTRACT AUDIT PHASE: completion is not yet available; required current execution evidence is missing.",
@@ -62,7 +62,7 @@ export function contractAuditDecisionContext(pending, witness = null) {
     if (command) text += ` Earlier successful check ${command} belongs to generation ${stale.generation}, NOT this tree.`;
     if (removed.length) text += ` Removed files: ${removed.map(p => literal(p)).join(", ")}. Recreate the assertion check or use a direct inline assertion against the public API; do not rerun a missing file.`;
     else if (command) text += ` Next: rerun ${command} directly against the current tree. If it fails, repair the demonstrated defect and rerun it.`;
-    else text += " Next: execute a direct assertion against the actual API or CLI and the public contract. Create the check separately if needed.";
+    else text += " Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not.";
     text += " Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away.";
   } else if (pending.needsProject === true) {
     phase = "project";

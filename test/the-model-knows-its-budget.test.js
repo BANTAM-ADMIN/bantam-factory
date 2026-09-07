@@ -84,7 +84,10 @@ test("a green auto-verify puts the land instruction before the TAP wall", async 
   const green = r.turns.map((x) => String(x.observation ?? "")).find((o) => /\[auto-verify\][^]*PASS/.test(o));
   assert.ok(green, "an auto-verify green must occur");
   const block = green.slice(green.indexOf("[auto-verify]"));
-  const close = block.indexOf("do not keep editing a green tree");
+  const close = block.indexOf("do not edit or delete files merely to tidy a green tree");
   assert.ok(close >= 0 && close < 300,
     `the land instruction must lead, not trail: found at ${close}`);
+  assert.match(block, /Follow any current verification workflow for additional required proof/);
+  assert.match(block, /If the task is complete and no proof is pending, request DONE/);
+  assert.doesNotMatch(block, /remove any scratch files and emit done/);
 });

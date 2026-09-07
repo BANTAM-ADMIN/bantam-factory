@@ -20,26 +20,26 @@ async function freshExec() {
 test("a green print-only node -e probe gets the assertion nudge", async () => {
   const exec = await freshExec();
   const r = await exec.execute({ a: "shell", c: `node -e 'for (const s of ["a b"]) console.log(s, "=>", s.replace(/ /, "-"))'` });
-  assert.match(r.observation, /\[gauge\] This probe only prints/);
+  assert.match(r.observation, /\[gauge\] Printed values alone/);
   assert.match(r.observation, /assert/);
 });
 
 test("a probe that already asserts is left alone", async () => {
   const exec = await freshExec();
   const r = await exec.execute({ a: "shell", c: `node -e 'const assert = require("node:assert"); assert.equal(1, 1); console.log("ok")'` });
-  assert.doesNotMatch(r.observation, /\[gauge\] This probe only prints/);
+  assert.doesNotMatch(r.observation, /\[gauge\]/);
 });
 
 test("a failing probe is already loud — no nudge", async () => {
   const exec = await freshExec();
   const r = await exec.execute({ a: "shell", c: `node -e 'console.log("x"); process.exit(1)'` });
-  assert.doesNotMatch(r.observation, /\[gauge\] This probe only prints/);
+  assert.doesNotMatch(r.observation, /\[gauge\]/);
 });
 
 test("ordinary shell commands never get the nudge", async () => {
   const exec = await freshExec();
   const r = await exec.execute({ a: "shell", c: "echo hello && ls" });
-  assert.doesNotMatch(r.observation, /\[gauge\] This probe only prints/);
+  assert.doesNotMatch(r.observation, /\[gauge\]/);
 });
 
 test("the nudge is capped at two per run", async () => {
@@ -48,7 +48,7 @@ test("the nudge is capped at two per run", async () => {
   const first = await exec.execute({ a: "shell", c: probe });
   const second = await exec.execute({ a: "shell", c: probe + " # again" });
   const third = await exec.execute({ a: "shell", c: probe + " # third" });
-  assert.match(first.observation, /\[gauge\] This probe only prints/);
-  assert.match(second.observation, /\[gauge\] This probe only prints/);
-  assert.doesNotMatch(third.observation, /\[gauge\] This probe only prints/);
+  assert.match(first.observation, /\[gauge\] Printed values alone/);
+  assert.match(second.observation, /\[gauge\] Printed values alone/);
+  assert.doesNotMatch(third.observation, /\[gauge\]/);
 });

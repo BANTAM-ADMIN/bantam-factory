@@ -22,8 +22,8 @@ test("repeated real compound checks remain unknown until a retained standalone a
   const { result, prompts, requests } = await run(workspace, [EDIT, VERIFY,
     compound("UNTRUSTED_FIRST_CHECK_PASSED"), compound("UNTRUSTED_SECOND_CHECK_PASSED"),
     { a: "write_file", p: "check-contract.mjs", content: script },
-    // Creating the check advances source generation; let the second independent
-    // audit run before (not after) the focused assertion that must discharge it.
+    // Creating a check advances workspace generation, but is not a production
+    // change and must not reopen the independent source review.
     VERIFY,
     { a: "shell", c: "node check-contract.mjs\n" }, DONE], {
     maxTurns: 12, promptTrajectory: "extension", shellSandbox: live ? "docker" : "host",
@@ -40,7 +40,9 @@ test("repeated real compound checks remain unknown until a retained standalone a
   assert.match(current, /separate permitted shell action run only node check-contract.mjs/);
   assert.match(current, /printed pass messages are not proof/);
   assert.ok(!requests[4].jsonSchema.properties.a.enum.includes("done"));
-  assert.equal(result.turns[5].contractStateAudit.status, "report");
+  assert.equal(result.turns[5].contractStateAudit, undefined);
+  assert.equal(result.turns.filter(turn => turn.contractStateAudit).length, 1,
+    "an assertion-only file must not reopen the unchanged product audit");
   assert.equal(result.turns[6].verificationReceipts.entries.length, 2, result.turns[6].observation);
   assert.equal(result.turns[6].parsedAction.c, "node check-contract.mjs\n", "real trailing LF survives the authored action");
   assert.equal(result.turns[6].verificationReceipts.entries[0].shellExecution.executedCommand.trim(), "node check-contract.mjs");

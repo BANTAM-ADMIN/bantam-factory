@@ -1380,11 +1380,12 @@ export class Executor {
     // Card 18 (slugline): a node -e probe PRINTED the defect ("hi-there-",
     // trailing dash in plain sight) and the model checkmarked the contract
     // anyway — the symbolic trace outvoted the evidence on the screen. A
-    // printout cannot fail; an assertion can. Nudge green print-only probes
-    // toward the form the runner can gauge. Capped at two per run.
+    // Printed values alone are not a comparison against the contract. This is
+    // conservative advice, not proof that arbitrary inline code cannot fail.
+    // Explicit throw/exit/failure paths suppress it. Capped at two per run.
     if (code === 0 && (this._printProbeSteers ?? 0) < 2 && isPrintOnlyProbe(c) && (res.stdout ?? "").trim()) {
       this._printProbeSteers = (this._printProbeSteers ?? 0) + 1;
-      out += `\n[gauge] This probe only prints — a wrong value cannot fail here, it just scrolls past. Re-read each printed value against the contract before trusting it, or rerun these cases as assertions (node:assert / a test file) so a mismatch stops the line.`;
+      out += `\n[gauge] Printed values alone do not establish that the public contract holds. If these values are diagnostics rather than checked results, compare them explicitly with the expected result or use assertions (node:assert / a test file) so a mismatch fails the check. This reminder is not a finding that the program lacks another failure path.`;
     }
     if (res.timedOut) {
       const secs = Math.round(timeoutMs / 1000);
@@ -1465,13 +1466,15 @@ function removeIfExists(file) {
   try { fs.unlinkSync(file); } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
 
-// A probe that only prints leaves verification to the reader's eyes; card 18
-// showed those eyes checkmarking a contract the output visibly violated.
+// A bounded lexical nudge only, never a proof classifier. Conditional throws,
+// explicit failure helpers and exit-status assignments can check results even
+// without the substring "assert". Unknown/delegated code may also fail, so the
+// observation must not claim otherwise merely because this heuristic missed it.
 function isPrintOnlyProbe(command) {
   const evalProbe = /\bnode\s+(--eval|-e)\b/.test(command) || /\bpython3?\s+-c\b/.test(command);
   if (!evalProbe) return false;
   const prints = command.includes("console.log(") || command.includes("print(");
-  return prints && !/assert/i.test(command);
+  return prints && !/assert|\b(?:throw|raise|fail|reject)\b|\bprocess\s*\.\s*(?:exit|exitCode)\b|\bsys\s*\.\s*exit\b|\bos\s*\.\s*_exit\b/i.test(command);
 }
 
 function clipShellObservation(s, command) {

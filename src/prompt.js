@@ -156,7 +156,7 @@ function contextUpdatePromptBlocks(updates, template) {
 export function contractAuditPromptText(audit, template = CHATML_TEMPLATE) {
   if (!audit || typeof audit !== "object" || Array.isArray(audit)
       || audit.status !== "report" || audit.focus !== "collection-preconditions"
-      || audit.outputFormat !== "collection-findings-v1" || audit.advisory !== true
+      || !["collection-findings-v1", "collection-findings-v2"].includes(audit.outputFormat) || audit.advisory !== true
       || !Number.isSafeInteger(audit.generation) || audit.generation < 0
       || !/^[a-f0-9]{64}$/.test(audit.promptSha256 ?? "")
       || !/^[a-f0-9]{64}$/.test(audit.taskSha256 ?? "")

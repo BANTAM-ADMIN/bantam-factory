@@ -33,7 +33,8 @@ import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote 
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
-import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, sameAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { contractAuditMeasuredFacts } from "./contract-audit-measured-facts.js";
 import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
 import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
 import { protectedAuditWitnessCleanupRefusal } from "./contract-audit-witness-retention.js";
@@ -194,7 +195,7 @@ import { decidePlanAudit, repositoryDocumentContractCue } from "./plan-audit-pol
 import { decideSeamSteer, SEAM_STEER_TIP } from "./seam-steer.js";
 import { scaledReconLimit, scaledProgressNudgeAfter } from "./recon-budget.js";
 import { ReadLedger } from "./read-ledger.js";
-import { budgetTurns } from "./history-budget.js";
+import { budgetTurns, createHistoryWindow } from "./history-budget.js";
 import { extractLoci, renderLoci, isUnbalanced, renderEditRegion } from "./failure-locus.js";
 import { deliverableCommand, invokesCommand, smokeNudge } from "./smoke-run.js";
 import { checkEditedApi } from "./api-check.js";
@@ -1845,10 +1846,14 @@ async function runAgentCore({
   // fragment; cleared as soon as a valid action parses. A first attempt is
   // never penalised, because repeated tokens are correct in code.
   let degeneratePenalty = 0;
-  const capTurns = (h) => budgetTurns(
-    Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h,
-    { charBudget: historyCharBudget, pinHead: extensionTrajectory },
-  );
+  const historyWindow = extensionTrajectory ? createHistoryWindow({
+    charBudget: historyCharBudget, pinHead: true,
+    onRebase: receipt => {
+      if (receipt.overflow) metrics.extensionHistoryRebases = (metrics.extensionHistoryRebases ?? 0) + 1;
+      onEvent({ type: "extension_history_rebase", ...receipt });
+    },
+  }) : h => budgetTurns(h, { charBudget: historyCharBudget });
+  const capTurns = h => historyWindow(Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h);
   // Count the rendered bytes, not an annotation that might have been clipped.
   // This boundary is the exact prompt passed to ModelClient, NOT evidence that
   // a remote server accepted or attended to it. Raw request films independently
@@ -3282,11 +3287,12 @@ async function runAgentCore({
     // reads, unrelated commands, subsequent repeats and caller guards stay put.
     const auditCheckRepeat = auditRecovery && action.a === "shell"
       && ((auditRecovery.needsFocused && isFocusedAuditCommand(action.c, verificationScript))
-        || (auditRecovery.needsProject && verificationScript && String(action.c).trim() === verificationScript.trim()))
+        || (auditRecovery.needsProject && verificationScript && isConfiguredAuditCommand(action.c, verificationScript)))
       && !turns.slice(Math.max(auditRecovery.turn,
-        auditRecovery.needsProject && String(action.c).trim() === String(verificationScript).trim()
+        auditRecovery.needsProject && isConfiguredAuditCommand(action.c, verificationScript)
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
-        turn.shellExecution && (turn.shellExecution.command === action.c || turn.shellExecution.executedCommand === action.c));
+        turn.shellExecution && (sameAuditCommand(turn.shellExecution.command, action.c)
+          || sameAuditCommand(turn.shellExecution.executedCommand, action.c)));
     const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditWitnessRefusal && !nodeCheckRefusal
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
@@ -4872,7 +4878,7 @@ async function runAgentCore({
         // Verdict-aware close: a PASS means the model can LAND (the migreduce
         // spiral reached green mid-run but kept editing); only a non-pass says "fix".
         const close = r.code === 0
-          ? `The tests PASS. If your change is complete, remove any scratch files and emit done — do not keep editing a green tree.`
+          ? `The configured tests PASS. Keep intended regression checks; do not edit or delete files merely to tidy a green tree. Follow any current verification workflow for additional required proof. If the task is complete and no proof is pending, request DONE; other completion gates still apply.`
           : `Use this result to fix what is still failing; do not keep editing blindly.`;
         // On green, the close LEADS: it is the only actionable sentence, and
         // trailing it after ~2,000 chars of ok-lines buried it — tb33 received
@@ -5480,7 +5486,11 @@ async function runAgentCore({
         onEvent({ type: "contract_state_audit_start", generation: workspaceEditGeneration, number: contractAudits });
         try {
           result.contractStateAudit = await runContractStateAudit({ model, task,
-            documents: suppliedTaskDocuments, ...auditSources, generation: workspaceEditGeneration, signal });
+            documents: suppliedTaskDocuments, ...auditSources, generation: workspaceEditGeneration, signal,
+            measuredFacts: contractAuditMeasuredFacts({ generation: workspaceEditGeneration,
+              sources: auditSources.sources, cliContract, cliReceipt: cliVerification,
+              projectEvidence: verificationReceipt(result.verificationEvidence) }),
+          });
         } catch (error) {
           if (signal?.aborted) { markInterrupted("contract_state_audit"); break; }
           throw error;

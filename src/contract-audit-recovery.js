@@ -52,11 +52,41 @@ function sameRecordedCommand(a, b) {
   return normalized !== null && normalized === recordedCommandText(b);
 }
 
+// Recognition/dedup identity only; receipts and executed bytes stay untouched.
+// One terminal literal stderr merge changes neither argv nor exit status. It
+// is not a pipeline, a file redirect, or permission to normalize a compound
+// command. Locate its whitespace delimiter outside quotes AND escapes before
+// removing it; quoted "2>&1" remains an argument and open quotes fail closed.
+export function canonicalAuditCommand(command) {
+  let text = recordedCommandText(command);
+  if (!text) return null;
+  const merge = /[ \t]+2>&1$/.exec(text);
+  if (merge) {
+    let quote = null;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === "\\" && quote !== "'") { i++; continue; }
+      if (quote) { if (ch === quote) quote = null; continue; }
+      if (ch === "'" || ch === '"') { quote = ch; continue; }
+      if (i === merge.index) {
+        text = recordedCommandText(text.slice(0, i));
+        break;
+      }
+    }
+  }
+  return text && !hasShellControlOutsideQuotes(text)
+    && verificationShellStatusRisk(text) === null ? text : null;
+}
+
+export function sameAuditCommand(a, b) {
+  const normalized = canonicalAuditCommand(a);
+  return normalized !== null && normalized === canonicalAuditCommand(b);
+}
+
 function wordsForDirectCommand(command) {
-  command = recordedCommandText(command);
-  if (!command || hasShellControlOutsideQuotes(command)
-      || verificationShellStatusRisk(command) !== null) return null;
-  const words = splitShellWords(command);
+  const normalized = canonicalAuditCommand(command);
+  if (!normalized) return null;
+  const words = splitShellWords(normalized);
   return words.length ? words : null;
 }
 
@@ -77,6 +107,13 @@ function sameConfiguredExecution(actual, configured) {
   const timeout = /^--test-timeout=([1-9]\d*)$/.exec(a[2] ?? "");
   if (!timeout || Number(timeout[1]) < 5000 || Number(timeout[1]) > 60000) return false;
   return a.filter((_, index) => index !== 2).every((word, index) => word === b[index]);
+}
+
+// Used by the pending-audit repeat exception as well as receipt recognition.
+// A matching string alone is not execution proof or completion authority.
+export function isConfiguredAuditCommand(actual, configured) {
+  return typeof configured === "string" && Boolean(configured.trim())
+    && sameConfiguredExecution(actual, configured);
 }
 
 // Recognition only: never rewrite or re-execute a shell program. A successful
@@ -465,7 +502,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
         }
         if (proof && configured && sameConfiguredExecution(command, configured)) {
           const controller = proof.source !== "shell";
-          if (proof.configuredCommand !== configured
+          if ((proof.configuredCommand !== configured && (controller || proof.configuredCommand != null))
               || (controller && (!sameCommand(proof.command, configured) || !sameConfiguredExecution(proof.executedCommand, configured)))
               || (controller && typeof verificationWorkspaceReadOnly === "boolean"
                 && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(); continue; }
@@ -504,7 +541,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
       projectTurn = index; projectOrder = at;
       const controller = proof.source !== "shell";
       projectWitnessValid = orderedReceiptCommand(proof, shell, { generation, workspace }) === command
-        && proof.configuredCommand === configured
+        && (proof.configuredCommand === configured || (!controller && proof.configuredCommand == null))
         && (!controller || (sameCommand(proof.command, configured) && sameConfiguredExecution(proof.executedCommand, configured)))
         && (!controller || typeof verificationWorkspaceReadOnly !== "boolean"
           || proof.workspaceReadOnly === verificationWorkspaceReadOnly);

@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { canonicalEncode } from "../src/factory/fact-fabric.js";
 import { deriveCliContract, buildCliAssertionProbe } from "../src/contract-cli-assertion-spec.js";
 import { cliVerificationPassed, cliVerificationDecisionContext, validateCliCaseMeasurements } from "../src/contract-cli-verification.js";
+import { contractAuditMeasuredFacts } from "../src/contract-audit-measured-facts.js";
 
 const sha = value => crypto.createHash("sha256").update(value).digest("hex");
 const digest = value => sha(canonicalEncode(value));
@@ -64,6 +65,38 @@ test("current fixed CLI receipt derives a scoped pass and ignores cached project
   assert.equal(cliVerificationDecisionContext(contract, receipt, options), null);
   assert.equal(cliVerificationPassed(contract, JSON.parse(before), options), true, "serialized receipts retain their binding");
   assert.equal(JSON.stringify(receipt), before, "validation does not change saved measurements");
+});
+
+test("independent audit context carries only validated current-source CLI measurements", () => {
+  const { contract, receipt } = fixture();
+  const args = { generation: 3, sources: receipt.sources, cliContract: contract, cliReceipt: receipt };
+  const facts = contractAuditMeasuredFacts(args);
+  assert.equal(facts.length, 3);
+  assert.deepEqual(facts.map(f => [f.case, f.status, f.exitCode]), [
+    ["valid-input", "pass", 0], ["missing-argument", "pass", 2], ["extra-argument", "pass", 2],
+  ]);
+  assert.ok(facts.every(f => f.receiptSha256 === digest(receipt)));
+  assert.ok(facts.every(f => !Object.hasOwn(f, "stdout") && !Object.hasOwn(f, "candidateVerified")));
+  assert.deepEqual(contractAuditMeasuredFacts({ ...args, generation: 4 }), []);
+  assert.deepEqual(contractAuditMeasuredFacts({ ...args, sources: [{ path: "tool.mjs", sha256: sha("changed") }] }), []);
+  const wrong = structuredClone(receipt);
+  wrong.probeEvidence.stages[2].stdout += "invented measurement";
+  assert.deepEqual(contractAuditMeasuredFacts({ ...args, cliReceipt: wrong }), []);
+});
+
+test("audit project facts preserve measured scope and reject stale, masked, empty or failed evidence", () => {
+  const sources = [{ path: "tool.mjs", sha256: sha(SOURCE) }];
+  const proof = { schema: 1, source: "automatic", generation: 3, status: "pass", exitCode: 0,
+    statusScope: "execution", configuredCommand: "npm test", outputSha256: sha("test output"),
+    workspaceReadOnly: true, counts: { passed: 4, failed: 0, total: 4 } };
+  const args = { generation: 3, sources, projectEvidence: proof };
+  assert.deepEqual(contractAuditMeasuredFacts(args), [{ kind: "project-verification", generation: 3,
+    sources, receiptSha256: digest(proof), status: "pass", exitCode: 0, command: "npm test",
+    workspaceReadOnly: true, counts: proof.counts }]);
+  for (const change of [{ generation: 2 }, { status: "fail" }, { invalidated: true }, { exitCode: 1 },
+    { statusScope: "final-configured-command" }, { counts: { passed: 0, failed: 0, total: 0 } }]) {
+    assert.deepEqual(contractAuditMeasuredFacts({ ...args, projectEvidence: { ...proof, ...change } }), []);
+  }
 });
 
 test("API-only, project-pass, echoed prose and malformed station receipts cannot prove the CLI", () => {

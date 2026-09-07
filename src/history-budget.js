@@ -57,6 +57,88 @@ export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
   }
 }
 
+// Extension-only hysteresis. Keep one retained boundary while new evidence
+// fits; at hard overflow leave room for subsequent turns instead of sliding
+// the prefix on every request. Views still use the existing pointer-safe
+// compactor, and evidence objects are never changed. Rebuild callers retain
+// budgetTurns' existing stateless behavior.
+export function createHistoryWindow({ charBudget = 120000, pinHead = true,
+  retainRatio = 2 / 3, onRebase = null } = {}) {
+  if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
+    throw new Error("history retainRatio must be between zero and one");
+  }
+  const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 120000);
+  const target = Math.floor(limit * retainRatio);
+  let origin = null, cutoff = null, previousNewest = null, previousLength = 0;
+  let previousChars = 0, previousKeyKind = null, lastOverflow = null;
+  return function historyWindow(turns) {
+    const list = Array.isArray(turns) ? turns : [];
+    if (!list.length) {
+      origin = cutoff = previousNewest = previousKeyKind = lastOverflow = null;
+      previousLength = previousChars = 0;
+      return [];
+    }
+    const ids = list.map(turn => turn?.i);
+    let realCount = 0;
+    while (realCount < ids.length && Number.isSafeInteger(ids[realCount]) && ids[realCount] >= 0
+        && (!realCount || ids[realCount] > ids[realCount - 1])) realCount++;
+    // repairObs/WRAP_UP_NOTE are transient unnumbered trailing context, not a
+    // different transcript or a new real turn. Their appearance/removal must
+    // not reset the cutoff and reintroduce already-evicted history.
+    const hasIds = realCount > 0 && ids.slice(realCount).every(id => id == null);
+    const keyKind = hasIds ? "turn-id" : "position";
+    const keys = hasIds ? ids.map((id, i) => i < realCount ? id : ids[realCount - 1] + i - realCount + 1)
+      : list.map((_, i) => i);
+    const first = list[0];
+    const identity = JSON.stringify([keyKind, first?.i ?? null, first?.rawOutput ?? null,
+      first?.parsedAction ?? first?.action ?? null, first?.observation ?? null]);
+    const newest = hasIds ? ids[realCount - 1] : keys.at(-1), oldCutoff = cutoff;
+    const realLength = hasIds ? realCount : list.length;
+    const reset = origin !== null && (identity !== origin || keyKind !== previousKeyKind)
+      ? "origin-changed" : origin !== null && (newest < previousNewest || realLength < previousLength)
+        ? "rewind" : null;
+    if (reset) { cutoff = null; lastOverflow = null; }
+    origin = identity;
+    let start = cutoff === null ? 0 : keys.findIndex(key => key >= cutoff);
+    if (start < 0) start = list.length - 1;
+    const retained = pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start);
+    let window = compactHistory(retained);
+    const beforeChars = window.reduce((total, turn) => total + turnSize(turn), 0);
+    let afterChars = beforeChars, overflow = false;
+    if (beforeChars > limit) {
+      overflow = true;
+      window = budgetTurns(retained, { charBudget: target, pinHead });
+      // budgetTurns keeps a contiguous suffix (plus the optional pinned head).
+      // Its views may be new objects, so locate that suffix by count, not object
+      // identity; never resurrect turns excluded by the previous boundary.
+      const tailCount = window.length - (pinHead ? 1 : 0);
+      start = pinHead && tailCount === 0 ? 0 : list.length - Math.max(1, tailCount);
+      if (hasIds && realCount < list.length && start >= realCount) {
+        // Keep the latest actual causal turn as well as its transient steer.
+        // The cutoff always names real evidence, never a synthetic position
+        // that could later be reused by the next worker turn.
+        start = realCount - 1;
+        window = compactHistory(pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start));
+      }
+      cutoff = keys[start];
+      afterChars = window.reduce((total, turn) => total + turnSize(turn), 0);
+    }
+    const signature = overflow ? `${newest}:${cutoff}:${afterChars}` : null;
+    if (typeof onRebase === "function" && (reset || (overflow && signature !== lastOverflow))) {
+      onRebase({ reason: reset ?? "overflow", overflow, keyKind,
+        cutoffBefore: oldCutoff, cutoffAfter: cutoff,
+        hardCharBudget: limit, targetCharBudget: target, beforeChars, afterChars,
+        previousChars, retainedTurns: window.length, newest,
+        // The pinned origin/newest causal turn are mandatory, as in budgetTurns.
+        oversizedRequiredTurns: afterChars > limit });
+    }
+    previousNewest = newest; previousLength = realLength;
+    previousKeyKind = keyKind; previousChars = afterChars;
+    lastOverflow = signature;
+    return window;
+  };
+}
+
 function firstKeptIndex(compacted, limit, { pinHead = false } = {}) {
   // pinHead: never evict turn 0. The first turn is the task's own grounding (the
   // spec read, the repo map) and the least droppable bytes in the run; evicting

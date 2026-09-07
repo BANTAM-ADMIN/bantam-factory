@@ -135,7 +135,7 @@ test('single workshop comparison scopes four actual corners without legacy task,
   assert.match(prose,/No held-out-task claim is made/);
   assert.match(share,/1 work order · 4 systems · 4\/4 attempts recorded/);
   assert.match(share,/3\/4 artifacts accepted/);
-  for(const label of ['BANTAM · 27B','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);
+  for(const label of ['BANTAM · local','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);
   for(const text of [prose,share])assert.doesNotMatch(text,
     /DeepSeek|BANTAM · Astra|wrapped CLI|receipt reducer|snapshot tool|dependency planner|three (?:tasks|work orders)|six[- ]system|two Astra|frontier work overlapped|CPU\/I\/O contention|\d+(?:\.\d+)?\s*%\s*less|less recorded time|BANTAM finished .*sooner/i);
   const hermes=embedded(html).series[0].cards[0].rows.find(row=>row.arm==='hermes');

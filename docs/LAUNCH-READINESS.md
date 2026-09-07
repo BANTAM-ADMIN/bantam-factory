@@ -14,15 +14,25 @@ The [privacy audit record](PRIVACY-RELEASE-AUDIT.md) records checks and remainin
 |---|---|---|
 | Existing llama.cpp first | Guided discovery/manual URL, consent, saved connection, real HTTP adapter regression tests | Fresh-machine exercise against multiple runtime versions; remote recorded-card support |
 | Other OpenAI-compatible APIs | Explicit dialect/model/key selection and tiny constrained-response check | Provider matrix, authenticated remote comparison recording, clear unsupported-capability handling |
-| Existing Codex account | Explicit context/quota consent, Luna/Terra/Sol/Astra chooser, existing adapter | Fresh account/install layouts; portable isolated comparison runtime |
+| Existing Codex account | Explicit consent and chooser; Linux x64 isolated runtime discovers tools and non-root UID/GID; dummy-auth offline checks before scored cards | Additional account/install layouts, keyring/custom-home authentication, account-validity qualification |
 | Claude Code only when explicitly requested | Removed implicit REPL/default-picker Claude selection; direct CLI agent corner retained | Put explicit Claude agent comparison under the new frozen-card/isolation flow; do not use it as a model/teacher/judge |
 | Optional recommended model download | Pinned DavidAU artifacts and three context/vision configurations; consent/integrity/startup inference tests | Clean-machine installation; physical 92K and GPU-vision fit under real workloads |
 | Lower-VRAM option | Explicit experimental Tiel 32K CPU-expert profile; GPU/RAM admission tests | Actual 8–16GB systems, occupied-context fit, repeated accepted coding completions, complete performance accounting |
-| Easy installed-harness comparison | `bantamfactory cards` chooser, plans, consent; Hermes/OpenCode path registration and offline readiness checks; discovered Node/Git/Python and non-root UID/GID | Native DeepSeek installations, additional packaging layouts, portable Codex and explicit Claude adapters |
+| Easy installed-harness comparison | `bantamfactory cards` chooser, plans, consent; Hermes/OpenCode path registration; Hermes/OpenCode/Codex offline checks; discovered tools and non-root UID/GID | Native DeepSeek installations, additional packaging layouts, additional Codex account layouts and explicit Claude frozen-card adapter |
 | Live progress and polished replay | CLI progress plus local static replay/export; dynamic participant counts; frozen workspaces and independent grading | Unified visual live view and clean-machine browser/runner exercises; do not treat a static replay as live streaming |
 | Fair, auditable accounting | Local HTTP recorder, native receipts, independent grades, completion separately recorded | Require complete accounting for efficiency claims across every supported adapter; preserve unavailable metrics rather than inventing totals |
-| Community sharing/learning | Portable evidence format; validation; no implicit execution/promotion | End-user privacy preview and governed import/qualification workflow |
+| Community sharing/learning | Portable evidence validation; `cards --public` creates an allowlisted local summary; no implicit execution/promotion/upload | Richer privacy preview and governed import/qualification workflow |
 | Private repository | Verified private at the last push; evidence remains local | Recheck before subsequent pushes; publication requires explicit authorization |
+
+## Fresh evidence
+
+The [September 7 context-packet card](fights/context-packet-2026-09-07-public/README.md)
+was run from a clean clone of `7459b17`: BANTAM and Hermes passed all five
+groups; OpenCode left the starter unimplemented after reaching its output cap.
+The public derivative includes replay, portable JSON and SVG/PNG share images.
+Hermes has one canceled request without a wire usage receipt; separate settled
+endpoint counters are documented, not substituted into complete-receipt totals.
+Automatic counter settlement after cancellation remains accounting work.
 
 Keep the full objective intact. Missing adapters or qualifications are not solved
 by relabeling a narrower demo as the finished launch product. Existing historical

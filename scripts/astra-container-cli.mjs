@@ -8,26 +8,34 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {nonRootIdentity,identityFiles,discoverPeerTools,linkedLibraries} from '../src/linux-peer-runtime.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IMAGE = "ubuntu:24.04";
 
-export function discoverRuntime() {
-  const launcher = fs.realpathSync(execFileSync("which", ["codex"], { encoding: "utf8" }).trim());
-  const require = createRequire(launcher);
-  const installed = path.dirname(require.resolve("@openai/codex-linux-x64/package.json"));
-  const vendor = path.join(installed, "vendor", "x86_64-unknown-linux-musl");
-  const tools = ["/usr/bin/node", "/usr/bin/git"];
-  const libraries = new Set();
-  for (const tool of tools) {
-    const output = execFileSync("ldd", [tool], { encoding: "utf8" });
-    for (const match of output.matchAll(/(?:=>\s+|^\s*)(\/[^\s]+)\s+\(/gm)) libraries.add(match[1]);
+export function discoverCodexInstallation(selected,{resolvePackage=launcher=>createRequire(launcher).resolve('@openai/codex-linux-x64/package.json')}={}){
+  const launcher=fs.realpathSync(absolute(selected,'Codex executable'));
+  if(!fs.statSync(launcher).isFile())throw Error('Codex executable must be a regular file');
+  fs.accessSync(launcher,fs.constants.R_OK|fs.constants.X_OK);
+  const header=Buffer.alloc(64),fd=fs.openSync(launcher,'r');
+  try{fs.readSync(fd,header,0,header.length,0);}finally{fs.closeSync(fd);}
+  if(header.subarray(0,4).equals(Buffer.from([127,69,76,70]))){
+    if(header[4]!==2||header[5]!==1||header.readUInt16LE(18)!==62)throw Error('Codex comparison needs a Linux x64 executable');
+    return {launcher,binary:launcher,vendor:null,packaging:'standalone-elf'};
   }
+  let vendor;
+  try{vendor=path.join(path.dirname(resolvePackage(launcher)),'vendor','x86_64-unknown-linux-musl');}
+  catch{throw Error('Cannot resolve installed Codex native binary. Use a supported npm installation or standalone Linux x64 binary on PATH; nothing was installed.');}
+  const binary=path.join(vendor,'bin','codex');fs.accessSync(binary,fs.constants.R_OK|fs.constants.X_OK);
+  return {launcher,binary,vendor,packaging:'npm-linux-x64'};
+}
+export function discoverRuntime() {
+  const installation=discoverCodexInstallation(execFileSync('which',['codex'],{encoding:'utf8',timeout:3000}).trim());
+  const tools=discoverPeerTools();
   return {
-    vendor, tools, libraries: [...libraries],
+    ...installation,...tools,identity:nonRootIdentity(),libraries:linkedLibraries([...tools.tools,installation.binary]),
     auth: path.join(os.homedir(), ".codex", "auth.json"),
     certificates: "/etc/ssl/certs/ca-certificates.crt",
-    npm: "/usr/lib/node_modules/npm",
   };
 }
 
@@ -39,6 +47,7 @@ function absolute(value, label) {
 }
 
 export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds = 480, probe = false, sessionDirectory = null }) {
+  const {uid,gid}=nonRootIdentity(runtime.identity);
   const root = absolute(workspace, "workspace");
   if (["/", os.homedir(), REPO].includes(root)) throw new Error("use a disposable project workspace, not a home or harness root");
   if (!Array.isArray(args) || (!probe && !["exec", "app-server"].includes(args[0]))) {
@@ -62,22 +71,25 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
     "run", "--rm", "--pull", "never", "--init", "--interactive",
     "--name", name, "--cidfile", absolute(cidfile, "cidfile"),
     "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-    "--pids-limit", "256", "--memory", "2g", "--cpus", "2", "--user", "1000:1000",
+    "--pids-limit", "256", "--memory", "2g", "--cpus", "2", "--user", `${uid}:${gid}`,
     "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777",
-    "--tmpfs", "/home/ubuntu:rw,nosuid,nodev,size=128m,uid=1000,gid=1000,mode=700",
-    "--tmpfs", "/home/ubuntu/.codex:rw,nosuid,nodev,size=128m,uid=1000,gid=1000,mode=700",
+    "--tmpfs", `/home/ubuntu:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid},mode=700`,
+    "--tmpfs", `/home/ubuntu/.codex:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid},mode=700`,
+    ...mount(path.join(runtime.control,'passwd'),'/etc/passwd'),
+    ...mount(path.join(runtime.control,'group'),'/etc/group'),
     ...mount(root, root, args[0] === "app-server"),
-    ...mount(runtime.vendor, "/opt/codex"),
+    ...(runtime.vendor?mount(runtime.vendor,'/opt/codex'):mount(runtime.binary,'/opt/codex/bin/codex')),
     ...mount(runtime.auth, "/home/ubuntu/.codex/auth.json"),
     ...(sessionDirectory ? mount(sessionDirectory, "/home/ubuntu/.codex/sessions", false) : []),
     ...mount(runtime.certificates, "/etc/ssl/certs/ca-certificates.crt"),
-    ...runtime.tools.flatMap((tool) => mount(tool, tool)),
+    ...(runtime.toolMounts??runtime.tools.map(tool=>({source:tool,target:tool}))).flatMap(tool=>mount(tool.source,tool.target)),
     ...runtime.libraries.flatMap((library) => mount(fs.realpathSync(library), library)),
-    ...mount("/usr/lib/git-core", "/usr/lib/git-core"),
+    ...mount(runtime.gitCore??'/usr/lib/git-core', '/opt/git-core'),
     ...mount("/usr/share/git-core", "/usr/share/git-core"),
     ...mount(runtime.npm, "/opt/npm"),
     "--env", "PATH=/tmp/astra-tools:/opt/codex/codex-path:/opt/codex/bin:/usr/bin:/bin",
     "--env", "LANG=C.UTF-8", "--env", "NO_COLOR=1",
+    '--env','GIT_EXEC_PATH=/opt/git-core',
     "--workdir", root,
     ...(probe ? ["--network", "none"] : []),
     IMAGE,
@@ -93,17 +105,19 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
       if((hostConfig!=='/home/ubuntu/.codex'&&fs.existsSync(hostConfig))||fs.existsSync('/home/ubuntu/.codex/config.toml'))throw Error('unexpected host config');
       cp.execFileSync('git',['init','--quiet']);cp.execFileSync('git',['add','container-write-probe.txt']);
       cp.execFileSync('git',['-c','user.name=Container Probe','-c','user.email=probe@invalid','commit','--quiet','-m','confined probe']);
-      console.log(JSON.stringify({node:process.version,codex:cp.execFileSync('/opt/codex/bin/codex',['--version'],{encoding:'utf8'}).trim(),npm:cp.execFileSync('npm',['--version'],{encoding:'utf8'}).trim(),git:cp.execFileSync('git',['--version'],{encoding:'utf8'}).trim(),authReadonly:readonly,workspaceWrite:true,hostConfigAbsent:true}));`;
-    return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", "/usr/bin/node", "-e", check];
+      const home=require('node:os').homedir();if(home!=='/home/ubuntu')throw Error('unexpected container home');
+      console.log(JSON.stringify({node:process.version,codex:cp.execFileSync('/opt/codex/bin/codex',['--version'],{encoding:'utf8'}).trim(),npm:cp.execFileSync('npm',['--version'],{encoding:'utf8'}).trim(),git:cp.execFileSync('git',['--version'],{encoding:'utf8'}).trim(),uid:process.getuid(),gid:process.getgid(),home,authReadonly:readonly,credentialFixture:true,workspaceWrite:true,hostConfigAbsent:true}));`;
+    return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", '/usr/bin/timeout','--signal=TERM','--kill-after=5s','30s',"/usr/bin/node", "-e", check];
   }
   return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", "/usr/bin/timeout",
     "--signal=TERM", "--kill-after=5s", `${timeoutSeconds}s`, "/opt/codex/bin/codex", ...args];
 }
 
 export async function main(args = process.argv.slice(2)) {
-  if (process.platform !== "linux" || process.arch !== "x64" || process.getuid?.() !== 1000 || process.getgid?.() !== 1000) {
-    throw new Error("this tested Ubuntu runtime requires Linux x64 and host uid/gid 1000");
+  if (process.platform !== "linux" || process.arch !== "x64") {
+    throw new Error("this isolated Codex runtime requires Linux x64");
   }
+  nonRootIdentity();
   const workspace = fs.realpathSync(process.cwd());
   const probe = args[0] === "--probe";
   const cidDir = process.env.ASTRA_CONTAINER_CID_DIR;
@@ -114,7 +128,14 @@ export async function main(args = process.argv.slice(2)) {
   const cidfile = explicitCid || path.join(cidDir, `${name}.cid`);
   if (fs.existsSync(cidfile)) throw new Error("refusing to overwrite an existing CID receipt");
   const runtime = discoverRuntime();
-  for (const file of [runtime.auth, path.join(runtime.vendor, "bin", "codex"), runtime.certificates]) fs.accessSync(file, fs.constants.R_OK);
+  runtime.control=fs.mkdtempSync(path.join(path.dirname(cidfile),'runtime-'));
+  for(const [file,contents]of Object.entries(identityFiles(runtime.identity)))fs.writeFileSync(path.join(runtime.control,file),contents,{flag:'wx',mode:0o600});
+  if(probe){
+    runtime.auth=path.join(runtime.control,'auth-fixture.json');fs.writeFileSync(runtime.auth,'{}\n',{flag:'wx',mode:0o600});
+  }else{
+    try{fs.accessSync(runtime.auth,fs.constants.R_OK);}catch{throw Error('The isolated Codex comparison requires an existing readable file-based auth cache. Keyring-only/custom-home accounts need a separate adapter; BANTAM did not log in or export credentials.');}
+  }
+  for (const file of [runtime.binary, runtime.certificates]) fs.accessSync(file, fs.constants.R_OK);
   const timeoutSeconds = Number(process.env.ASTRA_CONTAINER_TIMEOUT_SECONDS || "480");
   const sessionDirectory = process.env.ASTRA_CONTAINER_SESSION_DIR || null;
   if (sessionDirectory) {
@@ -127,6 +148,10 @@ export async function main(args = process.argv.slice(2)) {
   const child = spawn("docker", dockerArgs, { stdio: "inherit" });
   const cleanup = () => {
     try { execFileSync("docker", ["rm", "-f", name], { stdio: "ignore", timeout: 10000 }); } catch { /* --rm may have finished */ }
+    let absent=false;
+    try{execFileSync('docker',['inspect',name],{stdio:['ignore','pipe','pipe'],timeout:5000});}
+    catch(error){absent=/No such (?:object|container)/i.test(String(error.stderr??''));}
+    fs.writeFileSync(path.join(runtime.control,'cleanup.json'),JSON.stringify({name,absent})+'\n',{mode:0o600});
   };
   const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
   for (const signal of signals) process.once(signal, cleanup);

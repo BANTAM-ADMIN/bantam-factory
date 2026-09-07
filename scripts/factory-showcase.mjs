@@ -26,6 +26,13 @@ const SYSTEMS={
   'codex-astra':['Codex · Astra','astra','GPT-6 Astra · native CLI'],
   'bantam-codex-astra':['BANTAM · Astra','astra','GPT-6 Astra · wrapped CLI'],
 };
+const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);
+function localDescription(modelId){
+  const name=path.basename(String(modelId??''));
+  if(/^Qwen[^/]*27B[^/]*\.gguf$/i.test(name))return 'Qwen 27B · same local model';
+  if(/^Tiel-Coder-35B-A3B[^/]*\.gguf$/i.test(name))return 'Tiel 35B-A3B · same local model';
+  return 'Selected local model · same endpoint';
+}
 const OUTCOMES=new Set(['PASS','OUTPUT_ONLY','TIMEOUT','FAIL','SETUP_ERROR']);
 const knownDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(v)?v:null;
 const counts=rows=>({observed:rows.filter(r=>r.recorded).length,planned:rows.length,
@@ -35,7 +42,7 @@ const counts=rows=>({observed:rows.filter(r=>r.recorded).length,planned:rows.len
   groupsPassed:rows.reduce((s,r)=>s+(r.groupsPassed??0),0),groupsTotal:rows.reduce((s,r)=>s+(r.groupsTotal??0),0)});
 
 function identity(manifest,arm){
-  if(SYSTEMS[arm])return {label:SYSTEMS[arm][0],family:SYSTEMS[arm][1],model:SYSTEMS[arm][2]};
+  if(SYSTEMS[arm])return {label:arm==='bantam-local-27b'?'BANTAM · local':SYSTEMS[arm][0],family:SYSTEMS[arm][1],model:SYSTEMS[arm][1]==='local'?localDescription(manifest.modelId):SYSTEMS[arm][2]};
   if(manifest.schema!=='bantam.factory-local-variant.v1'||arm!==manifest.arm
     ||!/^bantam-local-[a-z0-9][a-z0-9-]{0,119}$/.test(arm))throw Error('unsupported or unbound model identity');
   // Public labels are selected from model identity, never copied from free text.
@@ -91,7 +98,9 @@ function publicAccounting(a={}){
       finished:BOOL(g.finished),responseBytes:count(g.responseBytes)}))};
 }
 function publicIdentity(row){
-  if(SYSTEMS[row.arm])return {arm:row.arm,label:SYSTEMS[row.arm][0],model:SYSTEMS[row.arm][2],family:SYSTEMS[row.arm][1],bantam:row.arm.startsWith('bantam-')};
+  if(SYSTEMS[row.arm])return {arm:row.arm,label:row.arm==='bantam-local-27b'?'BANTAM · local':SYSTEMS[row.arm][0],
+    model:SYSTEMS[row.arm][1]==='local'?(LOCAL_DESCRIPTIONS.has(row.model)?row.model:'Selected local model · same endpoint'):SYSTEMS[row.arm][2],
+    family:SYSTEMS[row.arm][1],bantam:row.arm.startsWith('bantam-')};
   const tiel=row.model==='Tiel 35B-A3B · IQ4_XS'&&/^bantam-local-[a-z0-9][a-z0-9-]{0,119}$/.test(row.arm??'');
   return {arm:'bantam-local-variant',label:tiel?'BANTAM · Tiel':'BANTAM · local variant',model:tiel?'Tiel 35B-A3B · IQ4_XS':'Explicit local variant',family:'local',bantam:true};
 }
@@ -245,7 +254,7 @@ function client(){
     $('edition-label').textContent=`EDITION ${String(si+1).padStart(2,'0')} / ${s.complete?'RECORDED SERIES':'PARTIAL SERIES'}`;
     const headline=$('headline');headline.replaceChildren(el('span',s.kind==='comparison'?'Same weights.':'One factory.'),el('br'),el('em',s.kind==='comparison'?'Different processes.':'Another worker.'));
     const localSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='local').map(r=>r.arm))).size,frontierSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='astra').map(r=>r.arm))).size;
-    $('series-subtitle').textContent=s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same 27B weights. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
+    $('series-subtitle').textContent=s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same selected local model. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
     $('hero-score').replaceChildren(document.createTextNode(String(s.counts.pass)),el('small',`/ ${s.counts.observed}`));
     $('hero-score-note').textContent=`${s.counts.groupsMeasured?`${s.counts.groupsPassed}/${s.counts.groupsTotal} independent groups passed across ${s.counts.groupsMeasured} measured attempts.`:'No independent group results recorded.'} ${s.counts.planned-s.counts.observed?`${s.counts.planned-s.counts.observed} planned attempts have no final record.`:'Every recorded outcome remains visible.'}`;
     $('accepted-count').textContent=`${s.counts.accepted}/${s.counts.observed}`;$('completed-count').textContent=`${s.counts.completed}/${s.counts.observed}`;
@@ -264,7 +273,7 @@ function client(){
     let title=`${accepted.length}/${c.rows.filter(r=>r.recorded).length} accepted projects. ${strict.length} clean PASS.`,note='Functional acceptance and the completion protocol are shown separately. One attempt is not a reliability estimate.';
     if(s.kind==='comparison'){
       const observation=sameModelObservation(c.rows);
-      if(observation){title=`Same 27B. Both accepted. BANTAM finished ${observation.ratio.toFixed(2)}× sooner than DeepSeek Harness.`;note='Observed on this card, not a universal ranking. Cache efficiency and cloud-system results can favor another lane.';}
+      if(observation){title=`Same local model. Both accepted. BANTAM finished ${observation.ratio.toFixed(2)}× sooner than DeepSeek Harness.`;note='Observed on this card, not a universal ranking. Cache efficiency and cloud-system results can favor another lane.';}
     }else if(incomplete.length)note='Passing tests did not guarantee a clean finish. These incomplete deliveries stay visible beside successful runs.';
     append(body,el('strong',title),el('p',note));takeaway.replaceChildren(body);if(focus)takeaway.append(button('Show all lanes',()=>{focus=null;render();},'quiet'));
   }

@@ -65,6 +65,18 @@ test('contradictory source model identity cannot be erased by public reprojectio
   assert.throws(() => build(raw), /contradictory public model identity/);
 });
 
+test('current public local identities survive launch packaging without inventing a model', () => {
+  for (const model of ['Qwen 27B · same local model', 'Tiel 35B-A3B · same local model',
+    'Selected local model · same endpoint']) {
+    const raw = fixture();
+    for (const card of raw.series[0].cards) for (const contender of card.rows) contender.model = model;
+    assert.equal(build(raw).series[0].cards[0].rows[0].model, model);
+  }
+  const mixed = fixture();
+  mixed.series[0].cards[0].rows[0].model = 'Tiel 35B-A3B · same local model';
+  assert.equal(build(mixed).comparison, null);
+});
+
 test('the latest local attempt is retained even when it failed; no best-run fallback', () => {
   const raw = fixture(), later = structuredClone(raw.series[1]);
   later.cards[0].rows[0].outcome = 'FAIL';

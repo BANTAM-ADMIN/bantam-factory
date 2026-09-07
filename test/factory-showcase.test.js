@@ -220,6 +220,13 @@ test('exported public boundary independently strips hostile nested properties an
   assert.deepEqual(p.series[0].cards[0].rows[0].tokenUpdates,[{t:10,inputTokens:12,outputTokens:1,cacheHitTokens:5,freshInputTokens:7,partial:false}]);
 });
 
+test('public comparisons do not label every local model as Qwen 27B or expose arbitrary model IDs',t=>{
+ const f=fixture(t,{arm:'bantam-local-27b'}),manifest=JSON.parse(fs.readFileSync(path.join(f.root,'manifest.json')));
+ manifest.modelId='/private/operator/another-model.gguf';write(f.root,'manifest.json',manifest);
+ const built=buildShowcase({roots:[f.root],mode:'public'}),r=built.data.series[0].cards[0].rows[0];
+ assert.equal(r.model,'Selected local model · same endpoint');assert.equal(r.label,'BANTAM · local');
+ assert.ok(!JSON.stringify(built).includes('/private/operator'));
+});
 test('hostile private source stays data, inline scripts compile, and no remote resources are required',t=>{
   const f=fixture(t,{hostile:'</script><img src="https://evil.invalid/x" onerror="alert(1)">'}),built=buildShowcase({roots:[f.root]}),html=renderShowcase(built);
   assert.ok(!html.includes('<img src="https://evil.invalid'));

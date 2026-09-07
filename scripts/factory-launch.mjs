@@ -21,6 +21,9 @@ const PUBLIC_MODELS = {
   'codex-astra': 'GPT-6 Astra · native CLI',
   'bantam-codex-astra': 'GPT-6 Astra · wrapped CLI',
 };
+const LOCAL_ARMS = new Set(['bantam-local-27b', 'deepseek-local-27b', 'opencode', 'hermes']);
+const LOCAL_MODELS = new Set(['Qwen 27B · same local weights', 'Qwen 27B · same local model',
+  'Tiel 35B-A3B · same local model', 'Selected local model · same endpoint']);
 
 function validateShape(raw) {
   if (!record(raw) || raw.schema !== 'bantam.factory-showcase.v1' || raw.mode !== 'public'
@@ -49,7 +52,8 @@ function validateShape(raw) {
         // The projection replaces display labels. Check the actual input
         // identity first so that replacement cannot erase a contradiction and
         // manufacture a same-model claim from different recorded weights.
-        if (Object.hasOwn(PUBLIC_MODELS, row.arm) && row.model !== PUBLIC_MODELS[row.arm])
+        if (Object.hasOwn(PUBLIC_MODELS, row.arm) && (LOCAL_ARMS.has(row.arm)
+          ? !LOCAL_MODELS.has(row.model) : row.model !== PUBLIC_MODELS[row.arm]))
           throw Error('contradictory public model identity');
         if (!record(row.accounting) || !record(row.accounting.full)
             || !Array.isArray(row.tokenUpdates) || row.tokenUpdates.length > 10000)

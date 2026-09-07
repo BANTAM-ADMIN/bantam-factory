@@ -6,7 +6,17 @@ this repository. Historical result discussions elsewhere in the documentation
 refer to those archived runs, not to a currently distributed public showcase.
 Reusable work orders, graders and generators remain in the repository.
 
-New cards will be generated from fresh runs and reviewed before publication.
+## Fresh reviewed card
+
+[Context packet — September 7, 2026](context-packet-2026-09-07-public/README.md)
+includes a presentation, replay and downloadable share image. One same-model
+attempt per system: BANTAM 5/5 in 124.6 seconds, Hermes 5/5 in 589.0 seconds,
+OpenCode 0/5 in 157.8 seconds. Read the linked accounting and output-budget
+caveats before drawing comparisons; this is not a reliability study.
+
+## Publication policy
+
+New cards are generated from fresh runs and reviewed before publication.
 Keep raw evidence outside tracked documentation (for example under the ignored
 `.bantam/` directory). Do not publish raw prompts, workspaces, machine paths,
 account details, credentials or embedded evidence bundles by default. Inspect

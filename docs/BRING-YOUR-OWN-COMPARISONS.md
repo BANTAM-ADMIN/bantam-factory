@@ -21,6 +21,8 @@ bantamfactory cards
 bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
 # Explicit unattended authorization for these participants and this task:
 bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
+# Also generate a sanitized local page, without uploading anything:
+bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --public --yes
 ```
 
 The default kit is `factory-2026-09-07`: context-packet, patch-transaction and
@@ -37,6 +39,12 @@ transcripts: **inspect before sharing**. Nothing is uploaded automatically.
 Exit 0 means the requested series completed and every participant passed;
 failed/incomplete outcomes return 1, setup/command errors return 2.
 
+With `--public`, a separate `public/` subdirectory contains an allowlisted
+summary page, JSON and package hashes. It excludes raw prompts, source, private
+paths and transcripts; preserves failed outcomes, measured timings and accounting
+gaps; and does not upload anything. Review only that directory for sharing.
+The surrounding evidence and default `fight-cards.html` are still private.
+
 Rebuild presentation from existing evidence without any model calls:
 
 ```bash
@@ -50,9 +58,21 @@ successful portable export.
 
 Select cloud IDs explicitly (`codex-astra`, `bantam-codex-astra`); `--yes` also
 requires explicit `--arms` and `--card`. Cloud-only execution no longer requires
-a local model. The current isolated Codex benchmark runtime still requires Linux
-x64, uid/gid 1000 and its expected npm installation layout; ordinary BANTAM
-Codex setup is separate. The front door does not remove these adapter limits.
+a local model. The isolated Codex benchmark runtime requires Linux x64 and a
+non-root numeric UID/GID. It discovers Node/Git/npm paths and supports the known
+npm Codex layout or a standalone Linux x64 Codex executable on PATH. Ordinary
+BANTAM Codex setup is separate from this container adapter.
+
+Selected Codex cards first run an offline probe with dummy credentials; a
+broken runtime stops the comparison before any scored participant. The probe
+checks executable startup, tools, writable candidate space, isolated home and
+container cleanup, not account validity or task quality. Run it separately with
+`bantamfactory cards --check --arms codex-astra --yes` (no cloud/model request).
+Scored comparisons additionally require a readable default file-backed Codex
+auth cache. They mount that cache read-only; no login, export, credential write
+or keyring migration is performed. Keyring-only/custom-home accounts still need
+another adapter. Expired credentials can still fail at actual inference.
+See [official credential-storage guidance](https://developers.openai.com/codex/auth#credential-storage).
 
 Local recorded cards currently need a credential-free loopback llama.cpp origin
 with `/health`, `/v1/models`, `/props` and `/slots`. A saved llama.cpp connection

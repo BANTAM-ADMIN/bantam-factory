@@ -5,9 +5,12 @@ import {FACTORY_KITS,PUBLIC_FACTORY_CARDS,factoryKit} from '../scripts/factory-c
 import {FIGHT_ARMS,fightPlan,runFactoryFights} from '../scripts/factory-fights.mjs';
 import {writeFactoryReplay} from '../scripts/factory-fight-replay.mjs';
 import {writeFightCardExport} from '../scripts/factory-fight-export.mjs';
+import {writeShowcase} from '../scripts/factory-showcase.mjs';
 import {loadConnection,discoverModelServers} from './first-run.js';
 import {readCompetitorRegistry,registerCompetitor,executablePath,verifyCompetitorRegistration} from './competitor-registry.js';
 import {checkPeerReadiness,readinessLocation} from './peer-readiness.js';
+import {checkCodexReadiness} from './codex-readiness.js';
+import {nonRootIdentity} from './linux-peer-runtime.js';
 
 const LOCAL=new Set(['bantam-local-27b','hermes','opencode','deepseek-local-27b']);
 export const CARDS_HELP=`BANTAM FACTORY · fight cards
@@ -17,6 +20,7 @@ bantamfactory cards --list          List frozen tasks and installed participants
 bantamfactory cards --register hermes --path /path/to/installation-or-executable
 bantamfactory cards --register opencode --path /path/to/installation-or-executable
 bantamfactory cards --check --arms hermes,opencode --yes  Offline runtime checks; no model requests
+bantamfactory cards --check --arms codex-astra --yes     Offline Codex check; dummy credentials
 bantamfactory cards --replay DIR    Rebuild replay/export from saved evidence; no inference
 bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
 bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
@@ -24,6 +28,7 @@ bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --end
 Options: --kit ID (default factory-2026-09-07), --card ID, --arms ID,...,
          --endpoint URL, --out NEW-DIRECTORY, --timeout-seconds 1..600,
          --repetitions 1..3, --serial, --list, --replay DIR, --check, --dry-run, --yes, --help
+         --public (also generate an allowlisted public summary; never upload)
          --register hermes|opencode --path PATH (save location only; no execution)
 
 No rival installations, model downloads, cloud requests or uploads occur from
@@ -100,15 +105,16 @@ export function preflightCards(plan,{exec=execFileSync,participants=discoverCard
  for(const image of new Set(['alpine:3',...(plan.arms.some(a=>a!=='bantam-local-27b')?['ubuntu:24.04']:[]),...(plan.arms.includes('deepseek-local-27b')?['bantam/deepseek-fight:0.1.2-rc.1']:[])])){
   check('docker',['image','inspect',image],`Required Docker image missing: ${image}`);
  }
- if(plan.arms.some(a=>a.includes('codex'))&&(process.platform!=='linux'||process.arch!=='x64'||process.getuid?.()!==1000||process.getgid?.()!==1000)){
-  throw Error('The current isolated Codex card runtime requires Linux x64 with uid/gid 1000. Ordinary BANTAM Codex setup is separate; this runtime needs portability work.');
+ if(plan.arms.some(a=>a.includes('codex'))){
+  if(process.platform!=='linux'||process.arch!=='x64')throw Error('The isolated Codex card runtime currently requires Linux x64.');
+  nonRootIdentity();
  }
 }
 export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(s),interactive=Boolean(process.stdin.isTTY&&process.stderr.isTTY),
  discover=discoverCardParticipants,findExecutable=findCardExecutable,servers=discoverModelServers,connection=loadConnection(),
  registry=readCompetitorRegistry,register=registerCompetitor,
- preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness}={}){
- const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check']);
+ preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness,checkCodex=checkCodexReadiness,showcase=writeShowcase}={}){
+ const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check','public']);
  for(const key of Object.keys(args))if(!allowed.has(key))throw Error(`Unknown cards option: --${key}`);
  if(args.help){out(CARDS_HELP);return 0;}
  if(args.register!==undefined||args.path!==undefined){
@@ -137,7 +143,7 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  if(args.check){
   if(typeof args.arms!=='string'||Object.keys(args).some(k=>!['_','check','arms','out','yes','dry-run'].includes(k)))throw Error('Use --check --arms hermes,opencode [--out NEW-DIRECTORY] [--yes|--dry-run].');
   const arms=args.arms.split(',').map(a=>a.trim());
-  if(!arms.length||arms.some(a=>!['hermes','opencode'].includes(a))||new Set(arms).size!==arms.length)throw Error('--check currently supports selected Hermes/OpenCode runtimes only.');
+  if(!arms.length||arms.some(a=>!['hermes','opencode','codex-astra','bantam-codex-astra'].includes(a))||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/Codex runtimes only.');
   const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name)));
   const output=args.out?path.resolve(args.out):readinessLocation(path.resolve('.bantam/fight-cards/offline-check'));
   out(`Offline runtime checks: ${arms.join(', ')}\nEvidence: ${output}\nNo model inference, cloud login, downloads or publication. Installed program code will execute in network-disabled containers.\n`);
@@ -147,7 +153,11 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
    const approved=/^y(es)?$/i.test((await ask('Run these installed tools offline? [y/N] ')).trim());
    if(!approved){out('Cancelled; no installed tools executed.\n');return 0;}
   }
-  preflight({arms,peerExecutables},{participants});await checkPeers({arms,peerExecutables,output});
+  if(fs.existsSync(output))throw Error('Choose a fresh readiness evidence directory.');
+  preflight({arms,peerExecutables},{participants});
+  const peers=arms.filter(a=>['hermes','opencode'].includes(a)),codex=arms.some(a=>a.includes('codex'));
+  if(peers.length)await checkPeers({arms:peers,peerExecutables,output:codex?path.join(output,'peers'):output});
+  if(codex)await checkCodex({output:peers.length?path.join(output,'codex'):output});
   out('Offline readiness passed. This is not a coding score or token-accounting qualification.\n');return 0;
  }
  const selected={...args};
@@ -164,6 +174,7 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  const plan=makeCardsPlan(selected,{connection,registrations});
  out('\nPlanned comparison (no work launched yet):\n'+JSON.stringify(plan,null,2)+'\n');
  if(args['dry-run'])return 0;
+ if(args.public)out('A sanitized public summary will also be generated locally. Raw evidence stays private; no publication is authorized.\n');
  out('Fresh isolated workspaces; no changes to your current project. All failures remain recorded.\nRaw task/source/model transcripts remain private locally; inspect before sharing. No automatic uploads.\n');
  if(plan.arms.some(a=>!LOCAL.has(a)))out('Cloud participants send task/context to OpenAI using your signed-in Codex account and consume its quota/access.\n');
  if(args.yes){
@@ -171,6 +182,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  }else if(!interactive)throw Error('Noninteractive execution requires --card, --arms and --yes. Use --dry-run to inspect without running.');
  else if(!/^y(es)?$/i.test((await ask('Run exactly this comparison, using the listed local/cloud resources? [y/N] ')).trim())){out('Cancelled; no tasks launched.\n');return 0;}
  preflight(plan,{participants});
+ if(plan.arms.some(a=>a.includes('codex'))){
+  const output=readinessLocation(plan.output)+'.codex';out(`Checking Codex offline before scored work. Evidence: ${output}\n`);
+  plan.codexReadiness=await checkCodex({output,requireAuthentication:true});
+ }
  const peerArms=plan.arms.filter(a=>['hermes','opencode'].includes(a));
  if(peerArms.length){
   const output=readinessLocation(plan.output);out(`Checking selected peer runtimes offline first. Evidence: ${output}\n`);
@@ -186,6 +201,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
     out(`Private replay: ${rendered.output}\nEvidence: ${plan.output}\n`);
    }
   }
+ }
+ if(args.public&&fs.existsSync(path.join(plan.output,'manifest.json'))){
+  const summary=showcase({roots:[plan.output],output:path.join(plan.output,'public'),mode:'public'});
+  out(`Public summary (review before sharing): ${summary.output}\nOnly that public subdirectory is sanitized. Do not share the surrounding raw evidence.\n`);
  }
  return manifest?.complete&&manifest.results.every(r=>r.pass)?0:1;
 }

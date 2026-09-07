@@ -100,3 +100,12 @@ test('legacy REPL no longer includes Claude or Codex in implicit fight selection
  assert.match(source,/const arms = armsArg \?\? \["bantam", "hermes", "opencode"\]/);
  assert.doesNotMatch(source,/armsArg \?\?.*claude-sonnet/);
 });
+test('public flag exports only the sanitized derivative after execution, retaining a failed score and never uploading',async t=>{
+ const root=tmp(t),output=path.join(root,'run');let exports=0,ran=0;
+ const options={out:()=>{},interactive:false,registry:()=>({tools:{}}),discover:()=>[],preflight:()=>{},
+  run:async p=>{ran++;fs.mkdirSync(p.output);fs.writeFileSync(path.join(p.output,'manifest.json'),'{}');return {complete:true,results:[{pass:false}]};},
+  exportCard:()=>{},replay:()=>({output:'private.html'}),showcase:p=>{exports++;assert.equal(p.mode,'public');assert.deepEqual(p.roots,[output]);assert.equal(p.output,path.join(output,'public'));return {output:path.join(p.output,'index.html')};}};
+ const args={public:true,card:'context-packet',arms:'bantam-local-27b',out:output};
+ assert.equal(await factoryCardsCommand({...args,'dry-run':true},options),0);assert.equal(exports,0);assert.equal(ran,0);
+ assert.equal(await factoryCardsCommand({...args,yes:true},options),1);assert.equal(exports,1);assert.equal(ran,1);
+});

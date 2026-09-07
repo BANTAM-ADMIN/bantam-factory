@@ -57,6 +57,8 @@ test('FAIL and OUTPUT_ONLY reduce the pass count without hiding acceptance or el
   Object.assign(rows[2],{outcome:'OUTPUT_ONLY',accepted:true,completed:false});
   const html=renderLaunchPage(data,options),svg=renderShareCard(data,options);
   assert.match(html,/<div class="hero-number">1\/3<\/div>/);
+  assert.match(prose(html),/Artifacts accepted: 2\/3/);
+  assert.match(svg,/2\/3 artifacts accepted/);
   assert.match(prose(html),/Summed run time 0:06\.0/);
   assert.match(svg,/FAIL/);assert.match(svg,/OUTPUT_ONLY/);
   assert.equal(embedded(html).series[0].cards[2].rows[0].accepted,true);

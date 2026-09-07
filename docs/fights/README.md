@@ -2,6 +2,11 @@
 
 ## Public launch card
 
+New: **[the factory workshop cards](workshop-2026-09-07/public/index.html)**
+exercise context packing, patch transactions and stream framing with BANTAM's
+local Tiel worker. This is a separate qualification edition, not a new
+six-harness comparison. See its [record and method](workshop-2026-09-07/README.md).
+
 Start with **[the public fight card](launch/public/index.html)** for the clean,
 shareable comparison and recorded replay. The [publication guide](launch/README.md)
 defines the public-only deployment boundary. The detailed engineering archive

@@ -19,6 +19,14 @@ generation: use the matching adapter and inspect the startup constraint check.
 
 ## Current factory fight cards
 
+The new **[factory workshop](docs/fights/workshop-2026-09-07/public/index.html)**
+adds three newly authored build/extend/repair work orders: context packets, atomic
+patch planning, and streaming-response framing. This is a BANTAM-only Tiel
+qualification with its own [method and results](docs/fights/workshop-2026-09-07/README.md),
+not a rerun or replacement of the historical comparison. These stress cards
+retain failures and unfinished work; they are an engineering report, not a
+clean-sweep launch claim.
+
 Open the **[public launch fight card](docs/fights/launch/public/index.html)**:
 three build/change/repair cards, six systems, all 18 comparison attempts retained,
 plus a separate latest Tiel qualification. It includes recorded replay,

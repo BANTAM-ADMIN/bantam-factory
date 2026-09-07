@@ -33,13 +33,16 @@ function qualificationSummary(data){
   const series=data.series.find(s=>s.kind==='variant'),cards=series?.cards??[];
   const rows=cards.flatMap(c=>c.rows),recorded=rows.filter(r=>r.recorded===true);
   const single=cards.every(c=>c.rows.length===1);
+  const acceptedCards=cards.filter(c=>c.rows.length===1&&c.rows.every(r=>r.recorded===true&&r.bantam===true
+    &&r.accepted===true&&r.publicExit===0&&r.hiddenExit===0
+    &&r.protectedChanges===0&&valid(r.groupsTotal)&&r.groupsTotal>0&&r.groupsPassed===r.groupsTotal)).length;
   const passed=cards.filter(c=>c.rows.length===1&&c.rows.every(r=>r.recorded===true&&r.bantam===true
     &&r.outcome==='PASS'&&r.accepted===true&&r.completed===true&&r.publicExit===0&&r.hiddenExit===0
     &&r.protectedChanges===0&&valid(r.groupsTotal)&&r.groupsTotal>0&&r.groupsPassed===r.groupsTotal)).length;
   const sum=recorded.reduce((n,r)=>n+(valid(r.wallMs)?r.wallMs:0),0);
   const wallMs=cards.length&&single&&recorded.length===cards.length&&recorded.every(r=>valid(r.wallMs))&&Number.isSafeInteger(sum)?sum:null;
   const models=[...new Set(rows.map(r=>r.model).filter(v=>typeof v==='string'&&v))];
-  return {series,cards,total:cards.length,passed,recorded:recorded.length,wallMs,model:models.length===1?models[0]:'Recorded local workers'};
+  return {series,cards,total:cards.length,passed,acceptedCards,recorded:recorded.length,wallMs,model:models.length===1?models[0]:'Recorded local workers'};
 }
 
 function qualificationShare(data){
@@ -55,7 +58,7 @@ function qualificationShare(data){
   <text x="412" y="288" fill="#526058" font-family="Arial,sans-serif" font-size="20">${E(q.model)} · BANTAM</text>
   ${q.cards.slice(0,3).map((card,i)=>`<text x="70" y="${350+i*43}" fill="#202923" font-family="Arial,sans-serif" font-size="20">${E(card.kind)} · ${E(card.title)}</text><text x="1130" y="${350+i*43}" text-anchor="end" fill="#526058" font-family="monospace" font-size="20">${E(card.rows.length===1?card.rows[0].outcome:'Unknown')}</text>`).join('')}
   <line x1="70" y1="474" x2="1130" y2="474" stroke="#c8cec2"/>
-  <text x="70" y="512" fill="#202923" font-family="Arial,sans-serif" font-size="20">${q.recorded}/${q.total} attempts recorded · ${E(duration(q.wallMs))} summed run time</text>
+  <text x="70" y="512" fill="#202923" font-family="Arial,sans-serif" font-size="20">${q.recorded}/${q.total} attempts recorded · ${q.acceptedCards}/${q.total} artifacts accepted · ${E(duration(q.wallMs))} summed run time</text>
   <text x="70" y="550" fill="#526058" font-family="Arial,sans-serif" font-size="17">One qualification cohort. Not a model comparison or a reliability estimate.</text>
   <text x="70" y="592" fill="#526058" font-family="monospace" font-size="13">PUBLIC MEASUREMENTS · PRIVATE TRANSCRIPTS OMITTED · NOTHING AUTOMATICALLY PUBLISHED</text></svg>`;
 }
@@ -106,7 +109,7 @@ export function renderLaunchPage(input,{previewImage='share-card.svg',presentati
   const share=renderShareCard(data,{presentation});
   const description=qualification?'BANTAM local qualification: build, extend and repair useful tools. Recorded outcomes, elapsed times and token receipts.':'BANTAM recorded factory results. Same local model, different harnesses. Inspect outcomes, actual clocks and token receipts.';
   const socialDescription=qualification?'Recorded local-worker qualification. Accepted projects and clean completion are separate; no reliability estimate.':'Recorded results. Same local 27B model, different harnesses. Three tasks, one recorded repeat.';
-  const qualificationPlate=`<aside class="result-plate" aria-label="Recorded local qualification"><div class="plate-top"><span class="eyebrow">BANTAM / local qualification</span><span class="plate-number">${q.total} WORK ORDERS</span></div><div class="hero-number">${q.total?`${q.passed}/${q.total}`:'—'}</div><h2>tasks passed and completed.</h2><p>${E(q.model)}<br>Build. Extend. Repair.</p><div class="mini-comparison"><div><span>Summed run time</span><strong>${duration(q.wallMs)}</strong></div><div><span>Attempts recorded</span><strong>${q.recorded}/${q.total}</strong></div></div><p class="plate-note">All included tasks count, including failures and unrecorded work.<br>One qualification cohort, not a model comparison or reliability estimate.</p></aside>`;
+  const qualificationPlate=`<aside class="result-plate" aria-label="Recorded local qualification"><div class="plate-top"><span class="eyebrow">BANTAM / local qualification</span><span class="plate-number">${q.total} WORK ORDERS</span></div><div class="hero-number">${q.total?`${q.passed}/${q.total}`:'—'}</div><h2>tasks passed and completed.</h2><p>${E(q.model)}<br>Build. Extend. Repair.</p><div class="mini-comparison"><div><span>Summed run time</span><strong>${duration(q.wallMs)}</strong></div><div><span>Attempts recorded</span><strong>${q.recorded}/${q.total}</strong></div></div><p class="plate-note">Artifacts accepted: ${q.acceptedCards}/${q.total}. Independent checks passed; factory completion is separate.<br>All included tasks count, including failures and unrecorded work.<br>One qualification cohort, not a model comparison or reliability estimate.</p></aside>`;
   const qualificationMethod=`<section><h3>The qualification</h3><p>${q.total} included work orders: ${q.cards.map(card=>`${E(card.kind)} — ${E(card.title)}`).join('; ')||'no recorded qualification cohort'}. This is BANTAM-only local-worker qualification, not a comparison against other harnesses or models. Independent acceptance checks are separate from the worker's own tests.</p><p>The score requires both an accepted project and clean completion, with passing public and independent checks and no protected-file changes. Every included task remains in the denominator. Missing results are not failures, but do not count as passes. Summed run time is unknown if any included attempt lacks a measured duration.</p><p>One cohort does not establish a reliability rate or general capability. Recorded configuration, sampling and cache state can affect results. This does not measure every later harness revision. Public measurements omit private execution context and source.</p></section>`;
   const spot=!qualification&&sp.row?`<section class="qualification wrap" id="qualification" aria-labelledby="qualification-title">
     <div><p class="eyebrow">Another worker. The same idea.</p><h2 id="qualification-title">Small model.<br>A real work order.</h2><p class="section-copy">Tiel 35B-A3B, IQ4_XS, inside BANTAM. The latest included Snapshot qualification stands on its own.</p><a class="text-link" href="#history">See included qualification history <span aria-hidden="true">↗</span></a></div>

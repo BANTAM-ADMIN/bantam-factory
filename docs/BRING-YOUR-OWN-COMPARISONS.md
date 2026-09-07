@@ -7,6 +7,11 @@ support persistent installation-folder registration and offline readiness checks
 Other installation adapters and generic agent APIs still need work.
 Model setup does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Code.
 
+Listing checks PATH/registered executable metadata and the prepared DeepSeek
+image using read-only `docker image inspect`; it never starts or pulls an image.
+Claude Code presence is listed without invoking it. Detection is not runtime
+qualification, and Claude remains outside the frozen-card runner for now.
+
 ## Start a card
 
 ```bash

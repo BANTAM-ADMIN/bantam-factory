@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {factoryCardsCommand,makeCardsPlan,normalizeCardEndpoint,discoverCardParticipants,preflightCards} from '../src/factory-cards-command.js';
+import {factoryCardsCommand,makeCardsPlan,normalizeCardEndpoint,discoverCardParticipants,preflightCards,findCardImage} from '../src/factory-cards-command.js';
 import {runFactoryFights} from '../scripts/factory-fights.mjs';
 import {writeFactoryReplay} from '../scripts/factory-fight-replay.mjs';
 import {writeFightCardExport} from '../scripts/factory-fight-export.mjs';
@@ -14,6 +14,23 @@ test('card discovery checks executables, never invokes Claude or installs rivals
  const calls=[];const p=discoverCardParticipants({find:n=>{calls.push(n);return n==='hermes'?'/tools/hermes':null;}});
  assert.equal(p.find(p=>p.id==='hermes').installed,true);assert.equal(p.find(p=>p.id==='opencode').installed,false);
  assert.equal(calls.includes('claude'),false);assert.equal(p.some(p=>p.id.includes('claude')),false);
+});
+test('explicit listing recognizes prepared DeepSeek image using metadata only; planning does not inspect Docker',async()=>{
+ const digest='sha256:'+'a'.repeat(64),calls=[];
+ const inspectImage=image=>findCardImage(image,{exec:(exe,args)=>{calls.push([exe,args]);return digest+'\n';}});
+ const find=()=>null;
+ assert.equal(discoverCardParticipants({find,inspectImage}).find(p=>p.id==='deepseek-local-27b').installed,false);
+ assert.equal(calls.length,0);
+ const peer=discoverCardParticipants({find,inspectImages:true,inspectImage}).find(p=>p.id==='deepseek-local-27b');
+ assert.equal(peer.installed,true);assert.equal(peer.imageId,digest);
+ assert.deepEqual(calls,[['docker',['image','inspect','--format','{{.Id}}','bantam/deepseek-fight:0.1.2-rc.1']]]);
+ assert.equal(findCardImage('fixture',{exec:()=>{throw Error('Docker offline');}}),null);
+ let output='',metadataCalls=[];
+ assert.equal(await factoryCardsCommand({list:true},{registry:()=>({tools:{}}),discover:()=>[peer],
+  findExecutable:name=>{metadataCalls.push(name);return '/tools/claude';},out:s=>output+=s,
+  run:()=>{throw Error('must not invoke an agent');}}),0);
+ assert.deepEqual(metadataCalls,['claude']);assert.match(output,/Claude Code: detected/);
+ assert.match(output,/explicit direct agent comparison only/);
 });
 test('plans respect saved llama endpoint and never require one for cloud-only cards',t=>{
  const root=tmp(t),base={card:'context-packet',out:path.join(root,'run')};

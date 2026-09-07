@@ -44,8 +44,21 @@ export function findCardExecutable(name,{env=process.env}={}){
  }
  return null;
 }
-export function discoverCardParticipants({find=findCardExecutable,registrations={}}={}){
+export function findCardImage(image,{exec=execFileSync}={}){
+ try{
+  const id=exec('docker',['image','inspect','--format','{{.Id}}',image],{encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:1500}).trim();
+  return /^sha256:[a-f0-9]{64}$/.test(id)?id:null;
+ }catch{return null;}
+}
+export function discoverCardParticipants({find=findCardExecutable,registrations={},inspectImages=false,inspectImage=findCardImage}={}){
  return FIGHT_ARMS.map(id=>{
+  if(id==='deepseek-local-27b'){
+   const image='bantam/deepseek-fight:0.1.2-rc.1',imageId=inspectImages?inspectImage(image):null;
+   return {id,pool:'local',executable:null,installed:Boolean(imageId),imageId,
+    detail:imageId?`Prepared adapter image detected: ${image} (${imageId}); runtime not yet qualified`:
+     inspectImages?`Prepared adapter image unavailable or Docker inaccessible: ${image}; nothing installed`:
+      `Prepared adapter image prerequisite checked before execution: ${image}`};
+  }
   const command=id==='hermes'?'hermes':id==='opencode'?'opencode':id.includes('codex')?'codex':null;
   const registration=registrations[id];let executable=command?find(command):null,problem=null;
   if(registration){
@@ -92,7 +105,7 @@ export function preflightCards(plan,{exec=execFileSync,participants=discoverCard
  }
 }
 export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(s),interactive=Boolean(process.stdin.isTTY&&process.stderr.isTTY),
- discover=discoverCardParticipants,servers=discoverModelServers,connection=loadConnection(),
+ discover=discoverCardParticipants,findExecutable=findCardExecutable,servers=discoverModelServers,connection=loadConnection(),
  registry=readCompetitorRegistry,register=registerCompetitor,
  preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness}={}){
  const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check']);
@@ -111,13 +124,14 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   return 0;
  }
  const registrations=registry().tools;
- const participants=discover({registrations});
+ const participants=discover({registrations,inspectImages:Boolean(args.list||(interactive&&!args['dry-run']))});
  const list=()=>{
   out('\nBANTAM FACTORY · frozen work orders\n');
   for(const [kit,cards]of Object.entries(FACTORY_KITS))for(const id of cards)out(`  ${kit} / ${id} — ${PUBLIC_FACTORY_CARDS[id]?.description??id}\n`);
   out('\nParticipants (installation discovery only, not a readiness certificate)\n');
   participants.forEach(p=>out(`  ${p.id} [${p.pool}] ${p.installed?'detected':'needs setup'} · ${p.detail}\n`));
-  out('  Claude Code: explicit direct agent comparison only; see --help. Never auto-invoked.\n');
+  const claude=findExecutable('claude');
+  out(`  Claude Code: ${claude?`detected · ${claude}`:'not found on PATH'}; explicit direct agent comparison only; see --help. Never auto-invoked.\n`);
  };
  if(args.list){list();return 0;}
  if(args.check){

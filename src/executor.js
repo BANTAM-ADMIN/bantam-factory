@@ -1582,7 +1582,7 @@ export function stripTestOutputFilter(command) {
 // run it. Only suggest the FIRST test invocation: taking a later segment could
 // silently discard required cd/export/fixture setup. Output captures may be
 // omitted in a suggestion, never in an automatic compound-command rewrite.
-function directTestSuggestion(command) {
+export function directTestSuggestion(command, { isCheck = isTestCommand } = {}) {
   const text = String(command ?? "").trim();
   let quote = null, end = text.length;
   for (let i = 0; i < text.length; i++) {
@@ -1607,7 +1607,7 @@ function directTestSuggestion(command) {
     if (!count || (tail && !/^[;|&\n\r]/.test(tail))) return null;
   }
   const candidate = text.slice(0, end).trim();
-  if (!candidate || !isTestCommand(candidate) || hasShellControlOutsideQuotes(candidate)
+  if (!candidate || !isCheck(candidate) || hasShellControlOutsideQuotes(candidate)
       || verificationShellStatusRisk(candidate, { pipefail: true })) return null;
   return candidate;
 }

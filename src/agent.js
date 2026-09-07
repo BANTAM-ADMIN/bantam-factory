@@ -34,6 +34,8 @@ import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
 import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { contractAuditPhaseState } from "./contract-audit-phase.js";
+import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
@@ -2080,6 +2082,9 @@ async function runAgentCore({
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
+    const contractAuditPhase = contractAuditPhaseState(auditRecovery, {
+      useGrammar, interactive, advisoryMode, writeBatch, callerExcludedActions,
+    });
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
@@ -2129,10 +2134,19 @@ async function runAgentCore({
       enabledActionDefinitions({ features: turnActionFeatures })
         .map((definition) => definition.verb),
     );
-    const excludeThisTurn = [...new Set(terminalClosureTurn
+    const excludeThisTurn = [...new Set([...(terminalClosureTurn
       ? [...callerExcludedActions, ...[...enabledTurnVerbs].filter(verb => verb !== "done")]
-      : requestedExclusions)]
+      : requestedExclusions), ...contractAuditPhase.excludeVerbs])]
       .filter((verb) => enabledTurnVerbs.has(verb));
+    // Never solve an empty intersection by restoring an impossible completion
+    // or a caller-forbidden tool. inspect cannot act without a legal sub-verb.
+    if (useGrammar && contractAuditPhase.active
+        && ![...enabledTurnVerbs].some(verb => verb !== "inspect" && !excludeThisTurn.includes(verb))) {
+      controllerStop = { kind: "contract-audit-no-action", reason: "No legal action remains while contract audit execution proof is pending." };
+      summary = controllerStop.reason;
+      onEvent({ type: "controller_stop", ...controllerStop });
+      break;
+    }
     // The forceBuildEdit veto is a single-turn escalation: consume it once the mask has been composed.
     if (forceBuildEdit && useGrammar) forceBuildEdit = false;
     if (documentRevisionTurn && useGrammar) {
@@ -2476,7 +2490,7 @@ async function runAgentCore({
             "Follow the ordering literally in the next assertion-bearing probe. In particular, capture the returned Promise, trigger abort/reset while work is blocked, and only then await the Promise.",
           ].join("\n")
         : "";
-      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor]
+      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, contractAuditPhase.note, documentReviewCompleteReanchor, previewFailureReanchor]
         .filter(Boolean)
         .join("\n\n");
       const decHintText = decHint
@@ -3111,6 +3125,10 @@ async function runAgentCore({
       ? "[investigation budget reached] You have investigated enough. Do NOT read files or run more commands. If the user asked a QUESTION, your next action must be \"respond\" with your answer. If they asked you to BUILD/CREATE/CHANGE something, do NOT respond with a plan — START WRITING it NOW with write_file (or replace); build the first runnable slice and keep going."
       : null;
     const beforeShellFiles = !gateRejection && !interactiveStop && action.a === "shell" ? snapshotWorkspaceFiles(workspace) : null;
+    const auditCleanupRefusal = beforeShellFiles ? compoundAuditCleanupRefusal(action.c, {
+      pending: auditRecovery, workspace: exec.realWorkspace,
+      sourcePaths: [...beforeShellFiles.keys()].filter(p => SOURCE_EXT_RE.test(p) && !isGeneratedPath(p)),
+    }) : null;
     const shellScopeSnapshot = !gateRejection && !interactiveStop && action.a === "shell"
       && shellScopeGuard && typeof shellScopeGuard.capture === "function"
       ? shellScopeGuard.capture()
@@ -3165,7 +3183,7 @@ async function runAgentCore({
         auditRecovery.needsProject && String(action.c).trim() === String(verificationScript).trim()
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
         turn.shellExecution && (turn.shellExecution.command === action.c || turn.shellExecution.executedCommand === action.c));
-    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat
+    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       ? repetition.check(action)
@@ -3241,6 +3259,10 @@ async function runAgentCore({
       }
     } else if (gateRejection) {
       result = { observation: gateRejection };
+    } else if (auditCleanupRefusal) {
+      result = { observation: auditCleanupRefusal.correction, auditCleanupRefusal };
+      metrics.compoundAuditCleanupRefusals = (metrics.compoundAuditCleanupRefusals ?? 0) + 1;
+      onEvent({ type: "verification_workflow_refusal", turn: turns.length, ...auditCleanupRefusal });
     } else if (duplicate) {
       // Repetition is not completion authority. A pending review may require
       // a DIFFERENT shell command, so do not tell the worker DONE or mask its
@@ -6105,6 +6127,9 @@ async function runAgentCore({
         controllerStop: result.controllerStop, shellScopeRollback: result.shellScopeRollback,
       }], { generation: workspaceEditGeneration, workspace: exec.realWorkspace, configuredCommand: verificationScript });
       if (failure) result.observation += `\n${focusedFailureReminder(failure)}`;
+    }
+    if (result.auditCleanupRefusal && !result.observation.endsWith(result.auditCleanupRefusal.correction)) {
+      result.observation += `\n${result.auditCleanupRefusal.correction}`;
     }
 
     // Normalize evaluator-only volatility only after every controller-owned

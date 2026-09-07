@@ -1,0 +1,8 @@
+{
+  "id": "context-packet",
+  "title": "Context packet",
+  "shape": "build",
+  "deliverables": ["context-packet.js"],
+  "protected": ["package.json", "test/public.test.js"],
+  "groups": ["required-sections-and-reservation", "utf8-framing-and-exact-budget", "optional-priority-skip-and-stable-ties", "validation-opaque-identities-and-immutability", "cli-json-and-errors"]
+}

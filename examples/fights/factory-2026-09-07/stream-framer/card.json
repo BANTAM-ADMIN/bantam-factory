@@ -1,0 +1,8 @@
+{
+  "id": "stream-framer",
+  "title": "Stream framer",
+  "shape": "repair",
+  "deliverables": ["stream-framer.js"],
+  "protected": ["package.json", "test/public.test.js"],
+  "groups": ["utf8-and-arbitrary-chunk-boundaries", "field-parsing-and-frame-dispatch", "termination-and-finish-state", "invalid-input-and-poisoned-decoder", "cli-canonical-chunks-and-errors"]
+}

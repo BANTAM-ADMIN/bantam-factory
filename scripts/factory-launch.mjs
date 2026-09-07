@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {publicShowcaseData} from './factory-showcase.mjs';
+import {PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -33,7 +34,7 @@ function validateShape(raw) {
       throw Error('invalid public series');
     const identities = new Set();
     for (const card of series.cards) {
-      if (!record(card) || !CARD_IDS.includes(card.card) || !Number.isSafeInteger(card.repeat)
+      if (!record(card) || !Object.hasOwn(PUBLIC_FACTORY_CARDS,card.card) || !Number.isSafeInteger(card.repeat)
           || card.repeat < 1 || card.repeat > 100 || !Array.isArray(card.rows)
           || !card.rows.length || card.rows.length > 12)
         throw Error('invalid public work order');
@@ -121,7 +122,8 @@ export function buildLaunchData(bytes) {
     series: clean.series};
 }
 
-export async function writeLaunchPackage({input, output, browser = null}) {
+export async function writeLaunchPackage({input, output, browser = null, presentation = 'comparison'}) {
+  if (!['comparison','qualification'].includes(presentation)) throw Error('presentation must be comparison or qualification');
   if (!path.isAbsolute(input ?? '') || !path.isAbsolute(output ?? '') || fs.existsSync(output))
     throw Error('input and a fresh output directory must be absolute paths');
   const stat = fs.lstatSync(input);
@@ -131,9 +133,9 @@ export async function writeLaunchPackage({input, output, browser = null}) {
   if (browser !== null && !path.isAbsolute(browser)) throw Error('browser executable must be an absolute path');
   const {renderLaunchPage, renderShareCard} = await import('./factory-launch-page.mjs');
   const files = new Map([
-    ['index.html', renderLaunchPage(data, {previewImage: browser ? 'share-card.png' : 'share-card.svg'})],
+    ['index.html', renderLaunchPage(data, {previewImage: browser ? 'share-card.png' : 'share-card.svg', presentation})],
     ['fight-card.json', JSON.stringify(data, null, 2) + '\n'],
-    ['share-card.svg', renderShareCard(data)],
+    ['share-card.svg', renderShareCard(data, {presentation})],
   ]);
   fs.mkdirSync(path.dirname(output), {recursive: true});
   fs.mkdirSync(output);
@@ -149,7 +151,7 @@ export async function writeLaunchPackage({input, output, browser = null}) {
       throw Error('browser did not render the required 1200×630 PNG');
     files.set('share-card.png', png);
   }
-  const manifest = {schema: 'bantam.launch-package.v1', public: true, redacted: true,
+  const manifest = {schema: 'bantam.launch-package.v1', public: true, redacted: true, presentation,
     rawEvidenceIncluded: false, source: data.source,
     files: [...files].map(([file, content]) => ({path: file, bytes: Buffer.byteLength(content), sha256: digest(content)}))};
   fs.writeFileSync(path.join(output, 'package.json'), JSON.stringify(manifest, null, 2) + '\n', {flag: 'wx'});
@@ -159,12 +161,13 @@ export async function writeLaunchPackage({input, output, browser = null}) {
 export function parseLaunchArgs(args) {
   const parsed = {};
   for (let i = 0; i < args.length; i++) {
-    const key = {'--input': 'input', '--output': 'output', '--browser': 'browser'}[args[i]];
+    const key = {'--input': 'input', '--output': 'output', '--browser': 'browser', '--presentation':'presentation'}[args[i]];
     if (!key || Object.hasOwn(parsed, key) || !args[i + 1] || args[i + 1].startsWith('--'))
-      throw Error('usage: factory-launch.mjs --input ABS_PUBLIC_SHOWCASE_JSON --output ABS_FRESH_DIRECTORY [--browser ABS_CHROMIUM]');
+      throw Error('usage: factory-launch.mjs --input ABS_PUBLIC_SHOWCASE_JSON --output ABS_FRESH_DIRECTORY [--browser ABS_CHROMIUM] [--presentation comparison|qualification]');
     parsed[key] = args[++i];
   }
   if (!parsed.input || !parsed.output) throw Error('both --input and --output are required');
+  if (parsed.presentation && !['comparison','qualification'].includes(parsed.presentation)) throw Error('invalid presentation');
   return parsed;
 }
 

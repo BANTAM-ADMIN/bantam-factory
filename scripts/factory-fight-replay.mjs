@@ -5,9 +5,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import {factoryKit} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const KIT = path.join(REPO, 'examples/fights/factory-2026-09-06');
 const ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
@@ -263,7 +263,8 @@ function outerEvents(text,arm) {
 }
 
 /** Build only from recorded artifacts. Missing clocks/metrics remain null. */
-export function buildReplayLane({directory,result,arm,card,repeat,outer='',limits={},kitSeal={},identity=null}) {
+export function buildReplayLane({directory,result,arm,card,repeat,outer='',limits={},kitSeal={},kitId='factory-2026-09-06',identity=null}) {
+  const KIT=factoryKit(kitId).root;
   // A presentation adapter may describe a separately recorded local variant.
   // Never alias its identity or evidence to the historical 27B lane.
   const localVariant=/^bantam-local-[a-z0-9][a-z0-9-]{0,119}$/.test(arm??'')

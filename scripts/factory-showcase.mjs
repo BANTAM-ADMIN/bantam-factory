@@ -7,6 +7,7 @@ import {gzipSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
 import {buildReplayLane,normalizeReplayUsage,replayLineDiff} from './factory-fight-replay.mjs';
 import {deriveSavedWireUsage} from './fight-usage-report.mjs';
+import {factoryKit, PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SHA=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -16,11 +17,7 @@ const BOOL=v=>typeof v==='boolean'?v:null;
 const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const J=v=>JSON.stringify(v).replace(/[<>&\u2028\u2029]/g,c=>`\\u${c.charCodeAt(0).toString(16).padStart(4,'0')}`);
 const readJSON=f=>JSON.parse(fs.readFileSync(f,'utf8'));
-const CARDS={
-  'receipt-reducer':{title:'Receipt reducer',kind:'BUILD',number:'01',description:'Turn a noisy stream of events into a trustworthy account of what happened.'},
-  'snapshot-drift':{title:'Snapshot drift',kind:'EXTEND',number:'02',description:'Bind a snapshot to real files. Detect what changed, and validate what did not.'},
-  'job-planner':{title:'Job planner',kind:'REPAIR',number:'03',description:'Order dependent work deterministically. Propagate failure without losing the plan.'},
-};
+const CARDS=PUBLIC_FACTORY_CARDS;
 const SYSTEMS={
   'bantam-local-27b':['BANTAM · 27B','local','Qwen 27B · same local weights'],
   'deepseek-local-27b':['DeepSeek Harness','local','Qwen 27B · same local weights'],
@@ -106,7 +103,7 @@ export function publicShowcaseData(privateData){
     series:privateData.series.map((s,si)=>({id:`series-${si+1}`,title:s.kind==='comparison'?'The original factory comparison':`Local worker · edition ${si+1}`,
       kind:s.kind==='comparison'?'comparison':'variant',complete:s.complete===true,startedAt:knownDate(s.startedAt),finishedAt:knownDate(s.finishedAt),
       counts:counts(s.cards.flatMap(c=>c.rows).map(r=>({...r,groupsPassed:N(r.groupsPassed),groupsTotal:N(r.groupsTotal)}))),cards:s.cards.map(c=>{
-        if(!CARDS[c.card]||!Number.isSafeInteger(c.repeat)||c.repeat<1)throw Error('invalid public card identity');
+        if(!Object.hasOwn(CARDS,c.card)||!Number.isSafeInteger(c.repeat)||c.repeat<1)throw Error('invalid public card identity');
         return {id:`s${si+1}-${c.card}-r${c.repeat}`,card:c.card,...CARDS[c.card],repeat:c.repeat,
         rows:c.rows.map((r,ri)=>({id:`s${si+1}-${c.card}-r${c.repeat}-lane${ri+1}`,...publicIdentity(r),
           recorded:r.recorded===true,outcome:OUTCOMES.has(r.outcome)?r.outcome:'NOT RECORDED',
@@ -126,12 +123,13 @@ export function buildShowcase({roots,mode='private',limits={},now=new Date().toI
     if(!stat.isFile()||stat.isSymbolicLink()||stat.size>8*1024*1024)throw Error('invalid manifest file');
     const raw=fs.readFileSync(manifestPath),m=JSON.parse(raw);
     if(!['bantam.factory-fights.v1','bantam.factory-local-variant.v1'].includes(m.schema))throw Error('unsupported showcase series schema');
+    const kit=factoryKit(m.kitId??'factory-2026-09-06');
     if(!Array.isArray(m.plan)||!Array.isArray(m.results)||m.plan.length>200||m.results.length>200)throw Error('invalid series records');
     const key=r=>`${r.repeat}/${r.card}/${r.arm}`,rowsByKey=new Map();
     for(const r of m.results){if(rowsByKey.has(key(r)))throw Error('duplicate result identity');rowsByKey.set(key(r),r);}
     const cards=new Map(),seenIdentities=new Set();
     for(const item of [...m.plan,...m.results]){
-      if(!CARDS[item.card]||!Number.isInteger(item.repeat)||item.repeat<1||item.repeat>100)throw Error('invalid card/repeat');
+      if(!kit.cards.includes(item.card)||!Number.isInteger(item.repeat)||item.repeat<1||item.repeat>100)throw Error('invalid card/repeat for the recorded kit');
       const system=identity(m,item.arm),k=key(item);if(seenIdentities.has(k))continue;seenIdentities.add(k);
       const result=rowsByKey.get(k)??null,cardKey=`${item.repeat}/${item.card}`;
       if(!cards.has(cardKey))cards.set(cardKey,{id:`s${si+1}-${item.card}-r${item.repeat}`,card:item.card,...CARDS[item.card],repeat:item.repeat,rows:[]});
@@ -141,7 +139,7 @@ export function buildShowcase({roots,mode='private',limits={},now=new Date().toI
       if(fs.existsSync(path.join(directory,'wire','exchanges.jsonl'))){
         try{report=deriveSavedWireUsage(path.join(directory,'wire'));}catch(error){reportError=String(error.message);}
       }
-      const built=buildReplayLane({directory,result,arm:item.arm,card:item.card,repeat:item.repeat,outer,limits,kitSeal:m.kitSeal??{},identity:system});
+      const built=buildReplayLane({directory,result,arm:item.arm,card:item.card,repeat:item.repeat,outer,limits,kitSeal:m.kitSeal??{},kitId:kit.id,identity:system});
       const id=`s${si+1}-${built.lane.id}`,groups=result?.grade?.groups;
       const row={...built.lane,id,...system,bantam:item.arm.startsWith('bantam-'),recorded:result!==null,
         outcome:OUTCOMES.has(result?.outcome)?result.outcome:'NOT RECORDED',accepted:BOOL(result?.candidatePass),completed:BOOL(result?.processCompleted),

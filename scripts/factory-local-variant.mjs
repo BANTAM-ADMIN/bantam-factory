@@ -5,7 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
-import {FIGHT_CARDS,cleanFightEnv,freshCommand,inspectLocalModel,executeContender,parseGrade} from './factory-fights.mjs';
+import {cleanFightEnv,freshCommand,inspectLocalModel,executeContender,parseGrade} from './factory-fights.mjs';
+import {factoryKit} from './factory-card-catalog.mjs';
 import {treeHashes,changedSealedFiles,acceptedBantamCompletion} from './repobrief-astra-fights.mjs';
 import {startModelRecorder} from './fight-model-proxy.mjs';
 import {serverCounters,counterDelta} from './fight-usage.mjs';
@@ -13,30 +14,37 @@ import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const KIT=path.join(ROOT,'examples/fights/factory-2026-09-06');
+const DEFAULT_KIT_ID='factory-2026-09-06';
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const write=(file,value)=>fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n',{mode:0o600});
 const quote=value=>`'${String(value).replace(/'/g,"'\\''")}'`;
 const clean=result=>result?.code===0&&!result.timedOut&&!result.aborted&&!result.bufferExceeded;
 
+// A closed, versioned allowlist, never a user-supplied directory or grader.
+// Return copies so callers cannot mutate the next run's permitted work orders.
+export function variantKit(kitId=DEFAULT_KIT_ID) {
+  return factoryKit(kitId);
+}
+
 export function variantOptions(options={}) {
-  const {output,label,variantId,modelId=null,modelFile=null,cards=FIGHT_CARDS,timeoutMs=600000,endpoint='http://127.0.0.1:8085',verificationWorkspaceReadOnly=false,contractAssertionStation=false}=options;
+  const {output,label,variantId,kitId=DEFAULT_KIT_ID,modelId=null,modelFile=null,timeoutMs=600000,endpoint='http://127.0.0.1:8085',verificationWorkspaceReadOnly=false,contractAssertionStation=false}=options;
+  const kit=variantKit(kitId),cards=options.cards===undefined?kit.cards:options.cards;
   if(!path.isAbsolute(output??''))throw Error('--output must be an absolute, fresh evidence directory');
   if(typeof label!=='string'||!label.trim()||label.length>200||/[\r\n\x00-\x1f]/.test(label))throw Error('--label must name the actual model variant');
   if(typeof variantId!=='string'||!/^[a-z0-9][a-z0-9-]{0,79}$/.test(variantId))throw Error('--variant-id must be a lowercase path-safe identifier');
   if(modelId!==null&&(typeof modelId!=='string'||!modelId.trim()||/[\r\n\x00-\x1f]/.test(modelId)))throw Error('--model-id must be an exact server model identity');
   if(modelFile!==null&&!path.isAbsolute(modelFile))throw Error('--model-file must be absolute');
-  if(!Array.isArray(cards)||!cards.length||new Set(cards).size!==cards.length||cards.some(c=>!FIGHT_CARDS.includes(c)))throw Error('--cards must contain distinct fresh factory card IDs');
+  if(!Array.isArray(cards)||!cards.length||new Set(cards).size!==cards.length||cards.some(c=>!kit.cards.includes(c)))throw Error('--cards must contain distinct IDs belonging to the selected factory kit');
   if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('--timeout-seconds must be 1..600');
   if(typeof verificationWorkspaceReadOnly!=='boolean')throw Error('verificationWorkspaceReadOnly must be a boolean');
   if(typeof contractAssertionStation!=='boolean')throw Error('contractAssertionStation must be a boolean');
   const url=new URL(endpoint);
   if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('--endpoint must be a loopback HTTP origin without credentials');
-  return {output,label:label.trim(),variantId,arm:`bantam-local-${variantId}`,modelId,modelFile,cards:[...cards],timeoutMs,endpoint:url.origin,verificationWorkspaceReadOnly,contractAssertionStation};
+  return {output,label:label.trim(),variantId,kitId,arm:`bantam-local-${variantId}`,modelId,modelFile,cards:[...cards],timeoutMs,endpoint:url.origin,verificationWorkspaceReadOnly,contractAssertionStation};
 }
 
 export function parseVariantArgs(args) {
-  const flags=new Map([['--output','output'],['--endpoint','endpoint'],['--label','label'],['--variant-id','variantId'],
+  const flags=new Map([['--output','output'],['--endpoint','endpoint'],['--label','label'],['--variant-id','variantId'],['--kit','kitId'],
     ['--model-id','modelId'],['--model-file','modelFile'],['--cards','cards'],['--timeout-seconds','timeoutMs']]);
   const options={};
   for(let i=0;i<args.length;i++){
@@ -64,11 +72,12 @@ export function localVariantCommand({task,workspace,dir,endpoint,modelId,verific
   return {exe,args,env}; // Do not copy historical corner/name/subtitle metadata.
 }
 
-export async function gradeLocalVariant(workspace,card,{run=runShellProcess}={}) {
-  if(!FIGHT_CARDS.includes(card)||!path.isAbsolute(workspace))throw Error('invalid card or workspace');
-  const kit=path.join(KIT,card),descriptor=JSON.parse(fs.readFileSync(path.join(kit,'card.json'),'utf8'));
+export async function gradeLocalVariant(workspace,card,{run=runShellProcess,kitId=DEFAULT_KIT_ID}={}) {
+  const selected=variantKit(kitId);
+  if(!selected.cards.includes(card)||!path.isAbsolute(workspace))throw Error('invalid card or workspace for selected kit');
+  const kit=path.join(selected.root,card),descriptor=JSON.parse(fs.readFileSync(path.join(kit,'card.json'),'utf8'));
   if(descriptor.id!==card||!Array.isArray(descriptor.groups)||!descriptor.groups.length)throw Error('invalid frozen card descriptor');
-  const files=[path.join(KIT,'grader-support.mjs'),...Object.keys(treeHashes(kit))
+  const files=[path.join(selected.root,'grader-support.mjs'),...Object.keys(treeHashes(kit))
     .filter(p=>!p.startsWith('starter/')&&!p.startsWith('reviewer/')).map(p=>path.join(kit,p))];
   const publicStart=Date.now();
   const publicResult=await run(workspace,'npm test',{shellSandbox:'docker',shellNetwork:false,workspaceReadOnly:true,timeoutMs:60000});
@@ -89,7 +98,7 @@ export function variantVerdict({processResult,grading,tampered,saved,usage}) {
   return {outcome,pass:outcome==='PASS',candidatePass,processCompleted,acceptedCompletion};
 }
 
-const SCRIPTS=['factory-local-variant.mjs','factory-fights.mjs','repobrief-astra-fights.mjs','fight-model-proxy.mjs','fight-usage.mjs'];
+const SCRIPTS=['factory-local-variant.mjs','factory-card-catalog.mjs','factory-fights.mjs','repobrief-astra-fights.mjs','fight-model-proxy.mjs','fight-usage.mjs'];
 function sourceSeal(){return Object.fromEntries([
   ...['src','bin'].flatMap(part=>Object.entries(treeHashes(path.join(ROOT,part))).map(([file,hash])=>[`${part}/${file}`,hash])),
   ...['package.json',...SCRIPTS.map(file=>`scripts/${file}`)].map(file=>[file,sha(fs.readFileSync(path.join(ROOT,file)))]),
@@ -175,23 +184,24 @@ function report(manifest){
 
 export async function runLocalVariant(input) {
   const options=variantOptions(input),{output,endpoint,cards,timeoutMs,arm,label,variantId}=options;
+  const selectedKit=variantKit(options.kitId),kitRoot=selectedKit.root;
   if(fs.existsSync(output))throw Error('refusing to overwrite an existing evidence directory');
   const model=await inspectLocalModel(endpoint);
   if(options.modelId!==null&&model.id!==options.modelId)throw Error(`server model identity mismatch: expected ${options.modelId}, observed ${model.id}`);
   const advertisedFile=model.props?.model_path;
   if(options.modelFile&&advertisedFile&&path.isAbsolute(advertisedFile)&&fs.realpathSync(options.modelFile)!==fs.realpathSync(advertisedFile))throw Error('--model-file does not match the server-advertised model path');
   const fileReceipt=await modelFileReceipt(options.modelFile??(advertisedFile&&path.isAbsolute(advertisedFile)&&fs.existsSync(advertisedFile)?advertisedFile:null));
-  const runtimeSeal=sourceSeal(),kitSeal=treeHashes(KIT);
+  const runtimeSeal=sourceSeal(),kitSeal=treeHashes(kitRoot);
   const assertFrozen=()=>{
-    if(JSON.stringify(runtimeSeal)!==JSON.stringify(sourceSeal())||JSON.stringify(kitSeal)!==JSON.stringify(treeHashes(KIT)))throw Error('runtime or frozen card bytes changed; no further score issued');
+    if(JSON.stringify(runtimeSeal)!==JSON.stringify(sourceSeal())||JSON.stringify(kitSeal)!==JSON.stringify(treeHashes(kitRoot)))throw Error('runtime or frozen card bytes changed; no further score issued');
     if(fileReceipt){const s=fs.statSync(fileReceipt.path);if(s.size!==fileReceipt.size||s.mtimeMs!==fileReceipt.mtimeMs)throw Error('model file metadata changed during series');}
   };
   fs.mkdirSync(path.dirname(output),{recursive:true});fs.mkdirSync(output,{mode:0o700});
   write(path.join(output,'local-model.json'),model);
   const manifest={schema:'bantam.factory-local-variant.v1',startedAt:new Date().toISOString(),complete:false,
-    label,variantId,arm,modelId:model.id,expectedModelId:options.modelId,modelFile:fileReceipt,modelFileSha256:fileReceipt?.sha256??null,endpoint,
+    label,variantId,kitId:selectedKit.id,arm,modelId:model.id,expectedModelId:options.modelId,modelFile:fileReceipt,modelFileSha256:fileReceipt?.sha256??null,endpoint,
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),sourceSeal:runtimeSeal,kitSeal,
-    design:'New separately identified local-model variant on the three frozen fresh factory cards. One serial BANTAM run per selected card, fresh identical starters, no teacher or operator repairs. Historical 27B cards remain unchanged. Different model/quantization/server settings prevent treating this as a pure harness ablation or statistical ranking.',
+    design:`New separately identified local-model variant on the frozen ${selectedKit.id} factory kit. One serial BANTAM run per selected card, fresh identical starters, no teacher or operator repairs. Historical cards remain unchanged. Different tasks/model/quantization/server settings prevent treating this as a pure harness ablation or statistical ranking.`,
     limits:{wallMs:timeoutMs,bantamTurns:60,reasoningPredict:4096,actionPredict:8192},
     configuration:{bantamContext:'extension/immutable',profile:'qwen',probeEnabled:true,teacher:false,
       contractAssertionStation:options.contractAssertionStation,
@@ -213,7 +223,7 @@ export async function runLocalVariant(input) {
       assertFrozen();
       const current=await inspectLocalModel(endpoint);
       if(fingerprint(current)!==fingerprint(model))throw Error('local server model/build/default settings changed');
-      const {card}=item,kit=path.join(KIT,card),dir=path.join(output,'repeat-1',card,arm),workspace=path.join(dir,'ws');
+      const {card}=item,kit=path.join(kitRoot,card),dir=path.join(output,'repeat-1',card,arm),workspace=path.join(dir,'ws');
       fs.mkdirSync(dir,{recursive:true,mode:0o700});fs.cpSync(path.join(kit,'starter'),workspace,{recursive:true,dereference:false});
       const materials=treeHashes(path.join(kit,'starter'));
       if(JSON.stringify(materials)!==JSON.stringify(treeHashes(workspace)))throw Error('starter copy mismatch');
@@ -231,7 +241,7 @@ export async function runLocalVariant(input) {
       const after=await optionalCounters(endpoint),serverUsage=counterDelta(before,after);
       write(path.join(dir,'server-usage.json'),{before,after,delta:serverUsage});assertFrozen();
       const tampered=changedSealedFiles(Object.fromEntries(Object.entries(materials).filter(([file])=>file==='package.json'||file.startsWith('test/'))),workspace);
-      const grading=await gradeLocalVariant(workspace,card);
+      const grading=await gradeLocalVariant(workspace,card,{kitId:selectedKit.id});
       for(const [name,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
         fs.writeFileSync(path.join(dir,`${name}.stdout.log`),record.stdout,{mode:0o600});fs.writeFileSync(path.join(dir,`${name}.stderr.log`),record.stderr,{mode:0o600});
       }
@@ -246,13 +256,13 @@ export async function runLocalVariant(input) {
       process.stdout.write(`${manifest.results.length}/${manifest.plan.length} ${card}: ${row.outcome}, ${(row.wallMs/1000).toFixed(1)}s, ${row.grade?.groups.filter(g=>g.pass).length??0}/${row.grade?.groups.length??0} groups\n`);
     }
     manifest.finishedAt=new Date().toISOString();manifest.complete=manifest.results.length===manifest.plan.length;
-    manifest.sourceMismatches=changedSealedFiles(runtimeSeal,ROOT);manifest.kitMismatches=changedSealedFiles(kitSeal,KIT);save();
+    manifest.sourceMismatches=changedSealedFiles(runtimeSeal,ROOT);manifest.kitMismatches=changedSealedFiles(kitSeal,kitRoot);save();
     return manifest;
   }catch(error){manifest.error={at:new Date().toISOString(),message:error.message};save();throw error;}
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  if(process.argv.includes('--help'))process.stdout.write('node scripts/factory-local-variant.mjs --output ABS_DIR --label "Tiel35BA3B IQ4_XS" --variant-id tiel35ba3b-iq4-xs [--endpoint http://127.0.0.1:8085] [--model-id EXACT_SERVER_ID] [--model-file ABS_GGUF] [--cards receipt-reducer,snapshot-drift,job-planner] [--timeout-seconds 600] [--verify-workspace-read-only] [--contract-assertion-station]\n');
+  if(process.argv.includes('--help'))process.stdout.write('node scripts/factory-local-variant.mjs --output ABS_DIR --label "Tiel35BA3B IQ4_XS" --variant-id tiel35ba3b-iq4-xs [--kit factory-2026-09-06|factory-2026-09-07] [--endpoint http://127.0.0.1:8085] [--model-id EXACT_SERVER_ID] [--model-file ABS_GGUF] [--cards COMMA_SEPARATED_KIT_IDS] [--timeout-seconds 600] [--verify-workspace-read-only] [--contract-assertion-station]\n');
   else Promise.resolve().then(()=>runLocalVariant(parseVariantArgs(process.argv.slice(2))))
     .then(result=>{process.stdout.write(`Evidence: ${result.results.length}/${result.plan.length} recorded in ${process.argv[process.argv.indexOf('--output')+1]}\n`);if(!result.complete||result.results.some(row=>!row.pass))process.exitCode=1;})
     .catch(error=>{process.stderr.write(`${error.stack}\n`);process.exitCode=1;});

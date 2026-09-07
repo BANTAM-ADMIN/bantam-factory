@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {variantOptions,parseVariantArgs,localVariantCommand,gradeLocalVariant,variantVerdict,runLocalVariant,cleanupVariantWorkspace,verifyVariantServer} from '../scripts/factory-local-variant.mjs';
+import {variantKit,variantOptions,parseVariantArgs,localVariantCommand,gradeLocalVariant,variantVerdict,runLocalVariant,cleanupVariantWorkspace,verifyVariantServer} from '../scripts/factory-local-variant.mjs';
 import {freshCommand} from '../scripts/factory-fights.mjs';
 
 const base={output:'/tmp/tiel-variant-evidence',label:'Tiel35BA3B IQ4_XS',variantId:'tiel35ba3b-iq4-xs'};
@@ -14,10 +14,41 @@ const grading={publicResult:successfulProcess,hidden:successfulProcess,record:{p
 
 test('variant options name the actual model without historical 27B labels',()=>{
   const parsed=variantOptions(base);
+  assert.equal(parsed.kitId,'factory-2026-09-06');
   assert.equal(parsed.arm,'bantam-local-tiel35ba3b-iq4-xs');assert.equal(parsed.label,'Tiel35BA3B IQ4_XS');
   assert.deepEqual(parsed.cards,['receipt-reducer','snapshot-drift','job-planner']);
   assert.equal(parsed.timeoutMs,600000);assert.equal(parsed.modelId,null);
   assert.equal(variantOptions({...base,endpoint:'http://127.0.0.1:8089/'}).endpoint,'http://127.0.0.1:8089');
+});
+
+test('explicit versioned kit selects only its own fresh cards without changing historical defaults',()=>{
+  const prefix=['--output',base.output,'--label',base.label,'--variant-id',base.variantId];
+  const selected=parseVariantArgs([...prefix,'--kit','factory-2026-09-07']);
+  assert.equal(selected.kitId,'factory-2026-09-07');
+  assert.deepEqual(selected.cards,['context-packet','patch-transaction','stream-framer']);
+  assert.deepEqual(parseVariantArgs([...prefix,'--kit','factory-2026-09-07','--cards','stream-framer,context-packet']).cards,
+    ['stream-framer','context-packet']);
+  assert.deepEqual(variantOptions(base).cards,['receipt-reducer','snapshot-drift','job-planner']);
+  assert.equal(selected.timeoutMs,600000);assert.equal(selected.contractAssertionStation,false);
+  assert.equal(selected.verificationWorkspaceReadOnly,false);
+  const kit=variantKit(selected.kitId);
+  assert.equal(path.basename(kit.root),'factory-2026-09-07');assert.ok(path.isAbsolute(kit.root));
+  kit.cards.push('injected');
+  assert.deepEqual(variantKit(selected.kitId).cards,['context-packet','patch-transaction','stream-framer']);
+});
+
+test('kit selection rejects cross-kit cards, arbitrary directories and duplicate flags before execution',async()=>{
+  const prefix=['--output',base.output,'--label',base.label,'--variant-id',base.variantId];
+  for(const suffix of [
+    ['--kit','factory-2026-09-07','--cards','snapshot-drift'],
+    ['--cards','context-packet'],['--kit','factory-2026-09-07','--cards','context-packet,context-packet'],
+    ['--kit','factory-2026-09-07','--kit','factory-2026-09-06'],
+    ['--kit','../../private'],['--kit','/tmp/user-kit'],['--kit','unknown'],['--kit','__proto__'],['--kit'],
+  ])assert.throws(()=>parseVariantArgs([...prefix,...suffix]));
+  for(const kitId of [null,{},[],1])assert.throws(()=>variantKit(kitId));
+  const run=async()=>{throw Error('must not launch a grading process');};
+  await assert.rejects(gradeLocalVariant('/tmp/ws','snapshot-drift',{kitId:'factory-2026-09-07',run}),/invalid card/);
+  await assert.rejects(gradeLocalVariant('/tmp/ws','context-packet',{run}),/invalid card/);
 });
 
 test('variant CLI rejects ambiguous options, remote endpoints, unsafe identities and duplicate cards',()=>{
@@ -80,6 +111,26 @@ test('public and hidden grading reuse readonly offline Docker and exact five-gro
   assert.ok(calls[1].command.includes("'/tmp/tiel candidate/ws'"));
   assert.ok(calls[1].options.readOnlyHostFiles.some(file=>file.endsWith('/grader-support.mjs')));
   assert.ok(!calls[1].options.readOnlyHostFiles.some(file=>file.includes('/reviewer/')||file.includes('/starter/')));
+  assert.deepEqual(result.record,record);
+});
+
+test('new-kit grading binds its own descriptor, grader and support while keeping reviewer code private',async()=>{
+  const selected=variantKit('factory-2026-09-07'),card='context-packet';
+  const descriptor=JSON.parse(fs.readFileSync(path.join(selected.root,card,'card.json'),'utf8'));
+  const record={schema:'bantam.factory-card-grade.v1',card,pass:true,groups:descriptor.groups.map(name=>({name,pass:true}))};
+  const calls=[],result=await gradeLocalVariant('/tmp/new-kit candidate/ws',card,{kitId:selected.id,run:async(workspace,command,options)=>{
+    calls.push({workspace,command,options});
+    return {...successfulProcess,stdout:command==='npm test'?'public passed':JSON.stringify(record),stderr:''};
+  }});
+  assert.equal(calls.length,2);assert.equal(calls[0].command,'npm test');
+  assert.ok(calls[1].command.includes(path.join(selected.root,card,'grader.mjs')));
+  assert.ok(calls[1].command.includes("'/tmp/new-kit candidate/ws'"));
+  const mounts=calls[1].options.readOnlyHostFiles;
+  assert.ok(mounts.includes(path.join(selected.root,'grader-support.mjs')));
+  assert.ok(mounts.includes(path.join(selected.root,card,'card.json')));
+  assert.ok(mounts.every(file=>file.startsWith(selected.root+path.sep)));
+  assert.ok(mounts.every(file=>!file.includes('/reviewer/')&&!file.includes('/starter/')));
+  for(const call of calls){assert.equal(call.options.shellSandbox,'docker');assert.equal(call.options.shellNetwork,false);assert.equal(call.options.workspaceReadOnly,true);}
   assert.deepEqual(result.record,record);
 });
 

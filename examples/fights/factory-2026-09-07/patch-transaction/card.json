@@ -1,0 +1,8 @@
+{
+  "id": "patch-transaction",
+  "title": "Patch transaction",
+  "shape": "extend",
+  "deliverables": ["patch-transaction.js"],
+  "protected": ["package.json", "test/public.test.js"],
+  "groups": ["preserve-single-edit-api", "original-coordinates-and-order-independence", "conflicts-and-atomic-preconditions", "validation-unicode-and-immutability", "cli-transaction-and-errors"]
+}

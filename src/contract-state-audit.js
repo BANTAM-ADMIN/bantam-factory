@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import { CHATML_TEMPLATE } from "./profiles.js";
 import { isGeneratedPath, isTestPath } from "./scope-guard.js";
+import { collectNodeCliRoutingFacts, formatNodeCliRoutingFacts } from "./node-cli-routing-facts.js";
 
 const digest = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const SOURCE = /\.(?:[cm]?[jt]sx?|py|go|rs|java|c|cpp|h|rb)$/i;
@@ -102,6 +103,28 @@ export function collectContractAuditSources(candidates, readFile, { maxFiles = 4
   return { sources, omitted };
 }
 
+function sourceRoutingFacts(sources) {
+  const facts = [];
+  let remaining = 1800;
+  const counts = new Map();
+  for (const source of sources) counts.set(source.path, (counts.get(source.path) ?? 0) + 1);
+  for (const source of sources.slice(0, 4)) {
+    if (facts.length >= 2 || counts.get(source.path) !== 1 || typeof source.text !== "string"
+        || source.sha256 !== digest(source.text)) continue;
+    const fact = collectNodeCliRoutingFacts({ source: source.text, path: source.path });
+    if (!fact) continue;
+    const note = sourceRoutingFactNote(fact);
+    if (note.length > remaining) continue;
+    facts.push(fact); remaining -= note.length;
+  }
+  return facts;
+}
+
+function sourceRoutingFactNote(fact) {
+  return `[source facts; scope=source-structure-only; candidateVerified=false; sha256=${fact.sourceSha256}]\n`
+    + formatNodeCliRoutingFacts(fact);
+}
+
 export function buildContractStateAuditPrompt({ task, documents, sources, omitted = [], template = CHATML_TEMPLATE, thinkMarkers = null }) {
   const collection = collectionContractAuditApplies(task, documents);
   const system = "You are a source-code state-machine auditor. No tools are available. Work only from the supplied code and public contract. "
@@ -113,7 +136,11 @@ export function buildContractStateAuditPrompt({ task, documents, sources, omitte
   const taskText = String(task);
   const contract = [`PUBLIC TASK:\n${taskText.slice(0, 12000)}${taskText.length > 12000 ? "\n[task truncated; omitted requirements unknown]" : ""}`, ...documents.slice(0, 4).map((d) =>
     `SUPPLIED DOCUMENT ${d.path}:\n${d.text.slice(0, 12000)}${d.truncated || d.text.length > 12000 ? "\n[document truncated; omitted requirements unknown]" : ""}`)].join("\n\n");
-  const code = sources.map((s) => `CURRENT SOURCE ${s.path}:\n${s.text}`).join("\n\n");
+  const sourceFacts = sourceRoutingFacts(sources);
+  const code = sources.map((s) => {
+    const fact = sourceFacts.find(item => item.path === s.path && item.sourceSha256 === s.sha256);
+    return `CURRENT SOURCE ${s.path}:\n${s.text}${fact ? `\n\n${sourceRoutingFactNote(fact)}` : ""}`;
+  }).join("\n\n");
   const omissions = omitted.length ? `\nOmitted source files (audit is partial): ${omitted.join(", ")}` : "";
   return `${template.open("system")}${system}\n${template.close}`
     + `${template.open("user")}${instruction}\n\n${contract}\n\n${code}${omissions}\n${template.close}`
@@ -132,6 +159,7 @@ export async function runContractStateAudit({ model, task, documents, sources, o
     focus: collectionContractAuditApplies(task, documents) ? "collection-preconditions" : "state-boundaries",
     documents: documents.map((d) => ({ path: d.path, sha256: digest(d.text) })),
     sources: sources.map(({ path: sourcePath, sha256 }) => ({ path: sourcePath, sha256 })),
+    sourceFacts: sourceRoutingFacts(sources),
     omitted, advisory: true,
     ...(collection ? { outputFormat: "collection-findings-v1", grammarSha256: digest(COLLECTION_AUDIT_GRAMMAR),
       jsonSchemaSha256: digest(JSON.stringify(COLLECTION_AUDIT_SCHEMA)) } : {}),

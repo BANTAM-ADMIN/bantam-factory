@@ -41,6 +41,10 @@ import { currentConfiguredFailure, verificationFailureContext } from "./verifica
 import { collectObjectConstructionFacts, formatObjectConstructionFacts } from "./object-construction-facts.js";
 import { directNodeCheckScript, nodeCheckSelfSpawnRefusal } from "./node-check-self-spawn.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
+import { deriveCliContract } from "./contract-cli-assertion-spec.js";
+import { runContractCliStation, formatContractCliStation } from "./contract-cli-station.js";
+import { cliVerificationPassed, cliVerificationDecisionContext } from "./contract-cli-verification.js";
+import { collectNodeCliRoutingFacts, formatNodeCliRoutingFacts } from "./node-cli-routing-facts.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
 import { impactFooter, familyFooter, familyFindings, familyBlocks, constantTableFooter, crossScopeUsageFooter, peerFunctionFooter, trimSiteList } from "./edit-context.js";
@@ -976,6 +980,14 @@ async function runAgentCore({
   const bareTurnPrefill = bareTemplate.open(bareTemplate.assistantRole);
   const taskNamedPaths = taskNamedSourcePaths(task, workspace);
   const taskOutputPaths = extractTaskOutputPaths(task);
+  const cliContract = !interactive && !advisoryMode && probeEnabled
+    && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker"
+    && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")
+    ? deriveCliContract(task) : null;
+  if (cliContract) {
+    env += `\n[public CLI verification] ${cliContract.module} has a separate required process contract. The controller will check the actual CLI after green verification or proposed completion, using a bounded declarative input and expected result. API-only assertions and printed statuses cannot discharge this CLI obligation.\n`;
+    onEvent({ type: "cli_contract", contract: structuredClone(cliContract) });
+  }
   const sourceProvenance = deriveSourceProvenanceObligation(task, { outputPaths: taskOutputPaths });
   // Source deliverable(s) the task NAMES (e.g. "call your program /app/gpt2.c").
   // Unlike taskNamedPaths, these need not exist yet — the commit-to-deliverable
@@ -1065,6 +1077,7 @@ async function runAgentCore({
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
+        ...(t.cliVerification ? { cliVerification: structuredClone(t.cliVerification) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
@@ -1271,6 +1284,7 @@ async function runAgentCore({
     writeBatchEnabled: Boolean(writeBatch),
     probeEnabled: Boolean(probeEnabled),
     contractAssertionStationEnabled: assertionStationEnabled,
+    cliVerificationEnabled: Boolean(cliContract),
     fileOperationPolicy,
     verificationPolicy,
     verificationTriggered: false,
@@ -1801,6 +1815,10 @@ async function runAgentCore({
   let editsSinceFullVerify = 0;   // edits the configured verifier has not run against
   const editedPathsThisRun = new Set();   // for the landing note's untouched-requirement check
   let contractAudits = turns.filter((turn) => turn.contractStateAudit).length;
+  // A resumed film is retained for audit, but does not grant live CLI authority.
+  // Obtain a fresh isolated receipt on the current invocation/tree.
+  let cliVerification = null;
+  const cliStationGenerations = new Set();
   const auditRecoveryVerifications = new Set(turns.flatMap(turn =>
     (Array.isArray(turn.verificationReceipts?.entries) ? turn.verificationReceipts.entries : []).flatMap(entry => {
       const proof = entry?.verificationEvidence;
@@ -2095,7 +2113,11 @@ async function runAgentCore({
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
-    const contractAuditPhase = contractAuditPhaseState(auditRecovery, {
+    const cliDecision = cliContract ? cliVerificationDecisionContext(cliContract, cliVerification, {
+      generation: workspaceEditGeneration,
+    }) : null;
+    const contractAuditPhase = contractAuditPhaseState(cliDecision
+      ? { ...auditRecovery, needsCli: true, configuredCommand: verificationScript } : auditRecovery, {
       useGrammar, interactive, advisoryMode, writeBatch, callerExcludedActions,
     });
     const auditWitness = collectionAuditEnabled && !auditRecovery
@@ -2108,10 +2130,22 @@ async function runAgentCore({
     // Structural facts explain current source only: they supply no expected
     // values, candidate edits, successful evidence, or completion authority.
     const failureSourceFacts = currentFailure ? currentFailureSourceFacts(turns, exec) : [];
-    const verificationWorkflow = currentFailure
+    const currentCliFailed = cliVerification?.generation === workspaceEditGeneration && cliVerification?.status === "failed";
+    let verificationWorkflow = currentFailure && !currentCliFailed
       ? { ...verificationFailureContext(currentFailure, { facts: failureSourceFacts.map(formatObjectConstructionFacts) }),
         sourceFacts: failureSourceFacts }
-      : collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null;
+      : cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
+    if (cliDecision && verificationWorkflow === cliDecision) {
+      try {
+        const filename = exec.resolveExisting(cliContract.module), stat = fs.lstatSync(filename);
+        if (stat.isFile() && stat.size <= 256 * 1024) {
+          const facts = collectNodeCliRoutingFacts({ source: fs.readFileSync(filename, "utf8"), path: cliContract.module });
+          const note = facts ? formatNodeCliRoutingFacts(facts) : "";
+          if (note && verificationWorkflow.text.length + note.length + 1 <= 2400)
+            verificationWorkflow = { ...verificationWorkflow, text: verificationWorkflow.text + "\n" + note, sourceFacts: [facts] };
+        }
+      } catch { /* Source facts are advisory, never acceptance authority. */ }
+    }
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
@@ -2296,7 +2330,7 @@ async function runAgentCore({
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
-      suppressDuringCurrentFailure: Boolean(currentFailure),
+      suppressDuringCurrentFailure: Boolean(currentFailure || currentCliFailed),
     });
     let repositoryText = "";
     let repositoryTurnId = null;
@@ -5549,13 +5583,66 @@ async function runAgentCore({
           + " No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.";
       }
     }
+    // CLI and API are separate surfaces. A successful API assertion or suite
+    // must not silently replace the explicitly requested process contract.
+    // Reuse the existing isolated probe/fact machinery; no candidate code is
+    // imported by this controller and no fixture/expected value comes from a
+    // hidden judge. One station attempt per current workspace generation.
+    if (cliContract && hasAuthoredWork && !interrupted && !result.controllerStop
+        && (result.verificationEvidence?.status === "pass" || action.a === "done")
+        && !cliStationGenerations.has(workspaceEditGeneration)
+        && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)) {
+      const sources = collectContractAuditSources([cliContract.module, ...editedPathsThisRun, ...openList],
+        relative => exec.safeReadText(exec.resolveExisting(relative))).sources;
+      if (sources.some(source => source.path === cliContract.module)) {
+        cliStationGenerations.add(workspaceEditGeneration);
+        onEvent({ type: "contract_cli_start", generation: workspaceEditGeneration, module: cliContract.module });
+        try {
+          cliVerification = await runContractCliStation({ workspace, model, task, documents: suppliedTaskDocuments,
+            sources, generation: workspaceEditGeneration, signal, dockerImage,
+            processRunner: shellProcessRunner, contract: cliContract });
+        } catch (error) {
+          if (signal?.aborted) { markInterrupted("contract_cli"); break; }
+          throw error;
+        }
+        result.cliVerification = cliVerification;
+        metrics.cliVerificationRuns = (metrics.cliVerificationRuns ?? 0) + 1;
+        metrics.cliVerificationTokens = (metrics.cliVerificationTokens ?? 0) + (cliVerification.tokens ?? 0);
+        if (cliVerification.probeEvidence) onEvent({ type: "probe", probeEvidence: structuredClone(cliVerification.probeEvidence) });
+        result.observation += `\n\n${formatContractCliStation(cliVerification)}`;
+        onEvent({ type: "contract_cli", cliVerification: structuredClone(cliVerification),
+          generation: workspaceEditGeneration, status: cliVerification.status });
+        if (cliVerificationPassed(cliContract, cliVerification, { generation: workspaceEditGeneration }) && verificationScript) {
+          // Record a new configured execution AFTER this additional station.
+          // A preceding green suite is not a substitute for this ordering.
+          let evidence = null;
+          const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
+            doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
+            readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly, processRunner: shellProcessRunner,
+            onExecution: execution => {
+              evidence = verificationEvidence({ execution, command: verificationScript,
+                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "automatic" });
+              recordVerification(evidence);
+            },
+          });
+          if (proof.interrupted || abortRequested()) markInterrupted("verification");
+          if (evidence && proof.status !== "pass") evidence = { ...evidence, status: proof.status };
+          cliVerification.projectVerification = verificationReceipt(evidence);
+          result.verificationEvidence = evidence;
+          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+            verification: { ...proof, status: evidence?.status ?? "unverified" }, evidence };
+          result.observation += `\n[cli-project-check] The configured verifier ran after the CLI station: ${evidence?.status ?? "unverified"}.\n${clip(proof.detail ?? "")}`;
+        }
+      }
+    }
     if (landingPassNote !== null) {
       const pending = collectionAuditEnabled ? currentAuditState() : null;
       if (landingPassNote === 0 && terminalClosureEligible({
         allowance: terminalClosureTurns, used: metrics.terminalClosure.used,
         turnsUsed: turns.length + 1, workTurnLimit: maxTurns, action, proof: doneVerificationProof,
         generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
-        verificationWorkspaceReadOnly, pendingAudit: pending, interrupted,
+        verificationWorkspaceReadOnly, pendingAudit: cliContract && !cliVerificationPassed(cliContract, cliVerification,
+          { generation: workspaceEditGeneration }) ? { ...pending, needsCli: true } : pending, interrupted,
         controllerStopped: controllerStop || result.controllerStop, resultDone: result.done, callerExcludedActions,
         freshEvidence: verificationReceipts.entries.some(entry => entry.verificationEvidence?.status === "pass"
           && entry.verificationEvidence.generation === workspaceEditGeneration),
@@ -6065,6 +6152,15 @@ async function runAgentCore({
         onEvent({ type: "document_audit_remediation_closed", documents: reviewedDocumentArtifacts });
       }
     }
+    if (result.done && !result.controllerStop && cliContract
+        && !cliVerificationPassed(cliContract, cliVerification, { generation: workspaceEditGeneration })) {
+      result.done = false;
+      result.summary = undefined;
+      result.observation += `\n${cliVerificationDecisionContext(cliContract, cliVerification,
+        { generation: workspaceEditGeneration })?.text ?? "CLI verification is still unresolved."}`;
+      metrics.cliCompletionRefusals = (metrics.cliCompletionRefusals ?? 0) + 1;
+      onEvent({ type: "cli_completion_refused", generation: workspaceEditGeneration, module: cliContract.module });
+    }
     const progress = classifyProgress(action, result.observation, {
       workspaceChanged: shellChangedWorkspace,
       doneAccepted: action.a === "done" && result.done && !result.controllerStop,
@@ -6246,6 +6342,7 @@ async function runAgentCore({
       ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
       ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
+      ...(result.cliVerification ? { cliVerification: structuredClone(result.cliVerification) } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
       shellExecution: shellReceipt,
       ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
@@ -6350,7 +6447,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

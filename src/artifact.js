@@ -170,6 +170,7 @@ export function buildArtifact({
       ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),
       ...(Object.hasOwn(t, "contractStateAudit") ? { contractStateAudit: serializableCopy(t.contractStateAudit) } : {}),
       ...(Object.hasOwn(t, "contractAssertion") ? { contractAssertion: serializableCopy(t.contractAssertion) } : {}),
+      ...(Object.hasOwn(t, "cliVerification") ? { cliVerification: serializableCopy(t.cliVerification) } : {}),
       ...(Object.hasOwn(t, "contextBasis") ? { contextBasis: serializableCopy(t.contextBasis) } : {}),
       ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: serializableCopy(t.contextUpdates) } : {}),
       ...(Object.hasOwn(t, "verificationWorkflow") ? { verificationWorkflow: serializableCopy(t.verificationWorkflow) } : {}),

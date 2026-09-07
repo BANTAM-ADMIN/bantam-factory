@@ -8,6 +8,18 @@ const PREFIX='CONTRACT AUDIT PHASE:';
 const state={schema:1,phase:'focused',generation:2,text:PREFIX+'x'.repeat(2400-PREFIX.length)};
 const rows=()=>Array.from({length:4},(_,i)=>({i,observation:`observation ${i}`,verificationWorkflow:structuredClone(state)}));
 
+test('CLI decision and source-routing facts occupy the priced immutable workflow slot',()=>{
+  const value={schema:1,phase:'cli',generation:4,text:'CLI VERIFICATION REQUIRED: missing-argument actual exit 0, required 2.\n[CLI routing] raw argv length 2 excludes the dispatch.',
+    sourceFacts:[{sourceSha256:'b'.repeat(64),candidateVerified:false}]};
+  const formatted=verificationWorkflowPromptText(value);
+  assert.match(formatted,/missing-argument actual exit 0/);
+  assert.match(formatted,/\[CLI routing\]/);
+  assert.doesNotMatch(formatted,/sourceSha256/);
+  const turns=rows().map(t=>({...t,verificationWorkflow:value}));
+  const each=turns[0].observation.length+96+formatted.length+96;
+  assert.deepEqual(budgetTurns(turns,{charBudget:each*2}).map(t=>t.i),[2,3]);
+});
+
 test('current execution failure uses the same validated and budgeted immutable slot',()=>{
   const failure={schema:1,phase:'failure',generation:3,text:'EXECUTION FAILURE: actual configured verifier is still red.',
     sourceFacts:[{sourceSha256:'a'.repeat(64),candidateVerified:false}]};

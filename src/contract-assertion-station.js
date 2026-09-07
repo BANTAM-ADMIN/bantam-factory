@@ -51,7 +51,7 @@ function readInput(root, relative) {
 
 function inputMetadata(input) { const { bytes, ...metadata } = input; return metadata; }
 
-function readBoundInputs(root, sources) {
+export function readBoundInputs(root, sources) {
   const inputs = sources.map(source => {
     const input = readInput(root, source.path);
     if (!input.bytes.equals(Buffer.from(source.text)) || input.sha256 !== source.sha256) throw new Error(`stale supplied source: ${source.path}`);

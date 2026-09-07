@@ -11,6 +11,18 @@ import { ALL_ACTION_VERBS } from "../src/action-protocol.js";
 
 const PENDING = Object.freeze({ needsFocused: true, needsProject: true, configuredCommand: "npm test" });
 
+test("separate CLI obligation keeps completion masked after API/project green", () => {
+  const phase = contractAuditPhaseState({ needsCli: true, needsFocused: false, needsProject: false });
+  assert.equal(phase.active, true);
+  assert.deepEqual(phase.excludeVerbs, ["done", "respond"]);
+  assert.match(phase.note, /API-only green cannot substitute/);
+  assert.deepEqual(contractAuditPhaseState({ needsCli: true }, { callerExcludedActions: ["shell", "write_file", "replace"] }).excludeVerbs, ["done"]);
+  assert.equal(contractAuditPhaseState({ needsCli: true }, { interactive: true }).active, false);
+  assert.equal(contractAuditPhaseState({ needsCli: true }, { advisoryMode: true }).active, false);
+  assert.ok(verificationWorkflowPromptText({ schema: 1, phase: "cli", generation: 2,
+    text: "CLI VERIFICATION REQUIRED: recorded process status is wrong." }).includes("recorded process status"));
+});
+
 test("maximal recovery fields remain bounded and render instead of silently losing the decision", () => {
   for (const command of ["x".repeat(510), '"'.repeat(510), "node check-api.mjs"]) {
     const pending = { ...PENDING, generation: Number.MAX_SAFE_INTEGER,

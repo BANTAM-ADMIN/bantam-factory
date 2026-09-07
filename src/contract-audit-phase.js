@@ -5,7 +5,7 @@ export function contractAuditPhaseState(pending, {
   writeBatch = false, callerExcludedActions = [],
 } = {}) {
   const active = !interactive && !advisoryMode
-    && Boolean(pending?.needsFocused === true || pending?.needsProject === true);
+    && Boolean(pending?.needsFocused === true || pending?.needsProject === true || pending?.needsCli === true);
   if (!active) return { active: false, excludeVerbs: [], note: "" };
   // Exactly the existing autonomous-implementation respond veto, not a new
   // restriction on interactive/advisory or caller-enforced read-only replies.
@@ -16,7 +16,9 @@ export function contractAuditPhaseState(pending, {
   const command = pending.configuredCommand;
   const commandText = typeof command === "string" && command.length <= 512
     && !/[\x00-\x1f\x7f]/.test(command) ? JSON.stringify(command) : null;
-  const next = pending.needsFocused === true
+  const next = pending.needsCli === true
+    ? "The separate public CLI process check is still missing, stale, or failing. Repair a demonstrated source or fixture defect and run the configured verifier; the controller will execute its fixed real-CLI check. API-only green cannot substitute for CLI evidence."
+    : pending.needsFocused === true
     ? "Next: execute a direct assertion against the actual API or CLI and the public contract. Create or repair the check separately if needed; printouts and broad-suite green do not replace this focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
     : `Focused proof is accepted for the current tree. Next: run ${commandText ? `exactly the configured project verifier ${commandText}` : "the exact configured project verifier"}, directly, on that unchanged tree. Do not repeat the focused check.`;
   return { active: true, excludeVerbs, note: [
@@ -63,10 +65,11 @@ export function contractAuditDecisionContext(pending, witness = null) {
 }
 
 export function verificationWorkflowPromptText(value) {
-  if (!value || value.schema !== 1 || !["focused", "project", "ready", "failure"].includes(value.phase)
+  if (!value || value.schema !== 1 || !["focused", "project", "ready", "failure", "cli"].includes(value.phase)
       || !Number.isSafeInteger(value.generation) || value.generation < 0
       || typeof value.text !== "string" || value.text.length > 2400
-      || !value.text.startsWith(value.phase === "failure" ? "EXECUTION FAILURE:"
+      || !value.text.startsWith(value.phase === "cli" ? "CLI VERIFICATION REQUIRED:"
+        : value.phase === "failure" ? "EXECUTION FAILURE:"
         : value.phase === "ready" ? "VERIFICATION READY:" : "CONTRACT AUDIT PHASE:")) return "";
   return `[verification workflow: current decision]\n${value.text}\n`;
 }

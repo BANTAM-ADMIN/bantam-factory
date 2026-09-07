@@ -59,6 +59,7 @@ import { collateralRefusal } from "./collateral.js";
 import { renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
 import { verificationEvidence, verificationShellStatusRisk } from "./verification-evidence.js";
+import { isFocusedAuditCommand } from "./contract-audit-recovery.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
 import { createEditPreservationWitness, formatEditPreservationReview } from "./edit-preservation.js";
 import { editPaths } from "./edit-actions.js";
@@ -1168,10 +1169,14 @@ export class Executor {
     const pipeNote = [statusCorrectionNote, this._pipeAutoCorrected].filter(Boolean).join("") || null;
     this._pipeAutoCorrected = null;
     const testCommand = isTestCommand(c);
+    // Direct assertion/check scripts use the same bounded verification clock
+    // as named runners. This classifier grants no proof or execution rewrite;
+    // ordinary deliverables/builds retain their separate shell timeout.
+    const verificationCommand = testCommand || isFocusedAuditCommand(c);
     // Ad-hoc executable checks deserve the same exit integrity as a named
     // suite. A successful tail must not turn a crashed node/python script green.
-    const pipefail = testCommand || isDeliverableRun(c);
-    const timeoutMs = testCommand
+    const pipefail = verificationCommand || isDeliverableRun(c);
+    const timeoutMs = verificationCommand
       ? Math.min(this.shellTimeoutMs, this.testTimeoutMs)
       : this.shellTimeoutMs;
     // One hanging test must not consume the whole run's timeout: the v6
@@ -1383,7 +1388,7 @@ export class Executor {
     }
     if (res.timedOut) {
       const secs = Math.round(timeoutMs / 1000);
-      if (testCommand) {
+      if (verificationCommand) {
         out += `\n[timeout] Verification was killed after ${secs}s. Treat this as failing evidence, not a reason to rerun the unchanged command. Inspect the latest edit for an infinite loop, deadlock, blocked I/O, or runaway recursion; run the smallest implicated test after changing code.`;
       } else {
         // The command was cut off by OUR timeout — it did not itself fail. Re-running

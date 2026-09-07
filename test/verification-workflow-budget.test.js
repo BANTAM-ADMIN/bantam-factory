@@ -8,6 +8,19 @@ const PREFIX='CONTRACT AUDIT PHASE:';
 const state={schema:1,phase:'focused',generation:2,text:PREFIX+'x'.repeat(2400-PREFIX.length)};
 const rows=()=>Array.from({length:4},(_,i)=>({i,observation:`observation ${i}`,verificationWorkflow:structuredClone(state)}));
 
+test('current execution failure uses the same validated and budgeted immutable slot',()=>{
+  const failure={schema:1,phase:'failure',generation:3,text:'EXECUTION FAILURE: actual configured verifier is still red.',
+    sourceFacts:[{sourceSha256:'a'.repeat(64),candidateVerified:false}]};
+  const formatted=verificationWorkflowPromptText(failure);
+  assert.match(formatted,/current decision.*\nEXECUTION FAILURE:/);
+  assert.doesNotMatch(formatted,/sourceSha256|candidateVerified/,'raw receipt metadata is retained, not charged as hidden prompt text');
+  const turns=rows().map(t=>({...t,verificationWorkflow:failure}));
+  const each=turns[0].observation.length+96+formatted.length+96;
+  assert.deepEqual(budgetTurns(turns,{charBudget:each*2}).map(t=>t.i),[2,3]);
+  for(const malformed of [{...failure,text:'VERIFICATION READY: no'}, {...failure,phase:'ready'}])
+    assert.equal(verificationWorkflowPromptText(malformed),'');
+});
+
 test('history charges the complete validated workflow and its separate chat wrapper',()=>{
   const turns=rows(),before=JSON.stringify(turns),formatted=verificationWorkflowPromptText(state);
   assert.ok(formatted.length>2400,'renderer wrapper is charged as well as bounded text');

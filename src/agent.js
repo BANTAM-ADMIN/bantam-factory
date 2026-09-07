@@ -37,6 +37,9 @@ import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecovery
 import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
 import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
 import { protectedAuditWitnessCleanupRefusal } from "./contract-audit-witness-retention.js";
+import { currentConfiguredFailure, verificationFailureContext } from "./verification-failure-context.js";
+import { collectObjectConstructionFacts, formatObjectConstructionFacts } from "./object-construction-facts.js";
+import { directNodeCheckScript, nodeCheckSelfSpawnRefusal } from "./node-check-self-spawn.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
@@ -851,10 +854,12 @@ async function runAgentCore({
     && contractStateAuditEnabled(contractStateAudit, task, suppliedTaskDocuments);
   const collectionAuditEnabled = contractAuditEnabled
     && collectionContractAuditApplies(task, suppliedTaskDocuments);
-  // Only checks created during this invocation can become retained witnesses.
+  // Only checks created during this invocation can become retained witnesses
+  // or trigger the self-launch diagnostic guard. The latter also applies when
+  // semantic collection audits are disabled.
   // Never infer ownership from a test-like filename or protect a user's
   // pre-existing source against requested cleanup. Resumes start conservatively.
-  const auditInitialFiles = collectionAuditEnabled ? snapshotWorkspaceFiles(workspace) : null;
+  const auditInitialFiles = snapshotWorkspaceFiles(workspace);
   // An incomplete inventory is unknown ownership, not an empty workspace.
   const auditInitialSourcePaths = auditInitialFiles ? [...auditInitialFiles.keys()] : null;
   // Reuse the explicitly enabled, isolated probe machinery. This checkpoint
@@ -2096,8 +2101,17 @@ async function runAgentCore({
     const auditWitness = collectionAuditEnabled && !auditRecovery
       ? currentFocusedAuditWitness(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
-    const verificationWorkflow = collectionAuditEnabled
-      ? contractAuditDecisionContext(auditRecovery, auditWitness) : null;
+    const currentFailure = currentConfiguredFailure(turns, {
+      generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
+    });
+    // Measured failure outranks model hypotheses, even hypotheses written later.
+    // Structural facts explain current source only: they supply no expected
+    // values, candidate edits, successful evidence, or completion authority.
+    const failureSourceFacts = currentFailure ? currentFailureSourceFacts(turns, exec) : [];
+    const verificationWorkflow = currentFailure
+      ? { ...verificationFailureContext(currentFailure, { facts: failureSourceFacts.map(formatObjectConstructionFacts) }),
+        sourceFacts: failureSourceFacts }
+      : collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null;
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
@@ -2282,6 +2296,7 @@ async function runAgentCore({
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
+      suppressDuringCurrentFailure: Boolean(currentFailure),
     });
     let repositoryText = "";
     let repositoryTurnId = null;
@@ -3158,6 +3173,25 @@ async function runAgentCore({
       sourcePaths: [...beforeShellFiles.keys()].filter(p => SOURCE_EXT_RE.test(p) && !isGeneratedPath(p)
         && (() => { try { return fs.lstatSync(path.resolve(workspace, p)).isFile(); } catch { return false; } })()),
     }) : null;
+    let nodeCheckRefusal = null;
+    if (beforeShellFiles && isFocusedAuditCommand(action.c, verificationScript)) {
+      const script = directNodeCheckScript(action.c);
+      if (script) {
+        try {
+          const filename = exec.resolveExisting(script);
+          const stat = fs.lstatSync(filename);
+          if (stat.isFile() && stat.size <= 256 * 1024) {
+            nodeCheckRefusal = nodeCheckSelfSpawnRefusal(action.c, {
+              workspace: exec.realWorkspace, path: script, source: fs.readFileSync(filename, "utf8"),
+              isCheck: true, initialSourcePaths: auditInitialSourcePaths,
+              sourcePaths: [...beforeShellFiles.keys()].filter(p => {
+                try { return fs.lstatSync(exec.resolveExisting(p)).isFile(); } catch { return false; }
+              }),
+            });
+          }
+        } catch { /* Unresolved or opaque checks remain subject to the executor deadline. */ }
+      }
+    }
     const shellScopeSnapshot = !gateRejection && !interactiveStop && action.a === "shell"
       && shellScopeGuard && typeof shellScopeGuard.capture === "function"
       ? shellScopeGuard.capture()
@@ -3212,7 +3246,7 @@ async function runAgentCore({
         auditRecovery.needsProject && String(action.c).trim() === String(verificationScript).trim()
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
         turn.shellExecution && (turn.shellExecution.command === action.c || turn.shellExecution.executedCommand === action.c));
-    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditWitnessRefusal
+    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditWitnessRefusal && !nodeCheckRefusal
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       ? repetition.check(action)
@@ -3296,6 +3330,10 @@ async function runAgentCore({
       result = { observation: auditWitnessRefusal.correction, auditWitnessRefusal };
       metrics.auditWitnessRetentionRefusals = (metrics.auditWitnessRetentionRefusals ?? 0) + 1;
       onEvent({ type: "verification_workflow_refusal", turn: turns.length, ...auditWitnessRefusal });
+    } else if (nodeCheckRefusal) {
+      result = { observation: nodeCheckRefusal.correction, nodeCheckRefusal };
+      metrics.nodeCheckSelfSpawnRefusals = (metrics.nodeCheckSelfSpawnRefusals ?? 0) + 1;
+      onEvent({ type: "diagnostic_self_spawn_refused", turn: turns.length, ...nodeCheckRefusal });
     } else if (duplicate) {
       // Repetition is not completion authority. A pending review may require
       // a DIFFERENT shell command, so do not tell the worker DONE or mask its
@@ -6167,6 +6205,9 @@ async function runAgentCore({
     if (result.auditWitnessRefusal && !result.observation.endsWith(result.auditWitnessRefusal.correction)) {
       result.observation += `\n${result.auditWitnessRefusal.correction}`;
     }
+    if (result.nodeCheckRefusal && !result.observation.endsWith(result.nodeCheckRefusal.correction)) {
+      result.observation += `\n${result.nodeCheckRefusal.correction}`;
+    }
 
     // Normalize evaluator-only volatility only after every controller-owned
     // addition (auto-verification, completion audit, test focus, etc.). Doing
@@ -6887,6 +6928,27 @@ function retargetEditAction(action, from, to) {
   return action.p === from ? { ...action, p: to } : action;
 }
 
+function currentFailureSourceFacts(turns, exec) {
+  const candidates = [...new Set(turns.slice(-80).reverse().flatMap(turn => [
+    ...(turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []),
+    ...(Array.isArray(turn.shellChangedPaths) ? turn.shellChangedPaths : []),
+  ]))].filter(p => typeof p === "string" && /\.(?:js|mjs|cjs)$/i.test(p)
+    && !isGeneratedPath(p) && !isTestPath(p)).slice(0, 3);
+  const facts = [];
+  for (const candidate of candidates) {
+    try {
+      const filename = exec.resolveExisting(candidate);
+      const stat = fs.lstatSync(filename);
+      if (!stat.isFile() || stat.size > 256 * 1024) continue;
+      const receipt = collectObjectConstructionFacts({
+        source: fs.readFileSync(filename, "utf8"), path: candidate,
+      });
+      if (receipt) facts.push(receipt);
+    } catch { /* Advisory source inspection must not prevent ordinary recovery. */ }
+  }
+  return facts;
+}
+
 function mapQueryPayload(value) {
   const query = String(value ?? "").trim();
   if (/^map\s*:/i.test(query)) return query.replace(/^map\s*:\s*/i, "");
@@ -6905,9 +6967,11 @@ export function formatWorkingNoteReanchor(state, {
   retireAfterVerifiedPass = false,
   suppressBeforeFirstEdit = false,
   recoveryEvidence = null,
+  suppressDuringCurrentFailure = false,
 } = {}) {
   const note = state?.workingNote;
   if (!note?.text) return "";
+  if (suppressDuringCurrentFailure) return "";
   // Before any accepted edit, private reasoning is reconnaissance or a plan for
   // the very next action—not durable state. Replaying it as controller guidance
   // caused a generic "understand the workspace" thought to outrank a complete

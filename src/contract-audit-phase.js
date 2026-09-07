@@ -63,9 +63,10 @@ export function contractAuditDecisionContext(pending, witness = null) {
 }
 
 export function verificationWorkflowPromptText(value) {
-  if (!value || value.schema !== 1 || !["focused", "project", "ready"].includes(value.phase)
+  if (!value || value.schema !== 1 || !["focused", "project", "ready", "failure"].includes(value.phase)
       || !Number.isSafeInteger(value.generation) || value.generation < 0
       || typeof value.text !== "string" || value.text.length > 2400
-      || !value.text.startsWith(value.phase === "ready" ? "VERIFICATION READY:" : "CONTRACT AUDIT PHASE:")) return "";
+      || !value.text.startsWith(value.phase === "failure" ? "EXECUTION FAILURE:"
+        : value.phase === "ready" ? "VERIFICATION READY:" : "CONTRACT AUDIT PHASE:")) return "";
   return `[verification workflow: current decision]\n${value.text}\n`;
 }

@@ -42,10 +42,40 @@ export function parseServerCounters(text){
   for(const name of names){const line=text.split('\n').find(line=>line.startsWith(`llamacpp:${name} `));if(line){const n=Number(line.split(' ')[1]);if(Number.isFinite(n)&&n>=0)counters[name]=n;}}
   return counters;
 }
-export async function serverCounters(endpoint){
-  const r=await fetch(endpoint.replace(/\/$/,'')+'/metrics',{signal:AbortSignal.timeout(5000)});
+export async function serverCounters(endpoint,{timeoutMs=5000}={}){
+  const r=await fetch(endpoint.replace(/\/$/,'')+'/metrics',{signal:AbortSignal.timeout(timeoutMs)});
   if(!r.ok)throw Error('server metrics unavailable');
   const raw=await r.text();return {at:new Date().toISOString(),raw,counters:parseServerCounters(raw)};
+}
+
+// Closing an HTTP recorder does not prove a canceled generation has stopped.
+// Preserve every observation and require two unchanged idle samples. This is
+// supplementary global accounting, never a replacement for missing wire usage.
+export async function settleServerCounters(endpoint,{timeoutMs=10000,pollMs=250}={},
+  {read=serverCounters,now=()=>performance.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+  if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000
+    ||!Number.isSafeInteger(pollMs)||pollMs<1||pollMs>timeoutMs)throw Error('invalid counter settlement limits');
+  const started=now(),samples=[];
+  let previousIdle=null,observedBusy=false;
+  const finish=reason=>({schema:'bantam.server-counter-settlement.v1',settled:reason==='idle',reason,
+    elapsedMs:Math.max(0,now()-started),observedBusy,samples,after:samples.at(-1)??null});
+  const totals=['prompt_tokens_total','prompt_tokens_cached_total','tokens_predicted_total'];
+  while(now()-started<timeoutMs){
+    let snapshot;
+    try{snapshot=await read(endpoint,{timeoutMs:Math.max(1,Math.min(5000,Math.ceil(timeoutMs-(now()-started))))});}
+    catch(error){snapshot={at:new Date().toISOString(),unavailable:true,error:error.message};}
+    samples.push(snapshot);
+    if(snapshot.unavailable)return finish('unavailable');
+    const c=snapshot.counters;
+    if(!c||!count(c.requests_processing)||!count(c.requests_deferred))return finish('missing-activity-counters');
+    const idle=c.requests_processing===0&&c.requests_deferred===0;
+    observedBusy ||= !idle;
+    if(idle&&previousIdle&&totals.every(key=>count(c[key])&&c[key]===previousIdle[key]))return finish('idle');
+    previousIdle=idle?c:null;
+    const remaining=timeoutMs-(now()-started);
+    if(remaining>0)await sleep(Math.min(pollMs,remaining));
+  }
+  return finish('timeout');
 }
 export function counterDelta(before,after){
   const a=before?.counters,b=after?.counters;

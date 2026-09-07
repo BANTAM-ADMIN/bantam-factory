@@ -45,6 +45,15 @@ paths and transcripts; preserves failed outcomes, measured timings and accountin
 gaps; and does not upload anything. Review only that directory for sharing.
 The surrounding evidence and default `fight-cards.html` are still private.
 
+Local counter windows now retain post-cleanup observations in each contender's
+`server-usage.json`. The runner waits up to ten seconds for two unchanged idle
+samples, 250 ms apart, so canceled requests can finish before the next local
+contender starts. This drain interval is recorded separately from contender
+wall time. Known-busy work that does not settle stops the local queue. Missing
+metrics are explicitly unavailable; ordinary server identity/idle checks still
+apply before the next contender. Endpoint counters remain supplementary and
+assume exclusive server use; they never replace missing request-level receipts.
+
 Rebuild presentation from existing evidence without any model calls:
 
 ```bash

@@ -32,7 +32,11 @@ groups; OpenCode left the starter unimplemented after reaching its output cap.
 The public derivative includes replay, portable JSON and SVG/PNG share images.
 Hermes has one canceled request without a wire usage receipt; separate settled
 endpoint counters are documented, not substituted into complete-receipt totals.
-Automatic counter settlement after cancellation remains accounting work.
+New runs retain bounded post-cleanup counter polling and require two unchanged
+idle samples before treating settlement as successful. A known-busy endpoint
+that does not settle stops the local queue. This is covered by synthetic HTTP
+lifecycle tests; the historical card is unchanged. Missing wire receipts remain
+missing, and broader runtime/accounting qualification is still required.
 
 Keep the full objective intact. Missing adapters or qualifications are not solved
 by relabeling a narrower demo as the finished launch product. Existing historical

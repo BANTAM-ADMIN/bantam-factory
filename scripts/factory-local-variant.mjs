@@ -9,7 +9,7 @@ import {cleanFightEnv,freshCommand,inspectLocalModel,executeContender,parseGrade
 import {factoryKit} from './factory-card-catalog.mjs';
 import {treeHashes,changedSealedFiles,acceptedBantamCompletion} from './repobrief-astra-fights.mjs';
 import {startModelRecorder} from './fight-model-proxy.mjs';
-import {serverCounters,counterDelta} from './fight-usage.mjs';
+import {serverCounters,counterDelta,settleServerCounters} from './fight-usage.mjs';
 import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 
@@ -246,9 +246,11 @@ export async function runLocalVariant(input) {
       let result,usage;
       try{result=await executeContender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs,events:[],arm});}
       finally{try{usage=await recorder.close();}finally{await cleanupVariantWorkspace(workspace,dir);}}
+      const settlement=await settleServerCounters(endpoint),after=settlement.after,serverUsage=counterDelta(before,after);
+      write(path.join(dir,'server-usage.json'),{before,after,delta:serverUsage,settlement});
       await verifyVariantServer(endpoint,model,dir);
-      const after=await optionalCounters(endpoint),serverUsage=counterDelta(before,after);
-      write(path.join(dir,'server-usage.json'),{before,after,delta:serverUsage});assertFrozen();
+      if(settlement.observedBusy&&!settlement.settled)throw Error('endpoint counter window did not settle after contender cleanup');
+      assertFrozen();
       const tampered=changedSealedFiles(Object.fromEntries(Object.entries(materials).filter(([file])=>file==='package.json'||file.startsWith('test/'))),workspace);
       const grading=await gradeLocalVariant(workspace,card,{kitId:selectedKit.id});
       for(const [name,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){

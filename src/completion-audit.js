@@ -106,7 +106,8 @@ export function lexicalContractAuditEnabled(
 export function lexicalContractAuditMessage(task) {
   const source = String(task ?? "");
   const clauses = [];
-  if (/\btrim(?:med|s|ming)?\b/i.test(source)) {
+  if (/\btrim(?:med|s|ming)?\b/i.test(source)
+      && !/\b(?:not|never)\s+(?:parsed\s+as\s+JSON\s+or\s+)?trim(?:med|s|ming)?\b/i.test(source)) {
     clauses.push(`"trimmed" means surrounding whitespace remains valid`);
   }
   if (/\bcase[\s-]*insensitive\b/i.test(source)) {
@@ -123,7 +124,7 @@ export function lexicalContractAuditMessage(task) {
   const language = clauses.length === 1
     ? clauses[0]
     : `${clauses.slice(0, -1).join(", ")}, and ${clauses.at(-1)}`;
-  return `\n\n${LEXICAL_CONTRACT_AUDIT_MARKER} The task names accepted string languages. Treat them as languages, not canonical serializers: ${language}. Compare the current accepting regexes and parsers against those named valid spellings now; correct any narrowed boundary, then rerun verification.`;
+  return `\n\n${LEXICAL_CONTRACT_AUDIT_MARKER} The task names accepted string languages: ${language}. Apply each rule only to its named input field. Preserve explicit canonical-encoding requirements and rejection rules for other fields; do not generalize whitespace or normalization permission. Compare the current accepting regexes and parsers against those named valid spellings now; correct any demonstrated mismatch, then rerun verification.`;
 }
 
 /**

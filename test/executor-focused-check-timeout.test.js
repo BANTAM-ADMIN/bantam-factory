@@ -74,6 +74,8 @@ test("a focused timeout is uncertainty, never a green receipt or advice to backg
   assert.equal(verificationEvidence({ execution: result.shellExecution, generation: 0 }).status, "unverified");
   assert.match(result.observation, /\[timeout\] Verification was killed after 3s/);
   assert.match(result.observation, /runaway recursion/);
+  assert.match(result.observation, /last unmatched marker/);
+  assert.match(result.observation, /do not assume a later finalizer ran/);
   assert.doesNotMatch(result.observation, /nohup|background and poll|VERDICT: all/);
 });
 

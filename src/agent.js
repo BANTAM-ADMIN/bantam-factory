@@ -44,6 +44,7 @@ import { currentConfiguredFailure, verificationFailureContext } from "./verifica
 import { collectObjectConstructionFacts, formatObjectConstructionFacts } from "./object-construction-facts.js";
 import { directNodeCheckScript, nodeCheckSelfSpawnRefusal } from "./node-check-self-spawn.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
+import { streamObligations, runStreamObligationStation, streamObligationDecision } from "./stream-obligation-station.js";
 import { deriveCliContract } from "./contract-cli-assertion-spec.js";
 import { runContractCliStation, formatContractCliStation, createCliProposalCache } from "./contract-cli-station.js";
 import { cliVerificationPassed, cliVerificationDecisionContext } from "./contract-cli-verification.js";
@@ -987,6 +988,10 @@ async function runAgentCore({
     && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker"
     && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")
     ? deriveCliContract(task) : null;
+  const streamStationEnabled = !interactive && !advisoryMode && probeEnabled && Boolean(verificationScript)
+    && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? 'docker') === 'docker'
+    && !callerExcludedActions.includes('probe') && !callerExcludedActions.includes('shell')
+    && streamObligations(task).length > 0;
   if (cliContract) {
     env += `\n[public CLI verification] ${cliContract.module} has a separate required process contract. After an authored edit, green verification or proposed completion, the controller can compare the real CLI with this module's own exported function on the same bounded input. This checks wiring and explicitly documented argument errors, not whether the function's answer is correct. Independent correctness tests remain required. API-only assertions and printed statuses cannot discharge this CLI obligation.\n`;
     onEvent({ type: "cli_contract", contract: structuredClone(cliContract) });
@@ -1082,6 +1087,7 @@ async function runAgentCore({
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
         ...(t.cliVerification ? { cliVerification: structuredClone(t.cliVerification) } : {}),
+        ...(t.streamVerification ? { streamVerification: structuredClone(t.streamVerification) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
@@ -1822,6 +1828,8 @@ async function runAgentCore({
   // A resumed film is retained for audit, but does not grant live CLI authority.
   // Obtain a fresh isolated receipt on the current invocation/tree.
   let cliVerification = null;
+  let streamVerification = null;
+  const streamStationGenerations = new Set(), streamProposalCache = new Map();
   const cliStationGenerations = new Set();
   const cliProposalCache = createCliProposalCache();
   const auditRecoveryVerifications = new Set(turns.flatMap(turn =>
@@ -2127,7 +2135,10 @@ async function runAgentCore({
     const cliDecision = cliContract ? cliVerificationDecisionContext(cliContract, cliVerification, {
       generation: workspaceEditGeneration,
     }) : null;
-    const contractAuditPhase = contractAuditPhaseState(cliDecision
+    const streamDecision = streamStationEnabled && hasAuthoredWork
+      ? streamObligationDecision(task, streamVerification, workspaceEditGeneration) : null;
+    const contractAuditPhase = contractAuditPhaseState(streamDecision
+      ? { ...auditRecovery, needsFocused: true, configuredCommand: verificationScript } : cliDecision
       ? { ...auditRecovery, needsCli: true, configuredCommand: verificationScript } : auditRecovery, {
       useGrammar, interactive, advisoryMode, writeBatch, callerExcludedActions,
     });
@@ -2166,7 +2177,7 @@ async function runAgentCore({
           readSource: p => exec.safeReadText(exec.resolveExisting(p)),
           facts: [cliSourceNote, ...failureSourceFacts.map(formatObjectConstructionFacts)].filter(Boolean),
         }), sourceFacts: [...failureSourceFacts, ...(cliSourceFact ? [cliSourceFact] : [])] }
-      : cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
+      : streamDecision ?? cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
     if (cliDecision && verificationWorkflow === cliDecision && cliSourceNote
         && verificationWorkflow.text.length + cliSourceNote.length + 1 <= 2400) {
       verificationWorkflow = { ...verificationWorkflow, text: verificationWorkflow.text + "\n" + cliSourceNote,
@@ -5557,6 +5568,23 @@ async function runAgentCore({
     // an incomplete initial edit must not spend the zero-work boundary review.
     const postEditGreen = result.verificationEvidence?.status === "pass"
       && result.verificationEvidence.generation === workspaceEditGeneration;
+    if (streamStationEnabled && hasAuthoredWork && !interrupted && !result.controllerStop
+        && (postEditGreen || (action.a === 'done' && result.done))
+        && !streamStationGenerations.has(workspaceEditGeneration)) {
+      const {sources} = collectContractAuditSources([...editedPathsThisRun, ...openList],
+        p => exec.safeReadText(exec.resolveExisting(p)));
+      streamStationGenerations.add(workspaceEditGeneration);
+      onEvent({type:'activity',label:'checking stream obligations'});
+      streamVerification = await runStreamObligationStation({workspace,model,task,sources,
+        generation:workspaceEditGeneration,signal,dockerImage,processRunner:shellProcessRunner,proposalCache:streamProposalCache});
+      result.streamVerification = streamVerification;
+      metrics.streamObligationStations = (metrics.streamObligationStations ?? 0) + 1;
+      for (const row of streamVerification.obligations) if(row.probeEvidence)
+        onEvent({type:'probe',probeEvidence:structuredClone(row.probeEvidence)});
+      const decision = streamObligationDecision(task,streamVerification,workspaceEditGeneration);
+      result.observation += '\n\n' + (decision?.text ?? '[stream obligations] All declared jig cases passed on the current source. Scope: the recorded fixtures, not complete contract certification. Project verification and other gates still apply.');
+      if(decision && result.done){result.done=false;result.summary=undefined;}
+    }
     const contractAuditCheckpoint = collectionAuditEnabled
       ? hasAuthoredWork && (postEditGreen || (action.a === "done" && result.done && !result.controllerStop))
       : ((contractAudits === 0 && directEditSucceeded) || (contractAudits === 1 && postEditGreen));
@@ -5726,6 +5754,10 @@ async function runAgentCore({
           : landingPassNote <= 1
             ? "\n[completion state] The current checks and audit-recovery requirements are satisfied. Emit done now with the verified result and any remaining limitations. Disclose leftover scratch; do not spend the final action on optional cleanup. Any necessary edit still requires verification."
             : "\n[completion state] The current checks and audit-recovery requirements are satisfied. Finish without optional changes; any necessary edit requires fresh verification before done.";
+    }
+    if (streamStationEnabled && result.done && !result.controllerStop) {
+      const decision=streamObligationDecision(task,streamVerification,workspaceEditGeneration);
+      if(decision){result.done=false;result.summary=undefined;result.observation+='\n'+decision.text;}
     }
     if (collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
       const pendingAudit = pendingContractAudit(turns, { generation: workspaceEditGeneration,
@@ -6409,6 +6441,7 @@ async function runAgentCore({
       ...(result.repairHandoff ? { repairHandoff: result.repairHandoff } : {}),
       ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
       ...(result.cliVerification ? { cliVerification: structuredClone(result.cliVerification) } : {}),
+      ...(result.streamVerification ? { streamVerification: structuredClone(result.streamVerification) } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
       shellExecution: shellReceipt,
       ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
@@ -6513,7 +6546,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "repairHandoff",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

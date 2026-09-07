@@ -1,6 +1,7 @@
 // A bounded, independent view of the supplied contract and current source.
 // This produces hypotheses, never verification evidence or executable actions.
 import crypto from "node:crypto";
+import { streamContractGuidance } from "./stream-contract-guidance.js";
 import { parse } from "acorn";
 import { CHATML_TEMPLATE } from "./profiles.js";
 import { isGeneratedPath, isTestPath } from "./scope-guard.js";
@@ -298,6 +299,10 @@ export function buildContractStateAuditPrompt({ task, documents, sources, omitte
     ? "READ-ONLY COLLECTION CONTRACT AUDIT. Derive requirements ONLY from the public task and supplied documents. First trace one ordinary valid call through EACH required public entrypoint, including the real CLI launch when specified: follow argument forwarding, dispatch guards, helper calls, and the resulting exit/output. A working exported API does not prove its CLI works, or vice versa. For Node file execution, process.argv is [runtimePath, entryPath, ...userArgs]; trace any slice at the caller before interpreting indexes or lengths in a helper. A node -e surrogate has a different argument layout. Prioritize a source-demonstrated valid-path failure before speculative edge cases. For each public entrypoint, independently trace unconditional preconditions with zero work: an invalid prerequisite with an empty collection must reach required validation before any loop, callback, early return, or output construction. Trace validation helpers and actual statement order before claiming validation is missing or late. Do not substitute a CLI wrapper for an exported API. Preserve conditional requirements; if empty input is forbidden, expect that rejection. Mark unspecified behavior unknown. Then check output container and element types, and ordering where explicitly required: trace the actual elements being added into the actual comparator. Return findings first, at most two concrete source-backed counterexamples, not an exhaustive review or table. Each finding has exactly entrypoint, requirement (quote the public requirement), location (file/function), fixture (a minimal executable assertion through the public API or real CLI), expected, predicted (actual control path, including the branch condition that admits this fixture), and contrast (one explicitly differing observable). Vary only the prerequisite under examination; keep unrelated fixture fields valid. Check combinations of requirements. No unseen tests, invented requirements, or execution claims. JSON shape: {\"findings\":[{\"entrypoint\":\"...\",\"requirement\":\"...\",\"location\":\"...\",\"fixture\":\"...\",\"expected\":\"...\",\"predicted\":\"...\",\"contrast\":{\"observable\":\"...\",\"expectedJson\":\"...\",\"predictedJson\":\"...\"}}],\"note\":\"...\"}. Zero findings is allowed but never certifies correctness. Keep every field concise; propose one minimal discriminating assertion rather than a new comprehensive suite."
     : "READ-ONLY CONTRACT STATE AUDIT. Derive the public boundaries from the supplied contract (including termination, reset, and chunk boundaries when applicable). First construct a compact table for reachable states at those boundaries: distinguish input histories that share the same state but leave different pending data; compare actual code behavior with what the contract requires. Then give at most two concrete counterexamples, stepping through the actual code. Check combinations of requirements, not just each requirement in isolation. Do not invent requirements or assume a failing test is correct. If you find no supported counterexample, say so without certifying correctness. Stay concise enough to include both the table and findings.";
   const taskText = String(task);
+  const streamGuide = streamContractGuidance(task);
+  const selectedInstruction = collection && streamGuide
+    ? 'READ-ONLY STATEFUL STREAM CONTRACT AUDIT. Keep the constrained findings/note JSON format. Prioritize source-traced protocol defects, not speculative CLI wrapper claims: (1) strict byte decoding and arbitrary partitions; (2) terminal-state guards before all input categories; (3) EVERY rejection entry path and subsequent calls; (4) pending line/field state at finalization and BOM handling. Trace one concrete valid history and one prohibited transition against actual branches. A green public suite is not proof of these dimensions. Derive expected behavior ONLY from the public contract. Return at most two concrete counterexamples; each finding has exactly entrypoint, requirement, location, fixture, expected, predicted, contrast:{observable,expectedJson,predictedJson}. Quote the requirement and use an executable assertion through the actual API. Zero findings is allowed, not certification. Do not assert that file-reading APIs parse their path argument as file contents. No execution claims or hidden-test assumptions.'
+    : instruction;
   const contract = [`PUBLIC TASK:\n${taskText.slice(0, 12000)}${taskText.length > 12000 ? "\n[task truncated; omitted requirements unknown]" : ""}`, ...documents.slice(0, 4).map((d) =>
     `SUPPLIED DOCUMENT ${d.path}:\n${d.text.slice(0, 12000)}${d.truncated || d.text.length > 12000 ? "\n[document truncated; omitted requirements unknown]" : ""}`)].join("\n\n");
   const sourceFacts = sourceRoutingFacts(sources);
@@ -310,7 +315,7 @@ export function buildContractStateAuditPrompt({ task, documents, sources, omitte
   }).join("\n\n");
   const omissions = omitted.length ? `\nOmitted source files (audit is partial): ${omitted.join(", ")}` : "";
   return `${template.open("system")}${system}\n${template.close}`
-    + `${template.open("user")}${instruction}${counterexampleDiscipline}\n\n${contract}\n\n${code}${measurements}${omissions}\n${template.close}`
+    + `${template.open("user")}${selectedInstruction}${counterexampleDiscipline}\nException contrasts must also be JSON data strings: for example encode an outcome object with kind=throw versus kind=return; never use bare throws or throws Error as JSON. These are predicted outcomes, not executed results.\n${streamGuide}\n\n${contract}\n\n${code}${measurements}${omissions}\n${template.close}`
     + template.open(template.assistantRole ?? "assistant")
     + (collection && typeof thinkMarkers?.open === "string" && typeof thinkMarkers?.close === "string"
       ? `${thinkMarkers.open}${thinkMarkers.close}\n\n` : "");
@@ -325,6 +330,7 @@ export async function runContractStateAudit({ model, task, documents, sources, o
   const receipt = {
     generation, promptSha256: digest(prompt), taskSha256: digest(String(task)),
     focus: collectionContractAuditApplies(task, documents) ? "collection-preconditions" : "state-boundaries",
+    ...(streamContractGuidance(task) ? { riskLens: 'stateful-stream-v1' } : {}),
     documents: documents.map((d) => ({ path: d.path, sha256: digest(d.text) })),
     sources: sources.map(({ path: sourcePath, sha256 }) => ({ path: sourcePath, sha256 })),
     sourceFacts: sourceRoutingFacts(sources),

@@ -22,6 +22,7 @@ import { composeRulesBlock } from "./prompt-rules.js";
 import { formatContractStateAudit, parseCollectionContractAudit } from "./contract-state-audit.js";
 import { formatContractAssertionStation } from "./contract-assertion-station.js";
 import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
+import { streamContractGuidance } from "./stream-contract-guidance.js";
 import { RAW_SOURCE_OBSERVATION, compactSourceRanges, recordDeliveredSourceLines, sourcePointerOrigins } from "./history-budget.js";
 
 // Same lifetime and keys as the caller's frozen-fragment cache. Never rebuild
@@ -495,7 +496,9 @@ export function buildPrompt({
   const toolsBlock = toolsText ? `\n\n${scrub(toolsText)}` : "";
   // A task-derived contract is immutable for the run. Keep it in the initial
   // cached prefix rather than re-injecting it as volatile per-turn guidance.
-  const contractBlock = contractText ? `\n\n${scrub(contractText)}` : "";
+  const streamGuide = !interactive ? streamContractGuidance(task) : '';
+  const contractBlock = (contractText ? `\n\n${scrub(contractText)}` : "")
+    + (streamGuide ? `\n\n${scrub(streamGuide)}` : '');
   // Under the extension invariant the tail may not exist, so the run-start
   // plan/skills ride in the initial turn; later revisions reach the model as
   // guidance folded into appended observations by the agent.

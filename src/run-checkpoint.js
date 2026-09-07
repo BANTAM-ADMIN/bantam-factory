@@ -131,7 +131,7 @@ export class RunCheckpoint {
       // reconstruct them from clipped observations, or erase explicit null /
       // false: that would turn an unverified new film into a legacy prose proof.
       for (const key of [
-        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "repairHandoff",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

@@ -6,6 +6,7 @@
 // single noisy command can't blow up the context window.
 
 import fs from "node:fs";
+import { TIMEOUT_LOCALIZATION } from "./stream-contract-guidance.js";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
@@ -1390,7 +1391,7 @@ export class Executor {
     if (res.timedOut) {
       const secs = Math.round(timeoutMs / 1000);
       if (verificationCommand) {
-        out += `\n[timeout] Verification was killed after ${secs}s. Treat this as failing evidence, not a reason to rerun the unchanged command. Inspect the latest edit for an infinite loop, deadlock, blocked I/O, or runaway recursion; run the smallest implicated test after changing code.`;
+        out += `\n[timeout] Verification was killed after ${secs}s. This is not passing evidence or a reason to rerun the unchanged command. Possible causes include an infinite loop, deadlock, blocked I/O, or runaway recursion. ${TIMEOUT_LOCALIZATION}`;
       } else {
         // The command was cut off by OUR timeout — it did not itself fail. Re-running
         // it inline will just time out again (and can leave a half-done install). Point

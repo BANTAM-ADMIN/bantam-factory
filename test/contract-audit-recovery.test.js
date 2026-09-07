@@ -10,6 +10,7 @@ import { buildAssertionProbe } from "../src/contract-assertion-spec.js";
 import { canonicalEncode } from "../src/factory/fact-fabric.js";
 import { projectProbeEvidence } from "../src/probe-evidence.js";
 import { runContractAssertionStation } from "../src/contract-assertion-station.js";
+import { clipKeepingControllerAnnotation } from "../src/prompt.js";
 
 const audit = { contractStateAudit: { focus: "collection-preconditions", status: "report", promptSha256: "audit-hash", report: "An unconditional precondition may be skipped with no entries.", sources: [] } };
 const options = { generation: 1, configuredCommand: "npm test" };
@@ -261,6 +262,56 @@ test("recovery names missing stages and requires a real public API assertion wit
   const note = contractAuditRecoveryNote(pendingContractAudit([audit], options));
   for (const phrase of [/actual public API/, /zero-work/, /before scaling a fuzz run/, /Repair only a demonstrated defect/, /No extra turns/, /focused-execution/, /project-verification/, /node --test test\/edge.test.js/, /python check_api.py/, /not oracle correctness/]) assert.match(note, phrase);
   assert.equal(contractAuditRecoveryNote(null), "");
+});
+
+test("recovery prioritizes the current valid-path executable diagnostic before bounded, falsifiable audit prose", () => {
+  const pending = pendingContractAudit([audit], options);
+  pending.report = "AUDIT_PREDICTION_SENTINEL " + "unverified prediction ".repeat(300);
+  const note = contractAuditRecoveryNote(pending);
+  assert.match(note, /^\[contract-audit-recovery\] Next: assert the current diagnostic/);
+  assert.match(note, /For a Node CLI/);
+  assert.match(note, /Other CLIs require their actual runtime/);
+  const reportAt = note.indexOf("AUDIT_PREDICTION_SENTINEL");
+  for (const phrase of ["console.log(condition)", "node:assert/strict", "one valid-path case first",
+    "spawnSync(process.execPath, [entry, ...args]", "assert.equal(child.status, expectedStatus, child.stderr)",
+    "Do not simulate the CLI", "After the focused assertion", "falsifiable model hypothesis",
+    "NOT an established defect", "do not change correct behavior"]) {
+    assert.ok(note.indexOf(phrase) >= 0 && note.indexOf(phrase) < reportAt, phrase);
+  }
+  assert.match(note, /Review excerpt truncated; the full audit remains recorded/);
+  assert.ok(note.length < 3500, "bounded review must not crowd out executable guidance or enlarge the previous budget");
+});
+
+test("the complete recovery instruction survives a repetition block's real 700-character clip", () => {
+  const note = contractAuditRecoveryNote(pendingContractAudit([audit], options));
+  const executive = note.split("\n")[0];
+  assert.ok(executive.length <= 550);
+  const observation = "[repetition] Repeated DONE is blocked.\n" + note
+    + "\n[working-checkpoint; model hypothesis]\n" + "stale reasoning ".repeat(1100);
+  assert.ok(observation.length > 16000);
+  const delivered = clipKeepingControllerAnnotation(observation);
+  assert.ok(delivered.includes(executive), "test complete rendered advice, not merely its marker");
+  for (const phrase of ["observed task-valid failure outranks the unverified audit hypothesis",
+    "spawnSync(process.execPath,[entry,...args])", "assert child.status and output",
+    "focused-execution + project-verification", "then exactly: npm test", "No echoes or filters"]) {
+    assert.ok(delivered.includes(phrase), phrase);
+  }
+});
+
+test("the displayed inline assertion shape qualifies only as a direct check; log-only and echoed variants still do not", () => {
+  const note = contractAuditRecoveryNote(pendingContractAudit([audit], options));
+  const command = note.match(/`(node -e '[^']+')`/)[1];
+  assert.equal(isFocusedAuditCommand(command), true, "shape recognition, not execution of unbound example variables");
+  assert.match(note, /supply actual\/expected from the public call first/);
+  assert.equal(pendingContractAudit([audit, check(command), project()], options), null);
+  for (const invalid of [command.replace("assert.deepEqual(actual, expected)", "console.log(actual === expected)"),
+    `${command}; echo "EXIT=$?"`, `node -e 'console.log(true)'`]) {
+    assert.equal(isFocusedAuditCommand(invalid), false, invalid);
+    assert.ok(pendingContractAudit([audit, check(invalid), project()], options), invalid);
+  }
+  const cli = `node -e 'const assert=require("node:assert/strict"); const {spawnSync}=require("node:child_process"); const child=spawnSync(process.execPath,[entry,...args],{encoding:"utf8"}); assert.equal(child.status,expectedStatus,child.stderr);'`;
+  assert.equal(isFocusedAuditCommand(cli), true);
+  assert.ok(pendingContractAudit([audit, check(cli, 1, { exitCode: 1 }), project()], options), "a failed actual assertion never receives credit");
 });
 
 test("pending audit preserves current generation and exact configured project identity for phase guidance", () => {

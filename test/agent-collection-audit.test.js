@@ -42,7 +42,8 @@ async function run(workspace, actions, extra = {}) {
       }
       prompts.push(prompt);
       assert.ok(actions.length, "no unbounded repair turns");
-      return { content: JSON.stringify(actions.shift()), tokens: 1, stoppedEos: true, stoppedLimit: false, timings: {} };
+      const next = actions.shift();
+      return { content: JSON.stringify(typeof next === "function" ? next(prompt) : next), tokens: 1, stoppedEos: true, stoppedLimit: false, timings: {} };
     } },
     maxTurns: 16, maxInvalidPerTurn: 0, useGrammar: true, interactive: false, grounding: false,
     shellSandbox: "host", verificationScript: "npm test", completionAudit: false,
@@ -66,7 +67,7 @@ test("fresh collection audit makes an empty-work precondition executable before 
   assert.equal(result.turns[2].contractStateAudit.focus, "collection-preconditions");
   assert.equal(result.turns[2].verificationEvidence.status, "pass", "the visible suite missed the cross-product edge");
   assert.equal(result.turns[3].doneAccepted, false);
-  assert.match(result.turns[3].observation, /still needs.*focused-execution/);
+  assert.match(result.turns[3].observation, /missing.*focused-execution/);
   assert.equal(result.turns[5].verificationEvidence.status, "fail", "real new API assertion demonstrates the defect");
   assert.equal(result.turns[7].verificationEvidence?.status, "pass", JSON.stringify(result.turns.map(turn => ({ a: turn.action.a, obs: turn.observation?.slice(0,180), proof: turn.verificationEvidence?.status }))));
   assert.equal(result.turns[7].contractStateAudit.focus, "collection-preconditions");
@@ -190,6 +191,50 @@ test("a fresh focused inline assertion immediately receives exact project verifi
   assert.equal(project.verificationEvidence.auditPromptSha256, result.turns[1].contractStateAudit.promptSha256);
   assert.equal(project.verificationEvidence.status, "pass");
   assert.deepEqual(checkpoint.turns()[2].verificationReceipts, result.turns[2].verificationReceipts);
+});
+
+test("real CLI assertions expose broken argv forwarding behind API-green and permit verified recovery", async (t) => {
+  const workspace = fixture(t);
+  fs.appendFileSync(path.join(workspace, "src/items.js"), "function main() { throw Error('TODO CLI'); }\n");
+  const publicBefore = fs.readFileSync(path.join(workspace, "test/public.test.js"), "utf8");
+  const cli = `${GOOD}import { pathToFileURL } from 'node:url';
+function main(argv) {
+  if (argv.length !== 1 || argv[0] !== 'list') throw Error('usage: items.js list');
+  console.log(JSON.stringify(collectItems('cli', [2, 1])));
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { main(process.argv); } catch (error) { console.error(error.message); process.exitCode = 2; }
+}
+`;
+  const fixed = cli.replace("main(process.argv);", "main(process.argv.slice(2));");
+  const focused = { a: "shell", c: `node --input-type=module -e "import assert from 'node:assert/strict'; import {spawnSync} from 'node:child_process'; const child=spawnSync(process.execPath, ['src/items.js','list'], {encoding:'utf8'}); assert.equal(child.status,0,child.stderr); assert.deepEqual(JSON.parse(child.stdout),[2,1]);"` };
+  const { result, audits, checkpoint } = await run(workspace, [edit(cli), VERIFY, DONE,
+    prompt => {
+      assert.match(prompt, /already-observed mismatch on a task-valid API\/CLI call takes priority/);
+      assert.match(prompt, /Assert the result, do not merely console.log a boolean/);
+      assert.match(prompt, /launch the real entry file as a child process/);
+      return focused;
+    },
+    edit(fixed), VERIFY, focused, DONE], {
+    task: `${TASK} Also expose the CLI: node src/items.js list must exit 0 and print JSON [2,1]. Invalid CLI arguments must exit 2.`,
+    contractAssertionStation: "off", extensionTrajectory: true, prefixMode: "immutable",
+    shellSandbox: process.env.BANTAM_LIVE_SANDBOX_TEST === "1" ? "docker" : "host",
+    verificationWorkspaceReadOnly: process.env.BANTAM_LIVE_SANDBOX_TEST === "1",
+  });
+  assert.equal(result.turns[1].verificationEvidence.status, "pass", result.turns[1].observation);
+  assert.equal(result.turns[2].doneAccepted, false);
+  assert.notEqual(result.turns[3].shellExecution.exitCode, 0, "the actual child launch fails its asserted valid-path status");
+  assert.match(result.turns[3].observation, /usage: items.js list/);
+  assert.equal(result.turns[3].doneAccepted, undefined);
+  assert.equal(audits.length, 2, "a repaired source is audited independently; no extra model station");
+  assert.ok(audits.every(prompt => prompt.includes("trace any slice at the caller")));
+  assert.equal(result.turns[6].shellExecution.exitCode, 0);
+  assert.equal(result.turns[6].verificationReceipts.entries.at(-1).verificationEvidence.status, "pass");
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+  assert.equal(result.turns.at(-1).doneAccepted, true);
+  assert.equal(result.metrics.contractAssertionStations ?? 0, 0);
+  assert.deepEqual(checkpoint.turns()[6].verificationReceipts, result.turns[6].verificationReceipts);
+  assert.equal(fs.readFileSync(path.join(workspace, "test/public.test.js"), "utf8"), publicBefore);
 });
 
 test("duplicate project checks cannot mask shell while a review still needs a focused assertion", async (t) => {

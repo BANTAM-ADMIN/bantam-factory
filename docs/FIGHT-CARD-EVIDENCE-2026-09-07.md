@@ -146,8 +146,9 @@ available actions, survives observation clipping, and cannot grant permission
 to change protected files. It no longer asks for `read_file` when that action
 is masked. A long-task regression checks the actual delivered prompt, performs
 a real line edit, passes public verification and reaches accepted done without
-changing protected tests. The previous benchmark remains FAIL; **this final
-schema-delivery fix has regression coverage, not a fresh live-model cohort**.
+changing protected tests. The previous benchmark remains FAIL. At commit
+`b793cf7`, this schema-delivery fix had regression coverage but no fresh
+live-model attempt. The subsequent Snapshot-only repair11 is recorded below.
 
 Planner's authored `test/edge.test.js` contained 15 cases and eventually passed
 within the 19-case project suite. The worker never launched that file as a
@@ -155,6 +156,176 @@ direct focused check. Its repeated broad suite runs and printed probes did
 not satisfy the focused-execution requirement. That completion limitation is
 still open. Automatically selecting and executing newly authored tests is a
 possible subsequent change, not implemented or claimed fixed in this batch.
+
+## Repair11: fresh Snapshot replay finishes, but regresses existing ordering
+
+After the operator released the GPU again, one fresh **Snapshot-only** attempt
+ran against committed `b793cf74362e6e7f24ad0a773fc2122177165c78`. This is not a
+new three-card cohort. Evidence: `factory-c72000-s1-mtp1-repair11/` under the
+same local provenance root. No candidate repairs or extra actions were given.
+
+**Result: FAIL.** The worker reached accepted done in 56 actions and passed
+all 3 public tests, but passed only 4/5 independent groups. The failed group
+was `builder-bytes-order-and-empty`: returned manifest entries were in input
+order rather than JavaScript string order. Contender time was **347.877s**;
+grading added **1.409s**. Accepted completion is not artifact correctness.
+
+At zero-based turn 11, a successful replacement changed the existing
+`[...paths].sort().map(...)` into `paths.map(...)`. The original task explicitly
+required sorted builder entries and preservation of that existing behavior;
+the ordering requirement remained in the delivered prompt. The worker's
+preceding reasoning had even correctly recognized that copying and sorting
+preserved the caller's input. This is not another missing-schema incident.
+The supplied builder test has one path, which cannot distinguish sorted from
+unsorted output; the independent multi-path fixture caught the regression.
+
+The new dynamic action-interface branch **did not engage**: there were no
+`edit_lines` actions or context-update records. This attempt therefore neither
+demonstrates nor disproves the effectiveness of that particular recovery fix.
+The earlier automatic focused-assertion/project-check mechanism did execute
+once before accepted completion. Its real passing receipts establish execution
+of those checks, not coverage of the missed ordering requirement.
+
+All **85/85** generation calls have complete wire accounting, independently
+rederived from hash-verified bodies and matched to the saved model calls:
+
+| Input | Cached input | Fresh input | Output | Prefix reuse |
+|---:|---:|---:|---:|---:|
+| 2,182,781 | 1,680,779 | 502,002 | 39,288 | 77.0017% |
+
+The model digest, context, limits, task, 23-file kit and runtime configuration
+match repair10; the committed harness version differs. All 410 sealed runtime
+files and 23 kit files remained unchanged during the replay. Protected files
+were intact, and the endpoint was idle at both measured boundaries. The server
+cache was not cleared and sampling was not seeded; this is not a controlled
+causal ablation or a reliability estimate. The old failure stays on the card,
+and this separate attempt is also shown as FAIL. No further harness change was
+made as part of this test.
+
+## Repair12: ordering passes, but the CLI and completion still fail
+
+The next change extends the existing exact-transition edit-preservation review
+to a narrowly matched removed intermediate call. A retained function changing
+`values.order().map(fn)` to `values.map(fn)` can receive a review even when no
+new function is added. The matcher is not specific to sorting or this card;
+it requires the remaining statement and downstream arguments to match, bounds
+its analysis, and records optional removal of a simple spread-copy wrapper.
+Intentional changes remain confirmable; the witness is source evidence, not a
+semantic-equivalence or correctness certificate. The saved repair11 deletion
+now produces an explicit `sort()` removal witness without modifying its files.
+
+Verification before the next live attempt: 21 module tests passed, 17 host
+integration checks passed with one Docker-only skip, and the separately
+enabled Docker selection passed 34/34. At the operator's request, the broader
+`npm test` process was stopped to prioritize the live Snapshot attempt. **That
+interrupted full-suite run is not recorded as a pass.** Runtime source was
+then held fixed for the benchmark.
+
+Fresh evidence: `factory-c72000-s1-mtp1-repair12/`, again **Snapshot only**, with
+the same task, frozen kit, model and limits. **Result: FAIL, 4/5 independent
+groups, 3/3 public tests, no accepted completion after 60 actions.** Contender
+time was **434.659s**, plus **1.672s** grading. Protected files and source/kit
+seals remained intact. There were no operator candidate repairs.
+
+The builder-ordering group passed, but `cli-create-verify-drift-and-errors`
+failed on a valid create command. The candidate passes the entire
+`process.argv` to `runCli`, reads `argv[1]` as the command even though it is the
+script filename, and puts the command handlers behind `argv.length === 2`.
+Thus valid invocations return usage/exit 2 instead of the required JSON/exit 0.
+The worker's own probes exposed the valid-invocation failure, but it did not
+repair it. Broad public tests do not exercise this CLI, and repeated printed
+probes did not establish the focused assertion required for completion.
+
+No chain-removal review fired in this run. The ordering pass therefore cannot
+be credited causally to the new review guard. This is another retained failed
+attempt, not a 5/5 result or evidence of a reliable complete workflow.
+
+Wire accounting is complete for **79/79** generation calls: **1,728,722 input,
+1,028,913 cached input, 699,809 fresh input and 48,964 output tokens**, with
+59.5187% prefix reuse. Full wire totals are distinct from supplementary global
+endpoint counters. The public Arena and separate private repair12 page retain
+this outcome alongside all earlier editions.
+
+## Repair13: prioritize observed behavior over repeated review hypotheses
+
+Repair12's concrete observations were still in the actual delivered context.
+The audit-refuting probe and valid CLI failure were roughly 75K and 68K
+characters back in the late prompt, while the unverified hypothesis was
+repeated much nearer the end. This was evidence prioritization, not wholesale
+loss of source or a license to treat printed booleans as passing assertions.
+
+The next generic context repair changes the independent review's order: trace
+an ordinary valid call through each required public entrypoint first, then the
+existing boundary checks. A required CLI must be traced separately from an
+exported API. For Node, the reviewer receives the actual file-launch argument
+layout and must follow caller slicing and dispatch guards. Validation helpers
+and statement order must be traced before alleging missing or late checks.
+
+Recovery now leads with a compact instruction to turn the current diagnostic
+into an assertion. An observed task-valid failure takes priority over a model
+review hypothesis. For a Node CLI, use a real child-process entry-file launch
+and assert the contract-derived status/output; importing the API or simulating
+arguments in `node -e` does not test that route. The old hypothesis comes last
+as a shorter, explicitly falsifiable excerpt. Working code must not be changed
+merely to satisfy an unsupported review.
+
+The recorded run's essential instruction was 421 characters with `npm test`
+configured. A
+regression with the actual repetition-prefix clipping path and a 16K trailing
+working note proves that priority, real-child assertions, missing phases and
+the exact project command survive. This does not enlarge observation budgets
+or alter frozen cache prefixes. Receipt recognition, source-generation binding,
+completion gates, the disabled assertion-station default, task, judges and
+60-action limit are unchanged.
+
+Before the fresh attempt, the targeted selection passed **123/123**, including
+enabled real-Docker checks. After the final compact-prefix change, the affected
+recovery/delivery/agent selection passed **56/56**, again with Docker enabled.
+These overlap and are not summed. The integration regression demonstrates
+API-green with a genuinely broken CLI, failed actual child assertion, repaired
+argument forwarding, fresh focused/project receipts, and accepted completion.
+It does not use the benchmark candidate or independent judge as its fixture.
+
+Fresh evidence: `factory-c72000-s1-mtp1-repair13/`, **Snapshot only**. The result
+is **PASS: 5/5 independent groups, 3/3 public tests, accepted completion in 51
+actions**. Contender time was **223.576s**, with **1.369s** of independent
+grading (224.945s combined). The CLI group passed. All 410 runtime and 23 kit
+seals remained unchanged, protected files were intact, and there were zero
+operator candidate interventions. The task, model and runtime recipe remained
+the same as repair12, apart from the recorded harness source revision.
+
+All **69/69** generation calls have complete accounting:
+
+| Input | Cached input | Fresh input | Output | Prefix reuse |
+|---:|---:|---:|---:|---:|
+| 1,642,238 | 1,194,946 | 447,292 | 21,567 | 72.7633% |
+
+The compact recovery instruction reached actual worker prompts. The worker
+authored executable API/CLI assertions, but still spent extra turns wrapping
+them in compound setup/launch commands and mistaking their printed success
+for the required focused receipt. Those attempts did not acquire credit.
+Eventually it requested the focused script directly with a passive status
+echo. The existing status guard removed only that suffix, executed the real
+direct check, and the controller followed it with fresh configured project
+verification. The subsequent done was accepted. This is a real successful
+recovery, not retroactive acceptance of earlier unverified probes.
+
+The independent auditor still produced unsupported hypotheses in this run;
+the worker's probes refuted them. Review calibration and wasted recovery turns
+remain improvement opportunities. One adaptive successful rerun does not prove
+a causal speedup, a reliability rate, or qualification of the other two cards.
+Earlier failures remain visible alongside this separately identified PASS.
+
+Post-run wording clarification: the recovery example explicitly labels
+`process.execPath` as a **Node** CLI launch, not a launcher for every language;
+other CLIs must use their actual runtime. The live result retains its original
+sealed prompt bytes. This small subsequent wording change is regression-tested,
+not represented as another model run.
+
+Final targeted closeout passed **128/128**, with no skips, including real Docker
+execution, edit-preservation, audit delivery/recovery, verification environment
+and the optional assertion-station regressions. This is not a rerun of the full
+repository suite; the earlier full-suite result belongs to `b793cf7` below.
 
 ## Hermes: show measured values without inventing a missing total
 
@@ -203,9 +374,9 @@ omit those private bytes and label the omission. A redacted summary is not
 the full auditable chain. Generating a page does not publish it or change the
 repository's private visibility.
 
-## Closeout verification
+## Earlier committed closeout verification (`b793cf7`)
 
-The final source tree passed `npm test`: **3,794 passed, zero failed, 41
+That committed source tree passed `npm test`: **3,794 passed, zero failed, 41
 explicitly skipped** (3,835 tests across 298 suites). The separately enabled
 real-Docker collection-audit, verification-environment and assertion-station
 checks passed **16/16**. Showcase tests, including explicit Chromium desktop
@@ -217,5 +388,6 @@ mobile widths. Their four packaged HTML/JSON hashes matched; all 474 embedded
 private evidence artifacts matched their recorded size and digest. The public
 summary has no raw prompt/source payloads or links to private evidence pages.
 These checks establish implementation and packaging behavior, not a new model
-score. The final context-delivery fix was not followed by another live cohort;
-the Planner completion limitation above remains open.
+score. At that commit the final context-delivery fix had not been followed by
+a live attempt. Repair11 above subsequently tested Snapshot, without engaging
+the dynamic-schema branch; the Planner completion limitation remains open.

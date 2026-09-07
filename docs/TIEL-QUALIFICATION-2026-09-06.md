@@ -12,7 +12,17 @@ accepted completions, with all 185 generation calls fully metered.
 [Completion receipts and fight-card evidence](FIGHT-CARD-EVIDENCE-2026-09-07.md)
 records each series, the identified controller/context defects, the final
 regression-tested tool-schema delivery fix, and the Hermes accounting
-investigation. No fresh live cohort has tested that final fix. The prior shutdown described below is a
+investigation. A subsequent Snapshot-only repair11 on committed `b793cf7`
+finished cleanly and passed 3/3 public tests but failed independent ordering
+acceptance (4/5 groups, 347.877s). That attempt did not engage the new
+tool-schema recovery branch. Snapshot-only repair12 subsequently passed the
+ordering group but failed CLI acceptance (4/5 groups, 434.659s), and exhausted
+60 actions without completion. Neither attempt is a 5/5 or reliable-finish
+claim. After the evidence-priority/real-entrypoint recovery-context repair,
+Snapshot-only repair13 achieved **PASS: 5/5 independent groups, 3/3 public
+tests, accepted completion in 51 actions and 223.576s**. All 69 model calls
+have complete accounting. It is one retained adaptive success, not a new
+reliability estimate or qualification of the other cards. The prior shutdown described below is a
 historical event, not the current GPU hold state.
 
 Tiel runs on the existing 4090/llama.cpp stack and is substantially faster at token generation in the earlier exploratory series. It is **not promoted to BANTAM's default**. The original, repair1, repair2, repair3 and repair4 series remain separately recorded below, with strict completion counts of 1/3, 2/3, 1/3, 0/3 and 1/3. Repair5's Snapshot-only run, all three repair6 cards and repair7's Snapshot-only run passed their frozen functional checks but exhausted their action budgets without accepted completion. Repair7's assertion station did not establish a completion improvement and ships disabled by default. These adaptive reruns do not establish reliability or complete correctness. The original 27B comparison remains unchanged; repair3 timings also include shared-endpoint contention.

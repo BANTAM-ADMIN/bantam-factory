@@ -3,17 +3,27 @@
 ## Latest Arena showcase
 
 Open the [public-summary Arena](showcase/public/index.html) for the original
-comparison and the separately recorded Tiel confirmation1, partial repair9
-and completed repair10 editions. Its strict allowlist omits private context,
+comparison and the separately recorded Tiel confirmation1, partial repair9,
+repair10 and Snapshot-only repair11/repair12/repair13 editions. Its strict allowlist omits private context,
 source, machine paths and raw evidence; it has no links to private pages.
 Nothing has been published externally.
 
 The [showcase guide](showcase/README.md) maps the editions and provides package
-hashes. The **[private repair10 evidence Arena](showcase/private/tiel-repair10/index.html)**
-contains the full recorded evidence and is not redacted. Repair10 is **1/3
-strict PASS, 2/3 accepted projects**, not an all-pass result: Receipt PASS,
-Snapshot FAIL, Planner OUTPUT_ONLY. Later code fixes are not measurements of a
-new model run. Review before any deliberate sharing or screen recording.
+hashes. The latest **[private repair13 Snapshot Arena](showcase/private/tiel-repair13/index.html)**
+records **PASS, 5/5 independent groups, 3/3 public tests**, with accepted completion
+after 51 actions: **223.576 seconds** of worker time plus **1.369 seconds** of
+grading. All **69/69 generation requests** have measured usage. This is one
+successful Snapshot-only attempt, not a three-card cohort or a reliability estimate.
+The unchanged **[repair12 Snapshot Arena](showcase/private/tiel-repair12/index.html)**
+records **FAIL, 4/5 independent groups, 434.659 seconds**: its public tests and
+ordering group passed, but the CLI group failed and no completion was accepted.
+The unchanged **[repair11 Snapshot Arena](showcase/private/tiel-repair11/index.html)**
+retains **FAIL, 4/5 groups, 347.877 seconds**, with clean completion but rejected
+ordering. Each is one Snapshot-only attempt, not a new three-card cohort.
+These private pages contain full non-redacted evidence.
+The unchanged **[private repair10 Arena](showcase/private/tiel-repair10/index.html)**
+retains **1/3 strict PASS, 2/3 accepted projects**: Receipt PASS, Snapshot FAIL,
+Planner OUTPUT_ONLY. Review before any deliberate sharing or screen recording.
 
 ## Current factory series
 

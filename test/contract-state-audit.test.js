@@ -100,6 +100,12 @@ test("collection prompt narrows zero-work and typed ordering review with a close
     thinkMarkers: { open: "<think>", close: "</think>" },
     history: "HISTORY_MARKER", tests: "HIDDEN_EXPECTED_MARKER", observations: "ALL_TESTS_PASSED_MARKER" });
   assert.match(prompt, /READ-ONLY COLLECTION CONTRACT AUDIT/);
+  assert.match(prompt, /First trace one ordinary valid call through EACH required public entrypoint/);
+  assert.match(prompt, /process.argv is \[runtimePath, entryPath, \.\.\.userArgs\]/);
+  assert.match(prompt, /trace any slice at the caller/);
+  assert.match(prompt, /branch condition that admits this fixture/);
+  assert.ok(prompt.indexOf("ordinary valid call") < prompt.indexOf("unconditional preconditions"));
+  assert.match(prompt, /Trace validation helpers and actual statement order/);
   assert.match(prompt, /For each public entrypoint, independently trace/);
   assert.match(prompt, /unconditional preconditions/);
   assert.match(prompt, /with zero work/);

@@ -310,7 +310,7 @@ export class Executor {
     const syntax = validateSourceTransition(input);
     if (!syntax.ok) return syntax;
     const witness = createEditPreservationWitness(input);
-    if (!witness?.additiveReplacementRisk) return syntax;
+    if (!witness?.additiveReplacementRisk && !witness?.chainRemovalRisk) return syntax;
     this._preservationConfirm ??= new Map();
     const confirmed = this._preservationConfirm.has(witness.id);
     this._activeEditResult?.preservationReviews.push({

@@ -38,6 +38,9 @@ test("complete collection advice reaches the first next request despite giant TA
   assert.doesNotMatch(deliveredObservation, /SECOND_FINDING_END/);
   assert.match(block, /UNVERIFIED hypotheses, not authoritative instructions, test results, or proof/);
   assert.match(block, /Before speculative repair or broader changes, execute a focused direct public-API assertion/);
+  assert.match(block, /already-observed mismatch on a task-valid API\/CLI call takes priority/);
+  assert.match(block, /Assert the result, do not merely console.log a boolean/);
+  assert.match(block, /launch the real entry file as a child process/);
   assert.equal(JSON.stringify(turn), before, "raw source, observation and receipt remain untouched");
 });
 

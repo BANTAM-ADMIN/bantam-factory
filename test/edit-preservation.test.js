@@ -133,3 +133,98 @@ test("long paths and source excerpts cannot inflate model-facing review beyond i
   assert.ok(formatEditPreservationReview(receipt).length <= 3400);
   assert.match(formatEditPreservationWitness(receipt), /more removed statements omitted/);
 });
+
+for (const method of ["order", "filter", "validate"]) {
+  test(`retained call-chain contraction reports the actual ${method} operation without an added function`, () => {
+    const oldSource = `export function build(xs){ return {items: xs.${method}(option).map(convert)}; }`;
+    const newSource = "export function build(xs){ return {items: xs.map(convert)}; }";
+    const receipt = witness(oldSource, newSource);
+    assert.equal(receipt.additiveReplacementRisk, false);
+    assert.equal(receipt.chainRemovalRisk, true);
+    assert.equal(receipt.reviewRequired, true);
+    assert.equal(receipt.removedOperationCount, 1);
+    const row = receipt.removedOperations[0];
+    assert.equal(row.method, method);
+    assert.equal(row.removedArrayCopy, false);
+    assert.equal(row.beforeFunction.name, "build");
+    assert.equal(row.afterFunction.name, "build");
+    assert.equal(row.operation.excerpt, `xs.${method}(option)`);
+    assert.equal(row.operation.sourceSha256, createHash("sha256").update(row.operation.excerpt).digest("hex"));
+    assert.match(row.after.excerpt, /xs\.map\(convert\)/);
+    const rendered = formatEditPreservationReview(receipt);
+    assert.ok(rendered.slice(0, 600).includes(`${method}()`));
+    assert.match(rendered, /No files were changed|reissue the identical edit/);
+    assert.match(rendered, /NOT proof of a bug/);
+    assert.equal(receipt.candidateVerified, false);
+  });
+}
+
+test("call-chain contraction can remove the exact simple spread-copy receiver with the intermediate call", () => {
+  const oldSource = "function build(xs){ return {items: [...xs].order().map(x => ({name:x}))}; }";
+  const newSource = "function build(xs){ return {items: xs.map(x => ({name:x}))}; }";
+  const receipt = witness(oldSource, newSource);
+  assert.equal(receipt.chainRemovalRisk, true);
+  assert.equal(receipt.removedOperations[0].removedArrayCopy, true);
+  assert.equal(receipt.removedOperations[0].operation.excerpt, "[...xs].order()");
+  assert.match(formatEditPreservationWitness(receipt).slice(0, 600), /array-copy wrapper/);
+  assert.deepEqual(JSON.parse(JSON.stringify(receipt)), receipt);
+  const { id, ...body } = receipt;
+  assert.equal(id, `sha256:${createHash("sha256").update(JSON.stringify(body)).digest("hex")}`);
+  assert.notEqual(id, witness(oldSource, newSource + "\n").id);
+});
+
+test("contraction matches a nested receiver while preserving every downstream operation", () => {
+  const receipt = witness("function build(xs){ const result = xs.validate().filter(keep).map(convert); return result; }",
+    "function build(xs){ const result = xs.filter(keep).map(convert); return result; }");
+  assert.equal(receipt.chainRemovalRisk, true);
+  assert.equal(receipt.removedOperations[0].method, "validate");
+});
+
+test("other changed expressions, callbacks, receivers and replacement operations are not contraction evidence", () => {
+  const oldSource = "function build(xs){ return xs.filter(keep).map(convert); }";
+  for (const newSource of [
+    "function build(xs){ return false; }",
+    "function build(xs){ return xs.map(different); }",
+    "function build(xs){ return other.map(convert); }",
+    "function build(xs){ return xs.select(keep).map(convert); }",
+    "function build(xs){ return xs.map(convert, extra); }",
+    "function renamed(xs){ return xs.map(convert); }",
+  ]) {
+    const receipt = witness(oldSource, newSource);
+    assert.equal(receipt.chainRemovalRisk, false, newSource);
+    assert.equal(receipt.reviewRequired, receipt.additiveReplacementRisk);
+  }
+  assert.equal(witness(oldSource, oldSource.replaceAll(" ", "  ")), null);
+});
+
+test("a moved call, a retained duplicate return, or ambiguous owners cannot impersonate a contraction", () => {
+  const examples = [
+    ["function f(xs){ return xs.order().map(convert); }", "function f(xs){ xs.order(); return xs.map(convert); }"],
+    ["function f(xs){ return [...xs].order().map(convert); }", "function f(xs){ xs.order(); return xs.map(convert); }"],
+    ["function f(xs){ return xs.order().map(convert); return xs.map(convert); }", "function f(xs){ return xs.map(convert); }"],
+    ["function f(xs){ return xs.order().map(convert); } function f(xs){ return 1; }",
+      "function f(xs){ return xs.map(convert); } function f(xs){ return 1; }"],
+    ["function f(xs){ return xs.order().map(convert); return xs.order().map(convert); }",
+      "function f(xs){ return xs.map(convert); }"],
+  ];
+  for (const [oldSource, newSource] of examples) {
+    assert.equal(witness(oldSource, newSource, { path: "worker.cjs" }).chainRemovalRisk, false);
+  }
+});
+
+test("contraction analysis is bounded and does not traverse a changed callback as the outer function", () => {
+  const oldSource = "function f(xs){ return xs.map(x => x.order().map(convert)); }";
+  assert.equal(witness(oldSource, oldSource.replace("x.order().map", "x.map")).chainRemovalRisk, false);
+  assert.equal(witness(oldSource, "function incomplete("), null);
+  const large = `function f(xs){ return xs.order().map(() => '${"x".repeat(17000)}'); }`;
+  assert.equal(witness(large, large.replace("xs.order().map", "xs.map")).chainRemovalRisk, false);
+  const many = "function f(xs){\n" + Array.from({ length: 70 }, (_, i) => `const x${i}=xs.op${i}().map(convert);`).join("\n") + "\n}";
+  const contracted = many.replace(/\.op\d+\(\)/g, "");
+  assert.equal(witness(many, contracted).chainRemovalRisk, false, "bounded-out analysis is not a certificate");
+  const small = witness(many.split("\n").slice(0, 9).join("\n") + "\n}", contracted.split("\n").slice(0, 9).join("\n") + "\n}");
+  assert.equal(small.removedOperationCount, 8);
+  assert.equal(small.removedOperations.length, 6);
+  assert.equal(small.omittedRemovedOperations, 2);
+  assert.ok(formatEditPreservationWitness(small).length <= 2800);
+  assert.ok(formatEditPreservationReview(small).length <= 3400);
+});

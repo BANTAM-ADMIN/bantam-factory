@@ -12,6 +12,9 @@ const MAX_NODES = 50000;
 const MAX_STATEMENTS = 4000;
 const MAX_REMOVED = 6;
 const MAX_FUNCTIONS = 4;
+const MAX_CHAIN_CANDIDATES = 64;
+const MAX_CHAIN_STATEMENT_CHARS = 16 * 1024;
+const MAX_CHAIN_FINGERPRINTS = 256;
 const SIMPLE_STATEMENTS = new Set([
   "ExpressionStatement", "VariableDeclaration", "ReturnStatement", "ThrowStatement",
   "BreakStatement", "ContinueStatement", "DebuggerStatement",
@@ -106,6 +109,110 @@ function statementLocation(statement, source) {
     excerpt: bytes.slice(0, 180), excerptTruncated: bytes.length > 180 };
 }
 
+const fingerprint = node => sha256(JSON.stringify(canonical(node)));
+const copiedArray = node => node?.type === "ArrayExpression" && node.elements.length === 1
+  && node.elements[0]?.type === "SpreadElement" ? node.elements[0].argument : null;
+const methodCall = node => node?.type === "CallExpression" && !node.optional
+  && node.callee?.type === "MemberExpression" && !node.callee.optional
+  && !node.callee.computed && node.callee.property?.type === "Identifier";
+
+function replaceNodeAt(root, keys, replacement) {
+  if (!keys.length) return replacement;
+  const [key, ...rest] = keys;
+  const clone = Array.isArray(root) ? [...root] : { ...root };
+  clone[key] = replaceNodeAt(root[key], rest, replacement);
+  return clone;
+}
+
+// Match a one-operation contraction, not an arbitrary edited return. Every
+// other AST node (including the downstream callback and arguments) must stay
+// exact. The optional [...value] contraction records a removed copy operation;
+// it does not claim receiver/binding equivalence or collection semantics.
+function removedChainOperations(oldTree, newTree, removed, unmatchedAfter, retainedOwner, before, after) {
+  let visited = 0, attempts = 0, hashes = 0;
+  const walk = (root, visit) => {
+    const pending = [{ node: root, keys: [] }];
+    while (pending.length) {
+      const { node, keys } = pending.pop();
+      if (!node || typeof node.type !== "string") continue;
+      if (++visited > MAX_NODES * 3) throw Error("bounded chain traversal exceeded");
+      if (FUNCTIONS.has(node.type)) continue; // Do not cross callback/function scope.
+      visit(node, keys);
+      for (const [key, value] of Object.entries(node)) {
+        if (LOCATION_KEYS.has(key)) continue;
+        if (Array.isArray(value)) {
+          for (let i = value.length - 1; i >= 0; i--) pending.push({ node: value[i], keys: [...keys, key, i] });
+        } else if (value && typeof value === "object") pending.push({ node: value, keys: [...keys, key] });
+      }
+    }
+  };
+  const callIdentity = node => {
+    if (++hashes > MAX_CHAIN_FINGERPRINTS) throw Error("bounded chain fingerprints exceeded");
+    const receiver = copiedArray(node.callee.object);
+    return fingerprint(receiver ? { ...node, callee: { ...node.callee, object: receiver } } : node);
+  };
+  try {
+    const candidates = [];
+    for (const statement of removed) {
+      const owner = retainedOwner(statement);
+      if (!owner || statement.node.end - statement.node.start > MAX_CHAIN_STATEMENT_CHARS) continue;
+      walk(statement.node, (downstream, keys) => {
+        const operation = downstream?.callee?.object;
+        if (!methodCall(downstream) || !methodCall(operation)) return;
+        if (++attempts > MAX_CHAIN_CANDIDATES) throw Error("bounded chain candidates exceeded");
+        const receiver = operation.callee.object;
+        const variants = [receiver, ...(copiedArray(receiver) ? [copiedArray(receiver)] : [])];
+        for (const [index, replacement] of variants.entries()) {
+          const contracted = replaceNodeAt(statement.node, [...keys, "callee", "object"], replacement);
+          const hash = fingerprint(contracted);
+          const matches = unmatchedAfter.filter(candidate => candidate.owner === owner && candidate.fingerprint === hash);
+          if (matches.length !== 1) continue; // Ambiguous counterpart is not a review trigger.
+          candidates.push({ statement, owner, afterStatement: matches[0], operation,
+            operationFingerprint: callIdentity(operation), removedArrayCopy: index === 1 });
+        }
+      });
+    }
+    if (!candidates.length) return [];
+
+    // A call moved intact elsewhere in the same retained function is not an
+    // absence claim. Count multiplicity so an existing duplicate cannot hide
+    // removal of another execution. No cross-function equivalence is inferred.
+    const names = new Set(candidates.map(row => row.operation.callee.property.name));
+    const counts = tree => {
+      const result = new Map();
+      for (const statement of tree.statements) {
+        if (!statement.owner || statement.node.end - statement.node.start > MAX_CHAIN_STATEMENT_CHARS) continue;
+        walk(statement.node, node => {
+          if (!methodCall(node) || !names.has(node.callee.property.name)) return;
+          const key = `${statement.owner.name}\0${callIdentity(node)}`;
+          result.set(key, (result.get(key) ?? 0) + 1);
+        });
+      }
+      return result;
+    };
+    const oldCounts = counts(oldTree), newCounts = counts(newTree), claimed = new Set();
+    const counterparts = new Map();
+    for (const row of candidates) {
+      const origins = counterparts.get(row.afterStatement) ?? new Set();
+      origins.add(row.statement); counterparts.set(row.afterStatement, origins);
+    }
+    return candidates.filter(row => {
+      const key = `${row.statement.owner.name}\0${row.operationFingerprint}`;
+      if (counterparts.get(row.afterStatement).size !== 1 || claimed.has(row.afterStatement)
+          || (newCounts.get(key) ?? 0) >= (oldCounts.get(key) ?? 0)) return false;
+      claimed.add(row.afterStatement);
+      return true;
+    }).map(row => ({
+      beforeFunction: functionLocation(row.statement.owner), afterFunction: functionLocation(row.owner),
+      method: row.operation.callee.property.name.slice(0, 80),
+      methodTruncated: row.operation.callee.property.name.length > 80,
+      removedArrayCopy: row.removedArrayCopy,
+      operation: statementLocation({ node: row.operation, fingerprint: fingerprint(row.operation) }, before),
+      before: statementLocation(row.statement, before), after: statementLocation(row.afterStatement, after),
+    }));
+  } catch { return []; } // Unsupported/bounded-out is not a preservation certificate.
+}
+
 /**
  * Return bounded AST-removal evidence, or null when silent/unavailable.
  * Null is NEVER a preservation/correctness certificate. This observes complete
@@ -148,6 +255,9 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
   const retainedOwner = (statement) => statement.owner && oldFunctions.get(statement.owner.name) === statement.owner
     ? newFunctions.get(statement.owner.name) ?? null : null;
   const retainedRemovals = removed.filter((statement) => retainedOwner(statement));
+  const operations = removedChainOperations(oldTree, newTree, removed,
+    [...remaining.values()].flat(), retainedOwner, before, after);
+  const additiveReplacementRisk = retainedRemovals.length > 0 && additions.length > 0;
   const details = removed.slice(0, MAX_REMOVED).map((statement) => {
     const afterOwner = retainedOwner(statement);
     const nearby = oldTree.statements.filter((candidate) => candidate.owner === statement.owner
@@ -169,7 +279,12 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
     removedStatementCount: removed.length,
     removedFromRetainedFunctions: retainedRemovals.length,
     addedTopLevelFunctionCount: additions.length,
-    additiveReplacementRisk: retainedRemovals.length > 0 && additions.length > 0,
+    additiveReplacementRisk,
+    chainRemovalRisk: operations.length > 0,
+    reviewRequired: additiveReplacementRisk || operations.length > 0,
+    removedOperationCount: operations.length,
+    removedOperations: operations.slice(0, MAX_REMOVED),
+    omittedRemovedOperations: Math.max(0, operations.length - MAX_REMOVED),
     removed: details, omittedRemovedStatements: removed.length - details.length,
     addedFunctions: additions.slice(0, MAX_FUNCTIONS).map((fn) => ({ ...functionLocation(fn),
       sourceSha256: sha256(after.slice(fn.node.start, fn.node.end)) })),
@@ -186,13 +301,22 @@ export function formatEditPreservationWitness(witness) {
     const quoted = JSON.stringify(value);
     return quoted.length > 180 ? `${quoted.slice(0, 150)}… [display clipped]` : quoted;
   };
-  const heading = `[edit-preservation] ${witness.phase === "applied" ? "Applied" : "Staged"} bytes remove ${witness.removedStatementCount} executable statement(s) by AST comparison; ${witness.addedTopLevelFunctionCount} new top-level function(s).\n`
+  const chainHeading = witness.chainRemovalRisk
+    ? `A retained call chain loses ${witness.removedOperations.map(row => `${row.method}()${row.removedArrayCopy ? " plus its array-copy wrapper" : ""}`).join(", ").slice(0, 200)}; its downstream call, arguments and enclosing statement otherwise match. This is a structural change, NOT proof of a bug.\n`
+    : "";
+  const heading = `[edit-preservation] ${chainHeading}${witness.phase === "applied" ? "Applied" : "Staged"} bytes remove ${witness.removedStatementCount} executable statement(s) by AST comparison; ${witness.addedTopLevelFunctionCount} new top-level function(s).\n`
     + (witness.additiveReplacementRisk ? "An existing function loses statements while new top-level functions are added.\n" : "")
     + (witness.addedFunctions.length ? `Added functions: ${witness.addedFunctions.map((fn) => `${fn.name} (AFTER L${fn.startLine})`).join(", ")}.\n` : "");
   const footer = "This is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. "
     + "If you intended an addition, preserve the existing anchor statements and insert around them. "
     + "Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.";
   let rows = "", shown = 0;
+  for (const row of witness.removedOperations ?? []) {
+    const line = `- CHAIN BEFORE ${witness.path}:${row.before.startLine}: ${excerpt(row.before.excerpt)}\n`
+      + `  ${afterLabel} ${witness.path}:${row.after.startLine}: ${excerpt(row.after.excerpt)}\n`;
+    if (heading.length + rows.length + line.length + footer.length + 80 > 2800) break;
+    rows += line;
+  }
   for (const row of witness.removed) {
     const owner = row.beforeFunction?.name ?? "<module>";
     const target = row.afterAnchor ?? row.afterFunction;
@@ -208,10 +332,10 @@ export function formatEditPreservationWitness(witness) {
 
 /** Text for the executor's bounded, exact-transition precommit review policy. */
 export function formatEditPreservationReview(witness) {
-  if (!witness?.additiveReplacementRisk) return "";
+  if (!witness?.additiveReplacementRisk && !witness?.chainRemovalRisk) return "";
   return `${formatEditPreservationWitness(witness)}\n`
     + "[edit-preservation review] No files were changed by this refused transaction. "
-    + "If the removal was accidental, preserve the required existing statements and submit the corrected additive edit. "
+    + "If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. "
     + "If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. "
     + `Review identity: ${witness.id}.`;
 }

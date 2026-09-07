@@ -11,9 +11,10 @@ import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 import {startModelRecorder} from './fight-model-proxy.mjs';
 import {codexSessionUsage,serverCounters,counterDelta} from './fight-usage.mjs';
+import {factoryKit} from './factory-card-catalog.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const KIT=path.join(ROOT,'examples/fights/factory-2026-09-06');
+const DEFAULT_KIT_ID='factory-2026-09-06';
 export const FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
 const LOCAL=new Set(FIGHT_ARMS.slice(0,4));
@@ -21,9 +22,10 @@ const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const write=(file,data)=>fs.writeFileSync(file,JSON.stringify(data,null,2)+'\n',{mode:0o600});
 const quote=text=>`'${String(text).replace(/'/g,"'\\''")}'`;
 
-export function fightPlan({arms=FIGHT_ARMS,cards=FIGHT_CARDS,repetitions=1}={}) {
+export function fightPlan({arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1}={}) {
+  const kit=factoryKit(kitId);if(cards===undefined)cards=kit.cards;
   if(!Array.isArray(arms)||!arms.length||arms.some(a=>!FIGHT_ARMS.includes(a))||new Set(arms).size!==arms.length)throw Error('invalid or duplicate arms');
-  if(!Array.isArray(cards)||!cards.length||cards.some(c=>!FIGHT_CARDS.includes(c))||new Set(cards).size!==cards.length)throw Error('invalid or duplicate cards');
+  if(!Array.isArray(cards)||!cards.length||cards.some(c=>!kit.cards.includes(c))||new Set(cards).size!==cards.length)throw Error('invalid or duplicate cards');
   if(!Number.isInteger(repetitions)||repetitions<1||repetitions>3)throw Error('repetitions must be 1..3');
   const plan=[];
   for(let repeat=1;repeat<=repetitions;repeat++)for(const [i,card] of cards.entries()){
@@ -42,9 +44,10 @@ export function cleanFightEnv(overrides={}) {
   return {...env,NO_COLOR:'1',...overrides};
 }
 
-export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192}) {
+export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,verificationWorkspaceReadOnly=false,terminalClosure=false}) {
   if(!FIGHT_ARMS.includes(arm))throw Error('unknown arm');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
+  if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
   if(['deepseek-local-27b','opencode','hermes'].includes(arm)) {
     return {exe:process.execPath,args:[path.join(ROOT,'scripts',arm==='deepseek-local-27b'?'deepseek-fight-cli.mjs':'peer-fight-cli.mjs'),
       ...(arm==='deepseek-local-27b'?[]:['--arm',arm]),'--workspace',workspace,'--task-file',path.join(dir,'task.md'),
@@ -61,6 +64,8 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
     if(arm==='bantam-local-27b'){
       command.args[command.args.indexOf('--endpoint')+1]=endpoint;command.env.BANTAM_ENDPOINT=endpoint;
     }
+    if(verificationWorkspaceReadOnly){command.args.push('--verify-workspace-read-only');command.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
+    if(terminalClosure)command.env.BANTAM_TERMINAL_CLOSURE='1';
   }
   return command;
 }
@@ -107,20 +112,23 @@ export async function executeContender(command,options) {
   }
 }
 
-const EXECUTION_SCRIPTS=['factory-fights.mjs','fight-model-proxy.mjs','fight-usage.mjs','repobrief-astra-fights.mjs','astra-container-cli.mjs','deepseek-fight-cli.mjs','peer-fight-cli.mjs'];
+const EXECUTION_SCRIPTS=['factory-fights.mjs','factory-card-catalog.mjs','fight-model-proxy.mjs','fight-usage.mjs','repobrief-astra-fights.mjs','astra-container-cli.mjs','deepseek-fight-cli.mjs','peer-fight-cli.mjs'];
 function sourceSeal() {return Object.fromEntries([
   ...['src','bin'].flatMap(part=>Object.entries(treeHashes(path.join(ROOT,part))).map(([p,h])=>[`${part}/${p}`,h])),
   ...EXECUTION_SCRIPTS.map(file=>[`scripts/${file}`,sha(fs.readFileSync(path.join(ROOT,'scripts',file)))]),
 ]);}
 function exactSeal(before,dir){return JSON.stringify(before)===JSON.stringify(treeHashes(dir));}
 
-async function grade(workspace,kit,card) {
+export async function gradeFactoryFight(workspace,card,{kitId=DEFAULT_KIT_ID,run=runShellProcess}={}) {
+  const selected=factoryKit(kitId);
+  if(!selected.cards.includes(card)||!path.isAbsolute(workspace))throw Error('invalid grading workspace/card');
+  const kit=path.join(selected.root,card);
   const descriptor=JSON.parse(fs.readFileSync(path.join(kit,'card.json'),'utf8'));
-  const files=[path.join(KIT,'grader-support.mjs'),...Object.keys(treeHashes(kit)).filter(p=>!p.startsWith('starter/')&&!p.startsWith('reviewer/')).map(p=>path.join(kit,p))];
+  const files=[path.join(selected.root,'grader-support.mjs'),...Object.keys(treeHashes(kit)).filter(p=>!p.startsWith('starter/')&&!p.startsWith('reviewer/')).map(p=>path.join(kit,p))];
   const publicStart=Date.now();
-  const publicResult=await runShellProcess(workspace,'npm test',{shellSandbox:'docker',shellNetwork:false,workspaceReadOnly:true,timeoutMs:60000});
+  const publicResult=await run(workspace,'npm test',{shellSandbox:'docker',shellNetwork:false,workspaceReadOnly:true,timeoutMs:60000});
   const publicWallMs=Date.now()-publicStart,hiddenStart=Date.now();
-  const hidden=await runShellProcess(workspace,`node ${quote(path.join(kit,'grader.mjs'))} ${quote(workspace)}`,{
+  const hidden=await run(workspace,`node ${quote(path.join(kit,'grader.mjs'))} ${quote(workspace)}`,{
     shellSandbox:'docker',shellNetwork:false,workspaceReadOnly:true,readOnlyHostFiles:files,timeoutMs:60000});
   const hiddenWallMs=Date.now()-hiddenStart;
   return {publicResult,hidden,record:parseGrade(hidden.stdout,card,descriptor.groups),
@@ -132,22 +140,25 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards=FIGHT_CARDS,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
-  const plan=fightPlan({arms,cards,repetitions});
+  if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
+  const selectedKit=factoryKit(kitId),kitRoot=selectedKit.root;if(cards===undefined)cards=selectedKit.cards;
+  const plan=fightPlan({arms,cards,kitId,repetitions});
   const model=await inspectLocalModel(endpoint);
-  const kitSeal=treeHashes(KIT),runtimeSeal=sourceSeal();
-  for(const card of cards){const meta=JSON.parse(fs.readFileSync(path.join(KIT,card,'card.json'),'utf8'));if(meta.id!==card||!Array.isArray(meta.groups)||!meta.groups.length)throw Error('invalid card descriptor');}
+  const kitSeal=treeHashes(kitRoot),runtimeSeal=sourceSeal();
+  for(const card of cards){const meta=JSON.parse(fs.readFileSync(path.join(kitRoot,card,'card.json'),'utf8'));if(meta.id!==card||!Array.isArray(meta.groups)||!meta.groups.length)throw Error('invalid card descriptor');}
   fs.mkdirSync(output,{recursive:true,mode:0o700});
   write(path.join(output,'local-model.json'),model);
-  const manifest={schema:'bantam.factory-fights.v1',startedAt:new Date().toISOString(),
-    design:'Exploratory system comparison: fresh independent cards, identical starter/task bytes per contender, rotated order within queues. No teacher or manual repairs. Native sampling/tool/resource differences are recorded, not a pure context ablation. One repeat is not a statistical ranking. Historical cards remain unchanged.',
+  const manifest={schema:'bantam.factory-fights.v1',kitId,startedAt:new Date().toISOString(),
+    design:`Exploratory system regression/demo on the frozen ${kitId} kit: fresh contender workspaces on already-seen adaptive development tasks, identical starter/task bytes per contender, rotated order within queues. No teacher or manual repairs. Native sampling/tool/resource differences are recorded, not a pure context ablation or held-out evaluation. One repeat is not a statistical ranking. Historical cards remain unchanged.`,
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
     sourceSeal:runtimeSeal,kitSeal,modelId:model.id,modelFileSha256:null,endpoint,
-    limits:{wallMs:timeoutMs,bantamTurns:60,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
+    limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,codexModel:'gpt-6-astra',codexEffort:'medium',
+      verificationWorkspaceReadOnly,terminalClosure,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',
       sampling:'native configured values, retained in local wire requests',
       outputPolicy:'BANTAM separates up-to-4096 reasoning and up-to-8192 action requests; peers share their declared output allowance between reasoning and action. Native input reservation/compaction may depend on the declared output allowance.',
@@ -162,10 +173,10 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   save();
   const runQueue=async(queue)=>{for(const item of queue){
     if(fs.existsSync(path.join(output,'STOP_AFTER_CURRENT'))){manifest.stoppedEarly='Operator requested stop at a clean contender boundary; no active run was interrupted.';break;}
-    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,KIT))throw Error('source or kit changed after freeze');
+    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or kit changed after freeze');
     const current=await inspectLocalModel(endpoint,{requireIdle:LOCAL.has(item.arm)});
     if(current.id!==model.id||current.props.build_info!==model.props.build_info||current.props.default_generation_settings.n_ctx!==model.props.default_generation_settings.n_ctx)throw Error('local server identity/settings changed');
-    const {card,arm,repeat}=item,kit=path.join(KIT,card),dir=path.join(output,`repeat-${repeat}`,card,arm),workspace=path.join(dir,'ws');
+    const {card,arm,repeat}=item,kit=path.join(kitRoot,card),dir=path.join(output,`repeat-${repeat}`,card,arm),workspace=path.join(dir,'ws');
     fs.mkdirSync(dir,{recursive:true});fs.cpSync(path.join(kit,'starter'),workspace,{recursive:true,dereference:false});
     const materials=treeHashes(path.join(kit,'starter'));
     if(!exactSeal(materials,workspace))throw Error('starter copy mismatch');
@@ -173,7 +184,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     fs.mkdirSync(path.join(dir,'native-sessions'));
     const recorder=LOCAL.has(arm)?await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')}):null;
     const countersBefore=recorder?await serverCounters(endpoint):null;
-    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model.id,timeoutMs,probeEnabled,peerOutputTokens});
+    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
     let result,wireUsage;
@@ -182,9 +193,9 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const countersAfter=recorder?await serverCounters(endpoint):null;
     const serverUsage=recorder?counterDelta(countersBefore,countersAfter):null;
     if(recorder)write(path.join(dir,'server-usage.json'),{before:countersBefore,after:countersAfter,delta:serverUsage});
-    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,KIT))throw Error('source or grader changed during contender run; no score issued');
+    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during contender run; no score issued');
     const tampered=changedSealedFiles(Object.fromEntries(Object.entries(materials).filter(([p])=>p==='package.json'||p.startsWith('test/'))),workspace);
-    const grading=await grade(workspace,kit,card);
+    const grading=await gradeFactoryFight(workspace,card,{kitId});
     for(const [label,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
       fs.writeFileSync(path.join(dir,`${label}.stdout.log`),record.stdout);fs.writeFileSync(path.join(dir,`${label}.stderr.log`),record.stderr);
     }
@@ -208,23 +219,25 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
       gradingTiming:grading.timing,contenderPlusGradingWallMs:result.wallMs+grading.timing.totalWallMs,
       usage,serverUsage,nativeMetadata:native,nativeLaunch,nativeUsage:cliUsage,
       finalFiles:treeHashes(workspace,{excludeGenerated:true}),operatorInterventions:0};
-    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,KIT))throw Error('source or grader changed during judging; no score issued');
+    if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during judging; no score issued');
     write(path.join(dir,'result.json'),row);manifest.results.push(row);save();
     process.stdout.write(`${manifest.results.length}/${plan.length} ${card} ${arm}: ${outcome}, ${(row.wallMs/1000).toFixed(1)}s, ${row.grade?.groups.filter(g=>g.pass).length??0}/${row.grade?.groups.length??0} groups\n`);
   }};
   if(parallelQueues)await Promise.all([runQueue(plan.filter(item=>LOCAL.has(item.arm))),runQueue(plan.filter(item=>!LOCAL.has(item.arm)))]);
   else await runQueue(plan);
   manifest.finishedAt=new Date().toISOString();manifest.complete=manifest.results.length===plan.length;
-  manifest.sourceMismatches=changedSealedFiles(runtimeSeal,ROOT);manifest.kitMismatches=changedSealedFiles(kitSeal,KIT);save();
+  manifest.sourceMismatches=changedSealedFiles(runtimeSeal,ROOT);manifest.kitMismatches=changedSealedFiles(kitSeal,kitRoot);save();
   process.stdout.write(`Evidence: ${output}\n`);return manifest;
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const args=process.argv.slice(2),value=flag=>{const i=args.indexOf(flag);return i<0?null:args[i+1];};
   runFactoryFights({output:args[0],...(value('--arms')?{arms:value('--arms').split(',')}:{}),
+    ...(value('--kit')?{kitId:value('--kit')}:{}),
     ...(value('--cards')?{cards:value('--cards').split(',')}:{}),...(value('--repetitions')?{repetitions:Number(value('--repetitions'))}:{}),
     ...(value('--timeout-seconds')?{timeoutMs:Number(value('--timeout-seconds'))*1000}:{}),
     ...(value('--peer-output-tokens')?{peerOutputTokens:Number(value('--peer-output-tokens'))}:{}),
-    parallelQueues:!args.includes('--serial'),probeEnabled:!args.includes('--no-probe')})
+    parallelQueues:!args.includes('--serial'),probeEnabled:!args.includes('--no-probe'),
+    verificationWorkspaceReadOnly:args.includes('--verify-workspace-read-only'),terminalClosure:args.includes('--terminal-closure')})
     .catch(error=>{process.stderr.write(`${error.stack}\n`);process.exitCode=1;});
 }

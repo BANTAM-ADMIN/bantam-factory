@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {parse} from 'acorn';
 import {factoryKit} from '../scripts/factory-card-catalog.mjs';
-import {fightPlan,FIGHT_ARMS,FIGHT_CARDS,freshCommand,parseGrade,cleanFightEnv,gradeFactoryFight,runFactoryFights} from '../scripts/factory-fights.mjs';
+import {fightPlan,FIGHT_ARMS,FIGHT_CARDS,freshCommand,parseGrade,cleanFightEnv,gradeFactoryFight,runFactoryFights,optionalServerCounters,inspectLocalModel} from '../scripts/factory-fights.mjs';
+import {counterDelta} from '../scripts/fight-usage.mjs';
 test('fresh plan covers all18corner/card cells once, with rotated order',()=>{
   const plan=fightPlan();assert.equal(plan.length,18);assert.equal(new Set(plan.map(r=>r.card+':'+r.arm)).size,18);
   assert.notEqual(plan[0].arm,plan[6].arm);assert.notEqual(plan[6].arm,plan[12].arm);
@@ -144,4 +145,42 @@ test('runtime execution seal inventory includes the versioned kit catalog',()=>{
   assert.ok(inventory.init.elements.map(node=>node.value).includes('factory-card-catalog.mjs'));
   const seal=ast.body.find(node=>node.type==='FunctionDeclaration'&&node.id.name==='sourceSeal');
   assert.match(source.slice(seal.start,seal.end),/EXECUTION_SCRIPTS\.map/);
+});
+
+test('optional server counters preserve explicit unavailable snapshots without inventing usage',async t=>{
+  const endpoint='http://127.0.0.1:9999',calls=[];
+  const current={counters:{prompt_tokens_total:12,prompt_tokens_cached_total:8,tokens_predicted_total:4}};
+  const fetch=t.mock.method(globalThis,'fetch',async(url,options)=>{
+    calls.push({url,options});throw Error('connection refused after inference server exited');
+  });
+  const before=Date.now(),missing=await optionalServerCounters(endpoint+'/'),after=Date.now();
+  assert.equal(calls[0].url,endpoint+'/metrics');assert.ok(calls[0].options.signal instanceof AbortSignal);
+  assert.equal(missing.unavailable,true);assert.match(missing.error,/connection refused/);
+  assert.ok(Date.parse(missing.at)>=before&&Date.parse(missing.at)<=after);
+  assert.equal(Object.hasOwn(missing,'counters'),false);assert.equal(Object.hasOwn(missing,'raw'),false);
+  assert.equal(counterDelta(current,missing),null);assert.equal(counterDelta(missing,current),null);
+  assert.equal(counterDelta(missing,missing),null);
+  fetch.mock.mockImplementation(async()=>({ok:false,status:503}));
+  const unavailable=await optionalServerCounters(endpoint);
+  assert.equal(unavailable.unavailable,true);assert.match(unavailable.error,/metrics unavailable/);
+  assert.equal(counterDelta(current,unavailable),null);
+  fetch.mock.mockImplementation(async()=>({ok:true,async text(){throw Error('response body interrupted');}}));
+  assert.match((await optionalServerCounters(endpoint)).error,/response body interrupted/);
+  fetch.mock.mockImplementation(async()=>{throw Error('endpoint still down');});
+  await assert.rejects(inspectLocalModel(endpoint),/endpoint still down/,'next-boundary health/identity checks stay mandatory');
+});
+
+test('available supplemental counters retain measured deltas and remain separate from contender usage',async t=>{
+  const bodies=[
+    'llamacpp:prompt_tokens_total 10\nllamacpp:prompt_tokens_cached_total 20\nllamacpp:tokens_predicted_total 30\nllamacpp:prompt_seconds_total 1\nllamacpp:tokens_predicted_seconds_total 2\nllamacpp:requests_processing 0\nllamacpp:requests_deferred 0\n',
+    'llamacpp:prompt_tokens_total 14\nllamacpp:prompt_tokens_cached_total 26\nllamacpp:tokens_predicted_total 38\nllamacpp:prompt_seconds_total 2\nllamacpp:tokens_predicted_seconds_total 4\nllamacpp:requests_processing 0\nllamacpp:requests_deferred 0\n',
+  ];let i=0;
+  t.mock.method(globalThis,'fetch',async()=>({ok:true,async text(){return bodies[i++];}}));
+  const before=await optionalServerCounters('http://127.0.0.1:9999'),after=await optionalServerCounters('http://127.0.0.1:9999');
+  assert.equal(before.raw,bodies[0]);assert.equal(after.raw,bodies[1]);assert.equal(before.unavailable,undefined);
+  const delta=counterDelta(before,after);
+  assert.equal(delta.source,'server-counter-window');assert.equal(delta.inputTokens,10);
+  assert.equal(delta.freshInputTokens,4);assert.equal(delta.cacheHitTokens,6);assert.equal(delta.outputTokens,8);
+  assert.equal(delta.promptSeconds,1);assert.equal(delta.generationSeconds,2);
+  assert.equal(delta.idleBefore,true);assert.equal(delta.idleAfter,true);
 });

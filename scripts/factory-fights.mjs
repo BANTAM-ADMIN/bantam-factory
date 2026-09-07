@@ -92,6 +92,14 @@ export async function inspectLocalModel(endpoint,{requireIdle=true}={}) {
   return result;
 }
 
+// Supplemental global counters must not erase a finished contender's receipts
+// when the inference server dies. Own-wire usage remains separate authority;
+// the next contender still requires the ordinary live identity/idle check.
+export async function optionalServerCounters(endpoint) {
+  try{return await serverCounters(endpoint);}
+  catch(error){return {at:new Date().toISOString(),unavailable:true,error:String(error?.message??error)};}
+}
+
 export async function executeContender(command,options) {
   try{return await execute(command,options);}
   finally{
@@ -183,14 +191,14 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const task=fs.readFileSync(path.join(kit,'task.md'),'utf8');fs.writeFileSync(path.join(dir,'task.md'),task);
     fs.mkdirSync(path.join(dir,'native-sessions'));
     const recorder=LOCAL.has(arm)?await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')}):null;
-    const countersBefore=recorder?await serverCounters(endpoint):null;
+    const countersBefore=recorder?await optionalServerCounters(endpoint):null;
     const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
     let result,wireUsage;
     try {result=await executeContender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs,events:[],arm});}
     finally {wireUsage=recorder?await recorder.close():null;}
-    const countersAfter=recorder?await serverCounters(endpoint):null;
+    const countersAfter=recorder?await optionalServerCounters(endpoint):null;
     const serverUsage=recorder?counterDelta(countersBefore,countersAfter):null;
     if(recorder)write(path.join(dir,'server-usage.json'),{before:countersBefore,after:countersAfter,delta:serverUsage});
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during contender run; no score issued');

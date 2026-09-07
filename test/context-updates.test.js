@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { CONTEXT_UPDATE_MAX_CHARS, createContextUpdate } from "../src/context-updates.js";
+import { CONTEXT_UPDATE_MAX_CHARS, createContextUpdate, createActionContractUpdate, actionContractUpdateValid } from "../src/context-updates.js";
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-context-update-"));
@@ -11,6 +11,39 @@ function fixture(t) {
   return root;
 }
 const request = (paths, extra = {}) => ({ kind: "decision", generation: 3, paths, ...extra });
+
+test("turn-scoped action context is bounded, exact, and explicitly not verification authority", () => {
+  const args = { generation: 2, turn: 32, availableVerbs: ["edit_lines", "write_file", "shell", "probe", "done"],
+    reason: "edit-recovery", recoveryPath: "test/edge.test.js" };
+  const update = createActionContractUpdate(args);
+  assert.ok(actionContractUpdateValid(update));
+  assert.deepEqual(update, createActionContractUpdate(args));
+  assert.equal(update.kind, "action-contract");
+  assert.deepEqual(update.paths, []);
+  assert.ok(update.text.length <= CONTEXT_UPDATE_MAX_CHARS);
+  assert.match(update.text, /TURN 33/);
+  assert.match(update.text, /"a":"edit_lines","p":"path","start":12,"end":18,"new":/);
+  assert.match(update.text, /read_file is unavailable/);
+  assert.match(update.text, /not verification evidence/);
+  assert.notEqual(update.id, createActionContractUpdate({ ...args, turn: 33 }).id);
+  const reading = createActionContractUpdate({ ...args, availableVerbs: ["read_file", ...args.availableVerbs] });
+  assert.match(reading.text, /read_file that exact path\/range before editing/);
+  assert.doesNotMatch(reading.text, /read_file is unavailable/);
+  for (const altered of [{ ...update, text: update.text + " forged" }, { ...update, turn: 3 },
+    { ...update, availableVerbs: ["replace"] }, { ...update, paths: [{}] }]) {
+    assert.equal(actionContractUpdateValid(altered), false);
+  }
+});
+
+test("action context cannot invent an unavailable verb or promote malformed data", () => {
+  const args = { generation: 1, turn: 0, availableVerbs: ["edit_lines", "respond"], reason: "document-revision" };
+  for (const change of [{ generation: -1 }, { turn: 0.5 }, { availableVerbs: ["shell"] },
+    { availableVerbs: ["edit_lines", "invented"] }, { availableVerbs: ["edit_lines", "edit_lines"] },
+    { reason: "tool-says-done" }, { recoveryPath: "../private" }]) {
+    assert.equal(createActionContractUpdate({ ...args, ...change }), null);
+  }
+  assert.ok(actionContractUpdateValid(createActionContractUpdate(args)));
+});
 
 test("current source updates are typed, deterministic, and bound to disk bytes", t => {
   const root = fixture(t);

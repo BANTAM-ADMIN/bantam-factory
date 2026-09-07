@@ -13,6 +13,7 @@ import { parseAssertionSpec, buildAssertionProbe } from "./contract-assertion-sp
 
 const HASH = /^[a-f0-9]{64}$/;
 const SOURCES = new Set(["shell", "automatic", "scoped", "landing", "completion"]);
+export const VERIFICATION_RECEIPTS_SCHEMA = "bantam.verification-receipts.v1";
 const record = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const badFlags = value => ["blocked", "invalidated", "interrupted", "aborted", "timedOut", "bufferExceeded", "error", "signal", "uncertainty"].some(key => Boolean(value?.[key]));
 
@@ -26,6 +27,20 @@ function wordsForDirectCommand(command) {
 function sameCommand(actual, expected) {
   const a = wordsForDirectCommand(actual), b = wordsForDirectCommand(expected);
   return Boolean(a && b && a.length === b.length && a.every((word, index) => word === b[index]));
+}
+
+// The executor may inject exactly one bounded per-test timeout immediately
+// after a bare Node --test. Retain every other token, including test selection;
+// do not normalize arbitrary options, wrappers, masks or caller-set timeouts.
+function sameConfiguredExecution(actual, configured) {
+  if (sameCommand(actual, configured)) return true;
+  const a = wordsForDirectCommand(actual), b = wordsForDirectCommand(configured);
+  if (!a || !b || a.length !== b.length + 1 || b[1] !== "--test"
+      || !/^(?:node|nodejs)$/.test(b[0]?.split("/").at(-1) ?? "")
+      || b.some(word => /^--test-timeout(?:=|$)/.test(word))) return false;
+  const timeout = /^--test-timeout=([1-9]\d*)$/.exec(a[2] ?? "");
+  if (!timeout || Number(timeout[1]) < 5000 || Number(timeout[1]) > 60000) return false;
+  return a.filter((_, index) => index !== 2).every((word, index) => word === b[index]);
 }
 
 // Recognition only: never rewrite or re-execute a shell program. A successful
@@ -117,7 +132,7 @@ function inlineNodeAssertion(source) {
 }
 
 export function isFocusedAuditCommand(command, configured = null) {
-  if (configured && sameCommand(command, configured)) return false;
+  if (configured && sameConfiguredExecution(command, configured)) return false;
   const words = wordsForDirectCommand(command);
   if (!words) return false;
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) words.shift();
@@ -225,12 +240,60 @@ function validContractAssertion(station, audit, generation) {
 function validStationProject(proof, generation, configured, workspaceReadOnly) {
   if (!configured || !validReceipt(proof, generation, { verification: true })
       || proof.statusScope !== "execution" || !sameCommand(proof.command, configured)
-      || !sameCommand(proof.executedCommand, configured) || !sameCommand(proof.statusCommand, configured)
+      || !sameConfiguredExecution(proof.executedCommand, configured) || proof.statusCommand !== proof.executedCommand
       || (typeof workspaceReadOnly === "boolean" && proof.workspaceReadOnly !== workspaceReadOnly)) return false;
   if (proof.counts != null && (!record(proof.counts)
       || !["passed", "failed", "total"].every(key => Number.isSafeInteger(proof.counts[key]) && proof.counts[key] >= 0)
       || proof.counts.total < 1 || proof.counts.failed !== 0 || proof.counts.passed !== proof.counts.total)) return false;
   return true;
+}
+
+// This envelope is written only by the controller at actual execution
+// completion, never reconstructed from action text, cached proofs or model
+// claims. Its sequence is local to the recorded turn. It is not authentication
+// of an arbitrary foreign log. Bare arrays/legacy aliases establish no order.
+function orderedTurnReceipts(turn, index) {
+  const envelope = turn.verificationReceipts;
+  if (!record(envelope) || envelope.schema !== VERIFICATION_RECEIPTS_SCHEMA
+      || envelope.authority !== "controller-execution-order" || envelope.turn !== index
+      || !Array.isArray(envelope.entries) || envelope.entries.length < 1 || envelope.entries.length > 16) return null;
+  const entries = envelope.entries;
+  if (entries.some((entry, sequence) => !record(entry) || entry.sequence !== sequence
+      || !Object.hasOwn(entry, "verificationEvidence") || !Object.hasOwn(entry, "shellExecution")
+      || (entry.verificationEvidence !== null && !record(entry.verificationEvidence))
+      || (entry.shellExecution !== null && !record(entry.shellExecution))
+      || (!entry.verificationEvidence && !entry.shellExecution))) return null;
+  // Old readers still use these aliases. A contradictory alias (including an
+  // invalidation/failure) must not disappear merely because an envelope exists.
+  try {
+    for (const key of ["verificationEvidence", "shellExecution"]) {
+      if (turn[key] != null && !entries.some(entry => entry[key] != null
+          && canonicalEncode(entry[key]) === canonicalEncode(turn[key]))) return null;
+    }
+  } catch { return null; }
+  return entries;
+}
+
+function orderedReceiptCommand(proof, shell, { generation, workspace }) {
+  if ((proof && !validReceipt(proof, generation, { verification: true }))
+      || (shell && !validReceipt(shell, generation))) return null;
+  if (proof && (proof.statusScope !== "execution" || proof.statusCommand !== proof.executedCommand)) return null;
+  if (proof?.source === "shell" && !shell) return null;
+  if (proof && shell && ["command", "executedCommand", "generation", "exitCode", "cwd", "workspaceReadOnly", "sandbox"]
+    .some(key => (proof[key] ?? null) !== (shell[key] ?? null))) return null;
+  if (workspace != null && [proof, shell].filter(Boolean).some(receipt => receipt.cwd !== workspace)) return null;
+  if (proof?.counts != null && (!record(proof.counts)
+      || !["passed", "failed", "total"].every(key => Number.isSafeInteger(proof.counts[key]) && proof.counts[key] >= 0)
+      || proof.counts.failed !== 0 || proof.counts.total < 1 || proof.counts.passed < 1
+      || proof.counts.passed > proof.counts.total || proof.countsScope !== "single-execution")) return null;
+  const command = commandForAuditReceipt(proof, shell, workspace);
+  // A successful Node test launcher may discover no cases. In this new ordered
+  // path retain measured execution counts, not merely the launcher's exit zero.
+  const words = wordsForDirectCommand(command);
+  while (words && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) words.shift();
+  if (words && /^(?:node|nodejs)$/.test(words[0]?.split("/").at(-1) ?? "")
+      && words[1] === "--test" && !(proof?.counts?.passed > 0)) return null;
+  return command;
 }
 
 export function pendingContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
@@ -245,17 +308,20 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
   if (auditIndex < 0) return null;
   const audit = turns[auditIndex].contractStateAudit;
   const configured = String(configuredCommand ?? "").trim();
-  let focusedTurn = null, projectTurn = null, stationProjectTurn = null;
+  let focusedTurn = null, projectTurn = null, focusedOrder = null, projectOrder = null, order = 0;
+  const clear = () => { focusedTurn = projectTurn = focusedOrder = projectOrder = null; };
   for (let index = auditIndex; index < turns.length; index++) {
     const turn = turns[index];
     if (turn?.contractAssertion) {
       const station = turn.contractAssertion;
-      focusedTurn = projectTurn = stationProjectTurn = null;
+      clear();
       if (!turn.controllerStop && !turn.shellScopeRollback?.violations?.length
           && validContractAssertion(station, audit, generation)) {
         focusedTurn = index;
+        focusedOrder = order++;
         if (validStationProject(station.projectVerification, generation, configured, verificationWorkspaceReadOnly)) {
-          projectTurn = stationProjectTurn = index;
+          projectTurn = index;
+          projectOrder = order++;
         }
       }
       // The ordinary action/proof on this turn precedes the station. Only the
@@ -263,6 +329,25 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
       continue;
     }
     if (index === auditIndex) continue;
+    if (turn && Object.hasOwn(turn, "verificationReceipts")) {
+      const entries = orderedTurnReceipts(turn, index);
+      if (!entries || turn.controllerStop || turn.shellScopeRollback?.violations?.length) { clear(); continue; }
+      for (const entry of entries) {
+        const at = order++, proof = entry.verificationEvidence, shell = entry.shellExecution;
+        const command = orderedReceiptCommand(proof, shell, { generation, workspace });
+        if (!command) { clear(); continue; }
+        if (isFocusedAuditCommand(command, configured)) { focusedTurn = index; focusedOrder = at; }
+        if (proof && configured && sameConfiguredExecution(command, configured)) {
+          const controller = proof.source !== "shell";
+          if (proof.configuredCommand !== configured
+              || (controller && (!sameCommand(proof.command, configured) || !sameConfiguredExecution(proof.executedCommand, configured)))
+              || (controller && typeof verificationWorkspaceReadOnly === "boolean"
+                && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(); continue; }
+          projectTurn = index; projectOrder = at;
+        }
+      }
+      continue;
+    }
     const proof = turn?.verificationEvidence;
     const shell = turn?.shellExecution;
     if (!proof && !shell) continue;
@@ -271,24 +356,27 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
     if (turn.controllerStop || turn.shellScopeRollback?.violations?.length
         || (proof && !validReceipt(proof, generation, { verification: true }))
         || (shell && !validReceipt(shell, generation))) {
-      focusedTurn = projectTurn = stationProjectTurn = null;
+      clear();
       continue;
     }
     const command = commandForAuditReceipt(proof, shell, workspace);
-    if (!command) { focusedTurn = projectTurn = stationProjectTurn = null; continue; }
+    if (!command) { clear(); continue; }
+    const at = order++;
     const nameFiltered = wordsForDirectCommand(command)?.some(word => /^--test-name-pattern(?:=|$)/.test(word));
     // A zero-match filtered run can exit zero. It proves no assertion ran and
     // must not clear the review; absent counts are unknown, not success.
     const observedFilteredCase = !nameFiltered || (proof?.counts?.passed > 0 && proof.counts.failed === 0);
     if ((!proof || proof.statusScope === "execution") && observedFilteredCase
-        && isFocusedAuditCommand(command, configured)) focusedTurn = index;
-    if (proof && configured && sameCommand(command, configured)) projectTurn = index;
+        && isFocusedAuditCommand(command, configured)) { focusedTurn = index; focusedOrder = at; }
+    if (proof && configured && sameConfiguredExecution(command, configured)) { projectTurn = index; projectOrder = at; }
   }
   const projectAfterFocused = projectTurn !== null && focusedTurn !== null
-    && (projectTurn > focusedTurn || (projectTurn === focusedTurn && stationProjectTurn === focusedTurn));
+    && projectOrder > focusedOrder;
   if (focusedTurn !== null && (!configured || projectAfterFocused)) return null;
   return { turn: auditIndex, promptSha256: audit.promptSha256 ?? null,
     report: String(audit.report ?? ""), sources: audit.sources ?? [], focusedTurn, projectTurn,
+    configuredCommand: configured || null,
+    generation: Number.isSafeInteger(generation) && generation >= 0 ? generation : null,
     needsFocused: focusedTurn === null,
     needsProject: Boolean(configured && !projectAfterFocused),
     missing: [...(focusedTurn === null ? ["focused-execution"] : []),
@@ -297,7 +385,16 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
 
 export function contractAuditRecoveryNote(pending) {
   if (!pending) return "";
+  const configured = typeof pending.configuredCommand === "string" ? pending.configuredCommand : null;
+  if (pending.needsFocused === false && pending.needsProject === true && configured
+      && Number.isSafeInteger(pending.focusedTurn) && pending.focusedTurn >= 0) {
+    return `[contract-audit-recovery] Focused assertion accepted at turn ${pending.focusedTurn + 1} for generation ${pending.generation ?? "unknown"}. Only project-verification remains.\n`
+      + `Next action: execute exactly this configured project command:\n${configured}\n`
+      + "Do not repeat the focused check or emit DONE yet. Another runner, selector or package script is not interchangeable with this configured command, even if its output looks equivalent. Do not append echoed status, filters or other shell commands.";
+  }
   return `[contract-audit-recovery] The independent API review at turn ${pending.turn + 1} still needs ${pending.missing?.join(" + ") || "current executable evidence"}. An earlier green suite, a fresh broad suite alone, an edit, and the review's prose are not evidence that these boundary combinations were tested.\n`
+    + "A printed green verdict or echoed exit code does not replace the typed execution receipt. Execute the focused launcher directly, then the configured project check directly; do not append status-printing commands. The controller may record two separate real executions in that order on one turn.\n"
+    + (configured ? `After the focused assertion, execute exactly this configured project command:\n${configured}\n` : "")
     + `${pending.report.slice(0, 3000)}${pending.report.length > 3000 ? "\n[Review excerpt truncated; consult the full recorded audit.]" : ""}\n`
     + "Check each supported finding against the public contract. Run a small direct assertion through the actual public API that distinguishes the claimed behavior (including zero-work inputs where applicable), using writable temporary fixtures. Accepted launch shapes include `node --test test/edge.test.js`, `node check-api.mjs`, `python check_api.py`, or a direct inline assertion; use a concrete permitted file, not an output filter, echoed status, or compound shell program. Establish that one case and its launcher work before scaling a fuzz run. Repair only a demonstrated defect; reject unsupported findings with an executable counterexample, not an unrelated edit. Then run fresh configured project verification on the same source generation. These receipts show execution, not oracle correctness or complete contract coverage. The controller's source-bound assertion station can provide this focused execution; its post-station project receipt is separate. An unbound probe projection or model claim does not qualify. No extra turns are granted.";
 }

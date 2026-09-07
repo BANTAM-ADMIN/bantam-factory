@@ -56,9 +56,9 @@ const SANDBOX_PIDS_LIMIT = Math.max(256, Number(process.env.BANTAM_SANDBOX_PIDS)
 const SANDBOX_MEMORY = process.env.BANTAM_SANDBOX_MEMORY || "4g";
 import { isTestCommand, isDeliverableRun } from "./logic/deliverable-signals.js";
 import { collateralRefusal } from "./collateral.js";
-import { parseTestCounts, renderFailingTests } from "./logic/test-focus.js";
+import { renderFailingTests } from "./logic/test-focus.js";
 import { hasShellControlOutsideQuotes, shellSegments, splitShellWords } from "./shell-lex.js";
-import { verificationShellStatusRisk } from "./verification-evidence.js";
+import { verificationEvidence, verificationShellStatusRisk } from "./verification-evidence.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
 import { createEditPreservationWitness, formatEditPreservationReview } from "./edit-preservation.js";
 import { editPaths } from "./edit-actions.js";
@@ -1102,7 +1102,7 @@ export class Executor {
     if (discardError) return discardError;
     const directStatusCheck = stripPassiveTestStatusSuffix(c);
     const statusCorrectionNote = directStatusCheck
-      ? `[status-guard] Ran the direct check WITHOUT the passive status-print suffix. The echo was not executed; the recorded process exit is the check's actual status, not an echoed claim. Command executed: ${directStatusCheck}\n`
+      ? `[status-guard] Ran the direct check WITHOUT the passive status-print suffix. The echo was not executed; stdout and stderr are captured separately, so a trailing 2>&1 merge is omitted too. The recorded process exit is the check's actual status, not an echoed claim. Command executed: ${directStatusCheck}\n`
       : null;
     if (directStatusCheck) c = directStatusCheck;
     const testPipeError = shellTestPipeError(c);
@@ -1216,22 +1216,31 @@ export class Executor {
     // back a digest leaves that question unanswered, so it asks again (v13 ran
     // the suite three times in a row). Answer it in the first line.
     let verdictLine = "";
-    if (testCommand && !res.timedOut) {
-      const counts = parseTestCounts(`${res.stdout}\n${res.stderr ?? ""}`);
-      if (counts) {
-        verdictLine = counts.failed === 0
-          ? `VERDICT: all ${counts.total} tests passed.\n`
-          : `VERDICT: ${counts.failed} of ${counts.total} tests FAILED (${counts.passed} passed).\n`;
-        // Which ones. The model filters test output because it wants the FAILING
-        // test names out of a thousand-line TAP stream; stripping its filter and
-        // then clipping the raw output to the HEAD hands back "ok 1, ok 2, ok 3…"
-        // and never the failures buried at line 324. v29 tried six filter
-        // variants in a row hunting two failures it was structurally prevented
-        // from seeing. Pull the `not ok` lines to the top, where clipping can't
-        // eat them — this is the exact fact the filter was reaching for.
-        if (counts.failed > 0) {
-          verdictLine += renderFailingTests(`${res.stdout}\n${res.stderr ?? ""}`, { root: this.realWorkspace });
-        }
+    if (testCommand) {
+      // Use the same typed status/counts as the controller, before clipping.
+      // Printed green counts cannot override a masked exit, interrupted runner,
+      // zero-case run or multiple conflicting summaries. This object is only
+      // narration input; the agent binds the actual execution's generation.
+      const measured = verificationEvidence({ execution: this.lastShellExecution, command: c });
+      const counts = measured?.counts;
+      if (!measured || measured.status === "unverified" || measured.statusScope !== "execution") {
+        verdictLine = "VERDICT: UNVERIFIED — this whole command did not establish a passing check.\n";
+      } else if (measured.status === "fail") {
+        verdictLine = counts?.failed > 0
+          ? `VERDICT: ${counts.failed} of ${counts.total} tests FAILED (${counts.passed} passed).\n`
+          : `VERDICT: FAILED (exit ${this.lastShellExecution.exitCode}; printed counts do not establish success).\n`;
+      } else if (counts?.total > 0) {
+        verdictLine = `VERDICT: all ${counts.total} tests passed.\n`;
+      }
+      // Which ones. The model filters test output because it wants the FAILING
+      // test names out of a thousand-line TAP stream; stripping its filter and
+      // then clipping the raw output to the HEAD hands back "ok 1, ok 2, ok 3…"
+      // and never the failures buried at line 324. v29 tried six filter
+      // variants in a row hunting two failures it was structurally prevented
+      // from seeing. Pull the `not ok` lines to the top, where clipping can't
+      // eat them — this is the exact fact the filter was reaching for.
+      if (measured?.status === "fail" && counts?.failed > 0) {
+        verdictLine += renderFailingTests(`${res.stdout}\n${res.stderr ?? ""}`, { root: this.realWorkspace });
       }
     }
     // Sanitizer output carries the exact bug (ERROR/#0..#N file:line/SUMMARY) but
@@ -1623,7 +1632,8 @@ function automaticTestPipeCorrection(command) {
 
 // Execute one already-requested check exactly once, with its own exit status.
 // This is NOT a compound-shell simplifier: only a trailing literal echo of $?
-// may be omitted. In particular, never remove required setup or cleanup, expand
+// and one immediately preceding 2>&1 capture merge may be omitted. Both streams
+// are captured independently already. Never remove required setup or cleanup, expand
 // an inferred command, or turn an expected-negative CLI call into an assertion.
 export function stripPassiveTestStatusSuffix(command) {
   const text = String(command ?? "").trim();
@@ -1637,7 +1647,16 @@ export function stripPassiveTestStatusSuffix(command) {
     if (ch === ";") { separator = index; break; }
   }
   if (separator < 0 || quote) return null;
-  const direct = text.slice(0, separator).trim(), suffix = text.slice(separator + 1).trim();
+  let direct = text.slice(0, separator).trim();
+  const suffix = text.slice(separator + 1).trim();
+  const merge = /[ \t]+2>&1$/.exec(direct);
+  if (merge) {
+    // An escaped separator can make the digit part of an argument instead of
+    // an fd. Do not reinterpret that program or remove any other redirection.
+    const backslashes = /\\+$/.exec(direct.slice(0, merge.index))?.[0].length ?? 0;
+    if (backslashes % 2) return null;
+    direct = direct.slice(0, merge.index).trim();
+  }
   // No shell expansion in the primary, even inside quoted arguments. The sole
   // permitted variable expansion is the printed exit code in the discarded echo.
   if (!direct || /[$`\r\n]/.test(direct) || hasShellControlOutsideQuotes(direct)
@@ -1797,6 +1816,7 @@ export async function runShellProcess(workspace, command, {
     await processRunner("docker", ["rm", "-f", runner.cleanupName], { timeoutMs: 5000 });
   }
   return { ...res, sandbox: runner.sandbox, pipefail: pipefail === true,
+    cwd: realWorkspace, executedCommand: command,
     scratchDirectory: runner.scratchDirectory ?? null };
 }
 

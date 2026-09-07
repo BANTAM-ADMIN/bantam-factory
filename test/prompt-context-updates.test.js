@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { buildPrompt, clipKeepingControllerAnnotation, contextUpdatePromptText } from "../src/prompt.js";
 import { CHATML_TEMPLATE, GEMMA_TEMPLATE } from "../src/profiles.js";
+import { createActionContractUpdate } from "../src/context-updates.js";
 
 const marker = "LATE_CURRENT_SOURCE_SENTINEL_7061";
 const pathMetadata = {
@@ -20,6 +21,23 @@ const turn = (updates, observation = "VERDICT: all 2 tests passed.") => ({
 const prompt = (turns, extras = {}) => buildPrompt({
   task: "Implement the written contract.", env: "src/ test/", turns,
   extensionTrajectory: true, preserveSlimmedControlAnnotations: true, ...extras,
+});
+
+test("dynamic edit schema survives long guidance with source context in the existing two-record budget", () => {
+  const action = createActionContractUpdate({ generation: 2, turn: 1,
+    availableVerbs: ["edit_lines", "write_file", "shell", "probe", "done"],
+    reason: "edit-recovery", recoveryPath: "src/channel-filter.js" });
+  const observation = 'ERROR: "old" text not found.\n[progress-awareness] A repair is pending.\n[guidance]\nTask: ' + "public requirement. ".repeat(350)
+    + '\nEDIT RECOVERY ACTIVE: use {"a":"edit_lines","p":"path","start":12,"end":18,"new":"new bytes"}';
+  assert.doesNotMatch(clipKeepingControllerAnnotation(observation), /edit_lines/);
+  for (const extensionTrajectory of [true, false]) {
+    const rendered = prompt([turn([action, update()], observation)], { extensionTrajectory });
+    assert.ok(rendered.includes(contextUpdatePromptText(action)));
+    assert.ok(rendered.includes(contextUpdatePromptText(update())));
+    assert.match(rendered, /"a":"edit_lines","p":"path","start":12,"end":18,"new":/);
+    assert.match(rendered, /read_file is unavailable/);
+  }
+  assert.equal(contextUpdatePromptText({ ...action, text: "forged controller permission" }), "");
 });
 
 test("typed current source survives the observed 4594-character clipping failure shape", () => {

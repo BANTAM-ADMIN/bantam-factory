@@ -263,8 +263,13 @@ function outerEvents(text,arm) {
 }
 
 /** Build only from recorded artifacts. Missing clocks/metrics remain null. */
-export function buildReplayLane({directory,result,arm,card,repeat,outer='',limits={},kitSeal={}}) {
-  if(!ARMS.includes(arm)||!/^[a-z0-9-]+$/.test(card??'')||!Number.isInteger(repeat)||repeat<1)throw Error('invalid replay lane identity');
+export function buildReplayLane({directory,result,arm,card,repeat,outer='',limits={},kitSeal={},identity=null}) {
+  // A presentation adapter may describe a separately recorded local variant.
+  // Never alias its identity or evidence to the historical 27B lane.
+  const localVariant=/^bantam-local-[a-z0-9][a-z0-9-]{0,119}$/.test(arm??'')
+    && identity?.family==='local' && typeof identity.label==='string'
+    && identity.label.trim().length>0 && identity.label.length<=160;
+  if((!ARMS.includes(arm)&&!localVariant)||!/^[a-z0-9-]+$/.test(card??'')||!Number.isInteger(repeat)||repeat<1)throw Error('invalid replay lane identity');
   const collected=collectArtifacts(directory,limits),{artifacts,warnings}=collected;
   const hasLaneArtifacts=artifacts.length>0;
   const saved=readJSON(path.join(directory,'run.json'));
@@ -335,8 +340,8 @@ export function buildReplayLane({directory,result,arm,card,repeat,outer='',limit
   const latestResponse=wire.responseStops.at(-1);
   if(latestResponse?.reasons.includes('length'))stopReasons.push('latest wire response: length');
   const budgetLimited=stopReasons.includes('max-tokens')||latestResponse?.reasons.includes('length')===true;
-  const lane={id:`r${repeat}-${card}-${arm}`,arm,label:LABELS[arm]??arm,card,repeat,
-    family:ARMS.indexOf(arm)<4?'local':'astra',result:result??null,outcome:result?.outcome??(hasLaneArtifacts?'NO FINAL RESULT':'NOT RUN'),
+  const lane={id:`r${repeat}-${card}-${arm}`,arm,label:LABELS[arm]??identity.label,card,repeat,
+    family:ARMS.includes(arm)?(ARMS.indexOf(arm)<4?'local':'astra'):identity.family,result:result??null,outcome:result?.outcome??(hasLaneArtifacts?'NO FINAL RESULT':'NOT RUN'),
     duration,origin,stopReasons,budgetLimited,responseStops:wire.responseStops,
     usage:normalizeReplayUsage(result?.usage),usageComplete:result?.usage?.complete??null,
     usageSource:result?.usage?.source ?? result?.usage?.usageSource ?? null,

@@ -47,6 +47,25 @@ test('replay usage preserves unknown and derives fresh only from known valid tot
   assert.equal(normalizeReplayUsage({inputTokens:'100'}).inputTokens,null);
 });
 
+test('explicit local variant identity preserves its own label, arm and recorded events',t=>{
+  const root=fixture(t),arm='bantam-local-tiel35ba3b-iq4-xs-confirmation1';wire(root);
+  const {lane}=buildReplayLane({directory:root,result:baseResult(arm),arm,card:'receipt-reducer',repeat:1,
+    identity:{label:'BANTAM · Tiel 35B-A3B',family:'local'},outer:lines([{arm,t:200,title:'own event',text:'variant only'}])});
+  assert.equal(lane.arm,arm);assert.equal(lane.label,'BANTAM · Tiel 35B-A3B');assert.equal(lane.family,'local');
+  assert.ok(lane.events.some(event=>event.detail==='variant only'));
+  assert.equal(lane.tokenUpdates.at(-1).inputTokens,100);
+});
+
+test('variant adapter rejects traversal and implicit or incorrectly typed model identities',t=>{
+  const root=fixture(t),args={directory:root,card:'receipt-reducer',repeat:1};
+  for(const [arm,identity]of [['bantam-local-tiel',null],['../bantam-local-tiel',{label:'Tiel',family:'local'}],
+    ['bantam-local-tiel',{label:'Tiel',family:'astra'}],['unrecorded-peer',{label:'Peer',family:'local'}]]){
+    assert.throws(()=>buildReplayLane({...args,arm,identity}),/invalid replay lane identity/);
+  }
+  const {lane}=buildReplayLane({...args,arm:'bantam-local-27b',identity:{label:'Wrong replacement label',family:'local'}});
+  assert.equal(lane.label,'BANTAM · 27B');
+});
+
 test('wire replay uses actual request and response clocks and cumulative receipt usage',t=>{
   const root=fixture(t);wire(root);
   const {lane,payload}=buildReplayLane({directory:root,result:baseResult(),arm:'bantam-local-27b',card:'receipt-reducer',repeat:1});

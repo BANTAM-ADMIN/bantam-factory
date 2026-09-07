@@ -13,6 +13,7 @@
 
 import { QWEN_ASSISTANT_PREFILL, CHATML_TEMPLATE } from "./profiles.js";
 import { clipText as clipObservation, OBS_MAX } from "./clip.js";
+import { actionContractUpdateValid } from "./context-updates.js";
 import { editPaths, turnEditApplied } from "./edit-actions.js";
 import { START_WINDOW } from "./executor.js";
 import { repositoryQueryTool } from "./logic/runlog.js";
@@ -117,13 +118,15 @@ function contextUpdatePathValid(value) {
 export function contextUpdatePromptText(update, template = CHATML_TEMPLATE) {
   if (!update || typeof update !== "object" || Array.isArray(update)
       || update.schema !== 1
-      || !["decision", "edit-recovery"].includes(update.kind)
+      || !["decision", "edit-recovery", "action-contract"].includes(update.kind)
       || typeof update.id !== "string" || !CONTEXT_UPDATE_ID_RE.test(update.id)
       || !Number.isSafeInteger(update.generation) || update.generation < 0
       || typeof update.text !== "string" || !update.text.trim()
       || update.text.length > CONTEXT_UPDATE_TEXT_MAX
-      || !Array.isArray(update.paths) || update.paths.length < 1 || update.paths.length > 4
-      || !Array.from(update.paths).every(contextUpdatePathValid)
+      || (update.kind === "action-contract"
+        ? !actionContractUpdateValid(update)
+        : !Array.isArray(update.paths) || update.paths.length < 1 || update.paths.length > 4
+          || !Array.from(update.paths).every(contextUpdatePathValid))
       || !(template?.control instanceof RegExp)) return "";
   // A quoted source cannot terminate the metadata wrapper or forge a sibling
   // update. Template tokens are neutralized separately with the normal scrub.

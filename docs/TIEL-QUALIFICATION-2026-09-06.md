@@ -5,6 +5,16 @@ For the accessible model comparison and product implications, start with
 This document preserves the detailed experimental record rather than replacing
 it with a best-run summary.
 
+Update: the operator subsequently handed the GPU back. A fresh confirmation
+series recorded 3/3 accepted artifacts but only 1/3 accepted completions;
+the later complete repair10 series recorded 2/3 accepted artifacts and 1/3
+accepted completions, with all 185 generation calls fully metered.
+[Completion receipts and fight-card evidence](FIGHT-CARD-EVIDENCE-2026-09-07.md)
+records each series, the identified controller/context defects, the final
+regression-tested tool-schema delivery fix, and the Hermes accounting
+investigation. No fresh live cohort has tested that final fix. The prior shutdown described below is a
+historical event, not the current GPU hold state.
+
 Tiel runs on the existing 4090/llama.cpp stack and is substantially faster at token generation in the earlier exploratory series. It is **not promoted to BANTAM's default**. The original, repair1, repair2, repair3 and repair4 series remain separately recorded below, with strict completion counts of 1/3, 2/3, 1/3, 0/3 and 1/3. Repair5's Snapshot-only run, all three repair6 cards and repair7's Snapshot-only run passed their frozen functional checks but exhausted their action budgets without accepted completion. Repair7's assertion station did not establish a completion improvement and ships disabled by default. These adaptive reruns do not establish reliability or complete correctness. The original 27B comparison remains unchanged; repair3 timings also include shared-endpoint contention.
 
 Repair8's fresh Snapshot run subsequently achieved **PASS: 5/5 independent groups, accepted completion in 30 turns and 93.738 seconds**. Its collection-audit branch did not engage, so this is not a live exercise or causal demonstration of the repaired focused-launch recognizer; that fix has separate executable regression coverage below.

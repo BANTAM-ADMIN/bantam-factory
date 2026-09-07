@@ -6,6 +6,8 @@ import test from "node:test";
 import { composeExcludeVerbs } from "../src/turn-mask.js";
 import { latestVerificationRecovery, verificationRecoveryNote } from "../src/verification-recovery.js";
 import { runAgent } from "../src/agent.js";
+import { contextUpdatePromptText } from "../src/prompt.js";
+import { actionPromptMenuLine, LINE_EDIT_FEATURE } from "../src/action-protocol.js";
 
 test("recovery reads typed evidence, survives repeated reads, and retires on a measured pass", () => {
   const red = { verificationEvidence: { status: "fail", command: "node verify.mjs" } };
@@ -251,3 +253,89 @@ test("failed-anchor line editing composes with stalled verification recovery", a
   assert.equal(result.turns.at(-1).doneAccepted, true);
   assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
 });
+
+test("long-task extension delivers the dynamic edit schema through coactive recovery and applies a real line edit", async (t) => {
+  const workspace = phaseFixture(t);
+  const publicBytes = fs.readFileSync(path.join(workspace, "test/public.test.js"));
+  const actions = [
+    { a: "read_file", p: "target.js" },
+    { a: "write_file", p: "target.js", content: 'module.exports = "wrong";\n' },
+    { a: "shell", c: PHASE_VERIFY },
+    { a: "replace", p: "target.js", old: 'module.exports = "absent";', new: PHASE_IMPLEMENTATION },
+    { a: "read_file", p: "target.js" },
+    { a: "shell", c: "node verify.mjs" },
+    { a: "edit_lines", p: "target.js", start: 1, end: 1, new: PHASE_IMPLEMENTATION.trimEnd() },
+    { a: "shell", c: PHASE_VERIFY },
+    { a: "done", summary: "Repaired the current source and passed its direct public test." },
+  ];
+  const { result, calls, events } = await runPhase(workspace, actions, {
+    task: "Fix target.js to export ready and pass its unchanged public test.\n"
+      + "Use Node.js builtins. Preserve the public contract and existing protected tests.\n".repeat(80),
+    promptTrajectory: "extension", goalReanchor: true, goalReanchorAfter: 0,
+    preserveSlimmedControlAnnotations: true,
+  });
+  assert.equal(result.turns[3].editApplied, false);
+  assert.ok(events.some(event => event.type === "verification_recovery_mask"));
+  const call = calls[6];
+  assert.match(call.prompt, /\[verification recovery\]/);
+  assert.match(call.options.grammar, /edit_lines/);
+  assert.match(call.options.grammar, /shell/);
+  assert.doesNotMatch(call.options.grammar, /read_file/);
+  assert.doesNotMatch(call.options.grammar, /\\"replace\\"/);
+  const expected = actionPromptMenuLine("edit_lines", { features: [LINE_EDIT_FEATURE] });
+  assert.ok(call.prompt.includes(expected), "the newly enabled verb's complete canonical schema must actually reach the worker");
+  const update = result.turns[5].contextUpdates.find(entry => entry.kind === "action-contract");
+  assert.equal(update.turn, 6);
+  assert.ok(call.prompt.includes(contextUpdatePromptText(update)));
+  assert.match(contextUpdatePromptText(update), /read_file is unavailable/);
+  assert.ok(result.metrics.contextUpdatePromptReceipts.some(receipt => receipt.id === update.id && receipt.status === "included"));
+  assert.equal(result.turns[6].editApplied, true);
+  assert.equal(result.turns[7].verificationEvidence.status, "pass");
+  assert.equal(result.done, true);
+  assert.equal(result.turns.at(-1).doneAccepted, true);
+  assert.deepEqual(fs.readFileSync(path.join(workspace, "test/public.test.js")), publicBytes);
+  assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
+});
+
+for (const excludeEdit of [false, true]) {
+  test(`document-revision action interface respects caller exclusions${excludeEdit ? " including edit_lines" : " despite the grammar read exemption"}`, async (t) => {
+    const workspace = phaseFixture(t);
+    const draft = "# Plan\nCurrent draft.\n";
+    fs.writeFileSync(path.join(workspace, "plan.md"), draft);
+    const calls = [];
+    const result = await runAgent({
+      task: "Write plan.md with the required rollout and verification sections.", workspace,
+      model: { assistantPrefill: "", actTemperature: null, async complete(prompt, options) {
+        calls.push({ prompt, options });
+        return { content: JSON.stringify({ a: "read_file", p: "plan.md" }), tokens: 1, stoppedEos: true, timings: {} };
+      } },
+      resumeTurns: [
+        { action: { a: "write_file", p: "plan.md", content: draft }, editApplied: true,
+          observation: "wrote plan.md\n[completion-audit] Review the complete document." },
+        { action: { a: "read_file", p: "plan.md" }, observation: draft
+          + "\nDocument review context: review the current draft.\n- Task-derived safe-rollout gap: missing verification section" },
+      ],
+      maxTurns: 3, maxInvalidPerTurn: 0, useGrammar: true, grounding: false,
+      interactive: false, promptTrajectory: "extension", planAudit: "on",
+      excludeActions: ["read_file", "shell", "probe", ...(excludeEdit ? ["edit_lines"] : [])],
+      progressAwareness: false, completionAudit: false,
+      stateAudit: "off", contractStateAudit: "off", shellSandbox: "host",
+      autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
+    });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].options.grammar, /read_file/, "exercise the existing document-only grammar exemption");
+    const update = result.turns[1].contextUpdates?.find(entry => entry.kind === "action-contract");
+    if (excludeEdit) {
+      assert.equal(update, undefined, "an excluded edit verb must not receive a privileged interface grant");
+    } else {
+      assert.equal(update.reason, "document-revision");
+      assert.ok(calls[0].prompt.includes(contextUpdatePromptText(update)));
+      for (const verb of ["read_file", "shell", "probe"]) assert.ok(!update.availableVerbs.includes(verb));
+      assert.match(update.text, /read_file is unavailable/);
+      assert.doesNotMatch(update.text, /read_file that exact path\/range before editing/);
+    }
+    assert.equal(result.turns.length, 2, "the caller-excluded action is rejected before execution, not recorded as a fresh read");
+    assert.equal(result.done, false);
+    assert.equal(fs.readFileSync(path.join(workspace, "plan.md"), "utf8"), draft);
+  });
+}

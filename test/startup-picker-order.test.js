@@ -51,6 +51,67 @@ test("a fresh machine with no local models still recommends the cloud default", 
   assert.equal(c[0].recommended, true, "with nothing registered, this IS the right first move");
 });
 
+test("Astra is selectable after the recommended Codex models without exposing legacy models", () => {
+  const choices = startupModelChoices();
+  assert.deepEqual(choices.filter((entry) => entry.kind === "codex").map((entry) => entry.name),
+    ["codex-terra", "codex-luna", "codex-sol", "codex-astra"]);
+  const astra = choices[3];
+  assert.equal(astra.model, "gpt-6-astra");
+  assert.equal(astra.label, "GPT-6-Astra · medium reasoning");
+  assert.equal(astra.recommended, false);
+  assert.deepEqual(choices.filter((entry) => entry.recommended).map((entry) => entry.name), ["codex-terra"]);
+  assert.equal(resolveStartupModelChoice(choices, "", { enterSelectsRecommended: true }).name, "codex-terra");
+  for (const answer of ["4", "codex-astra", "gpt-6-astra"]) {
+    assert.equal(resolveStartupModelChoice(choices, answer), astra);
+  }
+});
+
+const astraCatalogEntry = {
+  model: "gpt-6-astra",
+  displayName: "Account Astra",
+  defaultReasoningEffort: "high",
+  supportedReasoningEfforts: ["medium", "high"].map((reasoningEffort) => ({ reasoningEffort })),
+};
+
+test("Astra startup selection honors live catalog defaults and supported remembered effort", () => {
+  const catalog = [astraCatalogEntry, { model: "gpt-5.6-terra" }];
+  for (const [saved, expected, lastUsed] of [[undefined, "high", false], ["medium", "medium", true], ["ultra", "high", false]]) {
+    const choices = startupModelChoices({
+      catalog,
+      preference: saved ? { kind: "codex", model: "gpt-6-astra", effort: saved } : null,
+    });
+    assert.equal(choices[0].name, "codex-terra", "catalog order must not move the default");
+    const astra = choices.find((entry) => entry.name === "codex-astra");
+    assert.equal(astra.label, `Account Astra · ${expected} reasoning`);
+    assert.equal(astra.effort, expected);
+    assert.equal(astra.lastUsed, lastUsed);
+    assert.equal(astra.recommended, false);
+  }
+});
+
+test("the startup picker does not invent Astra when the live catalog omits or hides it", () => {
+  for (const catalog of [
+    [{ model: "gpt-5.6-terra" }],
+    [{ ...astraCatalogEntry, hidden: true }, { model: "gpt-5.6-terra" }],
+  ]) {
+    const choices = startupModelChoices({ catalog });
+    assert.equal(choices.some((entry) => entry.name === "codex-astra"), false);
+    assert.equal(resolveStartupModelChoice(choices, "codex-astra"), null);
+    assert.equal(resolveStartupModelChoice(choices, "gpt-6-astra"), null);
+  }
+});
+
+test("Astra remains a single optional choice behind registered local profiles", () => {
+  const choices = startupModelChoices({ locals, catalog: [astraCatalogEntry, astraCatalogEntry] });
+  assert.equal(choices[0].name, "bantam-q4");
+  assert.equal(resolveStartupModelChoice(choices, "", { enterSelectsRecommended: true }).name, "bantam-q4");
+  assert.equal(choices.filter((entry) => entry.recommended).length, 1);
+  const astra = choices.filter((entry) => entry.name === "codex-astra");
+  assert.equal(astra.length, 1);
+  assert.equal(astra[0].recommended, false);
+  assert.equal(choices.indexOf(astra[0]), locals.length);
+});
+
 test("a warning rides with the entry that earned it", () => {
   const c = startupModelChoices({ locals, catalog: [], preference: null });
   const crew = c.find((x) => x.name === "bantam-q4-crew");

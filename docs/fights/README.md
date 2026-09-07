@@ -1,5 +1,20 @@
 # Fight Night — the BANTAM bench
 
+## Latest Arena showcase
+
+Open the [public-summary Arena](showcase/public/index.html) for the original
+comparison and the separately recorded Tiel confirmation1, partial repair9
+and completed repair10 editions. Its strict allowlist omits private context,
+source, machine paths and raw evidence; it has no links to private pages.
+Nothing has been published externally.
+
+The [showcase guide](showcase/README.md) maps the editions and provides package
+hashes. The **[private repair10 evidence Arena](showcase/private/tiel-repair10/index.html)**
+contains the full recorded evidence and is not redacted. Repair10 is **1/3
+strict PASS, 2/3 accepted projects**, not an all-pass result: Receipt PASS,
+Snapshot FAIL, Planner OUTPUT_ONLY. Later code fixes are not measurements of a
+new model run. Review before any deliberate sharing or screen recording.
+
 ## Current factory series
 
 Open the [packaged Arena replay](factory-2026-09-06/fight-cards.html).

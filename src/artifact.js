@@ -164,6 +164,7 @@ export function buildArtifact({
       // Presence is meaningful: explicit null means no execution proof; an
       // absent field belongs to a legacy film whose prose may be consulted.
       ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: serializableCopy(t.verificationEvidence) } : {}),
+      ...(Object.hasOwn(t, "verificationReceipts") ? { verificationReceipts: serializableCopy(t.verificationReceipts) } : {}),
       ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: serializableCopy(t.shellExecution) } : {}),
       ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: serializableCopy(t.probeEvidence) } : {}),
       ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: serializableCopy(t.editOutcome) } : {}),

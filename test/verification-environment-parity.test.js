@@ -74,8 +74,13 @@ test("landing cannot cache RW manual evidence as RO configured proof", async t =
   assert.equal(result.done, true);
   assert.ok(fake.calls.some(call => !call.readOnly));
   assert.ok(fake.calls.some(call => call.readOnly));
-  assert.equal(result.turns[1].verificationEvidence.workspaceReadOnly, true);
-  assert.equal(result.turns[1].verificationEvidence.source, "landing");
+  assert.equal(result.turns[0].verificationEvidence.workspaceReadOnly, true);
+  assert.equal(result.turns[0].verificationEvidence.source, "landing");
+  assert.equal(result.turns[1].verificationEvidence.workspaceReadOnly, false,
+    "the actual writable worker receipt is not overwritten by an older cached RO check");
+  assert.equal(result.turns[1].verificationEvidence.source, "shell");
+  assert.equal(result.turns[1].verificationReceipts.entries.length, 1);
+  assert.deepEqual(fake.calls.map(call => call.readOnly), [true, false], "cached RO proof remains valid without pretending it ran again");
   assert.equal(result.verification.workspaceReadOnly, true);
 });
 test("env opt-in is disclosed in context and an explicit false overrides it", async t => {

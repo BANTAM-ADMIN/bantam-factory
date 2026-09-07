@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand } from "../src/contract-audit-recovery.js";
+import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "../src/contract-audit-recovery.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "../src/verification-evidence.js";
 import { buildAssertionProbe } from "../src/contract-assertion-spec.js";
 import { canonicalEncode } from "../src/factory/fact-fabric.js";
@@ -263,6 +263,37 @@ test("recovery names missing stages and requires a real public API assertion wit
   assert.equal(contractAuditRecoveryNote(null), "");
 });
 
+test("pending audit preserves current generation and exact configured project identity for phase guidance", () => {
+  const pending = pendingContractAudit([audit], { generation: 7, configuredCommand: "  python3 -m pytest tests/unit  " });
+  assert.equal(pending.generation, 7);
+  assert.equal(pending.configuredCommand, "python3 -m pytest tests/unit");
+  assert.equal(pending.needsFocused, true);
+  assert.match(contractAuditRecoveryNote(pending), /After the focused assertion, execute exactly this configured project command:\npython3 -m pytest tests\/unit\n/);
+  const unspecified = pendingContractAudit([audit]);
+  assert.equal(unspecified.generation, null);
+  assert.equal(unspecified.configuredCommand, null);
+});
+
+test("an accepted focused assertion receives only the remaining exact configured project instruction", () => {
+  for (const configuredCommand of ["npm test", "node --test test/project.test.js", "python3 -m pytest tests/unit"]) {
+    const pending = pendingContractAudit([audit, check()], { generation: 1, configuredCommand });
+    assert.equal(pending.needsFocused, false);
+    assert.equal(pending.needsProject, true);
+    assert.equal(pending.configuredCommand, configuredCommand);
+    assert.equal(pending.generation, 1);
+    const note = contractAuditRecoveryNote(pending);
+    assert.match(note, /Focused assertion accepted at turn 2 for generation 1\. Only project-verification remains\./);
+    assert.ok(note.includes(`Next action: execute exactly this configured project command:\n${configuredCommand}\n`));
+    assert.match(note, /Do not repeat the focused check or emit DONE yet/);
+    assert.match(note, /not interchangeable with this configured command/);
+    assert.doesNotMatch(note, /An unconditional precondition|Proposed fixture|Accepted launch shapes|focused-execution \+/);
+    assert.ok(note.length < 600, "completed focus must not replay the broad review and stale instructions");
+  }
+  const rejected = pendingContractAudit([audit, check(), check(undefined, 1, { exitCode: 1 })], options);
+  assert.equal(rejected.needsFocused, true);
+  assert.doesNotMatch(contractAuditRecoveryNote(rejected), /Focused assertion accepted/);
+});
+
 const hash = text => crypto.createHash("sha256").update(text).digest("hex");
 const digest = value => `sha256:${hash(canonicalEncode(value))}`;
 function stationCase() {
@@ -420,4 +451,189 @@ test("actual station receipt shape composes with recovery using a mocked worker 
   assert.equal(pendingContractAudit([{ ...review, contractAssertion: station }], {
     ...options, verificationWorkspaceReadOnly: true,
   }), null);
+});
+
+const orderedOptions = { ...workspaceOptions, verificationWorkspaceReadOnly: true };
+function measuredCheck(command = "node --test test/edge.test.js", source = "shell", changes = {}) {
+  const execution = { command, executedCommand: command, exitCode: 0,
+    stdout: "# tests 3\n# pass 3\n# fail 0\n", stderr: "", cwd: auditWorkspace,
+    workspaceReadOnly: source !== "shell", sandbox: "docker:test", pipefail: true, ...changes };
+  return {
+    verificationEvidence: verificationReceipt(verificationEvidence({ execution, generation: 1,
+      configuredCommand: "npm test", source })),
+    shellExecution: source === "shell" ? shellExecutionReceipt(execution, { generation: 1 }) : null,
+  };
+}
+function orderedTurn(rows, turn = 1) {
+  // Exercise serialized values, not object identity or unrecorded in-memory data.
+  const entries = JSON.parse(JSON.stringify(rows.map((row, sequence) => ({ sequence, ...row }))));
+  return {
+    verificationReceipts: { schema: VERIFICATION_RECEIPTS_SCHEMA,
+      authority: "controller-execution-order", turn, entries },
+    verificationEvidence: entries.findLast(entry => entry.verificationEvidence)?.verificationEvidence ?? null,
+    shellExecution: entries.find(entry => entry.shellExecution)?.shellExecution ?? null,
+  };
+}
+const measuredProject = (changes = {}) => measuredCheck("npm test", "landing", changes);
+
+test("ordered actual focused and landing executions on one turn discharge without losing the shell proof", () => {
+  const row = orderedTurn([measuredCheck(), measuredProject()]);
+  assert.equal(row.verificationEvidence.source, "landing");
+  assert.equal(row.shellExecution.command, "node --test test/edge.test.js");
+  assert.equal(pendingContractAudit([audit, row], orderedOptions), null);
+  assert.equal(pendingContractAudit(JSON.parse(JSON.stringify([audit, row])), orderedOptions), null);
+  assert.ok(pendingContractAudit([audit, { verificationEvidence: row.verificationEvidence,
+    shellExecution: row.shellExecution }], orderedOptions), "legacy aliases cannot establish two executions or their order");
+});
+
+test("reversed receipt order and a pre-audit same-turn envelope cannot discharge a new review", () => {
+  const reversed = orderedTurn([measuredProject(), measuredCheck()]);
+  const pending = pendingContractAudit([audit, reversed], orderedOptions);
+  assert.equal(pending.needsFocused, false);
+  assert.equal(pending.needsProject, true);
+  assert.equal(pendingContractAudit([audit, reversed, orderedTurn([measuredProject()], 2)], orderedOptions), null);
+  assert.ok(pendingContractAudit([{ ...audit, ...orderedTurn([measuredCheck(), measuredProject()], 0) }], orderedOptions));
+  assert.ok(pendingContractAudit([orderedTurn([measuredCheck(), measuredProject()], 0), audit], orderedOptions));
+});
+
+test("bare arrays, missing authority, forged sequence or turn, and malformed envelopes fail closed", () => {
+  const mutations = [
+    row => { row.verificationReceipts = row.verificationReceipts.entries; },
+    row => { delete row.verificationReceipts.authority; },
+    row => { row.verificationReceipts.authority = "model"; },
+    row => { row.verificationReceipts.schema = 1; },
+    row => { row.verificationReceipts.turn = 0; },
+    row => { row.verificationReceipts.entries[1].sequence = 0; },
+    row => { row.verificationReceipts.entries.reverse(); },
+    row => { delete row.verificationReceipts.entries[0].shellExecution; },
+    row => { row.verificationReceipts.entries = []; },
+    row => { row.verificationReceipts.entries[0].verificationEvidence = "passed"; },
+    row => { row.verificationReceipts = null; },
+    row => { row.verificationReceipts.entries = Array.from({ length: 17 }, (_, sequence) => ({ sequence, ...measuredProject() })); },
+  ];
+  for (const mutate of mutations) {
+    const row = orderedTurn([measuredCheck(), measuredProject()]); mutate(row);
+    assert.ok(pendingContractAudit([audit, row], orderedOptions), mutate.toString());
+  }
+});
+
+test("contradictory legacy aliases cannot hide failure, stale generation, or invalidation behind an ordered envelope", () => {
+  for (const field of ["verificationEvidence", "shellExecution"]) {
+    for (const patch of [{ generation: 0 }, { invalidated: true }, { exitCode: 1 }, { outputSha256: "foreign" }]) {
+      const row = orderedTurn([measuredCheck(), measuredProject()]);
+      row[field] = { ...row[field], ...patch };
+      assert.ok(pendingContractAudit([audit, row], orderedOptions), `${field} ${JSON.stringify(patch)}`);
+    }
+  }
+  const row = orderedTurn([measuredCheck(), measuredProject()]);
+  row.verificationEvidence = { status: "pass", observation: "all checks passed" };
+  assert.ok(pendingContractAudit([audit, row], orderedOptions));
+});
+
+test("ordered shell proof must match its actual command, cwd, generation and process metadata even without cd", () => {
+  for (const patch of [
+    { command: "node --test test/other.test.js" }, { executedCommand: "node --test test/other.test.js" },
+    { cwd: "/tmp/elsewhere" }, { cwd: null }, { generation: 0 }, { workspaceReadOnly: true },
+    { sandbox: "host" }, { exitCode: 1 }, { invalidated: true }, { timedOut: true },
+  ]) {
+    const focused = measuredCheck(); Object.assign(focused.shellExecution, patch);
+    assert.ok(pendingContractAudit([audit, orderedTurn([focused, measuredProject()])], orderedOptions), JSON.stringify(patch));
+  }
+  const focused = measuredCheck(); focused.shellExecution = null;
+  assert.ok(pendingContractAudit([audit, orderedTurn([focused, measuredProject()])], orderedOptions), "shell proof alone has no execution partner");
+});
+
+test("ordered failure, unknown status, zero counts and invalidated executions clear credit instead of borrowing a parallel success", () => {
+  for (const patch of [
+    { status: "fail" }, { status: "unverified" }, { schema: 2 }, { source: "model" },
+    { generation: 0 }, { exitCode: 1 }, { invalidated: true }, { blocked: true },
+    { statusScope: "final-configured-command" }, { statusCommand: "node check-other.mjs" },
+    { counts: null }, { counts: { passed: 0, failed: 0, total: 0 } },
+    { counts: { passed: 0, failed: 0, total: 3 } }, { counts: { passed: 2, failed: 1, total: 3 } },
+    { counts: { passed: 4, failed: 0, total: 3 } }, { counts: { passed: 1.5, failed: 0, total: 3 } },
+    { countsScope: "multiple-summaries" },
+  ]) {
+    const focused = measuredCheck(); Object.assign(focused.verificationEvidence, patch);
+    assert.ok(pendingContractAudit([audit, orderedTurn([focused, measuredProject()])], orderedOptions), JSON.stringify(patch));
+  }
+  const failed = measuredCheck(undefined, "shell", { exitCode: 1 });
+  assert.ok(pendingContractAudit([audit, orderedTurn([measuredCheck(), measuredProject(), failed])], orderedOptions));
+  assert.equal(pendingContractAudit([audit, orderedTurn([failed, measuredCheck(), measuredProject()])], orderedOptions), null,
+    "only a later complete focused/project pair can recover after an observed failure");
+  const unknown = measuredCheck("MODE=test node --test test/edge.test.js", "shell", { stdout: "" });
+  assert.ok(pendingContractAudit([audit, orderedTurn([unknown, measuredProject()])], orderedOptions),
+    "an environment prefix cannot bypass measured Node test counts");
+});
+
+test("ordered controller project evidence binds the exact configured command, workspace and readonly profile", () => {
+  for (const patch of [
+    { command: "npm run other" }, { executedCommand: "npm test; echo done" },
+    { configuredCommand: null }, { configuredCommand: "npm run other" }, { statusCommand: "npm run other" },
+    { cwd: "/tmp/elsewhere" }, { cwd: null }, { workspaceReadOnly: false }, { workspaceReadOnly: null },
+    { generation: 0 }, { counts: { passed: 0, failed: 0, total: 0 } },
+  ]) {
+    const broad = measuredProject(); Object.assign(broad.verificationEvidence, patch);
+    assert.ok(pendingContractAudit([audit, orderedTurn([measuredCheck(), broad])], orderedOptions), JSON.stringify(patch));
+  }
+  assert.equal(pendingContractAudit([audit, orderedTurn([measuredCheck(), measuredCheck("npm test")])], orderedOptions), null,
+    "actual writable worker-shell project checks preserve established compatibility");
+});
+
+test("ordered bound cd checks and direct inline assertions qualify, but Planner's echoed compound remains unverified", () => {
+  const focused = measuredCheck(`cd ${auditWorkspace} && node --test test/edge.test.js`, "shell", {
+    executedCommand: `cd ${auditWorkspace} && node --test --test-timeout=30000 test/edge.test.js`,
+  });
+  assert.equal(pendingContractAudit([audit, orderedTurn([focused, measuredProject()])], orderedOptions), null);
+  const inline = `node -e 'const a=require("node:assert/strict");a.deepEqual([],[]);'`;
+  const direct = measuredCheck(inline);
+  assert.equal(direct.verificationEvidence, null);
+  assert.equal(pendingContractAudit([audit, orderedTurn([direct, measuredProject()])], orderedOptions), null);
+  const masked = measuredCheck(`cd ${auditWorkspace} && ${inline}; echo "exit=$?"; npm test 2>&1; echo "exit=$?"`);
+  assert.equal(masked.verificationEvidence.status, "unverified");
+  assert.ok(pendingContractAudit([audit, orderedTurn([masked, measuredProject()])], orderedOptions));
+});
+
+test("controller stop, rollback or failed station cannot borrow unrelated ordinary same-turn ordered proof", () => {
+  for (const patch of [{ controllerStop: { kind: "progress-gate" } }, { shellScopeRollback: { violations: ["protected"] } }]) {
+    assert.ok(pendingContractAudit([audit, { ...orderedTurn([measuredCheck(), measuredProject()]), ...patch }], orderedOptions));
+  }
+  const { review, station } = stationCase(); station.status = "assertion_failed";
+  assert.ok(pendingContractAudit([{ ...review, contractAssertion: station,
+    ...orderedTurn([measuredCheck(), measuredProject()], 0) }], orderedOptions));
+});
+
+test("configured Node suite retains its identity with only the executor's bounded injected timeout", () => {
+  const configured = "node --test test/project.test.js";
+  const makeProject = executedCommand => {
+    const execution = { command: configured, executedCommand, exitCode: 0,
+      stdout: "# tests 3\n# pass 3\n# fail 0\n", stderr: "", cwd: auditWorkspace,
+      workspaceReadOnly: true, sandbox: "docker:test", pipefail: true };
+    return { verificationEvidence: verificationReceipt(verificationEvidence({ execution, command: configured,
+      configuredCommand: configured, generation: 1, source: "landing" })), shellExecution: null };
+  };
+  const settings = { ...orderedOptions, configuredCommand: configured };
+  for (const timeout of [5000, 30000, 60000]) {
+    const actual = `node --test --test-timeout=${timeout} test/project.test.js`;
+    assert.equal(isFocusedAuditCommand(actual, configured), false, "the configured suite is not its own focused witness");
+    assert.equal(pendingContractAudit([audit, orderedTurn([measuredCheck(), makeProject(actual)])], settings), null);
+    const { review, station } = stationCase(); station.projectVerification = makeProject(actual).verificationEvidence;
+    assert.equal(pendingContractAudit([{ ...review, contractAssertion: station }], settings), null,
+      "station nested execution keeps its existing strong order/binding with injected timeout");
+  }
+  for (const actual of [
+    "node --test --test-timeout=4999 test/project.test.js",
+    "node --test --test-timeout=60001 test/project.test.js",
+    "node --test --test-timeout=30000 test/other.test.js",
+    "node --test --test-timeout=30000 --test-name-pattern=edge test/project.test.js",
+    "node --test --test-timeout=30000 --test-timeout=30000 test/project.test.js",
+    "node --test test/project.test.js --test-timeout=30000",
+    "node --test --test-timeout=30000 test/project.test.js; echo done",
+  ]) {
+    assert.ok(pendingContractAudit([audit, orderedTurn([measuredCheck(), makeProject(actual)])], settings), actual);
+  }
+  const explicit = "node --test --test-timeout=15000 test/project.test.js";
+  const changed = makeProject("node --test --test-timeout=30000 test/project.test.js");
+  changed.verificationEvidence.command = changed.verificationEvidence.configuredCommand = explicit;
+  assert.ok(pendingContractAudit([audit, orderedTurn([measuredCheck(), changed])], { ...settings, configuredCommand: explicit }),
+    "never replace a configured explicit timeout");
 });

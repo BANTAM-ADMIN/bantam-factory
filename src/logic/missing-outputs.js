@@ -24,6 +24,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 // "write it to X", "save the results to these files:", "produce Y", "output to Z"
 // `output` as a bare word is too weak: dna-insert says "a desired output
@@ -182,7 +183,42 @@ function candidates(p, workspace) {
  * passes while the deliverable was never written. A required output older than
  * the run that was asked to produce it is not a deliverable.
  */
-function problem(p, workspace, runStartedAt) {
+// Resume starts a new wall clock, not a new authorship history. Reuse the
+// controller's successful edit outcome plus its SAME-turn byte fingerprint;
+// an action, a claimed write, or a later read snapshot does not establish this.
+// This is only an old-mtime exception, never correctness/verification proof.
+function recordedCurrentEdit(turns, full, workspace) {
+  if (!Array.isArray(turns)) return false;
+  try {
+    const root = fs.realpathSync(workspace), target = path.resolve(full);
+    const relative = path.relative(root, target);
+    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+        || fs.realpathSync(target) !== target) return false;
+    const samePath = candidate => typeof candidate === "string" && candidate.length > 0
+      && path.resolve(root, candidate) === target;
+    for (let index = turns.length - 1; index >= 0; index--) {
+      const turn = turns[index];
+      if (turn?.shellChangedPaths?.some(samePath) || turn?.workspaceCoherence?.pendingPaths?.some(samePath)) return false;
+      const edit = turn?.editOutcome;
+      if (!edit?.applied || !Array.isArray(edit.paths) || !edit.paths.some(samePath)) continue;
+      if (edit.applied !== true || edit.reason !== "applied" || turn.editApplied === false
+          || turn.controllerStop || turn.shellScopeRollback?.violations?.length
+          || edit.invalidated || edit.blocked) return false;
+      const fingerprints = turn.workspaceCoherence?.fingerprints;
+      if (!fingerprints || typeof fingerprints !== "object" || Array.isArray(fingerprints)) return false;
+      const matching = Object.entries(fingerprints).filter(([file]) => samePath(file));
+      if (matching.length !== 1 || !/^file:\d+:\d+:[a-f0-9]{64}$/.test(matching[0][1])) return false;
+      const stat = fs.lstatSync(target);
+      if (!stat.isFile() || stat.size === 0 || stat.size > 64 * 1024 * 1024) return false;
+      const bytes = fs.readFileSync(target);
+      const current = `file:${stat.mode}:${bytes.length}:${crypto.createHash("sha256").update(bytes).digest("hex")}`;
+      return current === matching[0][1];
+    }
+  } catch { /* Unknown provenance cannot waive the old-mtime finding. */ }
+  return false;
+}
+
+function problem(p, workspace, runStartedAt, turns) {
   try {
     let sawEmpty = false;
     let sawStale = false;
@@ -193,7 +229,8 @@ function problem(p, workspace, runStartedAt) {
       if (st.size === 0) { sawEmpty = true; continue; }
       // Allow a second of slack: mtime resolution and the clock read are not
       // the same instant, and a false "untouched" is worse than a missed one.
-      if (runStartedAt && st.mtimeMs < runStartedAt - 1000) { sawStale = true; continue; }
+      if (runStartedAt && st.mtimeMs < runStartedAt - 1000
+          && !recordedCurrentEdit(turns, full, workspace)) { sawStale = true; continue; }
       return null;                     // present, non-empty, written by this run
     }
     if (sawStale) return "untouched — it predates this run, so you never wrote it";
@@ -217,7 +254,7 @@ export function missingOutputsObjection(turns, alreadyRejected = 0, opts = {}) {
 
   const bad = [];
   for (const p of required) {
-    const why = problem(p, workspace, runStartedAt);
+    const why = problem(p, workspace, runStartedAt, turns);
     if (why) bad.push(`${p} (${why})`);
   }
   if (!bad.length) return null;

@@ -11,7 +11,7 @@
 // read; the highest-priority local is recommended and listed first, and a
 // machine with no local models still falls back to the cloud default, because
 // with nothing registered that genuinely IS the right first move.
-import { recommendedCodexModels } from "./codex-models.js";
+import { codexModelOptions } from "./codex-models.js";
 
 /**
  * What separates one local profile from another. On a single-GPU rig every
@@ -69,7 +69,13 @@ export function startupModelChoices({
     };
   });
 
-  const codexChoices = recommendedCodexModels(catalog).map((entry) => {
+  // Startup visibility is not automatic recommendation: Astra is an explicit
+  // operator choice. Use the available catalog without exposing every legacy
+  // manual model or changing the automatic roles used elsewhere.
+  const selectableCodex = codexModelOptions(catalog)
+    .filter((entry) => entry.automatic || entry.model === "gpt-6-astra")
+    .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  const codexChoices = selectableCodex.map((entry) => {
     const rememberedEffort = preference?.kind === "codex"
       && preference.model === entry.model
       && entry.supportedReasoningEfforts.includes(preference.effort)

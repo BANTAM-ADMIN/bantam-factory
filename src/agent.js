@@ -32,7 +32,7 @@ import { latestVerificationRecovery, verificationRecoveryNote } from "./verifica
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
-import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand } from "./contract-audit-recovery.js";
+import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
@@ -42,7 +42,7 @@ import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-a
 import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
 import { buildPrompt, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
-import { createContextUpdate } from "./context-updates.js";
+import { createContextUpdate, createActionContractUpdate } from "./context-updates.js";
 import { requiredOutputPaths } from "./logic/missing-outputs.js";
 import { deliverableNotice } from "./logic/deliverable-watch.js";
 import { providedOracleNotice } from "./logic/provided-oracle-watch.js";
@@ -1038,6 +1038,7 @@ async function runAgentCore({
         ...(t.shellScopeRollback ? { shellScopeRollback: structuredClone(t.shellScopeRollback) } : {}),
         ...(t.scopedVerify ? { scopedVerify: t.scopedVerify } : {}),
         ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: t.verificationEvidence } : {}),
+        ...(Object.hasOwn(t, "verificationReceipts") ? { verificationReceipts: structuredClone(t.verificationReceipts) } : {}),
         ...(Object.hasOwn(t, "shellExecution") ? { shellExecution: t.shellExecution } : {}),
         ...(Object.hasOwn(t, "probeEvidence") ? { probeEvidence: structuredClone(t.probeEvidence) } : {}),
         ...(Object.hasOwn(t, "editOutcome") ? { editOutcome: t.editOutcome } : {}),
@@ -1780,6 +1781,12 @@ async function runAgentCore({
   let editsSinceFullVerify = 0;   // edits the configured verifier has not run against
   const editedPathsThisRun = new Set();   // for the landing note's untouched-requirement check
   let contractAudits = turns.filter((turn) => turn.contractStateAudit).length;
+  const auditRecoveryVerifications = new Set(turns.flatMap(turn =>
+    (Array.isArray(turn.verificationReceipts?.entries) ? turn.verificationReceipts.entries : []).flatMap(entry => {
+      const proof = entry?.verificationEvidence;
+      return proof?.source === "automatic" && proof.auditPromptSha256
+        ? [`${proof.auditPromptSha256}:${proof.generation}:${proof.configuredCommand}`] : [];
+    })));
   let lastContractAuditGeneration = turns.filter((turn) => turn.contractStateAudit).at(-1)?.contractStateAudit?.generation ?? -1;
   // History is evidence, not a second repository copy. Current seams live in
   // the bounded file panel below; keeping the entire old 180KB transcript made
@@ -2468,6 +2475,32 @@ async function runAgentCore({
       const reanchorText = [budgetText, baseReanchor, documentDraftReanchor, postGreenReanchor, documentRevisionReanchor, editRecoveryReanchor, documentReviewReanchor, externalMutationReanchor, workingNoteReanchor, decHintText]
         .filter(Boolean)
         .join("\n\n");
+
+      // Newly enabled grammar is not a model-visible action manual. In the
+      // extension path [guidance] can be swallowed into a preceding controller
+      // block's 700-character clip, losing syntax after a long task restatement.
+      // Reserve one existing typed-context slot before optional source views;
+      // render/record the whole exact interface after ordinary output clipping.
+      if (turns.length && (lineEditRecoveryTurn || documentRevisionTurn)
+          && enabledTurnVerbs.has("edit_lines") && !excludeThisTurn.includes("edit_lines")
+          && !callerExcludedActions.includes("edit_lines")) {
+        const last = turns.at(-1);
+        const update = createActionContractUpdate({ generation: workspaceEditGeneration,
+          turn: turns.length,
+          availableVerbs: [...enabledTurnVerbs].filter(verb => !excludeThisTurn.includes(verb)
+            && !callerExcludedActions.includes(verb)),
+          reason: documentRevisionTurn ? "document-revision" : "edit-recovery",
+          recoveryPath: documentRevisionTurn ? null : editRecoveryPath,
+        });
+        const existing = (Array.isArray(last.contextUpdates) ? last.contextUpdates : [])
+          .filter(entry => contextUpdatePromptText(entry, promptTemplate));
+        if (update && !existing.some(entry => entry.id === update.id) && existing.length < 2) {
+          last.contextUpdates = [...existing, update];
+          onEvent({ type: "context_update_created", id: update.id, kind: update.kind, paths: update.paths });
+          if (!extensionTrajectory) onEvent({ type: "observation_annotated", turn: turns.length - 1,
+            observation: last.observation, contextUpdates: last.contextUpdates });
+        }
+      }
 
       if (extensionTrajectory) {
         // A failed anchor is a specific freshness boundary. Supply actual disk
@@ -3172,7 +3205,13 @@ async function runAgentCore({
     } else if (gateRejection) {
       result = { observation: gateRejection };
     } else if (duplicate) {
-      result = { observation: duplicate.observation };
+      // Repetition is not completion authority. A pending review may require
+      // a DIFFERENT shell command, so do not tell the worker DONE or mask its
+      // only route to the outstanding execution.
+      const auditShellRecovery = action.a === "shell" && auditRecovery;
+      result = { observation: auditShellRecovery
+        ? `[repetition] This identical command was not executed again (previous execution: turn ${duplicate.duplicateOfTurn}). No new receipt was created.\n${contractAuditRecoveryNote(auditRecovery)}`
+        : duplicate.observation };
       metrics.duplicateActionRejections = repetition.duplicateActionRejections;
       metrics.duplicateShellRejections = repetition.duplicateShellRejections;
       metrics.inverseEditStops = repetition.inverseEditStops;
@@ -3180,8 +3219,8 @@ async function runAgentCore({
       // permitting the same verb immediately again only buys another API call.
       // Replay of the self-host failure's exact prompt changed a third identical
       // read into a targeted symbol search when read_file was masked.
-      if (useGrammar) nextMaskedVerb = action.a;
-      onEvent({ type: "duplicate_action", action, duplicateOfTurn: duplicate.duplicateOfTurn, message: duplicate.observation });
+      if (useGrammar && !auditShellRecovery) nextMaskedVerb = action.a;
+      onEvent({ type: "duplicate_action", action, duplicateOfTurn: duplicate.duplicateOfTurn, message: result.observation });
     } else if (panelRedirect) {
       // Replacement observation, not a rejection loop: the covered broad read is
       // never executed — the <open_files> panel already holds the current bytes,
@@ -3632,6 +3671,28 @@ async function runAgentCore({
       generation: workspaceEditGeneration,
       invalidated: shellChangedWorkspace || Boolean(result.shellScopeRollback?.violations?.length),
     });
+    // Preserve every actual execution in controller order. A landing/project
+    // check may follow a focused worker assertion in this very turn; the last
+    // verificationEvidence alias alone cannot express those two facts. Cached
+    // results are never appended as new executions.
+    const verificationReceipts = {
+      schema: VERIFICATION_RECEIPTS_SCHEMA, authority: "controller-execution-order",
+      turn: turns.length, entries: [],
+    };
+    const recordVerification = (evidence, shell = null) => {
+      if (!evidence && !shell) return;
+      verificationReceipts.entries.push({ sequence: verificationReceipts.entries.length,
+        verificationEvidence: verificationReceipt(evidence), shellExecution: shell });
+    };
+    recordVerification(result.verificationEvidence, shellReceipt);
+    const currentAuditState = () => pendingContractAudit([...turns, {
+      verificationEvidence: verificationReceipt(result.verificationEvidence),
+      shellExecution: shellReceipt,
+      ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
+      contractStateAudit: result.contractStateAudit, contractAssertion: result.contractAssertion,
+      controllerStop: result.controllerStop, shellScopeRollback: result.shellScopeRollback,
+    }], { generation: workspaceEditGeneration, configuredCommand: verificationScript,
+      verificationWorkspaceReadOnly, workspace: exec.realWorkspace });
     if (refusedEditPin && directEditSucceeded && directEditPaths.includes(refusedEditPin)) refusedEditPin = null;
     if (editRecoveryPath && directEditSucceeded && directEditPaths.includes(editRecoveryPath)) {
       onEvent({ type: "edit_recovery_completed", path: editRecoveryPath, action: action.a });
@@ -4508,6 +4569,7 @@ async function runAgentCore({
             execution: { ...r, workspaceReadOnly: verificationWorkspaceReadOnly }, command: plan.command, configuredCommand: verificationScript,
             generation: workspaceEditGeneration, source: "scoped",
           });
+          recordVerification(result.verificationEvidence);
           verifyCadenceSentinel.note({ ranVerification: true });
           repourSentinel.note({ ranVerification: true, verificationRed: result.verificationEvidence?.status === "fail" });
           const verdict = r.timedOut ? "TIMED OUT" : (r.code === 0 ? "PASS" : "FAIL");
@@ -4596,6 +4658,7 @@ async function runAgentCore({
           execution: { ...r, workspaceReadOnly: verificationWorkspaceReadOnly }, command: verificationScript, configuredCommand: verificationScript,
           generation: workspaceEditGeneration, source: "automatic",
         });
+        recordVerification(result.verificationEvidence);
         verifyCadenceSentinel.note({ ranVerification: true });
         repourSentinel.note({ ranVerification: true, verificationRed: result.verificationEvidence?.status === "fail" });
         const verdict = r.timedOut ? "TIMED OUT" : (r.code === 0 ? "PASS" : "FAIL");
@@ -4757,6 +4820,7 @@ async function runAgentCore({
 [budget] halfway: ${turns.length + 1} of ${maxTurns} turns used. If reconnaissance is still the bulk of what you have done, start converging on the deliverable now.`;
     }
     const landingWindow = Math.max(3, Math.round(maxTurns * 0.1));
+    let landingPassNote = null;
     // Interactive runs land too. The carve-off's TDD turn ran to its 60-turn
     // cap with no countdown (both notes were !interactive), wrapped up with a
     // trailing promise instead of a "Next:" line, and the REPL's
@@ -4797,7 +4861,10 @@ async function runAgentCore({
           ? { status: currentEvidence.status, exitCode: currentEvidence.exitCode, workspaceReadOnly: currentEvidence.workspaceReadOnly,
             detail: clip(currentEvidence.rawOutput) }
           : null;
-        const cached = doneVerificationProof
+        const auditBeforeLanding = collectionAuditEnabled ? currentAuditState() : null;
+        const needsPostFocusedProject = auditBeforeLanding
+          && !auditBeforeLanding.needsFocused && auditBeforeLanding.needsProject;
+        const cached = !needsPostFocusedProject && doneVerificationProof
           && doneVerificationProof.generation === workspaceEditGeneration
           && doneVerificationProof.command === verificationScript
           && verificationEnvironmentMatches(doneVerificationProof.verification)
@@ -4829,6 +4896,7 @@ async function runAgentCore({
                 execution, command: verificationScript, configuredCommand: verificationScript,
                 generation: workspaceEditGeneration, source: "landing",
               });
+              recordVerification(landingEvidence);
             },
           });
           if (proof.interrupted || abortRequested()) markInterrupted("verification");
@@ -4843,7 +4911,9 @@ async function runAgentCore({
           ranLandingVerification = true;
           metrics.landingVerifies = (metrics.landingVerifies ?? 0) + 1;
         }
-        result.verificationEvidence = landingEvidence;
+        // Keep the focused worker alias when all we did was consult an older
+        // cached project check. Reusing a cache is not a new execution.
+        if (ranLandingVerification) result.verificationEvidence = landingEvidence;
         delete result.scopedVerify;
         if (landingEvidence && landingEvidence.status !== "unverified") {
           result.scopedVerify = { verdict: landingEvidence.status, command: verificationScript, tests: [] };
@@ -4917,17 +4987,17 @@ async function runAgentCore({
           editsSinceFullVerify = 0;
           unverifiedEditSteerGiven = false;
         }
-        landingNote += proof.status === "pass"
-          ? (turnsRemaining <= 1
-            ? " The verify command PASSES on the current tree. Emit done now with the verified result and any remaining limitations. Do not spend the final action on optional cleanup; disclose leftover scratch in the summary. Any necessary edit still requires verification."
-            : " The verify command PASSES on the current tree. Finish any necessary cleanup now, preserving time for verification and done. Do not start optional changes.")
+        // Decide the green completion directive AFTER this turn's audit has
+        // run. A suite pass alone cannot promise that its review gate is clear.
+        if (proof.status === "pass") landingPassNote = turnsRemaining;
+        landingNote += proof.status === "pass" ? " The configured project check passes."
           : landingRestored
             ? ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nYou broke working code with edits you never re-verified, and the budget is nearly gone — I restored your best-passing version of ${[...bestSnapshot.keys()].join(", ")} (now shown in <open_files>). Run the verify command to confirm it is green, then emit done. Do NOT re-apply the change that broke it.`
             : proof.status === "unverified"
               ? ` The verify command did not establish a current passing result:\n${proof.detail ?? ""}\nResolve the verification problem and run a conclusive check before finishing.`
               : ` The verify command FAILS on the current tree:\n${proof.detail ?? ""}\nFix exactly this, then emit done.`;
       } else {
-        landingNote += " Wrap up: converge on the smallest correct change, run the tests once, remove scratch files, and emit done before the budget ends.";
+        landingNote += " Wrap up: converge on the smallest correct change and settle outstanding verification before done. Avoid optional cleanup or unrelated edits.";
       }
       result.observation += landingNote;
       metrics.landingNotes = (metrics.landingNotes ?? 0) + 1;
@@ -5267,7 +5337,8 @@ async function runAgentCore({
               readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly,
               processRunner: shellProcessRunner,
               onExecution: execution => { evidence = verificationEvidence({ execution, command: verificationScript,
-                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" }); },
+                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" });
+                recordVerification(evidence); },
             });
             if (proof.interrupted || abortRequested()) markInterrupted("verification");
             // A double-check can downgrade a first pass. Do not serialize the
@@ -5289,6 +5360,63 @@ async function runAgentCore({
           result.observation += "\nReview this newly supplied audit before requesting completion again.";
         }
       }
+    }
+    // The focused assertion is the model's work; choosing the already-bound
+    // project command again is a controller obligation. Execute that next
+    // station directly after a fresh focus, AFTER this turn's audit/restore
+    // decisions. Never credit a pre-audit focus or an older cached project.
+    const auditReadyForProject = collectionAuditEnabled && !interrupted && !result.done
+      && !result.contractAssertion && verificationScript ? currentAuditState() : null;
+    const auditVerificationKey = auditReadyForProject
+      ? `${auditReadyForProject.promptSha256}:${workspaceEditGeneration}:${verificationScript}` : null;
+    if (auditReadyForProject && !auditReadyForProject.needsFocused && auditReadyForProject.needsProject
+        && auditReadyForProject.focusedTurn === turns.length
+        && !auditRecoveryVerifications.has(auditVerificationKey)) {
+      auditRecoveryVerifications.add(auditVerificationKey); // one automatic attempt per audit/generation
+      onEvent({ type: "activity", label: "verifying" });
+      let evidence = null;
+      const proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
+        doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
+        readOnlyWorkspacePaths, workspaceReadOnly: verificationWorkspaceReadOnly,
+        processRunner: shellProcessRunner,
+        onExecution: execution => {
+          evidence = { ...verificationEvidence({ execution, command: verificationScript,
+            configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "automatic" }),
+            auditPromptSha256: auditReadyForProject.promptSha256 };
+          recordVerification(evidence);
+        },
+      });
+      if (proof.interrupted || abortRequested()) markInterrupted("verification");
+      if (evidence && proof.status !== "pass") evidence = { ...evidence, status: proof.status };
+      result.verificationEvidence = evidence;
+      const status = evidence?.status ?? "unverified";
+      doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
+        verification: { ...proof, status }, evidence };
+      delete result.scopedVerify;
+      if (status !== "unverified") result.scopedVerify = { verdict: status, command: verificationScript, tests: [] };
+      metrics.contractAuditRecoveryVerifies = (metrics.contractAuditRecoveryVerifies ?? 0) + 1;
+      result.observation += `\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: ${verificationScript}. Result: ${status.toUpperCase()}.\n${clip(proof.detail ?? "")}`;
+      onEvent({ type: "contract_audit_verification", auditTurn: auditReadyForProject.turn,
+        generation: workspaceEditGeneration, command: verificationScript, status });
+      verifyCadenceSentinel.note({ ranVerification: true });
+      repourSentinel.note({ ranVerification: true, verificationRed: status === "fail" });
+      if (status === "pass") {
+        blindEditStreak = probeStreak = turnsSinceVerify = editsSinceFullVerify = 0;
+        unverifiedEditSteerGiven = false;
+        result.observation += "\nThe focused and configured project receipts are now complete on this source generation. Do not repeat them or make unrelated edits; request done when the task is complete.";
+      }
+    }
+    if (landingPassNote !== null) {
+      const pending = collectionAuditEnabled ? currentAuditState() : null;
+      result.observation += pending
+        ? `\n[completion state] Project green is not yet completion: ${pending.missing.join(" + ")} remains. ${landingPassNote === 0 ? "No actions remain; completion is unresolved." : pending.needsFocused
+          ? "Next action: run the focused API assertion directly, without pipes, status echoes or another command. Do not edit merely to satisfy a review; demonstrate or disprove its claim."
+          : `Next action: run the configured project check directly (${verificationScript}) on this unchanged tree.`} Do not emit done while this evidence is missing.`
+        : landingPassNote === 0
+          ? "\n[completion state] Verification requirements are satisfied, but no actions remain for an accepted done."
+          : landingPassNote <= 1
+            ? "\n[completion state] The current checks and audit-recovery requirements are satisfied. Emit done now with the verified result and any remaining limitations. Disclose leftover scratch; do not spend the final action on optional cleanup. Any necessary edit still requires verification."
+            : "\n[completion state] The current checks and audit-recovery requirements are satisfied. Finish without optional changes; any necessary edit requires fresh verification before done.";
     }
     if (collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
       const pendingAudit = pendingContractAudit(turns, { generation: workspaceEditGeneration,
@@ -5468,13 +5596,14 @@ async function runAgentCore({
             doubleCheck: flakyVerify, envOverrides: shellEnvOverrides, shellSandbox, shellNetwork, dockerImage,
             readOnlyWorkspacePaths, workspaceReadOnly: true, processRunner: shellProcessRunner,
             onExecution: execution => { evidence = verificationEvidence({ execution, command: verificationScript,
-              configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" }); },
+              configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" });
+              recordVerification(evidence); },
           });
           if (proof.interrupted || abortRequested()) markInterrupted("verification");
           cached = doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript,
             verification: evidence?.status === "pass" ? proof : { ...proof, status: evidence?.status ?? "unverified" }, evidence };
         }
-        if (cached.evidence) result.verificationEvidence = cached.evidence;
+        if (cached.evidence && verificationReceipts.entries.length) result.verificationEvidence = cached.evidence;
         if (cached.verification.status !== "pass") {
           result.done = false;
           result.summary = undefined;
@@ -5499,6 +5628,7 @@ async function runAgentCore({
         if (!proof) {
           metrics.verifyDoneGateRuns++;
           onEvent({ type: "activity", label: "verifying" });
+          let evidence = null;
           proof = await runVerification(workspace, verificationScript, signal, verificationTimeoutMs, {
             doubleCheck: flakyVerify,
             envOverrides: shellEnvOverrides,
@@ -5508,9 +5638,15 @@ async function runAgentCore({
             readOnlyWorkspacePaths,
             workspaceReadOnly: verificationWorkspaceReadOnly,
             processRunner: shellProcessRunner,
+            onExecution: execution => {
+              evidence = verificationEvidence({ execution, command: verificationScript,
+                configuredCommand: verificationScript, generation: workspaceEditGeneration, source: "completion" });
+              recordVerification(evidence);
+            },
           });
           if (proof.interrupted || abortRequested()) markInterrupted("verification");
-          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript, verification: proof };
+          if (evidence) result.verificationEvidence = evidence;
+          doneVerificationProof = { generation: workspaceEditGeneration, command: verificationScript, verification: proof, evidence };
         }
         if (interrupted || proof.status !== "fail") return null;
         // gateCounts.verify_red is still the pre-increment value here; the helper
@@ -5929,6 +6065,7 @@ async function runAgentCore({
       ...(isEditAction(action) ? { editApplied: directEditSucceeded } : {}),
       scopedVerify: result.scopedVerify,   // trusted harness-run verdict (undefined if none)
       verificationEvidence: verificationReceipt(result.verificationEvidence),
+      ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
       ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
@@ -6035,7 +6172,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
         "contextBasis", "contextUpdates", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",

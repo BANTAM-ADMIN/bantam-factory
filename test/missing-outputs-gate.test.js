@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
+import { Executor } from "../src/executor.js";
+import { WorkspaceCoherenceTracker } from "../src/workspace-coherence.js";
 import { missingOutputsObjection, requiredOutputPaths } from "../src/logic/missing-outputs.js";
 
 // TB2 rstan-to-pystan (2026-08-21). The task lists four outputs by absolute path
@@ -143,4 +146,68 @@ test("real catalog instructions extract exactly their deliverables", () => {
   for (const [task, expected] of cases) {
     assert.deepEqual(requiredOutputPaths(task), expected, task.slice(0, 60));
   }
+});
+
+test("resume credits a successful typed edit only while its same-turn fingerprint matches current bytes", async t => {
+  const workspace = fs.mkdtempSync("/tmp/missing-output-resume-");
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  const file = path.join(workspace, "result.js");
+  const action = { a: "write_file", p: "result.js", content: "export const result = 1;\n" };
+  const result = await new Executor(workspace).execute(action);
+  assert.equal(result.editOutcome.applied, true);
+  const tracker = new WorkspaceCoherenceTracker(workspace); tracker.refresh("result.js");
+  const turn = JSON.parse(JSON.stringify({ parsedAction: action, editApplied: true,
+    editOutcome: result.editOutcome, workspaceCoherence: { fingerprints: tracker.snapshot(), pendingPaths: [] } }));
+  const old = new Date(Date.now() - 86400000); fs.utimesSync(file, old, old);
+  const options = { workspace, task: "Write result.js", runStartedAt: Date.now() };
+  assert.equal(missingOutputsObjection([turn], 0, options), null, "resumed clock must not erase recorded authorship");
+  assert.match(missingOutputsObjection([], 0, options), /untouched/, "the same preexisting file without recorded work is still uncredited");
+
+  for (const mutate of [
+    row => { delete row.editOutcome; },
+    row => { row.editOutcome.applied = false; },
+    row => { row.editOutcome.reason = "syntax_invalid"; },
+    row => { row.editApplied = false; },
+    row => { row.editOutcome.paths = ["other.js"]; },
+    row => { row.editOutcome.invalidated = true; },
+    row => { row.shellScopeRollback = { violations: ["result.js"] }; },
+    row => { row.controllerStop = { kind: "progress-gate" }; },
+    row => { delete row.workspaceCoherence; },
+    row => { row.workspaceCoherence.fingerprints["result.js"] = "file:33188:24:not-a-hash"; },
+  ]) {
+    const row = structuredClone(turn); mutate(row);
+    assert.match(missingOutputsObjection([row], 0, options), /untouched/, mutate.toString());
+  }
+  assert.match(missingOutputsObjection([{ parsedAction: action, observation: "wrote result.js", editApplied: true,
+    workspaceCoherence: turn.workspaceCoherence }], 0, options), /untouched/, "action, prose and read snapshot cannot assert authorship");
+  const noFingerprint = structuredClone(turn); delete noFingerprint.workspaceCoherence;
+  assert.match(missingOutputsObjection([noFingerprint, { workspaceCoherence: turn.workspaceCoherence }], 0, options), /untouched/,
+    "a later read fingerprint does not bind bytes to an earlier successful edit");
+
+  fs.writeFileSync(file, "export const result = 2;\n"); fs.utimesSync(file, old, old);
+  assert.match(missingOutputsObjection([turn], 0, options), /untouched/, "same-length externally changed bytes do not match");
+  fs.writeFileSync(file, action.content); fs.chmodSync(file, 0o600); fs.utimesSync(file, old, old);
+  assert.match(missingOutputsObjection([turn], 0, options), /untouched/, "changed mode is not the recorded fingerprint");
+  fs.chmodSync(file, 0o644);
+  assert.match(missingOutputsObjection([turn, { shellChangedPaths: ["result.js"] }], 0, options), /untouched/);
+  assert.match(missingOutputsObjection([turn, { workspaceCoherence: { pendingPaths: ["result.js"] } }], 0, options), /untouched/);
+  assert.match(missingOutputsObjection([turn, { editOutcome: { applied: true, reason: "applied", paths: ["result.js"] } }], 0, options), /untouched/,
+    "a later applied edit with unknown bytes cannot fall back to older proof");
+  fs.writeFileSync(file, "");
+  assert.match(missingOutputsObjection([turn], 0, options), /empty/, "authorship never waives empty content");
+  fs.unlinkSync(file);
+  assert.match(missingOutputsObjection([turn], 0, options), /missing/, "authorship never waives missing content");
+});
+
+test("resume authorship never credits a symlink as the recorded regular-file output", t => {
+  const workspace = fs.mkdtempSync("/tmp/missing-output-resume-path-");
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  const target = path.join(workspace, "target.js"), output = path.join(workspace, "result.js");
+  const content = "export const value = 1;\n";
+  fs.writeFileSync(target, content); fs.symlinkSync("target.js", output);
+  const old = new Date(Date.now() - 86400000); fs.utimesSync(target, old, old);
+  const stat = fs.statSync(target);
+  const turn = { editOutcome: { applied: true, reason: "applied", paths: ["result.js"] },
+    workspaceCoherence: { fingerprints: { "result.js": `file:${stat.mode}:${stat.size}:${crypto.createHash("sha256").update(content).digest("hex")}` } } };
+  assert.match(missingOutputsObjection([turn], 0, { workspace, task: "Write result.js", runStartedAt: Date.now() }), /untouched/);
 });

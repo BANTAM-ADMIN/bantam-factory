@@ -3,11 +3,53 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ACTION_DEFINITIONS, LINE_EDIT_FEATURE, actionPromptMenuLine } from "./action-protocol.js";
 
 export const CONTEXT_UPDATE_MAX_CHARS = 3000;
 const MAX_FILES = 4;
 const MAX_READ_BYTES = 256 * 1024;
 const MAX_LINES = 160;
+const KNOWN_ACTIONS = new Set(ACTION_DEFINITIONS.map(definition => definition.verb));
+
+// A turn-scoped grammar grant must carry its matching interface through the
+// same bounded, recorded channel as current source. It is not source evidence
+// or permission to bypass edit scope, and does not expand the two-record budget.
+export function createActionContractUpdate({ generation, turn, availableVerbs, reason, recoveryPath = null } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0
+      || !Number.isSafeInteger(turn) || turn < 0
+      || !Array.isArray(availableVerbs) || !availableVerbs.length
+      || availableVerbs.length > KNOWN_ACTIONS.size
+      || availableVerbs.some(verb => !KNOWN_ACTIONS.has(verb))
+      || new Set(availableVerbs).size !== availableVerbs.length
+      || !availableVerbs.includes("edit_lines")
+      || !["edit-recovery", "document-revision"].includes(reason)
+      || (recoveryPath !== null && !safeRelativePath(recoveryPath))) return null;
+  const text = [
+    `ACTION INTERFACE FOR TURN ${turn + 1} (generation ${generation}). Later turn interfaces supersede this one.`,
+    reason === "edit-recovery"
+      ? `EDIT RECOVERY ACTIVE${recoveryPath ? `: ${recoveryPath}` : ""}. The failed exact-match proposal was NOT APPLIED. Use actual current bytes, not that proposal.`
+      : "DOCUMENT REVISION: use the current document and its audited requirements.",
+    `Available actions on this turn: ${availableVerbs.join(", ")}.`,
+    "Line-pointer edit syntax (all fields required; start/end are positive, inclusive line numbers):",
+    actionPromptMenuLine("edit_lines", { features: [LINE_EDIT_FEATURE] }),
+    availableVerbs.includes("read_file")
+      ? "If the required current range is omitted or clipped, read_file that exact path/range before editing. Otherwise use the already delivered numbered bytes."
+      : "read_file is unavailable on this turn. Use already delivered current numbered bytes for edit_lines; do not guess omitted lines. A write_file rewrite is appropriate only when the complete current file is known and write_file is available. If required bytes are missing, do not overwrite unseen content.",
+    "Repair only a demonstrated implementation or fixture defect. This interface grants no protected-file permission and is not verification evidence. Existing scope and completion checks still apply.",
+  ].join("\n");
+  if (text.length > CONTEXT_UPDATE_MAX_CHARS) return null;
+  const metadata = { generation, turn, availableVerbs: [...availableVerbs], reason, recoveryPath };
+  const digest = crypto.createHash("sha256").update(JSON.stringify(metadata)).update(text).digest("hex");
+  return { schema: 1, id: `action-contract:${turn}:${digest}`, kind: "action-contract",
+    ...metadata, text, paths: [] };
+}
+
+export function actionContractUpdateValid(update) {
+  const expected = createActionContractUpdate(update);
+  return Boolean(expected && update.schema === expected.schema && update.kind === expected.kind
+    && update.id === expected.id && update.text === expected.text
+    && Array.isArray(update.paths) && update.paths.length === 0);
+}
 
 export function createContextUpdate(workspace, { kind, paths, generation, focusLine } = {}) {
   if (!["decision", "edit-recovery"].includes(kind)

@@ -76,10 +76,11 @@ test("plain extension supplies fresh recovery bytes once, not a nonexistent-pane
   fs.writeFileSync(path.join(workspace, "flag.js"), original);
   const result = await runAgent(options(workspace, model));
   const updates = result.turns.flatMap((turn) => turn.contextUpdates ?? []);
-  assert.equal(updates.filter((update) => update.kind === "edit-recovery").length, 1);
+  const recoveryUpdates = updates.filter((update) => update.kind === "edit-recovery");
+  assert.equal(recoveryUpdates.length, 1);
   assert.equal(updates.filter((update) => update.kind === "decision").length, 0, "optional review remains off");
-  assert.match(updates[0].text, /2\texport const flag = "CURRENT_RECOVERY_MARKER"/);
-  assert.ok(model.prompts[3].includes(contextUpdatePromptText(updates[0])));
+  assert.match(recoveryUpdates[0].text, /2\texport const flag = "CURRENT_RECOVERY_MARKER"/);
+  assert.ok(model.prompts[3].includes(contextUpdatePromptText(recoveryUpdates[0])));
   assert.doesNotMatch(model.prompts[3], /line numbers from the current file panel/);
   assert.equal(fs.readFileSync(path.join(workspace, "flag.js"), "utf8"), current);
   assert.equal(result.metrics.editRecoverySnapshots, 1);

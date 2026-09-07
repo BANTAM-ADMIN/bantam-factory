@@ -33,9 +33,10 @@ import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote 
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
-import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
-import { contractAuditPhaseState } from "./contract-audit-phase.js";
+import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
 import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
+import { protectedAuditWitnessCleanupRefusal } from "./contract-audit-witness-retention.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { composeInstructionGuards } from "./instruction-guard.js";
 import { symbolsIn } from "./collateral.js";
@@ -850,6 +851,12 @@ async function runAgentCore({
     && contractStateAuditEnabled(contractStateAudit, task, suppliedTaskDocuments);
   const collectionAuditEnabled = contractAuditEnabled
     && collectionContractAuditApplies(task, suppliedTaskDocuments);
+  // Only checks created during this invocation can become retained witnesses.
+  // Never infer ownership from a test-like filename or protect a user's
+  // pre-existing source against requested cleanup. Resumes start conservatively.
+  const auditInitialFiles = collectionAuditEnabled ? snapshotWorkspaceFiles(workspace) : null;
+  // An incomplete inventory is unknown ownership, not an empty workspace.
+  const auditInitialSourcePaths = auditInitialFiles ? [...auditInitialFiles.keys()] : null;
   // Reuse the explicitly enabled, isolated probe machinery. This checkpoint
   // owns the assertion procedure, never its model-designed expected outcome.
   const assertionStationEnabled = collectionAuditEnabled && probeEnabled
@@ -1052,6 +1059,7 @@ async function runAgentCore({
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
+        ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
@@ -2085,6 +2093,11 @@ async function runAgentCore({
     const contractAuditPhase = contractAuditPhaseState(auditRecovery, {
       useGrammar, interactive, advisoryMode, writeBatch, callerExcludedActions,
     });
+    const auditWitness = collectionAuditEnabled && !auditRecovery
+      ? currentFocusedAuditWitness(turns, { generation: workspaceEditGeneration,
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
+    const verificationWorkflow = collectionAuditEnabled
+      ? contractAuditDecisionContext(auditRecovery, auditWitness) : null;
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
@@ -2490,7 +2503,7 @@ async function runAgentCore({
             "Follow the ordering literally in the next assertion-bearing probe. In particular, capture the returned Promise, trigger abort/reset while work is blocked, and only then await the Promise.",
           ].join("\n")
         : "";
-      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, contractAuditPhase.note, documentReviewCompleteReanchor, previewFailureReanchor]
+      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor]
         .filter(Boolean)
         .join("\n\n");
       const decHintText = decHint
@@ -2539,6 +2552,16 @@ async function runAgentCore({
         }
       }
 
+      // This is current state, not change-only guidance. It must survive long
+      // tool output and identical read turns, and must follow the task/audit
+      // restatement. Render it as a bounded typed block on the newest fragment.
+      // Earlier fragments stay byte-identical for extension prefix reuse.
+      if (turns.length) {
+        if (verificationWorkflow) turns.at(-1).verificationWorkflow = verificationWorkflow;
+        else delete turns.at(-1).verificationWorkflow;
+        if (!extensionTrajectory) onEvent({ type: "observation_annotated", turn: turns.length - 1,
+          observation: turns.at(-1).observation, verificationWorkflow });
+      }
       if (extensionTrajectory) {
         // A failed anchor is a specific freshness boundary. Supply actual disk
         // bytes once per path/generation, not an instruction pointing to a panel
@@ -2601,6 +2624,7 @@ async function runAgentCore({
         if (turns.length) {
           const last = turns.at(-1);
           onEvent({ type: "observation_annotated", turn: turns.length - 1, observation: last.observation,
+            verificationWorkflow: last.verificationWorkflow ?? null,
             ...(Object.hasOwn(last, "contextUpdates") ? { contextUpdates: last.contextUpdates } : {}) });
         }
       }
@@ -3129,6 +3153,11 @@ async function runAgentCore({
       pending: auditRecovery, workspace: exec.realWorkspace,
       sourcePaths: [...beforeShellFiles.keys()].filter(p => SOURCE_EXT_RE.test(p) && !isGeneratedPath(p)),
     }) : null;
+    const auditWitnessRefusal = beforeShellFiles && auditWitness ? protectedAuditWitnessCleanupRefusal(action.c, {
+      witness: auditWitness, workspace: exec.realWorkspace, initialSourcePaths: auditInitialSourcePaths,
+      sourcePaths: [...beforeShellFiles.keys()].filter(p => SOURCE_EXT_RE.test(p) && !isGeneratedPath(p)
+        && (() => { try { return fs.lstatSync(path.resolve(workspace, p)).isFile(); } catch { return false; } })()),
+    }) : null;
     const shellScopeSnapshot = !gateRejection && !interactiveStop && action.a === "shell"
       && shellScopeGuard && typeof shellScopeGuard.capture === "function"
       ? shellScopeGuard.capture()
@@ -3183,7 +3212,7 @@ async function runAgentCore({
         auditRecovery.needsProject && String(action.c).trim() === String(verificationScript).trim()
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
         turn.shellExecution && (turn.shellExecution.command === action.c || turn.shellExecution.executedCommand === action.c));
-    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal
+    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditWitnessRefusal
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       ? repetition.check(action)
@@ -3263,6 +3292,10 @@ async function runAgentCore({
       result = { observation: auditCleanupRefusal.correction, auditCleanupRefusal };
       metrics.compoundAuditCleanupRefusals = (metrics.compoundAuditCleanupRefusals ?? 0) + 1;
       onEvent({ type: "verification_workflow_refusal", turn: turns.length, ...auditCleanupRefusal });
+    } else if (auditWitnessRefusal) {
+      result = { observation: auditWitnessRefusal.correction, auditWitnessRefusal };
+      metrics.auditWitnessRetentionRefusals = (metrics.auditWitnessRetentionRefusals ?? 0) + 1;
+      onEvent({ type: "verification_workflow_refusal", turn: turns.length, ...auditWitnessRefusal });
     } else if (duplicate) {
       // Repetition is not completion authority. A pending review may require
       // a DIFFERENT shell command, so do not tell the worker DONE or mask its
@@ -5475,7 +5508,7 @@ async function runAgentCore({
         const focusedLabel = typeof focusedCommand === "string"
           ? ` Focused command${focusedCommand.length > 180 ? " (excerpt)" : ""}: ${JSON.stringify(focusedCommand.slice(0, 180))}.` : "";
         result.observation += `\n[auto-verify] The focused and configured project receipts are now complete on generation ${workspaceEditGeneration}.${focusedLabel}`
-          + " Keep intended check scripts; temporary fixtures are different. Clean fixtures or other optional files BEFORE final verification, not after it. Any further workspace edit or deletion invalidates these receipts. If the task is complete, request DONE on this unchanged tree.";
+          + " No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.";
       }
     }
     if (landingPassNote !== null) {
@@ -6131,6 +6164,9 @@ async function runAgentCore({
     if (result.auditCleanupRefusal && !result.observation.endsWith(result.auditCleanupRefusal.correction)) {
       result.observation += `\n${result.auditCleanupRefusal.correction}`;
     }
+    if (result.auditWitnessRefusal && !result.observation.endsWith(result.auditWitnessRefusal.correction)) {
+      result.observation += `\n${result.auditWitnessRefusal.correction}`;
+    }
 
     // Normalize evaluator-only volatility only after every controller-owned
     // addition (auto-verification, completion audit, test focus, etc.). Doing
@@ -6274,7 +6310,7 @@ async function runAgentCore({
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
         "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
-        "contextBasis", "contextUpdates", "doneAccepted", "controllerStop",
+        "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)

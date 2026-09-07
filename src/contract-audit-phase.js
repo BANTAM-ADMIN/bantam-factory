@@ -25,3 +25,47 @@ export function contractAuditPhaseState(pending, {
     "The audit is a falsifiable model hypothesis, not an authoritative expected value. Keep intended checks; finish cleanup before final verification. Fresh focused and configured project proof clear this phase. No extra work turns are granted.",
   ].join("\n") };
 }
+
+// Current controller state, not model advice or acceptance authority. Unlike
+// ordinary guidance this travels on EVERY newest turn outside tool clipping.
+// Old copies remain immutable history; only the newest copy describes now.
+export function contractAuditDecisionContext(pending, witness = null) {
+  const current = pending ?? witness;
+  if (!current || !Number.isSafeInteger(current.generation) || current.generation < 0) return null;
+  const literal = value => {
+    if (typeof value !== "string" || !value.length || value.length > 512 || /[\x00-\x1f\x7f]/.test(value)) return null;
+    const encoded = JSON.stringify(value);
+    return encoded.length <= 512 ? encoded : null;
+  };
+  const generation = current.generation;
+  let phase, text;
+  if (!pending && witness) {
+    phase = "ready";
+    text = `VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation ${generation}).`
+      + (literal(witness.command) ? ` Focused command: ${literal(witness.command)}.` : "")
+      + " There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up.";
+  } else if (pending.needsFocused === true) {
+    phase = "focused";
+    const stale = pending.staleFocus, command = literal(stale?.command);
+    const removed = (Array.isArray(stale?.removedPaths) ? stale.removedPaths : [])
+      .filter(p => literal(p)).slice(0, 2);
+    text = `CONTRACT AUDIT PHASE: completion is not yet available; generation ${generation} needs fresh focused execution, then the configured project check.`;
+    if (command) text += ` Earlier successful check ${command} belongs to generation ${stale.generation}, NOT this tree.`;
+    if (removed.length) text += ` Removed files: ${removed.map(p => literal(p)).join(", ")}. Recreate the assertion check or use a direct inline assertion against the public API; do not rerun a missing file.`;
+    else if (command) text += ` Next: rerun ${command} directly against the current tree. If it fails, repair the demonstrated defect and rerun it.`;
+    else text += " Next: execute a direct assertion against the actual API or CLI and the public contract. Create the check separately if needed.";
+    text += " Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away.";
+  } else if (pending.needsProject === true) {
+    phase = "project";
+    text = `CONTRACT AUDIT PHASE: focused proof is current (generation ${generation}); only configured project verification remains. Next: run ${literal(pending.configuredCommand) ?? "the exact configured project command"} directly. Do not repeat the focused check, delete its script, or emit DONE yet.`;
+  } else return null;
+  return { schema: 1, phase, generation, text };
+}
+
+export function verificationWorkflowPromptText(value) {
+  if (!value || value.schema !== 1 || !["focused", "project", "ready"].includes(value.phase)
+      || !Number.isSafeInteger(value.generation) || value.generation < 0
+      || typeof value.text !== "string" || value.text.length > 2400
+      || !value.text.startsWith(value.phase === "ready" ? "VERIFICATION READY:" : "CONTRACT AUDIT PHASE:")) return "";
+  return `[verification workflow: current decision]\n${value.text}\n`;
+}

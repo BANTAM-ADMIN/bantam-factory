@@ -339,7 +339,7 @@ function staleFocusedCheck(turns, auditIndex, generation, configured, workspace)
   return { ...prior, changedPaths, removedPaths: changedPaths.filter(file => latest.get(file) === "missing") };
 }
 
-export function pendingContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
+function evaluateContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
   let auditIndex = -1;
   for (let index = turns.length - 1; index >= 0; index--) {
     const audit = turns[index]?.contractStateAudit;
@@ -348,11 +348,15 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
       break;
     }
   }
-  if (auditIndex < 0) return null;
+  if (auditIndex < 0) return { pending: null, witness: null };
   const audit = turns[auditIndex].contractStateAudit;
   const configured = String(configuredCommand ?? "").trim();
   let focusedTurn = null, projectTurn = null, focusedOrder = null, projectOrder = null, order = 0;
-  const clear = () => { focusedTurn = projectTurn = focusedOrder = projectOrder = null; };
+  let focusedWitness = null, projectWitnessValid = false;
+  const clear = () => {
+    focusedTurn = projectTurn = focusedOrder = projectOrder = null;
+    focusedWitness = null; projectWitnessValid = false;
+  };
   for (let index = auditIndex; index < turns.length; index++) {
     const turn = turns[index];
     if (turn?.contractAssertion) {
@@ -379,14 +383,17 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
         const at = order++, proof = entry.verificationEvidence, shell = entry.shellExecution;
         const command = orderedReceiptCommand(proof, shell, { generation, workspace });
         if (!command) { clear(); continue; }
-        if (isFocusedAuditCommand(command, configured)) { focusedTurn = index; focusedOrder = at; }
+        if (isFocusedAuditCommand(command, configured)) {
+          focusedTurn = index; focusedOrder = at;
+          focusedWitness = { command, turn: index, generation };
+        }
         if (proof && configured && sameConfiguredExecution(command, configured)) {
           const controller = proof.source !== "shell";
           if (proof.configuredCommand !== configured
               || (controller && (!sameCommand(proof.command, configured) || !sameConfiguredExecution(proof.executedCommand, configured)))
               || (controller && typeof verificationWorkspaceReadOnly === "boolean"
                 && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(); continue; }
-          projectTurn = index; projectOrder = at;
+          projectTurn = index; projectOrder = at; projectWitnessValid = true;
         }
       }
       continue;
@@ -410,13 +417,29 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
     // must not clear the review; absent counts are unknown, not success.
     const observedFilteredCase = !nameFiltered || (proof?.counts?.passed > 0 && proof.counts.failed === 0);
     if ((!proof || proof.statusScope === "execution") && observedFilteredCase
-        && isFocusedAuditCommand(command, configured)) { focusedTurn = index; focusedOrder = at; }
-    if (proof && configured && sameConfiguredExecution(command, configured)) { projectTurn = index; projectOrder = at; }
+        && isFocusedAuditCommand(command, configured)) {
+      focusedTurn = index; focusedOrder = at;
+      // Preserve legacy acceptance semantics, but do not protect a script on
+      // weaker legacy aliases than the current ordered execution path permits.
+      focusedWitness = orderedReceiptCommand(proof, shell, { generation, workspace }) === command
+        ? { command, turn: index, generation } : null;
+    }
+    if (proof && configured && sameConfiguredExecution(command, configured)) {
+      projectTurn = index; projectOrder = at;
+      const controller = proof.source !== "shell";
+      projectWitnessValid = orderedReceiptCommand(proof, shell, { generation, workspace }) === command
+        && proof.configuredCommand === configured
+        && (!controller || (sameCommand(proof.command, configured) && sameConfiguredExecution(proof.executedCommand, configured)))
+        && (!controller || typeof verificationWorkspaceReadOnly !== "boolean"
+          || proof.workspaceReadOnly === verificationWorkspaceReadOnly);
+    }
   }
   const projectAfterFocused = projectTurn !== null && focusedTurn !== null
     && projectOrder > focusedOrder;
-  if (focusedTurn !== null && (!configured || projectAfterFocused)) return null;
-  return { turn: auditIndex, promptSha256: audit.promptSha256 ?? null,
+  if (focusedTurn !== null && (!configured || projectAfterFocused)) {
+    return { pending: null, witness: focusedWitness && (!configured || projectWitnessValid) ? focusedWitness : null };
+  }
+  return { pending: { turn: auditIndex, promptSha256: audit.promptSha256 ?? null,
     report: String(audit.report ?? ""), sources: audit.sources ?? [], focusedTurn, projectTurn,
     configuredCommand: configured || null,
     staleFocus: focusedTurn === null ? staleFocusedCheck(turns, auditIndex, generation, configured, workspace) : null,
@@ -424,7 +447,19 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
     needsFocused: focusedTurn === null,
     needsProject: Boolean(configured && !projectAfterFocused),
     missing: [...(focusedTurn === null ? ["focused-execution"] : []),
-      ...(configured && !projectAfterFocused ? ["project-verification"] : [])] };
+      ...(configured && !projectAfterFocused ? ["project-verification"] : [])] }, witness: null };
+}
+
+export function pendingContractAudit(turns = [], options = {}) {
+  return evaluateContractAudit(turns, options).pending;
+}
+
+// A narrow locator for an ordinary receipt-backed focused check after its
+// required project verification. This is not completion authority, a proof of
+// the check's semantics, or permission to execute its command. Station-only
+// assertions have no ordinary workspace witness to protect and return null.
+export function currentFocusedAuditWitness(turns = [], options = {}) {
+  return evaluateContractAudit(turns, options).witness;
 }
 
 export function contractAuditRecoveryNote(pending) {

@@ -3,13 +3,24 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { contractAuditPhaseState } from "../src/contract-audit-phase.js";
+import { contractAuditPhaseState, contractAuditDecisionContext, verificationWorkflowPromptText } from "../src/contract-audit-phase.js";
 import { actionGrammar, actionJsonSchema } from "../src/grammar.js";
 import { composeExcludeVerbs } from "../src/turn-mask.js";
 import { runAgent } from "../src/agent.js";
 import { ALL_ACTION_VERBS } from "../src/action-protocol.js";
 
 const PENDING = Object.freeze({ needsFocused: true, needsProject: true, configuredCommand: "npm test" });
+
+test("maximal recovery fields remain bounded and render instead of silently losing the decision", () => {
+  for (const command of ["x".repeat(510), '"'.repeat(510), "node check-api.mjs"]) {
+    const pending = { ...PENDING, generation: Number.MAX_SAFE_INTEGER,
+      staleFocus: { command, generation: Number.MAX_SAFE_INTEGER - 1,
+        removedPaths: ["a".repeat(510), "b".repeat(510), "c".repeat(510)] } };
+    const context = contractAuditDecisionContext(pending);
+    assert.ok(context.text.length <= 2400);
+    assert.ok(verificationWorkflowPromptText(context).includes("CONTRACT AUDIT PHASE:"));
+  }
+});
 
 test("pending proof masks only impossible autonomous completion verbs", () => {
   const phase = contractAuditPhaseState(PENDING);

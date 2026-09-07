@@ -21,6 +21,7 @@ import { actionPromptMenu, actionPromptRules } from "./action-protocol.js";
 import { composeRulesBlock } from "./prompt-rules.js";
 import { formatContractStateAudit, parseCollectionContractAudit } from "./contract-state-audit.js";
 import { formatContractAssertionStation } from "./contract-assertion-station.js";
+import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
 import { RAW_SOURCE_OBSERVATION, compactSourceRanges, recordDeliveredSourceLines, sourcePointerOrigins } from "./history-budget.js";
 
 // Same lifetime and keys as the caller's frozen-fragment cache. Never rebuild
@@ -746,6 +747,8 @@ export function buildPrompt({
     if (auditBlock) p += userTurn(auditBlock);
     const assertionBlock = contractAssertionPromptText(turn.contractAssertion, template);
     if (assertionBlock) p += userTurn(assertionBlock);
+    const workflowBlock = verificationWorkflowPromptText(turn.verificationWorkflow);
+    if (workflowBlock) p += userTurn(scrub(workflowBlock));
     if (freezeKey != null) {
       // Rebase only the invalid observation. Historical action bytes and typed
       // context updates remain exactly as originally emitted, even if a caller

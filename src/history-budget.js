@@ -6,6 +6,7 @@
 // always kept; older contiguous turns fit only while the hard budget permits.
 
 import { clipText as clipObservation } from "./clip.js";
+import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
 
 const SOURCE_HEADER = /(?:^|\n)(?:#\s+)?([A-Za-z0-9_.@+/-]+\.(?:js|mjs|cjs|jsx|ts|tsx|mts|cts|py|go|rs|rb|java|kt|c|cc|cpp|cxx|h|hpp|hh|cs|php|swift|scala|m|mm|sh|sql))\s+\((?:current,\s*)?(\d+)\s+lines(?:,\s*showing\s+(\d+)-(\d+))?\):?\n/gim;
 // Prompt-only provenance: a budgeted view must not permanently erase the source
@@ -289,6 +290,10 @@ function normalizeSourcePath(value) {
 
 function turnSize(turn) {
   if (!turn || typeof turn !== "object") return 0;
+  // Use the same bounded validator/formatter as prompt.js: malformed or
+  // oversized state renders nothing, and never requires serializing unchecked
+  // metadata here. Valid current-state blocks are outside OBS_MAX, not budget.
+  const workflow = verificationWorkflowPromptText(turn.verificationWorkflow);
   // buildPrompt replays the parsed action and clips each observation to 4K;
   // raw model output and private reasoning are evidence-only fields. Price the
   // intermediate replay view, not arbitrary raw artifact fields. This is not
@@ -306,5 +311,6 @@ function turnSize(turn) {
     // its full render cap conservatively, including its separate chat wrapper.
     + (turn.contractStateAudit?.focus === "collection-preconditions" && turn.contractStateAudit.status === "report" ? 8100 : 0)
     + (turn.contractAssertion?.schema === "bantam.contract-assertion.v1" ? 4300 : 0)
+    + (workflow ? workflow.length + 96 : 0)
     + 96; // ChatML/observation wrapper overhead.
 }

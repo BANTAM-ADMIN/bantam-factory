@@ -113,6 +113,7 @@ export class RunCheckpoint {
       if (target) {
         target.observation = String(event.observation ?? target.observation ?? "");
         if (Object.hasOwn(event, "contextUpdates")) target.contextUpdates = serializableCopy(event.contextUpdates);
+        if (Object.hasOwn(event, "verificationWorkflow")) target.verificationWorkflow = serializableCopy(event.verificationWorkflow);
       }
       return;
     }
@@ -131,7 +132,7 @@ export class RunCheckpoint {
       // false: that would turn an unverified new film into a legacy prose proof.
       for (const key of [
         "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion",
-        "contextBasis", "contextUpdates", "doneAccepted", "controllerStop",
+        "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ]) {

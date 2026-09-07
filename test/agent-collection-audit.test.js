@@ -194,9 +194,13 @@ test("a fresh focused inline assertion immediately receives exact project verifi
   assert.deepEqual(checkpoint.turns()[2].verificationReceipts, result.turns[2].verificationReceipts);
 });
 
-test("cleanup after verified focus explains stale receipts and requires a fresh check before DONE", async (t) => {
+test("permitted cleanup of a preexisting check invalidates receipts and requires a fresh check before DONE", async (t) => {
   const workspace = fixture(t);
   const checkScript = "import assert from 'node:assert/strict'; import {collectItems} from './src/items.js'; assert.throws(() => collectItems('', [])); assert.deepEqual(collectItems('valid', [2, 1]), [2, 1]);\n";
+  // The new retention guard owns only this invocation's newly created checks.
+  // User-existing files remain removable; their deletion MUST still invalidate
+  // evidence. The companion retention regression covers new-check refusal.
+  fs.writeFileSync(path.join(workspace, "check-api.mjs"), "// preexisting user check\n");
   const focused = { a: "shell", c: "node check-api.mjs" };
   const { result, checkpoint } = await run(workspace, [edit(GOOD),
     { a: "write_file", p: "check-api.mjs", content: checkScript }, VERIFY, focused,
@@ -204,7 +208,7 @@ test("cleanup after verified focus explains stale receipts and requires a fresh 
     { a: "write_file", p: "check-api.mjs", content: checkScript }, focused,
     { a: "read_file", p: "src/items.js" }, { a: "list_dir", p: "." }, DONE,
   ], {
-    extensionTrajectory: true, prefixMode: "immutable",
+    promptTrajectory: "extension",
     shellSandbox: process.env.BANTAM_LIVE_SANDBOX_TEST === "1" ? "docker" : "host",
     verificationWorkspaceReadOnly: process.env.BANTAM_LIVE_SANDBOX_TEST === "1",
   });
@@ -217,7 +221,8 @@ test("cleanup after verified focus explains stale receipts and requires a fresh 
   assert.equal(first.verificationReceipts.entries.length, 2);
   assert.equal(first.verificationReceipts.entries[1].verificationEvidence.status, "pass");
   assert.match(first.observation, /Focused command: "node check-api\.mjs"/);
-  assert.match(first.observation, /Keep intended check scripts; temporary fixtures are different/);
+  assert.match(first.observation, /No optional cleanup remains/);
+  assert.match(first.observation, /Keep the passing check as regression coverage/);
   assert.equal(cleanup.verificationEvidence, null, "pure deletion does not invent a test execution");
   assert.equal(cleanup.shellExecution.invalidated, true);
   assert.deepEqual(cleanup.shellChangedPaths, ["check-api.mjs"]);

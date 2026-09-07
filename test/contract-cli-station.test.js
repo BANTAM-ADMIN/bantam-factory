@@ -11,9 +11,9 @@ import {runContractCliStation,formatContractCliStation} from '../src/contract-cl
 import {cliVerificationPassed} from '../src/contract-cli-verification.js';
 
 const sha=v=>crypto.createHash('sha256').update(v).digest('hex'),digest=v=>`sha256:${sha(canonicalEncode(v))}`;
-const TASK='CLI: `node convert.js INPUT_JSON_FILE`. The UTF-8 JSON file contains {value}. Exactly one argument is required. Success prints exactly one result JSON plus newline, exits 0 and has no stderr. Invalid arguments, unreadable files or invalid JSON exit 2, with nonempty stderr and no stdout. Return the input object unchanged.';
-const CODE="import fs from 'node:fs';const LF=String.fromCharCode(10);if(process.argv.length!==3){process.stderr.write('usage'+LF);process.exit(2);}process.stdout.write(JSON.stringify(JSON.parse(fs.readFileSync(process.argv[2],'utf8')))+LF);";
-const SPEC={module:'convert.js',input:{value:'small'},expected:{value:'small'}};
+const TASK='Export synchronous `convert(value)`.\n\nCLI: `node convert.js INPUT_JSON_FILE`. The UTF-8 JSON file contains `{value}`. Exactly one argument is required. Success prints exactly one result JSON plus newline, exits 0 and has no stderr. Invalid arguments, unreadable files or invalid JSON exit 2, with nonempty stderr and no stdout. Return the input object unchanged.';
+const CODE="import fs from 'node:fs';import {pathToFileURL} from 'node:url';export function convert(value){return {value};}if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const LF=String.fromCharCode(10);if(process.argv.length!==3){process.stderr.write('usage'+LF);process.exit(2);}const x=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));process.stdout.write(JSON.stringify(convert(x.value))+LF);}";
+const SPEC={module:'convert.js',input:{value:'small'}};
 function fixture(t,code=CODE){
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-cli-station-'));t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
   fs.writeFileSync(path.join(workspace,'convert.js'),code);fs.writeFileSync(path.join(workspace,'package.json'),'{"type":"module"}');
@@ -30,10 +30,11 @@ function experiment({failed=false,mutate=null}={}){
     calls.push({workspace,action,options});
     const inputs=action.inputs.map(({p})=>{const f=path.join(workspace,p),b=fs.readFileSync(f);return {p,size:b.length,sha256:sha(b),mode:fs.statSync(f).mode&0o777};}).sort((a,b)=>a.p.localeCompare(b.p));
     const streams=(out,err)=>{const r={};for(const [k,v]of [['stdout',out],['stderr',err]]){const b=Buffer.from(v);r[k+'Bytes']=b.length;r[k+'Sha256']=sha(b);r[k+'Base64']=b.toString('base64');}return r;};
-    const packet={schema:'bantam.cli-assertion-check.v1',status:failed?'failed':'complete',cases:[
-      {case:'valid-input',status:0,signal:null,error:null,...streams(JSON.stringify(SPEC.expected)+'\n',''),result:'passed'},
+    const reference=()=>{const bytes=Buffer.from(JSON.stringify({schema:'bantam.cli-api-reference.v1',module:SPEC.module,export:'convert',kind:'returned',value:SPEC.input,diagnostic:null})+String.fromCharCode(10));return {status:0,signal:null,error:null,...streams('',''),outcomeBytes:bytes.length,outcomeSha256:sha(bytes),outcomeBase64:bytes.toString('base64'),result:'returned'};};
+    const packet={schema:'bantam.cli-assertion-check.v2',status:failed?'failed':'complete',reference:reference(),cases:[
+      {case:'valid-input',status:0,signal:null,error:null,...streams(JSON.stringify(SPEC.input)+'\n',''),result:'passed'},
       {case:'missing-argument',status:2,signal:null,error:null,...streams('','usage'),result:'passed'},
-      {case:'extra-argument',status:failed?0:2,signal:null,error:null,...streams(failed?JSON.stringify(SPEC.expected)+'\n':'',failed?'':'usage'),result:failed?'failed':'passed'},
+      {case:'extra-argument',status:failed?0:2,signal:null,error:null,...streams(failed?JSON.stringify(SPEC.input)+'\n':'',failed?'':'usage'),result:failed?'failed':'passed'},
     ]};
     const sourceDigest=digest(inputs),experimentId='probe:cli-unit';
     const raw={schema:'bantam.probe-receipt.v1',experimentId,specDigest:digest(action),sourceDigest,sourceAfterDigest:sourceDigest,
@@ -50,23 +51,23 @@ test('one constrained CLI data proposal binds public process contract/current so
   const args=fixture(t),worker=model(),runner=experiment(),r=await runContractCliStation({...args,model:worker,runExperiment:runner.run,
     history:'WORKER_HISTORY_MARKER',tests:'PRIVATE_TEST_MARKER'});
   assert.equal(r.status,'complete',r.reason);assert.equal(worker.calls.length,1);assert.equal(runner.calls.length,1);
-  assert.equal(r.sourceUnchanged,true);assert.equal(r.candidateVerified,false);assert.equal(r.generation,2);
+  assert.equal(r.sourceUnchanged,true);assert.equal(r.candidateVerified,false);assert.equal(r.scope,'declared-cli-api-coherence');assert.equal(r.generation,2);
   assert.equal(r.contract.taskSha256,sha(TASK));assert.equal(r.contractSha256,sha(canonicalEncode(r.contract)));
   assert.equal(r.specSha256,sha(canonicalEncode(SPEC)));assert.equal(r.inputDigest,digest(r.inputs));
   assert.equal(r.grammarSha256,sha(CLI_ASSERTION_SPEC_GRAMMAR));assert.equal(r.probeSpecDigest,digest(runner.calls[0].action));
   assert.equal(r.tokens,73);assert.equal(r.promptSha256,sha(worker.calls[0].prompt));
   assert.deepEqual(r.inputs.map(i=>i.p),['convert.js','package.json']);
-  assert.doesNotMatch(worker.calls[0].prompt,/WORKER_HISTORY_MARKER|PRIVATE_TEST_MARKER|UNSEEN_GRADER_MARKER/);
+  assert.doesNotMatch(worker.calls[0].prompt,/WORKER_HISTORY_MARKER|PRIVATE_TEST_MARKER|UNSEEN_GRADER_MARKER/);assert.match(worker.calls[0].prompt,/Do not calculate an expected output/);assert.deepEqual(worker.calls[0].options.jsonSchema.required,['module','input']);
   assert.ok(worker.calls[0].prompt.endsWith('<think></think>\n\n'));assert.equal(worker.calls[0].options.nPredict,1800);
   assert.equal(worker.calls[0].options.retries,0);assert.equal(runner.calls[0].options.maxBuffer,262144);
   assert.equal(cliVerificationPassed(r.contract,r,{generation:2}),true);
   assert.match(formatContractCliStation(r),/Measured child extra-argument: passed; actual exit 2/);
 });
 
-test('failed child status is preserved despite forged cached PASS and remains a model-oracle-scoped finding',async t=>{
+test('failed child status is preserved despite forged cached PASS and remains coherence scoped',async t=>{
   const args=fixture(t),r=await runContractCliStation({...args,model:model(),runExperiment:experiment({failed:true}).run});
   assert.equal(r.status,'failed');assert.equal(r.probeEvidence.projection.status,'assertion_failed');
-  assert.match(formatContractCliStation(r),/actual exit 0/);assert.match(formatContractCliStation(r),/wrong model-designed expected value/);
+  assert.match(formatContractCliStation(r),/actual exit 0/);assert.match(formatContractCliStation(r),/agreement alone never certifies business correctness/);
   assert.equal(cliVerificationPassed(r.contract,r,{generation:2}),false);
 });
 
@@ -101,6 +102,22 @@ test('typed probe hashes and closed actual-child packet are both required, never
   ]){
     const r=await runContractCliStation({...args,model:model(),runExperiment:experiment({mutate}).run});assert.equal(r.status,'unavailable');
   }
+});
+
+test('unavailable API reference retains its real bounded diagnostic without claiming CLI correctness',async t=>{
+  const args=fixture(t),runner=experiment({mutate(raw){
+    const stage=raw.stages[2],packet=JSON.parse(stage.stdout);
+    packet.status='unavailable';packet.cases=[];packet.reference.result='unavailable';
+    packet.reference.reason='API reference threw: actual operand failed at convert.js:4';
+    const bytes=Buffer.from(JSON.stringify({schema:'bantam.cli-api-reference.v1',module:SPEC.module,export:'convert',kind:'threw',value:null,
+      diagnostic:{name:'TypeError',message:'actual operand failed',stack:'TypeError: actual operand failed at convert.js:4'}})+'\n');
+    packet.reference.outcomeBytes=bytes.length;packet.reference.outcomeSha256=sha(bytes);packet.reference.outcomeBase64=bytes.toString('base64');
+    stage.code=125;stage.stdout=JSON.stringify(packet);stage.stdoutDigest=digest(stage.stdout);
+  }});
+  const r=await runContractCliStation({...args,model:model(),runExperiment:runner.run});
+  assert.equal(r.status,'unavailable');assert.match(r.referenceDiagnostic,/actual operand failed at convert.js:4/);
+  assert.match(r.reason,/API reference unavailable/);assert.match(formatContractCliStation(r),/diagnostic \(untrusted\)/);
+  assert.equal(cliVerificationPassed(r.contract,r,{generation:2}),false);
 });
 
 test('profile role controls are neutralized in current source and supplied public documents',async t=>{

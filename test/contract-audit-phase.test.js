@@ -11,6 +11,52 @@ import { ALL_ACTION_VERBS } from "../src/action-protocol.js";
 
 const PENDING = Object.freeze({ needsFocused: true, needsProject: true, configuredCommand: "npm test" });
 
+test("repeated real compound checks remain unknown until a retained standalone assertion supplies focus", async t => {
+  const workspace = fixture(t);
+  const compound = suffix => ({ a: "shell", c: `${FOCUS.c}; node -e "console.log('${suffix}')"` });
+  const script = "import assert from 'node:assert/strict';\n"
+    + "import {collectItems} from './src/items.js';\n"
+    + "assert.throws(() => collectItems('', []));\n"
+    + "assert.deepEqual(collectItems('ok', [2, 1]), [2, 1]);\n";
+  const live = process.env.BANTAM_LIVE_SANDBOX_TEST === "1";
+  const { result, prompts, requests } = await run(workspace, [EDIT, VERIFY,
+    compound("UNTRUSTED_FIRST_CHECK_PASSED"), compound("UNTRUSTED_SECOND_CHECK_PASSED"),
+    { a: "write_file", p: "check-contract.mjs", content: script },
+    // Creating the check advances source generation; let the second independent
+    // audit run before (not after) the focused assertion that must discharge it.
+    VERIFY,
+    { a: "shell", c: "node check-contract.mjs\n" }, DONE], {
+    maxTurns: 12, promptTrajectory: "extension", shellSandbox: live ? "docker" : "host",
+    verificationWorkspaceReadOnly: live,
+  });
+  for (const index of [2, 3]) {
+    const proof = result.turns[index].verificationEvidence;
+    assert.ok(proof === null || proof.status === "unverified", "compound outer zero supplies no passing verifier proof");
+    assert.equal(result.turns[index].shellExecution.exitCode, 0, "real compound execution, not a blocked attempt");
+    assert.ok(result.turns[index].observation.includes(index === 2 ? "UNTRUSTED_FIRST_CHECK_PASSED" : "UNTRUSTED_SECOND_CHECK_PASSED"));
+  }
+  const current = prompts[4].slice(prompts[4].lastIndexOf("[verification workflow: current decision]"));
+  assert.match(current, /new workspace check script/);
+  assert.match(current, /separate permitted shell action run only node check-contract.mjs/);
+  assert.match(current, /printed pass messages are not proof/);
+  assert.ok(!requests[4].jsonSchema.properties.a.enum.includes("done"));
+  assert.equal(result.turns[5].contractStateAudit.status, "report");
+  assert.equal(result.turns[6].verificationReceipts.entries.length, 2, result.turns[6].observation);
+  assert.equal(result.turns[6].parsedAction.c, "node check-contract.mjs\n", "real trailing LF survives the authored action");
+  assert.equal(result.turns[6].verificationReceipts.entries[0].shellExecution.executedCommand.trim(), "node check-contract.mjs");
+  assert.equal(result.turns[6].verificationReceipts.entries[1].verificationEvidence.source, "automatic");
+  assert.equal(result.turns[6].verificationReceipts.entries[1].verificationEvidence.status, "pass");
+  assert.equal(result.turns[6].verificationReceipts.entries[1].verificationEvidence.executedCommand, "npm test");
+  assert.equal(result.turns[6].verificationReceipts.entries[1].verificationEvidence.generation,
+    result.turns[6].verificationReceipts.entries[0].shellExecution.generation);
+  assert.equal(requests.length, 8, "no extra worker calls are needed for controller verification");
+  assert.equal(result.reachedDone, true, result.turns.at(-1)?.observation);
+  assert.equal(result.turns.at(-1).doneAccepted, true);
+  assert.ok(requests[7].jsonSchema.properties.a.enum.includes("done"));
+  assert.equal(fs.readFileSync(path.join(workspace, "check-contract.mjs"), "utf8"), script);
+  assert.equal(fs.readFileSync(path.join(workspace, "src/items.js"), "utf8"), GOOD);
+});
+
 test("separate CLI obligation keeps completion masked after API/project green", () => {
   const phase = contractAuditPhaseState({ needsCli: true, needsFocused: false, needsProject: false });
   assert.equal(phase.active, true);

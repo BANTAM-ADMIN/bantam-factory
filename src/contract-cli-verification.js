@@ -1,6 +1,7 @@
+// V2 does not credit historical model-computed expected-output cases.
 // A CLI route is a separate public-contract obligation. API assertions and
 // echoed child statuses cannot establish it. This validates controller-owned
-// receipts, not arbitrary foreign logs or the correctness of a model's oracle.
+// receipts, not arbitrary foreign logs or whole-task business correctness.
 import crypto from "node:crypto";
 import path from "node:path";
 import { canonicalEncode } from "./factory/fact-fabric.js";
@@ -19,9 +20,13 @@ const relative = value => typeof value === "string" && value.length > 0 && value
   && value !== "." && path.posix.normalize(value) === value && !value.startsWith("../");
 
 function validContract(contract) {
-  return record(contract) && contract.schema === "bantam.cli-contract.v1"
+  return record(contract) && contract.schema === "bantam.cli-contract.v2"
     && HASH.test(contract.taskSha256 ?? "") && relative(contract.module)
     && /\.[cm]?js$/.test(contract.module) && contract.inputKind === "json-file"
+    && record(contract.api) && /^[A-Za-z_$][A-Za-z0-9_$]{0,119}$/.test(contract.api.export ?? "")
+    && Array.isArray(contract.api.arguments) && contract.api.arguments.length >= 1 && contract.api.arguments.length <= 8
+    && new Set(contract.api.arguments).size === contract.api.arguments.length
+    && contract.api.arguments.every(name => typeof name === "string" && /^[A-Za-z_$][A-Za-z0-9_$]{0,119}$/.test(name))
     && same(contract.success, { exitCode: 0, stdout: "single-json-newline", stderr: "empty" })
     && (contract.arity === null || (record(contract.arity) && contract.arity.arguments === 1
       && Number.isSafeInteger(contract.arity.exitCode) && contract.arity.exitCode > 0 && contract.arity.exitCode < 256
@@ -31,37 +36,57 @@ function validContract(contract) {
     && contract.evidence.reduce((sum, value) => sum + value.length, 0) <= 16000;
 }
 
-/** Validate fixed-runner child measurements; this does not confer task proof. */
+function measuredStream(measured, stream) {
+  const encoded = measured?.[stream + "Base64"], count = measured?.[stream + "Bytes"];
+  if (typeof encoded !== "string" || encoded.length > 23000 || !Number.isSafeInteger(count)
+    || count < 0 || count > 16384 || !HASH.test(measured?.[stream + "Sha256"] ?? "")) return null;
+  const bytes = Buffer.from(encoded, "base64");
+  return bytes.toString("base64") === encoded && bytes.length === count
+    && sha(bytes) === measured[stream + "Sha256"] ? bytes : null;
+}
+
+function supportedReference(value, depth = 0) {
+  if (depth > 16) return false;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value) && !Object.is(value, -0);
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).every(child => supportedReference(child, depth + 1));
+}
+
+/** Controller process measurements establish only CLI/API coherence. */
 export function validateCliCaseMeasurements(stdout, { contract, spec, status = "complete" } = {}) {
   try {
     if (!validContract(contract) || !parseCliAssertionSpec(JSON.stringify(spec), { contract, sourcePaths: [contract.module] })
-      || !["complete", "failed"].includes(status)
-      || typeof stdout !== "string" || stdout.length > 262144) return false;
+      || !["complete", "failed"].includes(status) || typeof stdout !== "string" || stdout.length > 262144) return false;
     const packet = JSON.parse(stdout), names = ["valid-input", ...(contract.arity ? ["missing-argument", "extra-argument"] : [])];
-    if (!record(packet) || packet.schema !== "bantam.cli-assertion-check.v1" || packet.status !== status
+    if (!record(packet) || packet.schema !== "bantam.cli-assertion-check.v2" || packet.status !== status
       || !Array.isArray(packet.cases) || packet.cases.length !== names.length) return false;
+    const reference = packet.reference;
+    if (!record(reference) || reference.result !== "returned" || reference.status !== 0
+      || reference.signal !== null || reference.error !== null) return false;
+    const out = measuredStream(reference, "stdout"), err = measuredStream(reference, "stderr");
+    const returned = measuredStream(reference, "outcome");
+    if (!out || out.length !== 0 || !err || err.length !== 0 || !returned?.length) return false;
+    const outcome = JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(returned));
+    if (!record(outcome) || !same(Object.keys(outcome).sort(), ["diagnostic", "export", "kind", "module", "schema", "value"])
+      || outcome.schema !== "bantam.cli-api-reference.v1" || outcome.module !== spec.module
+      || outcome.export !== contract.api.export || outcome.kind !== "returned" || outcome.diagnostic !== null
+      || !supportedReference(outcome.value)) return false;
     let failures = 0;
     for (const [index, measured] of packet.cases.entries()) {
       if (!record(measured) || measured.case !== names[index] || measured.signal !== null || measured.error !== null
         || !Number.isInteger(measured.status) || measured.status < 0 || measured.status > 255
         || !["passed", "failed"].includes(measured.result)) return false;
-      const streams = {};
-      for (const stream of ["stdout", "stderr"]) {
-        const encoded = measured[`${stream}Base64`], count = measured[`${stream}Bytes`];
-        if (typeof encoded !== "string" || encoded.length > 23000
-          || !Number.isSafeInteger(count) || count < 0 || count > 16384 || !HASH.test(measured[`${stream}Sha256`] ?? "")) return false;
-        const bytes = Buffer.from(encoded, "base64");
-        if (bytes.toString("base64") !== encoded || bytes.length !== count || sha(bytes) !== measured[`${stream}Sha256`]) return false;
-        streams[stream] = bytes;
-      }
+      const stdout = measuredStream(measured, "stdout"), stderr = measuredStream(measured, "stderr");
+      if (!stdout || !stderr) return false;
       let matches;
       if (index === 0) {
-        matches = measured.status === 0 && streams.stderr.length === 0;
+        matches = measured.status === 0 && stderr.length === 0;
         try {
-          const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(streams.stdout);
-          matches &&= text.endsWith("\n") && same(JSON.parse(text.slice(0, -1)), spec.expected);
+          const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(stdout);
+          matches &&= text.endsWith("\n") && same(JSON.parse(text.slice(0, -1)), outcome.value);
         } catch { matches = false; }
-      } else matches = measured.status === contract.arity.exitCode && streams.stdout.length === 0 && streams.stderr.length > 0;
+      } else matches = measured.status === contract.arity.exitCode && stdout.length === 0 && stderr.length > 0;
       if (measured.result !== (matches ? "passed" : "failed")) return false;
       if (!matches) failures++;
     }
@@ -72,7 +97,7 @@ export function validateCliCaseMeasurements(stdout, { contract, spec, status = "
 function measuredCliProjection(contract, receipt, generation) {
   try {
     if (!validContract(contract) || !Number.isSafeInteger(generation) || generation < 0
-      || !record(receipt) || receipt.schema !== "bantam.contract-cli-station.v1"
+      || !record(receipt) || receipt.schema !== "bantam.contract-cli-station.v2"
       || !["complete", "failed"].includes(receipt.status) || badFlags(receipt)
       || receipt.generation !== generation || receipt.sourceUnchanged !== true
       || receipt.taskSha256 !== contract.taskSha256 || !same(receipt.contract, contract)
@@ -150,7 +175,7 @@ export function cliVerificationDecisionContext(contract, receipt, { generation }
         if (item.reason) text += ` Diagnostic (untrusted): ${quoted(item.reason, 65)}.`;
         text += "\n";
       }
-      text += "Repair a demonstrated implementation defect. A model-designed input/expectation may itself be invalid; it is not an oracle and the worker cannot edit the controller's case.\n";
+      text += "Repair a demonstrated CLI/API mismatch or explicit process-contract defect. This comparison uses the measured API return, not a model-computed expected answer; it does not prove business correctness.\n";
     } else if (receipt?.generation !== undefined && receipt.generation !== generation) {
       text += "Earlier CLI evidence belongs to a different source generation and is stale. Preserve intended checks.\n";
     } else {
@@ -158,7 +183,7 @@ export function cliVerificationDecisionContext(contract, receipt, { generation }
       if (typeof receipt?.reason === "string" && receipt.reason.trim()) text += `Recorded unavailable reason (untrusted): ${quoted(receipt.reason, 200)}.\n`;
     }
     text += "Next: run the configured project verifier to trigger the controller CLI station. There is no worker station verb. It runs once per source generation; repeating an unchanged check does not retry a failed/unavailable station. Do not make gratuitous edits merely to force a retry.\n";
-    text += "The real CLI must return the model-declared JSON plus newline, exit 0, and no stderr for its proposed valid input.";
+    text += "The real CLI must preserve the measured public API JSON return plus newline, exit 0, and no stderr. API correctness still requires the configured tests.";
     if (contract.arity) text += ` Public missing/extra arguments: exit ${contract.arity.exitCode}, empty stdout, nonempty stderr.`;
     return { schema: 1, phase: "cli", generation, text };
   } catch { return null; }

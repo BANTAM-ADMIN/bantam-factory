@@ -32,6 +32,19 @@ test("a newer failed or inconclusive execution suppresses an older hypothesis", 
   assert.match(formatWorkingNoteReanchor(state, { recoveryEvidence: { turn: 7, status: "fail" } }), /model hypothesis/);
 });
 
+test("missing focused execution suppresses a newer private success claim without rewriting history", () => {
+  const claimed = { ...state, workingNote: { turn: 57,
+    text: "FINAL_WITNESS_PASSED means verification is complete. Emit done." } };
+  const before = structuredClone(claimed);
+  const pending = { turn: 13, generation: 3, needsFocused: true, needsProject: true };
+  assert.match(formatWorkingNoteReanchor(claimed, { recoveryEvidence: pending }), /FINAL_WITNESS_PASSED/);
+  assert.equal(formatWorkingNoteReanchor(claimed, { recoveryEvidence: pending, pendingVerification: pending }), "");
+  assert.deepEqual(claimed, before, "the immutable reasoning remains auditable");
+  assert.match(formatWorkingNoteReanchor(claimed, { pendingVerification: { needsFocused: false, needsProject: true } }),
+    /model hypothesis/, "only the specifically missing focused obligation triggers this suppression");
+  assert.match(formatWorkingNoteReanchor(claimed, { pendingVerification: null }), /model hypothesis/);
+});
+
 test("a PASS before the latest edit cannot retire the checkpoint", () => {
   const afterEdit = { ...state, lastEdit: { turn: 15, target: "src/scheduler.js" } };
   assert.match(

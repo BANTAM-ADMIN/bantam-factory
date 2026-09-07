@@ -5,7 +5,7 @@
 import { parse } from "acorn";
 import crypto from "node:crypto";
 import path from "node:path";
-import { hasShellControlOutsideQuotes, splitShellWords } from "./shell-lex.js";
+import { hasShellControlOutsideQuotes, splitShellWords, shellSegments } from "./shell-lex.js";
 import { verificationShellStatusRisk } from "./verification-evidence.js";
 import { projectProbeEvidence } from "./probe-evidence.js";
 import { canonicalEncode } from "./factory/fact-fabric.js";
@@ -17,8 +17,44 @@ export const VERIFICATION_RECEIPTS_SCHEMA = "bantam.verification-receipts.v1";
 const record = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const badFlags = value => ["blocked", "invalidated", "interrupted", "aborted", "timedOut", "bufferExceeded", "error", "signal", "uncertainty"].some(key => Boolean(value?.[key]));
 
+// Recognition/recorder matching only: never rewrite the executed program or
+// compare argv reconstructed by the deliberately small shell lexer. Remove
+// only outer, unquoted, unescaped POSIX whitespace. In particular an escaped
+// terminal blank/newline, an open quote, or a different quoted argument is not
+// the verification recorder's harmless trimming of the requested command.
+function recordedCommandText(command) {
+  if (typeof command !== "string") return null;
+  const start = command.search(/[^ \t\n]/);
+  if (start < 0) return null;
+  let quote = null, end = start, escapedTail = false;
+  for (let i = start; i < command.length; i++) {
+    const ch = command[i];
+    if (ch === "\\" && quote !== "'") {
+      if (i + 1 === command.length) return null;
+      escapedTail = /[ \t\r\n]/.test(command[++i]);
+      end = i + 1;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) quote = null;
+      end = i + 1; escapedTail = false;
+      continue;
+    }
+    if (ch === "'" || ch === '"') quote = ch;
+    else if (/[ \t\n]/.test(ch)) continue;
+    end = i + 1; escapedTail = false;
+  }
+  return quote || escapedTail ? null : command.slice(start, end);
+}
+
+function sameRecordedCommand(a, b) {
+  const normalized = recordedCommandText(a);
+  return normalized !== null && normalized === recordedCommandText(b);
+}
+
 function wordsForDirectCommand(command) {
-  if (typeof command !== "string" || !command.trim() || hasShellControlOutsideQuotes(command)
+  command = recordedCommandText(command);
+  if (!command || hasShellControlOutsideQuotes(command)
       || verificationShellStatusRisk(command) !== null) return null;
   const words = splitShellWords(command);
   return words.length ? words : null;
@@ -48,6 +84,7 @@ function sameConfiguredExecution(actual, configured) {
 // controller's actual cwd and complete execution receipt bind that workspace.
 // No relative paths, substitutions, setup programs, extra operators or masks.
 export function workspacePrefixedCommand(command, workspace, cwd) {
+  command = recordedCommandText(command);
   if (typeof workspace !== "string" || !path.posix.isAbsolute(workspace)
       || path.posix.normalize(workspace) !== workspace || cwd !== workspace
       || typeof command !== "string" || !/^cd[ \t]+/.test(command)) return null;
@@ -60,7 +97,7 @@ export function workspacePrefixedCommand(command, workspace, cwd) {
     if (ch === "&" && command[i + 1] === "&") { separator = i; break; }
   }
   if (separator < 0) return null;
-  const prefix = command.slice(0, separator), direct = command.slice(separator + 2).trim();
+  const prefix = command.slice(0, separator), direct = recordedCommandText(command.slice(separator + 2));
   if (/[\\$`\r\n\0*?\[\]{}]/.test(prefix)) return null;
   const words = wordsForDirectCommand(prefix);
   if (!words || words[0] !== "cd") return null;
@@ -76,7 +113,7 @@ function commandForAuditReceipt(proof, shell, workspace) {
   if (proof?.statusScope === "execution" && command !== executed) return null;
   if (wordsForDirectCommand(command)) return command;
   if (!shell || (proof && (proof.statusScope !== "execution" || proof.source !== "shell"
-      || proof.command !== shell.command || proof.executedCommand !== shell.executedCommand
+      || !sameRecordedCommand(proof.command, shell.command) || proof.executedCommand !== shell.executedCommand
       || (proof.cwd != null && proof.cwd !== shell.cwd)))
       || command !== shell.executedCommand) return null;
   return workspacePrefixedCommand(command, workspace, shell.cwd);
@@ -289,8 +326,9 @@ function orderedReceiptCommand(proof, shell, { generation, workspace }) {
       || (shell && !validReceipt(shell, generation))) return null;
   if (proof && (proof.statusScope !== "execution" || proof.statusCommand !== proof.executedCommand)) return null;
   if (proof?.source === "shell" && !shell) return null;
-  if (proof && shell && ["command", "executedCommand", "generation", "exitCode", "cwd", "workspaceReadOnly", "sandbox"]
-    .some(key => (proof[key] ?? null) !== (shell[key] ?? null))) return null;
+  if (proof && shell && (!sameRecordedCommand(proof.command, shell.command)
+      || ["executedCommand", "generation", "exitCode", "cwd", "workspaceReadOnly", "sandbox"]
+        .some(key => (proof[key] ?? null) !== (shell[key] ?? null)))) return null;
   if (workspace != null && [proof, shell].filter(Boolean).some(receipt => receipt.cwd !== workspace)) return null;
   if (proof?.counts != null && (!record(proof.counts)
       || !["passed", "failed", "total"].every(key => Number.isSafeInteger(proof.counts[key]) && proof.counts[key] >= 0)
@@ -337,6 +375,44 @@ function staleFocusedCheck(turns, auditIndex, generation, configured, workspace)
   }
   const changedPaths = [...changed].slice(0, 6);
   return { ...prior, changedPaths, removedPaths: changedPaths.filter(file => latest.get(file) === "missing") };
+}
+
+// Advice only, never an execution witness. Repeated actual failed/opaque Node
+// checks suggest switching transport to a retained file and a direct launcher.
+// Do not infer attempts from the worker's action, prose, or a forged alias.
+function focusedCheckRecovery(turns, auditIndex, generation, workspace) {
+  let attempts = 0;
+  for (let index = Math.max(auditIndex + 1, turns.length - 64); index < turns.length; index++) {
+    const turn = turns[index];
+    if (!turn || turn.controllerStop || turn.shellScopeRollback?.violations?.length) continue;
+    const entries = Object.hasOwn(turn, "verificationReceipts") ? orderedTurnReceipts(turn, index)
+      : turn.shellExecution ? [turn] : null;
+    for (const entry of entries ?? []) {
+      const proof = entry.verificationEvidence, shell = entry.shellExecution;
+      if (!record(shell) || shell.generation !== generation || !Number.isSafeInteger(generation)
+          || generation < 0 || !Number.isInteger(shell.exitCode) || shell.exitCode < 0 || shell.exitCode >= 125
+          || badFlags(shell) || !HASH.test(shell.outputSha256 ?? "")
+          || (workspace != null && shell.cwd !== workspace)
+          || typeof shell.executedCommand !== "string" || shell.executedCommand.length > 16000) continue;
+      if (proof && (proof.schema !== 1 || proof.source !== "shell" || !["fail", "unverified"].includes(proof.status)
+          || !HASH.test(proof.outputSha256 ?? "") || !sameRecordedCommand(proof.command, shell.command)
+          || ["executedCommand", "generation", "exitCode", "cwd", "workspaceReadOnly", "sandbox"]
+            .some(key => (proof[key] ?? null) !== (shell[key] ?? null))
+          || ["blocked", "invalidated", "interrupted", "aborted", "timedOut", "bufferExceeded", "error", "signal"]
+            .some(key => Boolean(proof[key])))) continue;
+      if (!proof && shell.exitCode === 0 && verificationShellStatusRisk(shell.executedCommand) === null) continue;
+      const segments = shellSegments(shell.executedCommand);
+      if (segments.length > 128 || !segments.some(segment => {
+        const words = splitShellWords(segment);
+        while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) words.shift();
+        return /^(?:node|nodejs)$/.test(words[0]?.split("/").at(-1) ?? "")
+          && (words.slice(1).some(word => /^(?:--test|--eval|-e)$/.test(word))
+            || isFocusedAuditCommand(segment));
+      })) continue;
+      if (++attempts >= 2) return "standalone-node-file";
+    }
+  }
+  return null;
 }
 
 function evaluateContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
@@ -443,6 +519,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
     report: String(audit.report ?? ""), sources: audit.sources ?? [], focusedTurn, projectTurn,
     configuredCommand: configured || null,
     staleFocus: focusedTurn === null ? staleFocusedCheck(turns, auditIndex, generation, configured, workspace) : null,
+    focusedCheckRecovery: focusedTurn === null ? focusedCheckRecovery(turns, auditIndex, generation, workspace) : null,
     generation: Number.isSafeInteger(generation) && generation >= 0 ? generation : null,
     needsFocused: focusedTurn === null,
     needsProject: Boolean(configured && !projectAfterFocused),

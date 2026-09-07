@@ -1,5 +1,7 @@
 // Sampling and a short volatile-tail reminder mirror the existing receipt gate.
 // They supply neither executable proof nor additional work/authority.
+const STANDALONE_NODE_CHECK = "Next: use a permitted file-edit action (e.g. write_file) to create a new workspace check script, e.g. check-contract.mjs. Import the real production API and assert public-contract expectations with node:assert/strict. Temporary fixture DATA goes under os.tmpdir(); the check SCRIPT stays in the workspace. In a separate permitted shell action run only node check-contract.mjs (substitute its actual relative path): no cd, bash -c, setup, echo, filters or cleanup. Keep the check; printed pass messages are not proof.";
+
 export function contractAuditPhaseState(pending, {
   useGrammar = true, interactive = false, advisoryMode = false,
   writeBatch = false, callerExcludedActions = [],
@@ -19,7 +21,8 @@ export function contractAuditPhaseState(pending, {
   const next = pending.needsCli === true
     ? "The separate public CLI process check is still missing, stale, or failing. Repair a demonstrated source or fixture defect and run the configured verifier; the controller will execute its fixed real-CLI check. API-only green cannot substitute for CLI evidence."
     : pending.needsFocused === true
-    ? "Next: execute a direct assertion against the actual API or CLI and the public contract. Create or repair the check separately if needed; printouts and broad-suite green do not replace this focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
+    ? pending.focusedCheckRecovery === "standalone-node-file" ? STANDALONE_NODE_CHECK
+      : "Next: execute a direct assertion against the actual API or CLI and the public contract. Create or repair the check separately if needed; printouts and broad-suite green do not replace this focused proof. Repair source only for a demonstrated defect, not merely to satisfy the review."
     : `Focused proof is accepted for the current tree. Next: run ${commandText ? `exactly the configured project verifier ${commandText}` : "the exact configured project verifier"}, directly, on that unchanged tree. Do not repeat the focused check.`;
   return { active: true, excludeVerbs, note: [
     "CONTRACT AUDIT PHASE: completion is not yet available; required current execution evidence is missing.",
@@ -48,6 +51,10 @@ export function contractAuditDecisionContext(pending, witness = null) {
       + " There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up.";
   } else if (pending.needsFocused === true) {
     phase = "focused";
+    if (pending.focusedCheckRecovery === "standalone-node-file") {
+      text = `CONTRACT AUDIT PHASE: completion is not yet available; generation ${generation} still needs focused proof. ${STANDALONE_NODE_CHECK} The audit is a hypothesis, not an oracle.`;
+      return { schema: 1, phase, generation, text };
+    }
     const stale = pending.staleFocus, command = literal(stale?.command);
     const removed = (Array.isArray(stale?.removedPaths) ? stale.removedPaths : [])
       .filter(p => literal(p)).slice(0, 2);

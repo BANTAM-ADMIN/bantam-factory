@@ -140,6 +140,40 @@ test("prompt bounds long supplied documents and labels omitted text as unknown",
   assert.match(taskClipped, /task truncated; omitted requirements unknown/);
 });
 
+test("collection audit requests discriminating counterexamples and traces full construction cost", async () => {
+  // cliguard1 Context t32 proposed priorities [1, 0] in that same input order
+  // and predicted the required ['a', 'b']: no observable order disagreement.
+  // Its other hypothesis treated an empty payload as zero-cost despite framing.
+  // This regression checks generic delivered guidance, not a task-specific oracle.
+  const task = "Implement exported function selectRecords(items, limit). Reject invalid arrays. Preserve input order in the returned identifiers.";
+  const current = "export function selectRecords(items, limit) { return items.map(item => item.key); }";
+  let delivered;
+  const receipt = await runContractStateAudit({ task, documents: [],
+    sources: [{ path: "src/select.js", text: current, sha256: sha(current) }], generation: 2,
+    model: { complete: async (prompt, options) => {
+      delivered = prompt;
+      assert.equal(options.nPredict, 2400);
+      assert.equal(options.grammar, COLLECTION_AUDIT_GRAMMAR);
+      return { content: '{"findings":[],"note":"No supported disagreement identified."}', tokens: 14 };
+    } },
+  });
+  assert.match(delivered, /predicted observable behavior must contradict the expected public requirement/);
+  assert.match(delivered, /Identical expected\/predicted behavior or a claim that something is untested is not a counterexample/);
+  assert.match(delivered, /at least two distinguishable items/);
+  assert.match(delivered, /required order and the suspected wrong order differ/);
+  assert.match(delivered, /coincident orders do not test that hypothesis/);
+  assert.match(delivered, /trace construction and helper contributions, including framing and delimiters/);
+  assert.match(delivered, /before predicting zero cost from an empty payload/);
+  assert.ok(delivered.indexOf("predicted observable behavior") < delivered.indexOf("PUBLIC TASK:"));
+  assert.ok(delivered.includes(current));
+  assert.doesNotMatch(delivered.slice(0, delivered.indexOf("PUBLIC TASK:")), /context-packet|packContext|cliguard1|selectRecords|priorities \[1, 0\]/);
+  assert.equal(receipt.promptSha256, sha(delivered));
+  assert.equal(receipt.advisory, true);
+  assert.deepEqual(receipt.findings, []);
+  assert.match(receipt.report, /not proof of correctness/);
+  for (const field of ["pass", "verificationEvidence", "counts", "action"]) assert.equal(Object.hasOwn(receipt, field), false);
+});
+
 test("audit reports are advisory hash-bound observations, never verification or actions", async () => {
   let actualPrompt, options;
   const result = await runContractStateAudit({ ...params, model: { complete: async (prompt, opts) => {

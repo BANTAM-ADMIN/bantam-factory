@@ -21,6 +21,108 @@ const check = (command = "node --test test/edge.test.js", generation = 1, execut
 };
 const project = () => check("npm test");
 
+function orderedCheck(row, turn) {
+  row = JSON.parse(JSON.stringify(row));
+  return { ...row, verificationReceipts: { schema: VERIFICATION_RECEIPTS_SCHEMA,
+    authority: "controller-execution-order", turn,
+    entries: [{ sequence: 0, verificationEvidence: row.verificationEvidence ?? null,
+      shellExecution: row.shellExecution ?? null }] } };
+}
+
+test("outer shell whitespace preserves direct assertion recognition and actual ordered execution credit", () => {
+  const direct = `node --input-type=module -e "\nimport assert from 'node:assert/strict';\nimport {spawnSync} from 'node:child_process';\nconst child=spawnSync(process.execPath,['-e','process.exit(0)']);\nassert.equal(child.status,0);\n"`;
+  for (const whitespace of ["\n", " \t\n\n"]) {
+    const command = whitespace + direct + whitespace;
+    assert.equal(isFocusedAuditCommand(command), true);
+    const row = orderedCheck(check(command), 1);
+    assert.equal(row.verificationEvidence, null, "an inline assertion retains shell-only execution authority");
+    assert.equal(row.shellExecution.executedCommand, command, "the execution is not rewritten");
+    const pending = pendingContractAudit([audit, row], options);
+    assert.equal(pending.needsFocused, false);
+    assert.equal(pending.needsProject, true);
+    assert.equal(pendingContractAudit([audit, row, orderedCheck(project(), 2)], options), null);
+    assert.ok(pendingContractAudit([audit, orderedCheck(check(command, 1, { exitCode: 1 }), 1), project()], options));
+    assert.ok(pendingContractAudit([audit, orderedCheck(check(command, 0), 1), project()], options));
+  }
+});
+
+test("recorder-request trimming accepts outer whitespace only, never different command or executed-status identity", () => {
+  const workspace = "/tmp/contract-whitespace-ws";
+  for (const prefix of ["", `cd '${workspace}' && `]) {
+    const command = ` \n${prefix}node --test test/edge.test.js\n\t`;
+    const row = orderedCheck(check(command, 1, { cwd: workspace, stdout: "# tests 1\n# pass 1\n# fail 0\n" }), 1);
+    assert.notEqual(row.verificationEvidence.command, row.shellExecution.command);
+    const opts = { ...options, workspace };
+    assert.equal(pendingContractAudit([audit, row], opts).needsFocused, false);
+    for (const alter of [
+      r => { r.verificationEvidence.command = r.verificationEvidence.command.replace("edge.test.js", "other.test.js"); },
+      r => { r.verificationEvidence.executedCommand = r.verificationEvidence.executedCommand.trim(); },
+      r => { r.verificationEvidence.statusCommand = r.verificationEvidence.statusCommand.trim(); },
+      r => { r.shellExecution.cwd = "/tmp/foreign"; },
+    ]) {
+      const broken = structuredClone(row); alter(broken);
+      // Keep aliases internally serialized; the pair, not an alias mismatch,
+      // must reject the contradiction.
+      broken.verificationReceipts.entries[0] = { sequence: 0,
+        verificationEvidence: broken.verificationEvidence, shellExecution: broken.shellExecution };
+      assert.equal(pendingContractAudit([audit, broken], opts).needsFocused, true);
+    }
+  }
+});
+
+test("outer whitespace normalization does not hide extra commands, open quotes or escaped terminal arguments", () => {
+  for (const command of [
+    "node check-api.mjs\nfalse\n", "node check-api.mjs; echo PASS\n",
+    "node check-api.mjs | tail\n", "node check-api.mjs && npm test\n",
+    "node 'check-api.mjs\n", 'node "check-api.mjs\n',
+    "node check-api.mjs\\\n", "node check-api.mjs\\ \n",
+  ]) {
+    assert.equal(isFocusedAuditCommand(command), false, JSON.stringify(command));
+    assert.equal(pendingContractAudit([audit, orderedCheck(check(command), 1)], options).needsFocused, true);
+  }
+  const quoted = orderedCheck(check("node 'check-api.mjs '\n"), 1);
+  quoted.verificationEvidence = { ...check("node check-api.mjs").verificationEvidence,
+    executedCommand: quoted.shellExecution.executedCommand, statusCommand: quoted.shellExecution.executedCommand };
+  quoted.verificationReceipts.entries[0].verificationEvidence = quoted.verificationEvidence;
+  assert.equal(pendingContractAudit([audit, quoted], options).needsFocused, true, "quoted argv whitespace is not recorder trimming");
+});
+
+test("two actual current-generation inconclusive Node checks suggest a standalone file without credit", () => {
+  const unknown = suffix => check(`node check-api.mjs; node -e 'console.log("${suffix}")'`);
+  const first = orderedCheck(unknown("FIRST"), 1), second = orderedCheck(unknown("SECOND"), 2);
+  assert.equal(first.verificationEvidence.status, "unverified");
+  const turns = [audit, first, second];
+  const before = JSON.stringify(turns);
+  const pending = pendingContractAudit(turns, options);
+  assert.equal(pending.focusedCheckRecovery, "standalone-node-file");
+  assert.equal(pending.needsFocused, true);
+  assert.equal(pending.needsProject, true);
+  assert.equal(JSON.stringify(turns), before, "advisory projection does not alter receipts");
+  assert.equal(pendingContractAudit([audit, first], options).focusedCheckRecovery, null);
+  const focused = orderedCheck(check("node check-api.mjs"), 3);
+  assert.equal(pendingContractAudit([...turns, focused], options).focusedCheckRecovery, null);
+  assert.equal(pendingContractAudit([...turns, focused, orderedCheck(project(), 4)], options), null);
+  const failed = i => orderedCheck(check(`node --input-type=module -e 'import assert from "node:assert/strict"; assert.ok(false)'`, 1, { exitCode: 1 }), i);
+  assert.equal(pendingContractAudit([audit, failed(1), failed(2)], options).focusedCheckRecovery, "standalone-node-file");
+});
+
+test("standalone-file advice ignores prose, old generations, pre-audit checks, blocked and conflicting receipts", () => {
+  const command = "node check-api.mjs; echo PASS";
+  const second = orderedCheck(check(command), 2);
+  for (const row of [
+    { parsedAction: { a: "shell", c: command }, observation: "passed twice" },
+    orderedCheck(check(command, 0), 1),
+    orderedCheck(check(command, 1, { blocked: true }), 1),
+    orderedCheck(check(command, 1, { timedOut: true }), 1),
+    orderedCheck(check("python check_api.py; echo PASS"), 1),
+    orderedCheck(check("node -e 'console.log(1)'"), 1),
+  ]) assert.equal(pendingContractAudit([audit, row, second], options).focusedCheckRecovery, null);
+  const foreign = orderedCheck(check(command), 1);
+  foreign.verificationEvidence.command = "node check-foreign.mjs; echo PASS";
+  assert.equal(pendingContractAudit([audit, foreign, second], options).focusedCheckRecovery, null);
+  assert.equal(pendingContractAudit([check(command), { ...audit, ...check(command) }, check(command)], options).focusedCheckRecovery, null);
+});
+
 test("stale focus context names observed cleanup without granting stale execution credit", () => {
   const removed = { sourceEditedByShell: true, shellChangedPaths: ["check-api.mjs"],
     workspaceCoherence: { fingerprints: { "check-api.mjs": "missing" } } };

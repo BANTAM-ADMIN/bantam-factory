@@ -985,7 +985,7 @@ async function runAgentCore({
     && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")
     ? deriveCliContract(task) : null;
   if (cliContract) {
-    env += `\n[public CLI verification] ${cliContract.module} has a separate required process contract. The controller will check the actual CLI after green verification or proposed completion, using a bounded declarative input and expected result. API-only assertions and printed statuses cannot discharge this CLI obligation.\n`;
+    env += `\n[public CLI verification] ${cliContract.module} has a separate required process contract. After an authored edit, green verification or proposed completion, the controller can compare the real CLI with this module's own exported function on the same bounded input. This checks wiring and explicitly documented argument errors, not whether the function's answer is correct. Independent correctness tests remain required. API-only assertions and printed statuses cannot discharge this CLI obligation.\n`;
     onEvent({ type: "cli_contract", contract: structuredClone(cliContract) });
   }
   const sourceProvenance = deriveSourceProvenanceObligation(task, { outputPaths: taskOutputPaths });
@@ -2130,21 +2130,27 @@ async function runAgentCore({
     // Structural facts explain current source only: they supply no expected
     // values, candidate edits, successful evidence, or completion authority.
     const failureSourceFacts = currentFailure ? currentFailureSourceFacts(turns, exec) : [];
-    const currentCliFailed = cliVerification?.generation === workspaceEditGeneration && cliVerification?.status === "failed";
-    let verificationWorkflow = currentFailure && !currentCliFailed
-      ? { ...verificationFailureContext(currentFailure, { facts: failureSourceFacts.map(formatObjectConstructionFacts) }),
-        sourceFacts: failureSourceFacts }
-      : cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
-    if (cliDecision && verificationWorkflow === cliDecision) {
+    let cliSourceFact = null;
+    let cliSourceNote = "";
+    if (cliDecision) {
       try {
         const filename = exec.resolveExisting(cliContract.module), stat = fs.lstatSync(filename);
         if (stat.isFile() && stat.size <= 256 * 1024) {
-          const facts = collectNodeCliRoutingFacts({ source: fs.readFileSync(filename, "utf8"), path: cliContract.module });
-          const note = facts ? formatNodeCliRoutingFacts(facts) : "";
-          if (note && verificationWorkflow.text.length + note.length + 1 <= 2400)
-            verificationWorkflow = { ...verificationWorkflow, text: verificationWorkflow.text + "\n" + note, sourceFacts: [facts] };
+          cliSourceFact = collectNodeCliRoutingFacts({ source: fs.readFileSync(filename, "utf8"), path: cliContract.module });
+          cliSourceNote = cliSourceFact ? formatNodeCliRoutingFacts(cliSourceFact) : "";
         }
       } catch { /* Source facts are advisory, never acceptance authority. */ }
+    }
+    const currentCliFailed = cliVerification?.generation === workspaceEditGeneration && cliVerification?.status === "failed";
+    let verificationWorkflow = currentFailure && !currentCliFailed
+      ? { ...verificationFailureContext(currentFailure, {
+          facts: [cliSourceNote, ...failureSourceFacts.map(formatObjectConstructionFacts)].filter(Boolean),
+        }), sourceFacts: [...failureSourceFacts, ...(cliSourceFact ? [cliSourceFact] : [])] }
+      : cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
+    if (cliDecision && verificationWorkflow === cliDecision && cliSourceNote
+        && verificationWorkflow.text.length + cliSourceNote.length + 1 <= 2400) {
+      verificationWorkflow = { ...verificationWorkflow, text: verificationWorkflow.text + "\n" + cliSourceNote,
+        sourceFacts: [cliSourceFact] };
     }
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
@@ -2331,6 +2337,7 @@ async function runAgentCore({
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
       suppressDuringCurrentFailure: Boolean(currentFailure || currentCliFailed),
+      pendingVerification: auditRecovery,
     });
     let repositoryText = "";
     let repositoryTurnId = null;
@@ -5588,8 +5595,11 @@ async function runAgentCore({
     // Reuse the existing isolated probe/fact machinery; no candidate code is
     // imported by this controller and no fixture/expected value comes from a
     // hidden judge. One station attempt per current workspace generation.
+    // An authored edit can trigger diagnostics before the project goes green:
+    // otherwise a failing import/CLI can block both the station and DONE.
     if (cliContract && hasAuthoredWork && !interrupted && !result.controllerStop
-        && (result.verificationEvidence?.status === "pass" || action.a === "done")
+        && (directEditSucceeded || result.sourceEditedByShell
+          || result.verificationEvidence?.status === "pass" || action.a === "done")
         && !cliStationGenerations.has(workspaceEditGeneration)
         && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)) {
       const sources = collectContractAuditSources([cliContract.module, ...editedPathsThisRun, ...openList],
@@ -7065,10 +7075,15 @@ export function formatWorkingNoteReanchor(state, {
   suppressBeforeFirstEdit = false,
   recoveryEvidence = null,
   suppressDuringCurrentFailure = false,
+  pendingVerification = null,
 } = {}) {
   const note = state?.workingNote;
   if (!note?.text) return "";
   if (suppressDuringCurrentFailure) return "";
+  // A newer private claim that a witness passed cannot outrank the current
+  // receipt ledger saying focused execution is still missing. Keep the raw
+  // reasoning in history, but do not re-anchor it beside the recovery step.
+  if (pendingVerification?.needsFocused === true) return "";
   // Before any accepted edit, private reasoning is reconnaissance or a plan for
   // the very next action—not durable state. Replaying it as controller guidance
   // caused a generic "understand the workspace" thought to outrank a complete

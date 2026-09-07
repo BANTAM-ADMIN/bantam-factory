@@ -8,21 +8,30 @@ import { cliVerificationPassed, cliVerificationDecisionContext, validateCliCaseM
 const sha = value => crypto.createHash("sha256").update(value).digest("hex");
 const digest = value => sha(canonicalEncode(value));
 const probeDigest = value => `sha256:${digest(value)}`;
-const TASK = "Build a JSON utility.\n\nCLI: `node tool.mjs INPUT_FILE`. The UTF-8 JSON file contains an object. Exactly one argument is required. Success prints one result JSON followed by newline, exits 0 and has no stderr. Invalid arguments, unreadable files or invalid JSON exit 2, with nonempty stderr and no stdout. Importing must not run the CLI.";
+const TASK = "Export synchronous `transform(value)`. Build a JSON utility.\n\nCLI: `node tool.mjs INPUT_FILE`. The UTF-8 JSON file contains `{value}`. Exactly one argument is required. Success prints one result JSON followed by newline, exits 0 and has no stderr. Invalid arguments, unreadable files or invalid JSON exit 2, with nonempty stderr and no stdout. Importing must not run the CLI.";
 const SOURCE = "// A controller receipt fixture, not executed candidate code.\n";
 
-function fixture({ failed = false, value = 3 } = {}) {
+function measured(stream, value) {
+  const bytes = Buffer.from(value);
+  return { [stream + "Bytes"]: bytes.length, [stream + "Sha256"]: sha(bytes), [stream + "Base64"]: bytes.toString("base64") };
+}
+
+function fixture({ failed = false, value = 3, apiValue = { value } } = {}) {
   const contract = deriveCliContract(TASK, { sourcePaths: ["tool.mjs"] });
   assert.ok(contract);
-  const spec = { module: contract.module, input: { value }, expected: { value } };
+  const spec = { module: contract.module, input: { value } };
   const inputs = [{ p: "tool.mjs", sha256: sha(SOURCE), size: Buffer.byteLength(SOURCE), mode: 420 },
     { p: "package.json", sha256: sha('{}\n'), size: 3, mode: 420 }];
   const question = "Does the declared public CLI case pass on these copied inputs?";
   const action = buildCliAssertionProbe(spec, { contract, inputs, question });
   const sourceDigest = probeDigest(inputs), experimentId = "probe:cli-fixture";
-  const casePacket = JSON.stringify({ schema: "bantam.cli-assertion-check.v1", status: failed ? "failed" : "complete",
+  const outcome = { schema: "bantam.cli-api-reference.v1", module: spec.module, export: contract.api.export,
+    kind: "returned", value: apiValue, diagnostic: null };
+  const casePacket = JSON.stringify({ schema: "bantam.cli-assertion-check.v2", status: failed ? "failed" : "complete",
+    reference: { status: 0, signal: null, error: null, result: "returned",
+      ...measured("stdout", ""), ...measured("stderr", ""), ...measured("outcome", JSON.stringify(outcome) + "\n") },
     cases: ["valid-input", "missing-argument", "extra-argument"].map((name, index) => {
-      const stdout = Buffer.from(index === 0 && !failed ? JSON.stringify(spec.expected) + "\n" : "");
+      const stdout = Buffer.from(index === 0 && !failed ? JSON.stringify(apiValue) + "\n" : "");
       const stderr = Buffer.from(index === 0 && !failed ? "" : "public CLI diagnostic\n");
       return { case: name, status: index === 0 && !failed ? 0 : 2, signal: null, error: null,
         stdoutBytes: stdout.length, stderrBytes: stderr.length, stdoutSha256: sha(stdout), stderrSha256: sha(stderr),
@@ -30,7 +39,7 @@ function fixture({ failed = false, value = 3 } = {}) {
         result: index === 0 && failed ? "failed" : "passed" };
     }) });
   const receipt = {
-    schema: "bantam.contract-cli-station.v1", status: failed ? "failed" : "complete", generation: 3,
+    schema: "bantam.contract-cli-station.v2", status: failed ? "failed" : "complete", generation: 3,
     contract, contractSha256: digest(contract), taskSha256: contract.taskSha256,
     sources: [{ path: "tool.mjs", sha256: sha(SOURCE) }], sourceUnchanged: true,
     spec, specSha256: digest(spec), inputs, inputDigest: sourceDigest,
@@ -98,6 +107,7 @@ test("task, contract, source and all copied-input metadata stay bound", () => {
 test("fixed action regeneration rejects spec, question, command and output substitutions", () => {
   const { contract, receipt, options } = fixture();
   const changes = [
+    r => { r.spec.input.value = false; r.specSha256 = digest(r.spec); },
     r => { r.spec.expected = false; r.specSha256 = digest(r.spec); },
     r => { r.spec.module = "other.mjs"; },
     r => { r.spec.shell = "echo PASS"; },
@@ -168,7 +178,7 @@ test("bounded current-decision context distinguishes measured failure, stale and
   assert.ok(red.text.length <= 1800);
   assert.match(red.text, /fixed real-child CLI check failed/);
   assert.match(red.text, /API-only assertions/);
-  assert.match(red.text, /model-designed input\/expectation/);
+  assert.match(red.text, /measured API return, not a model-computed expected answer/);
   assert.doesNotMatch(red.text, /<\|im_start\|>|<\/s>/);
   assert.equal(cliVerificationPassed(contract, receipt, options), false);
   const stale = cliVerificationDecisionContext(contract, receipt, { generation: 4 });
@@ -226,4 +236,48 @@ test("rendered quote budgets preserve all three cases and executable next-step g
   assert.match(unknown.text, /Next: run the configured project verifier to trigger the controller CLI station/);
   assert.match(unknown.text, /Do not make gratuitous edits merely to force a retry/);
   assert.doesNotMatch(unknown.text, /<\|im_start\|>/);
+});
+
+test("v2 establishes measured API/CLI coherence, not agreement with a model or business correctness", () => {
+  const { contract, receipt, options } = fixture({ value: 3, apiValue: { value: 999 } });
+  assert.equal(Object.hasOwn(receipt.spec, "expected"), false);
+  assert.equal(cliVerificationPassed(contract, receipt, options), true,
+    "the two routes sharing 999 proves coherence only, not the independently required business result");
+  assert.equal(cliVerificationPassed(contract, { ...receipt, schema: "bantam.contract-cli-station.v1" }, options), false);
+  const oracle = structuredClone(receipt); oracle.spec.expected = { value: 999 }; oracle.specSha256 = digest(oracle.spec);
+  assert.equal(cliVerificationPassed(contract, oracle, options), false, "v1 model-oracle field is forbidden");
+  const packet = JSON.parse(receipt.probeEvidence.stages[2].stdout);
+  Object.assign(packet.cases[0], measured("stdout", JSON.stringify({ value: 3 }) + "\n"));
+  assert.equal(validateCliCaseMeasurements(JSON.stringify(packet), { contract, spec: receipt.spec }), false,
+    "CLI matching the input instead of the measured API result is not a coherence pass");
+});
+
+test("reference requires the exact callable and closed FD3 JSON return, not stdout or exit zero alone", () => {
+  const { contract, receipt, options } = fixture();
+  const packet = JSON.parse(receipt.probeEvidence.stages[2].stdout);
+  const changeOutcome = (p, change) => {
+    const outcome = JSON.parse(Buffer.from(p.reference.outcomeBase64, "base64")); change(outcome);
+    Object.assign(p.reference, measured("outcome", JSON.stringify(outcome) + "\n"));
+  };
+  const changes = [
+    p => { p.reference.status = 1; }, p => { p.reference.signal = "SIGKILL"; },
+    p => { p.reference.error = "ETIMEDOUT"; }, p => { p.reference.result = "unavailable"; },
+    p => { Object.assign(p.reference, measured("stdout", "import side effect")); },
+    p => { Object.assign(p.reference, measured("stderr", "API diagnostic")); },
+    p => { p.reference.outcomeSha256 = sha("foreign"); }, p => { p.reference.outcomeBytes++; },
+    p => { p.reference.outcomeBase64 += "="; }, p => { Object.assign(p.reference, measured("outcome", "")); },
+    p => changeOutcome(p, o => { o.module = "other.mjs"; }),
+    p => changeOutcome(p, o => { o.export = "differentExport"; }),
+    p => changeOutcome(p, o => { o.kind = "threw"; }),
+    p => changeOutcome(p, o => { o.kind = "unsupported"; }),
+    p => changeOutcome(p, o => { o.diagnostic = { name: "Error", message: "invalid input", stack: "" }; }),
+    p => changeOutcome(p, o => { o.extra = true; }),
+  ];
+  for (const change of changes) {
+    const copied = structuredClone(packet); change(copied);
+    assert.equal(validateCliCaseMeasurements(JSON.stringify(copied), { contract, spec: receipt.spec }), false, change.toString());
+    const forged = structuredClone(receipt); forged.probeEvidence.stages[2].stdout = JSON.stringify(copied);
+    forged.probeEvidence.stages[2].stdoutDigest = probeDigest(forged.probeEvidence.stages[2].stdout);
+    assert.equal(cliVerificationPassed(contract, forged, options), false);
+  }
 });

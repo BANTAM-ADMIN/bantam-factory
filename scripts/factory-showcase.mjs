@@ -44,7 +44,7 @@ function identity(manifest,arm){
     model:isTiel?'Tiel 35B-A3B · IQ4_XS':'Explicit local variant · inspect private provenance'};
 }
 function seriesTitle(m,index){
-  if(m.schema==='bantam.factory-fights.v1')return 'The original factory comparison';
+  if(m.schema==='bantam.factory-fights.v1')return m.kitId==='factory-2026-09-07'?'Factory workshop comparison':'Factory system comparison';
   const tail=String(m.variantId??'').match(/-(repair|confirmation)([1-9][0-9]{0,3})$/);
   const worker=identity(m,m.arm).label==='BANTAM · Tiel'?'Tiel':'Local worker';
   return tail?`${worker} · ${tail[1]==='repair'?'repair':'confirmation'} ${Number(tail[2])}`:`Local worker · edition ${index+1}`;
@@ -100,7 +100,7 @@ function publicIdentity(row){
 export function publicShowcaseData(privateData){
   return {schema:'bantam.factory-showcase.v1',mode:'public',generatedAt:knownDate(privateData.generatedAt),
     privacy:{redacted:true,rawEvidenceIncluded:false,policy:'Explicit numeric/public-task allowlist; private logs, paths, source, prompts, group names and configuration omitted.'},
-    series:privateData.series.map((s,si)=>({id:`series-${si+1}`,title:s.kind==='comparison'?'The original factory comparison':`Local worker · edition ${si+1}`,
+    series:privateData.series.map((s,si)=>({id:`series-${si+1}`,title:s.kind==='comparison'?'Factory system comparison':`Local worker · edition ${si+1}`,
       kind:s.kind==='comparison'?'comparison':'variant',complete:s.complete===true,startedAt:knownDate(s.startedAt),finishedAt:knownDate(s.finishedAt),
       counts:counts(s.cards.flatMap(c=>c.rows).map(r=>({...r,groupsPassed:N(r.groupsPassed),groupsTotal:N(r.groupsTotal)}))),cards:s.cards.map(c=>{
         if(!Object.hasOwn(CARDS,c.card)||!Number.isSafeInteger(c.repeat)||c.repeat<1)throw Error('invalid public card identity');
@@ -244,11 +244,12 @@ function client(){
     }));
     $('edition-label').textContent=`EDITION ${String(si+1).padStart(2,'0')} / ${s.complete?'RECORDED SERIES':'PARTIAL SERIES'}`;
     const headline=$('headline');headline.replaceChildren(el('span',s.kind==='comparison'?'Same weights.':'One factory.'),el('br'),el('em',s.kind==='comparison'?'Different processes.':'Another worker.'));
-    $('series-subtitle').textContent=s.kind==='comparison'?'Four harnesses on the same local 27B. Native and BANTAM-wrapped Astra alongside them. Three useful tools; one frozen contract for each.':`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
+    const localSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='local').map(r=>r.arm))).size,frontierSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='astra').map(r=>r.arm))).size;
+    $('series-subtitle').textContent=s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same 27B weights. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
     $('hero-score').replaceChildren(document.createTextNode(String(s.counts.pass)),el('small',`/ ${s.counts.observed}`));
     $('hero-score-note').textContent=`${s.counts.groupsMeasured?`${s.counts.groupsPassed}/${s.counts.groupsTotal} independent groups passed across ${s.counts.groupsMeasured} measured attempts.`:'No independent group results recorded.'} ${s.counts.planned-s.counts.observed?`${s.counts.planned-s.counts.observed} planned attempts have no final record.`:'Every recorded outcome remains visible.'}`;
     $('accepted-count').textContent=`${s.counts.accepted}/${s.counts.observed}`;$('completed-count').textContent=`${s.counts.completed}/${s.counts.observed}`;
-    $('series-note').textContent=s.kind==='comparison'?'Exploratory, single-attempt system comparison. Warm cache, native tool and sampling differences. Local / frontier clocks are not a controlled hardware comparison.':'Adaptive qualification, not a causal ablation. Prior repairs, card order and cache state differ. A correct artifact without accepted completion remains OUTPUT_ONLY.';
+    $('series-note').textContent=s.kind==='comparison'?'Exploratory system comparison on already-seen development tasks, not a held-out ranking. Warm cache, native tool and sampling differences. Local / frontier clocks are not a controlled hardware comparison.':'Adaptive qualification, not a causal ablation. Prior repairs, card order and cache state differ. A correct artifact without accepted completion remains OUTPUT_ONLY.';
     $('card-tabs').replaceChildren(...s.cards.map((entry,i)=>{
       const n=entry.rows.filter(r=>r.recorded).length,b=button('',()=>setCard(i),'card-tab'+(i===ci?' selected':''));b.setAttribute('aria-current',i===ci?'true':'false');
       return append(b,el('span',`${entry.kind} / ${entry.number}${entry.repeat>1?' · REPEAT '+entry.repeat:''}`),el('b',entry.title),el('em',`${entry.rows.filter(r=>r.outcome==='PASS').length}/${n} PASS · ${entry.rows.filter(r=>r.accepted).length}/${n} accepted`));

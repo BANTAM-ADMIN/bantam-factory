@@ -41,6 +41,23 @@ function fixture() {
     spotlight:{seriesId:series[1].id,cardId:series[1].cards[0].id},series};
 }
 
+function fourCornerFixture({missing=false}={}) {
+  const original=fixture(),chosen=['codex-astra','hermes','bantam-local-27b','opencode'];
+  const rows=chosen.map(arm=>structuredClone(original.series[0].cards[0].rows.find(row=>row.arm===arm)));
+  const native=rows.find(row=>row.arm==='codex-astra');native.wallMs=1800;
+  const open=rows.find(row=>row.arm==='opencode');
+  Object.assign(open,{outcome:'FAIL',accepted:false,completed:true,groupsPassed:4,hiddenExit:1});
+  if(missing)Object.assign(open,{recorded:false,outcome:'NOT RECORDED',accepted:null,completed:null,
+    wallMs:null,groupsPassed:null,groupsTotal:null,publicExit:null,hiddenExit:null,protectedChanges:null,
+    accounting:{full:metrics(null,null,null,null),complete:null,requests:null,measuredRequests:null},tokenUpdates:[]});
+  const projected=publicShowcaseData({generatedAt:stamp,series:[{kind:'comparison',complete:!missing,
+    startedAt:stamp,finishedAt:missing?null:stamp,cards:[{card:'patch-transaction',repeat:1,rows}]}]});
+  return {...original,comparison:null,spotlight:null,series:projected.series};
+}
+
+const visibleProse=html=>html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
+  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');
+
 function embedded(html) {
   const block = html.match(/<script\b(?=[^>]*\bid=["']launch-data["'])(?=[^>]*\btype=["']application\/json["'])[^>]*>([\s\S]*?)<\/script>/i);
   assert.ok(block, 'public data must be independently inspectable');
@@ -100,6 +117,44 @@ test('public copy scopes selected development history without claiming every exp
   assert.doesNotMatch(prose,/See every recorded attempt|The whole record|No runs hidden/i);
   assert.match(prose,/selected[^.!?]{0,100}(?:history|development|qualification|edition|attempt)/i,
     'the public development-history selection must be explicit');
+});
+
+test('single workshop comparison scopes four actual corners without legacy task, contender or speed claims', () => {
+  const data=fourCornerFixture(),before=structuredClone(data),html=renderLaunchPage(data),svg=renderShareCard(data);
+  assert.deepEqual(data,before,'display order must not rewrite recorded row order');
+  assert.deepEqual(embedded(html),data);
+  const series=data.series[0],card=series.cards[0];
+  assert.equal(series.cards.length,1);assert.equal(card.card,'patch-transaction');
+  assert.deepEqual(card.rows.map(row=>row.arm),['codex-astra','hermes','bantam-local-27b','opencode']);
+  assert.deepEqual(series.counts,{observed:4,planned:4,accepted:3,completed:3,pass:2,
+    groupsMeasured:4,groupsPassed:19,groupsTotal:20});
+  const prose=visibleProse(html),share=visibleProse(svg);
+  assert.match(prose,/1 WORK ORDER\b/);assert.match(prose,/2\/4\s*attempts passed and completed/);
+  assert.match(prose,/Artifacts accepted:\s*3\/4/);
+  assert.match(prose,/3 local configurations/);assert.match(prose,/1 frontier reference/);
+  assert.match(prose,/No held-out-task claim is made/);
+  assert.match(share,/1 work order · 4 systems · 4\/4 attempts recorded/);
+  assert.match(share,/3\/4 artifacts accepted/);
+  for(const label of ['BANTAM · 27B','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);
+  for(const text of [prose,share])assert.doesNotMatch(text,
+    /DeepSeek|BANTAM · Astra|wrapped CLI|receipt reducer|snapshot tool|dependency planner|three (?:tasks|work orders)|six[- ]system|two Astra|frontier work overlapped|CPU\/I\/O contention|\d+(?:\.\d+)?\s*%\s*less|less recorded time|BANTAM finished .*sooner/i);
+  const hermes=embedded(html).series[0].cards[0].rows.find(row=>row.arm==='hermes');
+  assert.deepEqual(hermes.accounting.full,metrics(null,null,null,null));
+  assert.deepEqual(hermes.accounting.subset,metrics(100,8,70,30));
+  assert.equal(hermes.accounting.coverage.inputTokens.complete,false);
+  assert.equal(hermes.completed,false);assert.equal(hermes.accepted,true);
+});
+
+test('an unrecorded fourth corner keeps the planned denominator and unknown counters in the share record', () => {
+  const data=fourCornerFixture({missing:true}),html=renderLaunchPage(data),svg=renderShareCard(data);
+  const series=embedded(html).series[0],missing=series.cards[0].rows.find(row=>row.arm==='opencode');
+  assert.equal(series.complete,false);assert.equal(series.counts.observed,3);assert.equal(series.counts.planned,4);
+  assert.equal(missing.outcome,'NOT RECORDED');assert.equal(missing.wallMs,null);
+  assert.equal(missing.completed,null);assert.equal(missing.accepted,null);assert.deepEqual(missing.tokenUpdates,[]);
+  assert.deepEqual(missing.accounting.full,metrics(null,null,null,null));
+  assert.match(visibleProse(html),/2\/4\s*attempts passed and completed/);
+  assert.match(visibleProse(svg),/3\/4 attempts recorded/);
+  assert.match(visibleProse(svg),/OpenCode\s+NOT RECORDED\s+Unknown/);
 });
 
 // Adapted from the existing showcase CDP helper. Keep the browser process,
@@ -221,5 +276,57 @@ test('actual Chromium verifies mobile/desktop replay, exports, accessibility and
     for(const [name,value] of Object.entries(report))if(!['width','height','reducedMotion'].includes(name))assert.equal(value,true,name+': '+JSON.stringify(report));
     assert.deepEqual(requests.filter(url=>/^https?:/i.test(url)),[],'offline page must not request remote resources');
     assert.deepEqual(exceptions,[]);
+  }
+});
+
+test('actual Chromium keeps a one-work-order four-corner film and its exports scoped to recorded systems', {
+  skip:process.env.BANTAM_LAUNCH_BROWSER_TEST!=='1',timeout:60000,
+},async t=>{
+  const root=fs.mkdtempSync(path.join(os.homedir(),'bantam-four-corner-launch-test-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const data=fourCornerFixture(),expected=['bantam-local-27b','opencode','hermes','codex-astra'];
+  const script=`<script>setTimeout(async()=>{const report={};const expect=(name,value)=>{report[name]=Boolean(value);};
+    try{
+      const get=id=>document.getElementById(id),state=()=>window.__launchState();
+      const wait=async fn=>{for(let i=0;i<160;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('wait expired');};
+      await wait(()=>window.__launchReady===true);
+      const data=JSON.parse(get('launch-data').textContent),rows=data.series[0].cards[0].rows;
+      const lanes=()=>[...document.querySelectorAll('.lane')],meter=(arm,key='inputTokens')=>document.querySelector('.lane[data-arm="'+arm+'"] .token-'+key).textContent;
+      expect('oneTab',get('work-tabs').querySelectorAll('[role="tab"]').length===1&&state().card==='patch-transaction');
+      expect('fourCorners',JSON.stringify(lanes().map(n=>n.dataset.arm))===${JSON.stringify(JSON.stringify(expected))});
+      expect('sourceRowBinding',lanes().every(n=>rows[Number(n.dataset.row)].arm===n.dataset.arm));
+      expect('twoModelFamilies',document.querySelectorAll('.lane-group').length===2&&/3 different harnesses/.test(document.querySelector('.lane-group').textContent));
+      expect('noAbsentSystems',!document.querySelector('.lane[data-arm="deepseek-local-27b"],.lane[data-arm="bantam-codex-astra"]'));
+      expect('noLegacyMethod',!/Three useful Node|six-system series|frontier work overlapped|DeepSeek/.test(get('method').textContent));
+      const partial=document.querySelector('.lane[data-arm="hermes"]');
+      expect('partialNotZero',meter('hermes')==='100'&&meter('hermes','cacheHitTokens')==='70'&&/Measured subset/.test(partial.textContent));
+      expect('outputOnlyNotClean',/OUTPUT_ONLY/.test(partial.textContent)&&/Finish not accepted/.test(partial.textContent));
+      location.hash='card=patch-transaction&t=0&view=replay';
+      await wait(()=>state().mode==='replay'&&state().t===0);
+      expect('allPending',lanes().every(n=>/pending/i.test(n.querySelector('.project').textContent)&&/REPLAYING/.test(n.querySelector('.lane-status').textContent)));
+      expect('allUnknownBeforeFirstResponse',lanes().every(n=>/Unknown|—/i.test(n.querySelector('.token-inputTokens').textContent)));
+      get('timeline').value='1200';get('timeline').dispatchEvent(new Event('input'));
+      expect('savedCounterStep',lanes().every(n=>n.querySelector('.token-inputTokens').textContent==='100'));
+      get('timeline').value='1300';get('timeline').dispatchEvent(new Event('input'));
+      expect('noCounterInterpolation',meter('bantam-local-27b')==='100');
+      get('results').click();
+      const downloads=[],originalURL=URL.createObjectURL;URL.createObjectURL=blob=>{downloads.push(blob);return originalURL(blob);};HTMLAnchorElement.prototype.click=function(){};
+      get('download-data').click();await wait(()=>downloads.length>0);
+      expect('exactFourCornerDownload',JSON.stringify(JSON.parse(await downloads.at(-1).text()))===JSON.stringify(data));
+      get('share-svg').click();await wait(()=>downloads.some(blob=>blob.type.includes('svg')));
+      const svg=await downloads.find(blob=>blob.type.includes('svg')).text();
+      expect('scopedShare',svg.includes('4 systems')&&svg.includes('4/4 attempts recorded')&&!/DeepSeek|BANTAM · Astra/.test(svg));
+      expect('layout',document.documentElement.scrollWidth<=innerWidth);
+      report.width=innerWidth;report.height=innerHeight;
+    }catch(error){report.error=error.stack||String(error);}
+    const result=document.createElement('script');result.id='browser-results';result.type='application/json';result.textContent=JSON.stringify(report);document.body.append(result);
+    document.documentElement.dataset.browserComplete='true';
+  },20);</script>`;
+  const file=path.join(root,'index.html');fs.writeFileSync(file,renderLaunchPage(data).replace('</body>',script+'</body>'));
+  for(const [width,height] of [[1440,1000],[390,900]]){
+    const {report,requests,exceptions}=await browserPage({file,width,height,profile:path.join(root,'profile-'+width),reducedMotion:width===390});
+    assert.equal(report.error,undefined,JSON.stringify(report));assert.equal(report.width,width);assert.equal(report.height,height);
+    for(const [name,value] of Object.entries(report))if(!['width','height'].includes(name))assert.equal(value,true,name+': '+JSON.stringify(report));
+    assert.deepEqual(requests.filter(url=>/^https?:/i.test(url)),[]);assert.deepEqual(exceptions,[]);
   }
 });

@@ -101,7 +101,11 @@ test('explicit qualification selects first variant for both static results and r
   assert.deepEqual(embedded(html),data);
   assert.doesNotMatch(renderShareCard(data,options),/50%|DeepSeek/);
   const defaultHtml=renderLaunchPage(data);
-  assert.match(prose(defaultHtml),/less recorded time/);
+  assert.match(prose(defaultHtml),/Recorded system comparison/);
+  assert.match(prose(defaultHtml),/0\/1\s*attempts passed and completed/);
+  assert.match(prose(defaultHtml),/No winner or aggregate speed claim is inferred/);
+  assert.doesNotMatch(prose(defaultHtml),/less recorded time|50%|DeepSeek/);
+  assert.doesNotMatch(renderShareCard(data),/less recorded time|50%|DeepSeek/);
   assert.deepEqual(replaySelection(defaultHtml),comparison.cards);
 });
 

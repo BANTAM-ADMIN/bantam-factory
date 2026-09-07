@@ -55,10 +55,11 @@ export async function chromiumPage({file,width,height,profile,screenshot=null,in
     if(child.exitCode===null)await new Promise(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},2000);child.once('exit',()=>{clearTimeout(timer);resolve();});});
   }
 }
-function fixture(t,{variant=false,outcome='PASS',missing=false,wire=false,partial=false,hostile='',root:providedRoot=null}={}){
-  const root=providedRoot??temp(t),arm=variant?'bantam-local-tiel35ba3b-iq4-xs-72k-mtp1-confirmation1':'hermes';
-  const dir=path.join(root,'repeat-1/receipt-reducer',arm);
-  const r={card:'receipt-reducer',arm,repeat:1,outcome,pass:outcome==='PASS',candidatePass:true,processCompleted:outcome==='PASS',
+function fixture(t,{variant=false,outcome='PASS',missing=false,wire=false,partial=false,hostile='',root:providedRoot=null,
+  card='receipt-reducer',arm:requestedArm=null}={}){
+  const root=providedRoot??temp(t),arm=requestedArm??(variant?'bantam-local-tiel35ba3b-iq4-xs-72k-mtp1-confirmation1':'hermes');
+  const dir=path.join(root,'repeat-1',card,arm);
+  const r={card,arm,repeat:1,outcome,pass:outcome==='PASS',candidatePass:true,processCompleted:outcome==='PASS',
     startedAt:start,wallMs:10000,publicExit:0,hiddenExit:0,grade:{pass:true,groups:[{name:hostile||'independent group',pass:true}]},tampered:[],
     usage:{source:'local-wire-receipts',requests:partial?2:1,measuredRequests:1,complete:!partial,inputTokens:partial?null:100,
       outputTokens:partial?null:20,cacheHitTokens:partial?null:70,freshInputTokens:partial?null:30},
@@ -71,7 +72,7 @@ function fixture(t,{variant=false,outcome='PASS',missing=false,wire=false,partia
   if(!missing){write(dir,'result.json',r);write(dir,'task.md',hostile||'Public test fixture task');
     write(dir,'run.json',{turns:[{i:0,parsedAction:{a:'read_file',p:'api.js'},observation:hostile||'actual observed source'}]});
     write(dir,'ws/api.js',hostile||'export const value=1;');
-    write(root,'repeat-1/receipt-reducer/events.ndjson',JSON.stringify({arm,t:500,text:hostile||'real controller event'})+'\n');}
+    write(root,`repeat-1/${card}/events.ndjson`,JSON.stringify({arm,t:500,text:hostile||'real controller event'})+'\n');}
   if(wire){const rows=[];
     const add=(index,body,response,finished=true)=>{
       const stem=String(index).padStart(5,'0'),request={index,phase:'request',generation:true,route:'/completion',method:'POST',
@@ -86,6 +87,27 @@ function fixture(t,{variant=false,outcome='PASS',missing=false,wire=false,partia
   }
   return {root,dir,m,r};
 }
+
+function fourCornerFixture(t,{missing=false,root:providedRoot=null}={}){
+  const root=providedRoot??temp(t),arms=['codex-astra','hermes','bantam-local-27b','opencode'];
+  const fixtures=arms.map(arm=>{
+    const f=fixture(t,{root,card:'patch-transaction',arm,wire:arm==='hermes',partial:arm==='hermes',
+      missing:missing&&arm==='opencode',outcome:arm==='hermes'?'OUTPUT_ONLY':arm==='opencode'?'FAIL':'PASS'});
+    f.r.grade={pass:arm!=='opencode',groups:Array.from({length:5},(_,i)=>({name:`public-fixture-group-${i}`,pass:arm!=='opencode'||i<4}))};
+    if(arm==='opencode')Object.assign(f.r,{candidatePass:false,processCompleted:true,hiddenExit:1});
+    if(!(missing&&arm==='opencode'))write(f.dir,'result.json',f.r);
+    return f;
+  });
+  const manifest={...fixtures[0].m,kitId:'factory-2026-09-07',complete:!missing,
+    finishedAt:missing?null:fixtures[0].m.finishedAt,
+    plan:fixtures.map(({r})=>({card:r.card,arm:r.arm,repeat:r.repeat})),
+    results:fixtures.filter(({r})=>!(missing&&r.arm==='opencode')).map(f=>f.r)};
+  write(root,'manifest.json',manifest);
+  return {root,manifest,arms};
+}
+
+const visibleProse=html=>html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
+  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');
 
 test('separate local variant editions retain true identity and acceptance/completion distinction',t=>{
   const a=fixture(t),b=fixture(t,{variant:true,outcome:'OUTPUT_ONLY'}),before=fs.readFileSync(path.join(b.root,'manifest.json'));
@@ -115,6 +137,42 @@ test('public allowlisted system enum retains genuine same-model comparisons only
   assert.deepEqual(sameModelObservation(rows),{ratio:2,savedWallMs:10000});
   assert.equal(sameModelObservation([{...rows[0],outcome:'OUTPUT_ONLY'},rows[1]]),null);
   assert.equal(sameModelObservation([rows[0],{...rows[1],arm:'codex-astra'}]),null);
+});
+
+test('one workshop card with four actual systems remains a separate accurately counted comparison',t=>{
+  const f=fourCornerFixture(t),before=fs.readFileSync(path.join(f.root,'manifest.json'));
+  const built=buildShowcase({roots:[f.root]}),projected=publicShowcaseData(built.data),series=projected.series[0];
+  assert.equal(series.kind,'comparison');assert.equal(series.cards.length,1);
+  assert.equal(series.cards[0].card,'patch-transaction');
+  assert.deepEqual(series.cards[0].rows.map(row=>row.arm),f.arms,'preserve recorded order, not the six-arm template');
+  assert.deepEqual(series.counts,{observed:4,planned:4,accepted:3,completed:3,pass:2,
+    groupsMeasured:4,groupsPassed:19,groupsTotal:20});
+  assert.equal(built.payloads.length,4);assert.equal(series.cards[0].rows.filter(row=>row.family==='local').length,3);
+  assert.equal(series.cards[0].rows.filter(row=>row.family==='astra').length,1);
+  assert.equal(sameModelObservation(series.cards[0].rows),null,'no DeepSeek reference exists; do not infer a speed win');
+  const partial=series.cards[0].rows.find(row=>row.arm==='hermes');
+  assert.deepEqual(partial.accounting.full,{inputTokens:null,outputTokens:null,cacheHitTokens:null,freshInputTokens:null});
+  assert.deepEqual(partial.accounting.subset,{inputTokens:100,outputTokens:20,cacheHitTokens:70,freshInputTokens:30});
+  assert.deepEqual(partial.accounting.coverage.inputTokens,{measuredRequests:1,totalRequests:2,complete:false,missingRequestIndices:[2]});
+  assert.equal(partial.outcome,'OUTPUT_ONLY');assert.equal(partial.accepted,true);assert.equal(partial.completed,false);
+  const html=renderShowcase({data:projected,payloads:[]}),prose=visibleProse(html);
+  assert.doesNotMatch(prose,/DeepSeek|BANTAM · Astra|six[- ]system|three tasks|frontier work overlapped|CPU\/I\/O contention|BANTAM finished .*sooner/i);
+  assert.ok(!html.includes('type="application/octet-stream"'));
+  assert.ok(!html.includes(f.root));assert.ok(!html.includes('/private/model'));
+  assert.ok(before.equals(fs.readFileSync(path.join(f.root,'manifest.json'))));
+});
+
+test('a missing fourth workshop result is not padded with a legacy arm or zero measurements',t=>{
+  const f=fourCornerFixture(t,{missing:true}),{data}=buildShowcase({roots:[f.root],mode:'public'}),s=data.series[0];
+  assert.equal(s.complete,false);assert.equal(s.counts.planned,4);assert.equal(s.counts.observed,3);
+  assert.equal(s.counts.pass,2);assert.equal(s.counts.accepted,3);assert.equal(s.counts.completed,2);
+  assert.equal(s.counts.groupsMeasured,3);assert.equal(s.counts.groupsTotal,15);
+  const missing=s.cards[0].rows.find(row=>row.arm==='opencode');
+  assert.equal(missing.recorded,false);assert.equal(missing.outcome,'NOT RECORDED');
+  for(const field of ['wallMs','accepted','completed','groupsPassed','groupsTotal'])assert.equal(missing[field],null,field);
+  assert.deepEqual(missing.tokenUpdates,[]);
+  assert.deepEqual(missing.accounting.full,{inputTokens:null,outputTokens:null,cacheHitTokens:null,freshInputTokens:null});
+  assert.deepEqual(s.cards[0].rows.map(row=>row.arm),f.arms);
 });
 
 test('saved wire subsets expose four counters and coverage without filling unknown full totals',t=>{

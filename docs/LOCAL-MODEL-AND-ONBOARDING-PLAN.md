@@ -1,6 +1,17 @@
 # BANTAM: recommended local model and simple onboarding
 
-Date: 2026-09-07. Status: proposed product and implementation plan.
+Date: 2026-09-07. Status: original proposal, retained as a design record.
+
+Implementation update: the user selected DavidAU as the optional 24GB bundle.
+Consent-first setup, existing-server discovery/manual connection, the three
+DavidAU context/vision profiles, and an explicit experimental offloaded Tiel
+profile are implemented. See [current setup](FIRST-RUN-SETUP.md) and
+[comparison-adapter boundaries](BRING-YOUR-OWN-COMPARISONS.md). The original
+Unsloth-first proposal below is not the current default; Unsloth remains untested.
+The [fresh matched comparison](DAVIDAU-27B-COMPARISON-2026-09-07.md) recorded
+DavidAU 2/3 passes versus the older control's 3/3. The default is a product choice,
+not a claim that DavidAU won on reliability. Hardware qualification limitations
+are documented in the current setup guide.
 
 This document does not change a download default, install a model, publish the
 private repository, or certify an untested configuration. Model listings were

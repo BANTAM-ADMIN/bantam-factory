@@ -146,6 +146,18 @@ or **72K / GPU vision**. The latter two require a machine-specific fit check;
 Existing model files, launch configurations, and serving processes are not
 replaced. See [First-run setup](docs/FIRST-RUN-SETUP.md) for requirements and limits.
 
+For smaller GPUs, setup also offers **experimental Tiel 35B-A3B IQ4_XS**:
+32K context, text-only, CPU expert offload, approximately 8GB NVIDIA VRAM and
+32GB system RAM admission checks. This is explicitly opt-in and has **not**
+been physically qualified on 8–16GB GPUs. Its 18.63GB weights are not smaller
+than DavidAU's; actual speed depends on offloading and CPU memory bandwidth.
+Managed startup requires a tiny constrained inference, not just a health reply.
+
+Rival harnesses are optional, not installed by setup. See
+[compare with your existing tools](docs/BRING-YOUR-OWN-COMPARISONS.md) for current
+adapters and the planned comparison wizard; existing model APIs and full agent
+APIs are different interfaces.
+
 Then, from any project directory:
 
 ```bash

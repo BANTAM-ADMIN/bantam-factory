@@ -83,6 +83,13 @@ guarantees. MTP is embedded; do not install the legacy add-on sidecar for this
 model. No existing model/server is replaced. See the first-run guide for runtime,
 disk-space and platform limits. Bring-your-own servers remain the primary path.
 
+With a smaller GPU, menu item 5 offers experimental **Tiel 35B-A3B** with CPU
+expert offload, 32K context and no vision projector. It checks for roughly 8GB
+NVIDIA VRAM and 32GB system RAM, asks before downloading, and runs a startup
+inference before saving the connection. Low-VRAM performance and full-context
+fit are not yet physically qualified. These checks are not a hardware guarantee;
+see [the experimental profile](FIRST-RUN-SETUP.md#experimental-tiel-for-cpugpu-offload).
+
 ## Your first task
 
 ```bash

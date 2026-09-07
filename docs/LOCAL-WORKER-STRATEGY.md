@@ -6,6 +6,11 @@ hardware recommendation or reliability certification. Exact configurations,
 failed attempts and accounting remain in the
 [Tiel qualification record](TIEL-QUALIFICATION-2026-09-06.md).
 
+September 7 implementation update: setup now includes a separately selected
+experimental 32K CPU-expert-offloaded Tiel installer profile. It is not the
+measured 72K GPU profile below, and does not promote Tiel to the default or
+certify lower-VRAM performance. See [first-run setup](FIRST-RUN-SETUP.md).
+
 ## Why this matters to BANTAM
 
 BANTAM's product is the production process, not one indispensable set of

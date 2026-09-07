@@ -24,6 +24,9 @@ deliberate selections and bypass the implicit first-run chooser.
    `codex login status`; see the [official CLI reference](https://developers.openai.com/codex/cli/reference/#codex-login).
 3. **Easy mode:** explicitly install the stock DavidAU profile described below.
    It is an optional convenient configuration, not a requirement to use BANTAM.
+4. **Experimental lower-VRAM option (menu item 5):** Tiel 35B-A3B with CPU
+   expert offload. This is separately selected, never an automatic downgrade.
+   See the experimental profile below before choosing it.
 
 Discovery checks only `/v1/models` on loopback ports 8085, 8080, 8000, 1234,
 5000, 18086 and 11434. Metadata discovery does not guarantee grammar support;
@@ -65,10 +68,10 @@ profiles, not promises that any image size or context occupancy fits every
 24GB system. Fit depends on runtime build, other GPU workloads, and input size.
 Higher-context/GPU-vision profiles have not yet been physically qualified here.
 
-The managed installer currently supports **Linux with a detected NVIDIA GPU
-of approximately 24GB or more**. Other platforms and CPU/smaller-GPU/offloaded
-setups use the existing-server or Codex paths. It does not secretly select a
-smaller model or change a user's offloading settings.
+The managed DavidAU installer currently supports **Linux with a detected NVIDIA
+GPU of approximately 24GB or more**. Smaller GPUs have the explicit experimental
+Tiel option below. Other platforms and CPU-only setups use an existing server.
+It does not secretly select a different model or change a user's offloading settings.
 
 Weights are 17,537,488,416 bytes; the matching projector is 931,145,920 bytes.
 Both are checked against pinned SHA-256 digests before publication under
@@ -88,6 +91,12 @@ overwriting the user's registry. Explicit `BANTAM_MODELS` / `--models` still
 take precedence. Modified managed configurations are not silently overwritten.
 Port 8085 must be free to start a managed server. Setup refuses an occupied
 port rather than killing or claiming ownership of someone else's server.
+After health succeeds, a tiny grammar-constrained inference must return the
+expected response before the new connection is saved. Startup timing and any
+server-provided token timings are appended to the profile log. A missing timing
+field remains missing, never an invented zero. Failure stops only the server
+started by that launcher. This smoke check is not full-context fit or coding
+quality qualification.
 
 For explicit unattended installation (downloads **and** launch authorized):
 
@@ -109,7 +118,49 @@ The DavidAU stack has both successful and failed recorded adaptive attempts.
 Choosing it as easy mode does not imply universal reliability or reproduction
 of historical fight-card results; consult the comparison report.
 
+## Experimental Tiel for CPU/GPU offload
+
+Choose menu item 5, or explicitly authorize installation, launch and inference:
+
+```bash
+bantam setup --stock-profile tiel-32k-cpu-experts --yes
+```
+
+This profile uses the [pinned Tiel artifact](https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP/blob/199cff20cda0575344172543809cb0f990bfbceb/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf),
+revision `199cff20cda0575344172543809cb0f990bfbceb`, 18,629,540,384 bytes,
+SHA-256 `bf12bfacb04f587be6eecd578a5dc3d06861797d3a4cf81b1fad3d72b29dbbce`.
+It downloads to `~/.bantam/stock/tiel-35b-a3b/` using the same integrity checks
+and overwrite protection as DavidAU. Allow roughly 21GB disk plus runtime space.
+
+Configuration: 32,768 context tokens, one slot, Q8 K/V, text-only (no projector),
+all main and draft MoE experts on CPU, remaining supported layers on GPU,
+embedded MTP limit 1, batch 512 / ubatch 128, eight context checkpoints and
+1,024 MiB server cache-RAM allowance. The smaller context/buffers are a
+conservative starting configuration, **not the historical 72K fully GPU-offloaded
+Tiel benchmark configuration**. Required placement flags are checked before
+downloading weights and again before launch.
+
+Admission requires Linux, the first detected NVIDIA GPU having roughly 8GB
+VRAM or more, and roughly 32GB total system RAM (thresholds 7,680 MiB VRAM and
+30 GiB RAM allow reported-capacity differences). This is not a free-memory
+check or a guarantee: other programs, runtime buffers, OS overhead and context
+occupancy can still prevent a run. Multi-GPU selection and automatic memory
+tuning are not implemented; advanced users should supply their own server.
+
+This profile is an **experimental candidate for 8–16GB machines, not physically
+qualified on those machines**. Its weights are larger than DavidAU's 17.54GB
+model. Sparse active computation may help, but CPU memory bandwidth and
+offloading can erase its decode advantage. The recorded 4090 speed does not
+establish low-VRAM speed or equal task quality. See
+[Tiel qualification](TIEL-QUALIFICATION-2026-09-06.md).
+
+Promotion requires actual low-VRAM fit tests at substantial context occupancy,
+repeated frozen coding cards with acceptance receipts and independent grades,
+and complete token/cache/wall-time accounting. Failed attempts must remain
+visible. CPU-only and multi-user Tiel configurations are not qualified here.
+
 Rival harnesses are not installed by this onboarding flow. Local BANTAM cards
 remain useful without Hermes, OpenCode, or DeepSeek Harness. Any future optional
 comparison pack needs separate installation consent; published reference runs
 must remain distinguishable from tests executed on this user's machine.
+See [bring-your-own comparison design and current boundaries](BRING-YOUR-OWN-COMPARISONS.md).

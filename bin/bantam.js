@@ -6120,7 +6120,7 @@ bantam models add <name> --script /path/to/launch.sh [--endpoint URL] [--vision]
                                   register a llama.cpp model so the startup picker can launch it (run bare for prompts)
 bantam models remove <name>       unregister a model    ·    bantam models path   print the registry file
 bantam setup                       guided: existing server, Codex, or opt-in DavidAU 24GB stock
-bantam setup --stock-profile 72k-cpu-vision|92k-cpu-vision|72k-gpu-vision [--yes]
+bantam setup --stock-profile 72k-cpu-vision|92k-cpu-vision|72k-gpu-vision|tiel-32k-cpu-experts [--yes]
                                   managed Linux/NVIDIA profile; --yes authorizes download and launch
 bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding) with sizes — nothing optional is bundled
 bantam supervise [film.json] [--json]

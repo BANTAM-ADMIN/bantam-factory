@@ -38,9 +38,11 @@ export async function chooseFirstRun({ask,out,discover=discoverModelServers,hasC
  out(hasCodex?'      Codex CLI detected; uses your signed-in account and sends context to OpenAI.\n':'      Codex CLI not detected; installation/sign-in help is available. No automatic cloud use.\n');
  out('  [3] Easy mode: install stock DavidAU 27B (24GB NVIDIA GPU; confirmation required)\n');
  if(advanced)out('  [4] Advanced model menu\n');
+ out('  [5] Experimental lower-VRAM Tiel 35B-A3B (CPU expert offload; about 32GB RAM)\n');
  out('  [q / Enter] Cancel — no installs or changes\n');
  const answer=(await ask('Select: ')).trim();
  if(answer==='3')return {kind:'install-stock'};
+ if(answer==='5')return {kind:'install-stock',profile:'tiel-32k-cpu-experts'};
  if(answer==='2')return {kind:hasCodex?'choose-codex':'codex-help'};
  if(answer==='4'&&advanced)return {kind:'advanced'};
  if(answer!=='1')return null;

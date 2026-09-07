@@ -5,6 +5,8 @@ import {spawnSync} from 'node:child_process';
 import {chooseFirstRun,normalizeServerUrl,discoverModelServers,saveConnection,loadConnection,codexAvailable,confirmCodexConsent} from '../src/first-run.js';
 import {setupWizard} from '../src/setup-wizard.js';
 import {stockPlan,stockServerArgs,STOCK_PROFILES,STOCK_REVISION,installStockFiles,registerStockProfiles} from '../src/stock-model.js';
+import {TIEL_REVISION,stockRuntimeFlags} from '../src/stock-model.js';
+import {checkStockReadiness} from '../src/stock-readiness.js';
 const home=t=>{const p=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-setup-test-'));t.after(()=>fs.rmSync(p,{recursive:true,force:true}));return p;};
 test('first screen prioritizes existing models; cancel never installs or probes',async()=>{
  let output='',calls=0;const result=await chooseFirstRun({ask:async()=>'',out:s=>output+=s,hasCodex:false,discover:async()=>{calls++;return [];}});
@@ -116,4 +118,48 @@ test('connection wizard uses real HTTP transport and persists only after constra
  assert.equal(result.kind,'api');assert.equal(loadConnection(h).apiUrl,apiUrl);
  const inference=requests.find(r=>r.url==='/v1/completions');assert.ok(inference);assert.equal(inference.body.model,'bring-your-own');
  assert.ok(JSON.stringify(inference.body).includes('OKBANTAM'));assert.ok(requests.every(r=>r.url.startsWith('/v1/')));
+});
+test('Tiel is explicit, pinned, text-only and offloads main and draft experts',async t=>{
+ const choice=await chooseFirstRun({ask:async()=>'5',out:()=>{},hasCodex:false,discover:async()=>{throw Error('unexpected discovery');}});
+ assert.deepEqual(choice,{kind:'install-stock',profile:'tiel-32k-cpu-experts'});
+ const h=home(t),plan=stockPlan({home:h,profile:choice.profile}),args=stockServerArgs(plan);
+ assert.equal(plan.files.length,1);assert.equal(plan.bytes,18629540384);
+ assert.ok(plan.files[0].url.includes(TIEL_REVISION));assert.equal(plan.files[0].sha256.length,64);
+ assert.ok(args.includes('--cpu-moe'));assert.ok(args.includes('--spec-draft-cpu-moe'));
+ assert.equal(args.includes('--mmproj'),false);assert.equal(args[args.indexOf('--ctx-size')+1],'32768');
+ assert.ok(stockRuntimeFlags(plan).includes('--cpu-moe'));
+ registerStockProfiles({home:h,server:'/runtime'});
+ const entries=registerStockProfiles({home:h,server:'/runtime',family:'tiel'});
+ assert.equal(entries.length,4);const tiel=entries.find(e=>e.name===choice.profile);
+ assert.equal(tiel.vision,false);assert.equal(tiel.priority,10);
+ assert.equal(spawnSync('bash',['-n',tiel.script]).status,0);
+ assert.equal(registerStockProfiles({home:h,server:'/runtime',family:'tiel'}).length,4);
+});
+test('experimental Tiel checks GPU/RAM, requires consent, and does not install DavidAU profiles',async t=>{
+ let installs=0,output='';const h=home(t);
+ const options={home:h,profile:'tiel-32k-cpu-experts',platform:'linux',gpuMemory:()=>8192,systemMemory:()=>32*1024**3,
+  ask:async()=>'',out:s=>output+=s,findLlama:()=>'/runtime',checkRuntime:(_server,plan)=>assert.ok(stockRuntimeFlags(plan).includes('--spec-draft-cpu-moe')),
+  install:async plan=>{installs++;assert.equal(plan.files.length,1);}};
+ assert.equal(await setupWizard(options),null);assert.equal(installs,0);
+ assert.match(output,/NOT been benchmarked/);assert.match(output,/larger than DavidAU/);
+ await assert.rejects(setupWizard({...options,yes:true,gpuMemory:()=>4096}),/8GB/);
+ await assert.rejects(setupWizard({...options,yes:true,systemMemory:()=>16*1024**3}),/32GB/);
+ assert.equal(installs,0);
+ const result=await setupWizard({...options,yes:true});assert.equal(installs,1);
+ assert.equal(result.name,'tiel-32k-cpu-experts');assert.equal(result.model.vision,false);
+ assert.equal(JSON.parse(fs.readFileSync(path.join(h,'.bantam','managed-models.json'))).length,1);
+ assert.equal(loadConnection(h),null,'download/registration is not proof of a working server');
+});
+test('stock readiness requires inference, records measured timing, never claims qualification',async()=>{
+ const fetchImpl=async(url,options)=>{
+  assert.equal(url,'http://127.0.0.1:8085/completion');assert.equal(options.redirect,'error');
+  const body=JSON.parse(options.body);assert.equal(body.grammar,'root ::= "OKBANTAM"');
+  assert.equal(body.n_predict,32);
+  return {ok:true,json:async()=>({content:'OKBANTAM',timings:{prompt_n:7,predicted_n:4}})};
+ };
+ const result=await checkStockReadiness({fetchImpl});assert.equal(result.passed,true);
+ assert.equal(result.timings.prompt_n,7);assert.equal(result.fullContextQualified,false);assert.equal(result.taskQualityQualified,false);
+ await assert.rejects(checkStockReadiness({fetchImpl:async()=>({ok:false,status:503})}),/HTTP 503/);
+ await assert.rejects(checkStockReadiness({fetchImpl:async()=>({ok:true,json:async()=>({content:'wrong'})})}),/did not match/);
+ await assert.rejects(checkStockReadiness({fetchImpl:async()=>{throw Error('timeout');}}),/timeout/);
 });

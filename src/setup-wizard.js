@@ -1,7 +1,7 @@
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {execFileSync,spawn} from 'node:child_process';
 import {chooseFirstRun,saveConnection} from './first-run.js';
-import {STOCK_PROFILES,STOCK_REPO,stockPlan,installStockFiles,registerStockProfiles} from './stock-model.js';
+import {STOCK_PROFILES,STOCK_REPO,TIEL_REPO,isTielProfile,stockRuntimeFlags,stockPlan,installStockFiles,registerStockProfiles} from './stock-model.js';
 import {findLlamaServer,llamaInstallRoot} from './llama-install.js';
 import {formatBytes,renderProgress} from './provision.js';
 import {ModelClient} from './model.js';
@@ -24,9 +24,9 @@ export function nvidiaMemory(){
 }
 export async function setupWizard({ask,out,hidden,advanced=false,profile=null,yes=false,home=os.homedir(),
  choose=chooseFirstRun,Client=ModelClient,install=installStockFiles,installLlama,findLlama=findInstalledLlama,
- gpuMemory=nvidiaMemory,platform=process.platform,fetchImpl=fetch,
- checkRuntime=server=>{const help=execFileSync(server,['--help'],{encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});
-  for(const flag of ['--spec-type','--ctx-checkpoints','--no-mmproj-offload'])if(!help.includes(flag))throw Error(`Runtime lacks ${flag}; choose a compatible llama-server before downloading weights.`);} }={}){
+ gpuMemory=nvidiaMemory,systemMemory=os.totalmem,platform=process.platform,fetchImpl=fetch,
+ checkRuntime=(server,plan)=>{const help=execFileSync(server,['--help'],{encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});
+  for(const flag of stockRuntimeFlags(plan))if(!help.includes(flag))throw Error(`Runtime lacks ${flag}; choose a compatible llama-server before downloading weights.`);} }={}){
  const selection=profile?{kind:'install-stock'}:await choose({ask,out,advanced});
  if(!selection||selection.kind==='advanced'||selection.kind==='choose-codex')return selection;
  if(selection.kind==='codex-help'){
@@ -63,17 +63,23 @@ export async function setupWizard({ask,out,hidden,advanced=false,profile=null,ye
   return {kind:'api',config};
  }
  if(selection.kind!=='install-stock')return null;
+ profile??=selection.profile;
  if(platform!=='linux')throw Error('Managed stock installation currently supports Linux. Use an existing server or Codex on this platform.');
- const mem=gpuMemory();if(!mem||mem<23500)throw Error('Easy mode requires a detected NVIDIA GPU with about 24GB VRAM. Your own offloaded model/server is still supported.');
+ const tiel=isTielProfile(profile),mem=gpuMemory();
+ if(tiel){
+  if(!mem||mem<7680||systemMemory()<30*1024**3)throw Error('Experimental Tiel requires a detected NVIDIA GPU with about 8GB VRAM and about 32GB system RAM. These are admission checks, not fit guarantees. Use an existing server for other setups.');
+ }else if(!mem||mem<23500)throw Error('DavidAU easy mode requires a detected NVIDIA GPU with about 24GB VRAM. Choose experimental Tiel for CPU expert offload, or connect your own model/server.');
  if(!profile){Object.entries(STOCK_PROFILES).forEach(([id,p],i)=>out(`  [${i+1}] ${p.label}${p.recommended?' (recommended)':''}${p.warning?' — '+p.warning:''}\n`));
   const n=(await ask('Profile [1]: '))||'1';profile=Object.keys(STOCK_PROFILES)[Number(n)-1];if(!profile)throw Error('Invalid stock profile');}
  const plan=stockPlan({home,profile});
- out(`\nStock: DavidAU community-tuned 27B Q4_K_S; embedded MTP\n${plan.label}\nDownload: ${formatBytes(plan.bytes)} (model + vision projector)\nLocation: ${plan.root}\nSource/terms: https://huggingface.co/${STOCK_REPO}\n72K CPU vision is the measured baseline; other profiles require a fit check.\n`);
+ out(tiel
+  ? `\nExperimental Tiel 35B-A3B IQ4_XS; embedded MTP1; all expert weights on CPU.\n${plan.label}\n${plan.warning}\nDownload: ${formatBytes(plan.bytes)} (text-only model, no vision projector)\nLocation: ${plan.root}\nSource/terms: https://huggingface.co/${TIEL_REPO}\nThe model weights are larger than DavidAU's. Low active parameter count is not low resident memory.\nThis offloaded profile has NOT been benchmarked on an 8–16GB GPU. No speed or full-context fit promise.\n`
+  : `\nStock: DavidAU community-tuned 27B Q4_K_S; embedded MTP\n${plan.label}\nDownload: ${formatBytes(plan.bytes)} (model + vision projector)\nLocation: ${plan.root}\nSource/terms: https://huggingface.co/${STOCK_REPO}\n72K CPU vision is the measured baseline; other profiles require a fit check.\n`);
  let server=findLlama();out(server?`Use installed llama-server: ${server}\n`:'llama-server is missing. BANTAM will offer its prebuilt runtime installer too.\n');
- if(!yes&&!/^y(es)?$/i.test((await ask('Download/verify these artifacts, register profiles, and start the selected profile? [y/N] ')).trim()))return null;
+ if(!yes&&!/^y(es)?$/i.test((await ask('Download/verify artifacts, register profiles, start this profile and run a tiny inference test (no project data)? [y/N] ')).trim()))return null;
  if(!server){if(!installLlama)throw Error('No runtime installer available');await installLlama();server=findLlama();if(!server)throw Error('llama-server installation did not produce a usable binary');}
- checkRuntime(server);
+ checkRuntime(server,plan);
  let last=0;await install(plan,{consent:true,onProgress:p=>{if(Date.now()-last>1000){last=Date.now();out(renderProgress(p)+'\n');}}});
- const entries=registerStockProfiles({home,server});
- return {kind:'local',name:'davidau-'+profile,model:entries.find(e=>e.name==='davidau-'+profile)};
+ const entries=registerStockProfiles({home,server,family:tiel?'tiel':'davidau'}),name=tiel?profile:'davidau-'+profile;
+ return {kind:'local',name,model:entries.find(e=>e.name===name)};
 }

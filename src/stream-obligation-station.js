@@ -69,7 +69,11 @@ export function deriveLineStreamFixture(task,sources){
   const spec={module:named[0].path,export:exported,validText:`data: ${data}\r\n\r\ndata: ${marker}\n\n`,
     expectedJson:JSON.stringify([{event:'message',data}]),terminalSuffix:': jig\n'};
   if(!parseStreamSpec(JSON.stringify(spec),sources))return null;
-  return {spec,authority:'public-line-stream-adapter-v1',taskSha256:sha(task),
+  const framingClauses=[/Other CR characters remain data/i,/Strip\s+the one CR immediately preceding LF/i,
+    /A blank line dispatches the current frame only if it has at least one data\s+field/i,
+    /`push` returns only frames completed during that call/i];
+  const lineFraming=framingClauses.every(re=>re.test(task))?{marker,clauses:framingClauses.map(re=>task.match(re)[0])}:null;
+  return {spec,authority:'public-line-stream-adapter-v1',taskSha256:sha(task),lineFraming,
     clauses:[...clauses.map(re=>task.match(re)[0]),task.match(/joined data value of a dispatched frame is exactly\s+`([^`\r\n]{1,80})`,\s*mark\s+the stream terminated and emit no frame for it/i)[0]]};
 }
 const REVIEW_SCHEMA={type:'object',additionalProperties:false,required:['valid','reason'],properties:{valid:{type:'boolean'},reason:{type:'string',maxLength:500}}};
@@ -85,7 +89,7 @@ const CHILD = String.raw`
 import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';
 const write=fs.writeSync.bind(fs),stringify=JSON.stringify.bind(JSON);
-const {spec:s,obligation:id,bom}=JSON.parse(process.env.BANTAM_STREAM_CASE);
+const {spec:s,obligation:id,bom,lineFraming}=JSON.parse(process.env.BANTAM_STREAM_CASE);
 let calls=0,phase='infrastructure',caseContext='module import',cli=null;const mark=x=>write(2,x+'\n');
 try{
  const m=await import(pathToFileURL(path.join(process.cwd(),'subject',s.module)));
@@ -98,6 +102,19 @@ try{
  const decode=(chunks,label='whole valid fixture')=>{caseContext=label+'; chunksHex='+JSON.stringify(chunks.map(b=>Buffer.from(b).toString('hex')));const d=make(),out=[];for(const b of chunks)out.push(...push(d,b));assert.deepEqual(finish(d),[]);assert.deepEqual(out,expected);};
  phase='positive-control';decode([bytes]);phase='checking'; // Do not attribute a bad positive fixture to five separate obligations.
  if(id==='chunk-partitions'){
+  if(lineFraming){
+   const terminal='data: '+lineFraming.marker+'\n\n';
+   const check=(label,chunks,outputs)=>{const d=make();for(let i=0;i<chunks.length;i++){
+    caseContext=label+'; push index='+i+'; chunks='+stringify(chunks)+'; expected per-push='+stringify(outputs);
+    assert.deepEqual(push(d,Buffer.from(chunks[i])),outputs[i]);
+   }assert.deepEqual(finish(d),[]);};
+   const frame=data=>[{event:'message',data}];
+   check('embedded CR is data',['data: jig-é\rinside\n\n'+terminal],[frame('jig-é\rinside')]);
+   check('split CRLF between data fields',['data: jig-é\r','\ndata: second\r','\n','\r','\n',terminal],
+    [[],[],[],[],frame('jig-é\nsecond'),[]]);
+   check('embedded CR at chunk edge',['data: jig-é\r','inside\n','\n',terminal],
+    [[],[],frame('jig-é\rinside'),[]]);
+  }
   for(const b of [bytes,...(bom?[Buffer.concat([Buffer.from([239,187,191]),bytes])]:[])]){
    const prefix=b===bytes?'without BOM':'with leading BOM';
    for(let i=0;i<=b.length;i++)decode([b.subarray(0,i),b.subarray(i)],prefix+'; two-part split='+i+'/'+b.length);
@@ -133,10 +150,11 @@ try{
 }catch(e){write(3,stringify({status:phase==='checking'?'failed':'unavailable',caseContext:caseContext.slice(0,900),...(cli?{cli}:{}),message:String(e?.message??e).slice(0,1000),calls})+'\n');}
 `;
 const quote=s=>`'${s.replace(/'/g,`'"'"'`)}'`;
-export function buildStreamProbe(spec,obligation,inputs,{bom=false}={}) {
+export function buildStreamProbe(spec,obligation,inputs,{bom=false,lineFraming=null}={}) {
   if(!parseStreamSpec(JSON.stringify(spec),inputs.map(x=>({path:x.p})))
     ||!['chunk-partitions','strict-utf8','terminal-state','rejection-state','canonical-cli'].includes(obligation))throw Error('invalid stream probe');
-  const payload=Buffer.from(JSON.stringify({spec,obligation,bom})).toString('base64');
+  if(lineFraming&&(!/^[^\r\n]{1,80}$/.test(lineFraming.marker)||typeof lineFraming.marker!=='string'))throw Error('invalid framing marker');
+  const payload=Buffer.from(JSON.stringify({spec,obligation,bom,lineFraming})).toString('base64');
   const code=`import {spawnSync} from 'node:child_process';
 const r=spawnSync(process.execPath,['--input-type=module','-e',${JSON.stringify(CHILD)}],{env:{...process.env,BANTAM_STREAM_CASE:Buffer.from('${payload}','base64').toString()},timeout:4000,maxBuffer:262144,stdio:['ignore','pipe','pipe','pipe']});
 let x;try{x=JSON.parse(r.output[3]?.toString()??'');}catch{}
@@ -193,7 +211,7 @@ export async function runStreamObligationStation({workspace,model,task,sources,g
     for(const row of receipt.obligations){
       signal?.throwIfAborted();
       if(digest(readBoundInputs(fs.realpathSync(workspace),sources))!==receipt.inputDigest)throw Error('source changed');
-      const action=buildStreamProbe(spec,row.id,inputs,{bom:/leading UTF-8 BOM is ignored/.test(task)});
+      const action=buildStreamProbe(spec,row.id,inputs,{bom:/leading UTF-8 BOM is ignored/.test(task),lineFraming:derived?.lineFraming});
       const result=await runExperiment(workspace,action,{signal,dockerImage,processRunner,timeoutMs:10000});
       row.probeEvidence=result?.probeEvidence;
       const projection=validateAssertionProbeReceipt(row.probeEvidence,{action,inputs});
@@ -217,7 +235,8 @@ export function streamObligationDecision(task,receipt,generation){
     && parseStreamSpec(JSON.stringify(receipt.spec),receipt.inputs.map(x=>({path:x.p})))
     && receipt.obligations?.length===ids.length && ids.every((id,i)=>{
       const row=receipt.obligations[i];if(row?.id!==id)return false;
-      const action=buildStreamProbe(receipt.spec,id,receipt.inputs,{bom:/leading UTF-8 BOM is ignored/.test(task)});
+      const action=buildStreamProbe(receipt.spec,id,receipt.inputs,{bom:/leading UTF-8 BOM is ignored/.test(task),
+        lineFraming:deriveLineStreamFixture(task,receipt.inputs.map(x=>({path:x.p})))?.lineFraming});
       return row.probeSpecDigest===digest(action)
         && validateAssertionProbeReceipt(row.probeEvidence,{action,inputs:receipt.inputs})?.status==='assertion_passed';
     });}catch{return false;}})();

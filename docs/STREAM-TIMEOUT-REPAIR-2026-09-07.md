@@ -204,3 +204,43 @@ These fixes are regression-tested development progress, not qualification of
 the DavidAU stack or a clean launch showcase. The outstanding requirement is
 to preserve non-delimiter carriage returns as public-contract data and verify
 that behavior independently; the existing public-contract jigs miss it.
+
+### CR framing coverage repair
+
+The archived worker prompts retained "Other CR characters remain data" in
+all 18 turns. The first rewrite nevertheless scanned for either CR or LF.
+Neither its added tests nor the original single-data-line jig distinguished
+that implementation from LF-only framing. This was a missed contract witness,
+not evidence of context-window truncation.
+
+The public-clause adapter now enables additional witnesses only when the task
+explicitly states embedded-CR preservation, stripping one CR before LF,
+blank-line dispatch, and per-push frame delivery. The witnesses check embedded
+CR within a value, embedded CR at a chunk edge, and CRLF split across pushes
+between multiple data fields and at dispatch. Each push is checked against its
+own expected frames, rather than comparing only the final aggregate. Failures
+include the actual chunk schedule, failing push index, and expected outputs.
+The initial task guidance explains LF-only scanning for this explicit rule.
+
+Regression mutations cover CR truncation, bare-CR splitting, and premature
+completion of a pending CR. A separate correct implementation passes. A real
+sandboxed replay of the unchanged `stream-obligations5` source now fails the
+chunk/framing station with the embedded-CR witness while the other four
+dimensions pass. No benchmark answer, public test, or grader was edited.
+
+### Verified follow-up: 5/5
+
+`stream-obligations6` independently **passed all five grading groups** in
+169.707 seconds, with an accepted completion receipt and zero operator
+interventions. Source and kit seals remained unchanged throughout the run.
+This includes the previously failing field-parsing/embedded-CR group.
+
+Usage is complete for all 21 requests: 243,478 input tokens, 9,838 output
+tokens, 221,269 cached input tokens, and 22,209 fresh input tokens (90.88%
+prefix reuse). The full test suite finished before this model run started.
+Validation of the harness: 4,064 repository tests passed, zero failed, 76
+skipped; 13 focused tests and the live Docker integration test passed.
+
+This is one successful adaptive rerun, not a reliability estimate or proof
+that every task/model is launch-qualified. Earlier failed attempts remain
+recorded. No additional qualification run was started after this result.

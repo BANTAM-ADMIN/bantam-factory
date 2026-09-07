@@ -107,3 +107,23 @@ test('public-clause adapter constructs termination and expectations without a mo
  assert.equal(calls,5);assert.equal(r.authority,'public-line-stream-adapter-v1');assert.deepEqual(r.spec,derived.spec);
  assert.ok(r.obligations.every(x=>x.status==='unverified'),'derived fixture alone supplies no execution proof');
 });
+test('line framing witnesses distinguish embedded CR, split CRLF and per-push dispatch',t=>{
+ const publicTask=LINE_TASK+' Other CR characters remain data. Strip the one CR immediately preceding LF. A blank line dispatches the current frame only if it has at least one data field. `push` returns only frames completed during that call.';
+ const derived=deriveLineStreamFixture(publicTask,[{path:'api.mjs'}]);assert.ok(derived.lineFraming);
+ assert.equal(deriveLineStreamFixture(LINE_TASK,[{path:'api.mjs'}]).lineFraming,null,'do not infer missing protocol rules');
+ const correct=String.raw`export function createDecoder(){let text='',data=[],ended=false;const u=new TextDecoder('utf-8',{fatal:true});return {
+ push(b){text+=u.decode(b,{stream:true});const out=[];while(text.includes('\n')){const at=text.indexOf('\n');let line=text.slice(0,at);text=text.slice(at+1);if(line.endsWith('\r'))line=line.slice(0,-1);
+ if(!line){if(data.length){const value=data.join('\n');data=[];if(value==='[STOP]')ended=true;else out.push({event:'message',data:value});}}else if(line.startsWith('data: '))data.push(line.slice(6));}return out;},
+ finish(){u.decode();if(!ended||text||data.length)throw Error('unfinished');return [];}};}`;
+ const mutants=[
+  correct.replace("if(line.endsWith('\\r'))line=line.slice(0,-1);","line=line.replace(/\\r.*/, '');"),
+  correct.replace("text+=u.decode(b,{stream:true});","text+=u.decode(b,{stream:true}).replace(/\\r(?!\\n)/g,'\\n');"),
+  correct.replace("text+=u.decode(b,{stream:true});","text+=u.decode(b,{stream:true});if(text.endsWith('\\r'))text+='\\n';"),
+ ];
+ for(const [index,code]of [correct,...mutants].entries()){
+  const root=fixture(t,code),action=buildStreamProbe(derived.spec,'chunk-partitions',[{p:'api.mjs'}],{bom:true,lineFraming:derived.lineFraming});
+  const r=spawnSync('/bin/sh',['-c',action.check],{cwd:root,encoding:'utf8',timeout:7000});
+  assert.equal(r.status,index===0?0:1,r.stdout+r.stderr);
+  if(index){const outcome=JSON.parse(r.stdout);assert.match(outcome.caseContext,/embedded CR|split CRLF/);assert.match(outcome.caseContext,/push index=|chunks=/);}
+ }
+});

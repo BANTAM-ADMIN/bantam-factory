@@ -1,8 +1,16 @@
 # DavidAU NEO-CODER MTP versus the current BANTAM 27B
 
-Status: initial matched comparison complete; latest adaptive stream rerun is 4/5, not launch-qualified, 2026-09-07.
+Status: initial matched comparison complete; latest adaptive stream rerun passed 5/5, 2026-09-07. One adaptive pass does not establish launch-wide reliability.
 
-Latest follow-up: `stream-obligations5` finished in 202.206 seconds with an
+Latest follow-up: `stream-obligations6` independently passed all five groups
+in 169.707 seconds with accepted completion and no operator intervention.
+All 21 requests have complete usage: 243,478 input, 9,838 output, 221,269
+cached input, and 22,209 fresh input tokens (90.88% prefix reuse). Source/kit
+seals matched. The CR-framing coverage fix and full harness suite were tested
+before this rerun. This remains adaptive development evidence, not a new
+matched-model comparison or repeated qualification result.
+
+Previous follow-up: `stream-obligations5` finished in 202.206 seconds with an
 accepted receipt but failed independent field-parsing coverage (embedded CR
 data was truncated). The other four groups, including CLI canonical encoding,
 passed. Complete usage: 436,442 input, 8,966 output, 397,299 cached input,

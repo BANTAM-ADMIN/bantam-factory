@@ -271,7 +271,7 @@ export async function runLocalVariant(input) {
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  if(process.argv.includes('--help'))process.stdout.write('node scripts/factory-local-variant.mjs --output ABS_DIR --label "Tiel35BA3B IQ4_XS" --variant-id tiel35ba3b-iq4-xs [--kit factory-2026-09-06|factory-2026-09-07] [--endpoint http://127.0.0.1:8085] [--model-id EXACT_SERVER_ID] [--model-file ABS_GGUF] [--cards COMMA_SEPARATED_KIT_IDS] [--timeout-seconds 600] [--verify-workspace-read-only] [--contract-assertion-station]\n');
+  if(process.argv.includes('--help'))process.stdout.write('node scripts/factory-local-variant.mjs --output ABS_DIR --label "Tiel35BA3B IQ4_XS" --variant-id tiel35ba3b-iq4-xs [--kit factory-2026-09-06|factory-2026-09-07] [--endpoint http://127.0.0.1:8085] [--model-id EXACT_SERVER_ID] [--model-file ABS_GGUF] [--cards COMMA_SEPARATED_KIT_IDS] [--timeout-seconds 600] [--verify-workspace-read-only] [--contract-assertion-station] [--terminal-closure]\n');
   else Promise.resolve().then(()=>runLocalVariant(parseVariantArgs(process.argv.slice(2))))
     .then(result=>{process.stdout.write(`Evidence: ${result.results.length}/${result.plan.length} recorded in ${process.argv[process.argv.indexOf('--output')+1]}\n`);if(!result.complete||result.results.some(row=>!row.pass))process.exitCode=1;})
     .catch(error=>{process.stderr.write(`${error.stack}\n`);process.exitCode=1;});

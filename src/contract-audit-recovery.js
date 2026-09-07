@@ -109,7 +109,9 @@ function inlineNodeAssertion(source) {
   let tree;
   try { tree = parse(source, { ecmaVersion: "latest", sourceType: "module", allowAwaitOutsideFunction: true }); }
   catch { return false; }
-  const bindings = new Set(), calls = [];
+  const bindings = new Set(), awaitedNamespaces = new Set(), calls = [];
+  const synchronousMethods = new Set(["ok", "equal", "notEqual", "strictEqual", "notStrictEqual", "deepEqual", "notDeepEqual",
+    "deepStrictEqual", "notDeepStrictEqual", "throws", "doesNotThrow", "ifError", "match", "doesNotMatch", "fail"]);
   let nodes = 0, incomplete = false;
   const walk = (node, depth = 0) => {
     if (!node || typeof node !== "object") return;
@@ -120,6 +122,12 @@ function inlineNodeAssertion(source) {
     if (node.type === "VariableDeclarator" && node.id?.type === "Identifier"
         && node.init?.type === "CallExpression" && node.init.callee?.name === "require"
         && /^(?:node:)?assert(?:\/strict)?$/.test(node.init.arguments[0]?.value ?? "")) bindings.add(node.id.name);
+    // Await the literal builtin import before binding its namespace. A Promise,
+    // computed module name, or a string mentioning assert is not that binding.
+    if (node.type === "VariableDeclarator" && node.id?.type === "Identifier"
+        && node.init?.type === "AwaitExpression" && node.init.argument?.type === "ImportExpression"
+        && node.init.argument.source?.type === "Literal"
+        && /^(?:node:)?assert(?:\/strict)?$/.test(node.init.argument.source.value ?? "")) awaitedNamespaces.add(node.id.name);
     if (node.type === "CallExpression") calls.push(node.callee);
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) value.forEach(child => walk(child, depth + 1));
@@ -128,7 +136,9 @@ function inlineNodeAssertion(source) {
   };
   walk(tree);
   return !incomplete && calls.some(callee => callee?.type === "Identifier" ? bindings.has(callee.name)
-    : callee?.type === "MemberExpression" && bindings.has(callee.object?.name));
+    : callee?.type === "MemberExpression" && (bindings.has(callee.object?.name)
+      || (awaitedNamespaces.has(callee.object?.name) && synchronousMethods.has(callee.computed
+        ? callee.property?.type === "Literal" ? callee.property.value : null : callee.property?.name))));
 }
 
 export function isFocusedAuditCommand(command, configured = null) {

@@ -19,35 +19,11 @@ generation: use the matching adapter and inspect the startup constraint check.
 
 ## Current factory fight cards
 
-The new **[factory workshop](docs/fights/workshop-2026-09-07/public/index.html)**
-adds three newly authored build/extend/repair work orders: context packets, atomic
-patch planning, and streaming-response framing. This is a BANTAM-only Tiel
-qualification with its own [method and results](docs/fights/workshop-2026-09-07/README.md),
-not a rerun or replacement of the historical comparison. These stress cards
-retain failures and unfinished work; they are an engineering report, not a
-clean-sweep launch claim.
-
-Open the **[public launch fight card](docs/fights/launch/public/index.html)**:
-three build/change/repair cards, six systems, all 18 comparison attempts retained,
-plus a separate latest Tiel qualification. It includes recorded replay,
-shareable image/data exports and selected earlier local-attempt history.
-BANTAM and DeepSeek Harness both completed 3/3 using the same local 27B;
-BANTAM took 12.1 minutes total versus 22.7 minutes. These are single-attempt,
-recorded-configuration results, not a universal ranking or an out-of-box promise.
-
-The [public-package guide](docs/fights/launch/README.md) identifies the exact
-directory safe to stage for public hosting. The older
-[full-evidence Arena](docs/fights/factory-2026-09-06/fight-cards.html) remains a
-private, non-redacted archive; do not publish the repository around the card.
-
-The [full results](docs/FRESH-FACTORY-RESULTS-2026-09-06.md) also cover the six
-native Sol/Terra follow-ups, incomplete runs, unknown token totals and measured
-frontier advantages. The [private evidence package](docs/fights/factory-2026-09-06/README.md)
-contains the replay, machine-readable index and hash-verifiable receipts.
-It is **not privacy-redacted for public posting**. Read the
-[launch plan](docs/BANTAM-LAUNCH-PLAN.md) for the video storyboard, sharing checks
-and the proposed Workbench integration; this release does not implement that
-new Workbench.
+Old generated cards and their private evidence have been archived outside the
+repository. We will publish fresh, privacy-reviewed cards rather than ship
+workstation transcripts. See the [archive and publication policy](docs/fights/README.md)
+and [comparison guide](docs/BRING-YOUR-OWN-COMPARISONS.md). Historical measurements
+below describe earlier configurations, not a currently shipped showcase.
 
 ## A faster local-worker path: 35B-A3B
 
@@ -75,8 +51,7 @@ packaged historical Arena.
 The following board describes earlier builds and configurations, not the
 current factory series above.
 
-Open [`docs/fights/fight-night.html`](docs/fights/fight-night.html) — a fully
-self-contained replayable record of **35 cards, 297 corners**, where a local
+The privately archived fight-night page recorded of **35 cards, 297 corners**, where a local
 27B in this harness fights the same tasks as codex CLI, Claude Code CLI
 (sonnet/opus), and the same 27B weights in rival harnesses (hermes, opencode).
 Every card carries the full seven-corner roster. Twenty-five are bouts against
@@ -239,6 +214,5 @@ sign-off — see `CONTRIBUTING.md`. The BANTAM name is reserved.
 
 ## Status
 
-Pre-release. APIs and station names may still move. The benchmark record in
-`docs/fights/` is real and regenerable, but treat the whole thing as a
-fast-moving workshop, not a stable platform — that's what launch day is for.
+Pre-release. APIs and station names may still move. Historical benchmark
+artifacts are privately archived; new public cards require privacy review.

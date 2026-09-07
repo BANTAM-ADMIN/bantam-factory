@@ -5,3 +5,7 @@ runs/
 .DS_Store
 __pycache__/
 *.pyc
+
+# Raw/historical fight evidence is private; public packages require review.
+/docs/fights/*
+!/docs/fights/README.md

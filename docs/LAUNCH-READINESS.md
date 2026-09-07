@@ -3,6 +3,12 @@
 Updated September 7, 2026. The launch objective remains open. A passing test
 suite is necessary, not proof of a smooth installation on an unfamiliar PC.
 
+Privacy release blocker: old generated fight-card outputs have been moved to
+a verified private local archive outside the working tree. They remain in Git
+history. Keep this repository private pending the full secret/personal-data
+audit and an explicitly approved history-cleanup or clean-public-repository
+process. New public cards require review; see the [archive policy](fights/README.md).
+
 | Requirement | Current evidence | Remaining qualification/work |
 |---|---|---|
 | Existing llama.cpp first | Guided discovery/manual URL, consent, saved connection, real HTTP adapter regression tests | Fresh-machine exercise against multiple runtime versions; remote recorded-card support |

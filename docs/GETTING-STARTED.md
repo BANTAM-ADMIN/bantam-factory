@@ -26,11 +26,10 @@ You bring the engine. BANTAM is the rest of the car.
 - **Local operation.** A local model keeps inference on your machine. Hosted
   models and external image tools send their inputs to that provider. Docker
   shell network access is off by default.
-- **Receipts.** Open `docs/fights/fight-night.html` for the replayable
-  benchmark: this harness + a tuned Qwen 3.8 27B in `extension` context mode
-  against other harnesses and cloud agents, misses included. Those weights and
-  that mode differ from the stock model and `rebuild` default installed today;
-  see the [configuration disclosure](../README.md#receipts-not-benchmarks).
+- **Receipts.** Generate local comparisons with the
+  [comparison guide](BRING-YOUR-OWN-COMPARISONS.md). Old replay packages are
+  privately archived; new public cards require a privacy review. See the
+  [archive policy](fights/README.md).
 
 Use Linux, or Linux inside WSL2 with Docker available. You need Node 20+ and
 the toolchain and dependencies for your project. Native Windows is unsupported;

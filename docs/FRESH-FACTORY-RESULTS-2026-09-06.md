@@ -1,5 +1,8 @@
 # Fresh factory fight results — September 6, 2026
 
+> Referenced historical fight-card packages are privately archived outside this repository.
+> Their links now lead to the archive policy, not the old evidence.
+
 The revised main series completed all 18 planned attempts; the separately
 requested native Sol/Terra follow-up completed all six. BANTAM with the local
 27B and DeepSeek Harness with the same weights both finished 3/3 correctly.
@@ -260,10 +263,10 @@ or universal semantic completeness.
 
 Raw evidence remains in ignored private local storage. Paths below are relative
 to the repository. For retention after a private clone, the six-run sidecar also
-has a [private evidence package](fights/frontier-2026-09-06/README.md), including
-its [unchanged manifest](fights/frontier-2026-09-06/manifest.json),
-[511-member SHA-256 index](fights/frontier-2026-09-06/evidence-index.json) and
-[compressed source/session/receipt archive](fights/frontier-2026-09-06/evidence.tar.gz).
+has a [private evidence package](fights/README.md), including
+its [unchanged manifest](fights/README.md),
+[511-member SHA-256 index](fights/README.md) and
+[compressed source/session/receipt archive](fights/README.md).
 It preserves the sidecar schema rather than merging six follow-up observations
 into the 18-run main series. It is private, **not redacted**, and must not be
 mistaken for a publication-safe bundle. The original evidence locations are:
@@ -290,8 +293,8 @@ their correctness auditable.
 
 ## Private release-candidate verification
 
-The [completed Arena](fights/factory-2026-09-06/fight-cards.html) and
-[main evidence package](fights/factory-2026-09-06/README.md) now preserve all
+The [completed Arena](fights/README.md) and
+[main evidence package](fights/README.md) now preserve all
 18 main rows after a private clone. The archive contains 857 allowlisted files;
 extraction into a fresh directory reproduced every indexed byte count and
 SHA-256. The six-run sidecar archive independently reproduced all 511 members.

@@ -47,7 +47,7 @@ function sameConfiguredExecution(actual, configured) {
 // `cd EXACT_WORKSPACE && DIRECT` has the direct child's status, but only if the
 // controller's actual cwd and complete execution receipt bind that workspace.
 // No relative paths, substitutions, setup programs, extra operators or masks.
-function workspacePrefixedCommand(command, workspace, cwd) {
+export function workspacePrefixedCommand(command, workspace, cwd) {
   if (typeof workspace !== "string" || !path.posix.isAbsolute(workspace)
       || path.posix.normalize(workspace) !== workspace || cwd !== workspace
       || typeof command !== "string" || !/^cd[ \t]+/.test(command)) return null;

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {currentConfiguredFailure,verificationFailureContext} from '../src/verification-failure-context.js';
+import {verificationEvidence,verificationReceipt,shellExecutionReceipt} from '../src/verification-evidence.js';
 const options={generation:2,configuredCommand:'npm test',workspace:'/tmp/work'};
 const proof=(status='fail',changes={})=>({schema:1,source:'automatic',command:'npm test',executedCommand:'npm test',configuredCommand:'npm test',
   statusCommand:'npm test',statusScope:'execution',generation:2,cwd:'/tmp/work',exitCode:status==='fail'?1:0,status,
@@ -84,4 +85,80 @@ test('a complete structural fact is prioritized over optional test names without
   assert.ok(context.text.indexOf('Current source fact:')<context.text.indexOf('Failing case:'));
   assert.match(context.text,/not an oracle or permission to finish\.$/);
   assert.ok(!context.text.includes('x'.repeat(100)));
+});
+
+function realShell(command,{status='fail',workspace='/tmp/work',generation=2,configuredCommand='npm test'}={}){
+  const execution={command,executedCommand:command,exitCode:status==='fail'?1:0,cwd:workspace,
+    workspaceReadOnly:false,sandbox:'docker:alpine:3',pipefail:true,scratchDirectory:null,timedOut:false,interrupted:false,
+    bufferExceeded:false,error:null,blocked:false,
+    stdout:`TAP version 13\n${status==='fail'?'not ok 1 - public contract\n  error: broken\n':'ok 1 - public contract\n'}# tests 1\n# pass ${status==='fail'?0:1}\n# fail ${status==='fail'?1:0}\n`,stderr:''};
+  return {verificationEvidence:verificationReceipt(verificationEvidence({execution,command,configuredCommand,generation,source:'shell'})),
+    shellExecution:shellExecutionReceipt(execution,{generation})};
+}
+
+test('real exact-workspace cd receipt with stderr merge, null configured alias and newline carries current failure',()=>{
+  const command='cd /tmp/work && npm test 2>&1\n',turn=realShell(command);
+  assert.equal(turn.verificationEvidence.configuredCommand,null,'this is the real recorder shape');
+  assert.equal(turn.verificationEvidence.command,command.trim());assert.equal(turn.shellExecution.command,command);
+  assert.notEqual(turn.verificationEvidence.outputSha256,turn.shellExecution.outputSha256,'recorder raw formats intentionally differ');
+  const before=JSON.stringify(turn),failure=currentConfiguredFailure([turn],options);
+  assert.equal(failure?.command,command);assert.equal(failure?.turn,0);assert.equal(failure?.counts.failed,1);
+  assert.equal(JSON.stringify(turn),before);
+  assert.equal(currentConfiguredFailure([turn,realShell(command,{status:'pass'})],options),null);
+  const unrelated=realShell('node --check app.js',{status:'pass'});
+  assert.equal(currentConfiguredFailure([turn,unrelated,{reasoning:'tests are green'}],options)?.turn,0);
+});
+
+test('exact quoted workspace and optional cd separator reuse the existing narrow recognizer',()=>{
+  for(const command of ['cd /tmp/work && npm test','cd -- /tmp/work && npm test 2>&1\n']){
+    assert.equal(currentConfiguredFailure([realShell(command)],options)?.exitCode,1,command);
+  }
+  const workspace='/tmp/work space';
+  for(const command of ["cd '/tmp/work space' && npm test 2>&1\n",'cd -- "/tmp/work space" && npm test']){
+    assert.equal(currentConfiguredFailure([realShell(command,{workspace})],{...options,workspace})?.exitCode,1,command);
+  }
+});
+
+test('other cwd, subdirectory, setup, redirect and status-masking compounds cannot start or retire current failure',()=>{
+  const good=realShell('cd /tmp/work && npm test 2>&1\n');
+  const refused=[
+    'cd /tmp/other && npm test 2>&1','cd /tmp/work/sub && npm test 2>&1','cd . && npm test',
+    'cd /tmp/work/../work && npm test','cd /tmp/work && npm test -- --filter=other',
+    'cd /tmp/work && npm test 2>/dev/null','cd /tmp/work && npm test > /tmp/result',
+    'cd /tmp/work && npm test < fixture','cd /tmp/work && npm test 2>&1 | cat',
+    'cd /tmp/work && npm test; echo 0','cd /tmp/work && npm test 2>&1 && true',
+    'echo setup && cd /tmp/work && npm test','cd /tmp/work && npm test || true',
+    'cd /tmp/work && npm test &','cd /tmp/work && npm test\ntrue',
+    'cd "$TASK_ROOT" && npm test','cd /tmp/work && npm "test 2>&1',
+    "cd '/tmp/work && npm test 2>&1",'cd "/tmp/work && npm test 2>&1',
+    "cd /tmp/work && npm 'test 2>&1",'cd /tmp/work && npm test 2>&1"',
+    "cd /tmp/work && npm 'test 2>&1'",'cd /tmp/work && npm test "2>&1"',
+    'cd /tmp/work && npm test\\ 2>&1',
+  ];
+  for(const command of refused){
+    assert.equal(currentConfiguredFailure([realShell(command)],options),null,command);
+    assert.equal(currentConfiguredFailure([good,realShell(command,{status:'pass'})],options)?.turn,0,command);
+  }
+  for(const mutate of [
+    r=>{r.verificationEvidence.cwd=r.shellExecution.cwd='/tmp/elsewhere';},
+    r=>{r.verificationEvidence.configuredCommand='other';},
+    r=>{r.verificationEvidence.command='npm test';},
+    r=>{r.shellExecution.executedCommand='npm test';},
+    r=>{r.verificationEvidence.source='automatic';},
+    r=>{r.verificationEvidence.statusCommand='npm test';},
+    r=>{r.verificationEvidence.timedOut=true;},
+  ]){
+    const turn=structuredClone(good);mutate(turn);assert.equal(currentConfiguredFailure([turn],options),null);
+  }
+});
+
+test('ordered workspace-prefixed receipts preserve controller order and reject forged aliases',()=>{
+  const failed=realShell('cd /tmp/work && npm test 2>&1\n');
+  const passed=realShell('cd /tmp/work && npm test 2>&1\n',{status:'pass'});
+  const make=entries=>({...entries.at(-1),verificationReceipts:{schema:'bantam.verification-receipts.v1',
+    authority:'controller-execution-order',turn:0,entries:entries.map((r,sequence)=>({...r,sequence}))}});
+  assert.equal(currentConfiguredFailure([make([failed,passed])],options),null);
+  assert.equal(currentConfiguredFailure([make([passed,failed])],options)?.exitCode,1);
+  const forged=make([failed]);forged.verificationEvidence={...forged.verificationEvidence,counts:{passed:99,failed:1,total:100}};
+  assert.equal(currentConfiguredFailure([forged],options),null);
 });

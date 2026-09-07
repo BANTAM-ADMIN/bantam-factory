@@ -23,21 +23,22 @@ test('current typed failure suppresses a newer freeform checkpoint, not its raw 
   assert.equal(JSON.stringify(state),original);
 });
 
-test('actual extension keeps current red and complete source facts through log/read turns, then retires on real configured PASS',async t=>{
+for(const workspacePrefix of [false,true])test(`actual ${workspacePrefix?'exact-workspace cd':'direct'} extension keeps current red and complete source facts through log/read turns, then retires on real configured PASS`,async t=>{
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-configured-failure-'));
   t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
   fs.mkdirSync(path.join(workspace,'src'));fs.mkdirSync(path.join(workspace,'test'));
   fs.writeFileSync(path.join(workspace,'package.json'),JSON.stringify({type:'module',scripts:{test:'node --test test/public.test.js'}}));
   fs.writeFileSync(path.join(workspace,'src/items.js'),'// Implement the public transformation here.\n');
   fs.writeFileSync(path.join(workspace,'test/public.test.js'),"import test from 'node:test'; import assert from 'node:assert/strict'; import {packItems} from '../src/items.js'; test('actual public operand',()=>assert.deepEqual(packItems([{text:'ok'}]),[{frame:'OK',bytes:2}]));\n");
+  const configuredShell=workspacePrefix?`cd ${workspace} && npm test 2>&1\n`:'npm test';
   const actions=[
     {a:'write_file',p:'src/items.js',content:BAD},
-    {a:'shell',c:'npm test'},
+    {a:'shell',c:configuredShell},
     {a:'read_file',p:'src/items.js',start:2,limit:6},
     {a:'shell',c:'node --check src/items.js'},
     {a:'read_file',p:'src/items.js',start:3,limit:5},
     {a:'write_file',p:'src/items.js',content:GOOD},
-    {a:'shell',c:'npm test'},
+    {a:'shell',c:configuredShell},
     {a:'read_file',p:'src/items.js',start:1,limit:8},
     {a:'done',summary:'Implemented and verified the public transformation.'},
   ];
@@ -53,16 +54,19 @@ test('actual extension keeps current red and complete source facts through log/r
       actionPrompts.push(prompt);assert.ok(cursor<actions.length,'scripted model is bounded; no live model calls');
       return {content:JSON.stringify(actions[cursor++]),tokens:1,stoppedEos:true};
     }};
+  const live=process.env.BANTAM_LIVE_SANDBOX_TEST==='1';
   const result=await runAgent({workspace,model,
     task:'Implement src/items.js packItems(items). For each input object with text, return a new object with uppercase frame and its UTF-8 bytes. Do not mutate inputs. Run npm test.',
     maxTurns:actions.length,maxInvalidPerTurn:0,terminalClosureTurns:0,
     promptTrajectory:'extension',extensionBareHistory:true,thinkMode:'always',useGrammar:true,
-    interactive:false,grounding:false,shellSandbox:'host',verificationScript:'npm test',
-    verificationWorkspaceReadOnly:false,completionAudit:false,stateAudit:'off',contractStateAudit:'off',
+    interactive:false,grounding:false,shellSandbox:live?'docker':'host',verificationScript:'npm test',
+    verificationWorkspaceReadOnly:live,completionAudit:false,stateAudit:'off',contractStateAudit:'off',
     contractAssertionStation:'off',diagnoseStuckTests:false,testFocus:false,regressionGuard:false,
     progressAwareness:false,preGate:false,autoVerifyBlindEdits:0,autoVerifyProbes:0,autoVerifyStaleTurns:0,
   });
   assert.equal(cursor,actions.length);assert.equal(result.turns[1].verificationEvidence.status,'fail');
+  assert.equal(result.turns[1].verificationEvidence.configuredCommand,workspacePrefix?null:'npm test',
+    'actual recorder binds the direct command, but leaves the merged workspace-prefixed alias null');
   assert.equal(result.turns[3].verificationEvidence.status,'pass','unrelated syntax command really ran green');
   assert.equal(result.turns[6].verificationEvidence.status,'pass',result.turns.slice(5,7).map(t=>t.observation).join('\n'));
   assert.equal(result.reachedDone,true,result.turns.at(-1)?.observation);
@@ -72,7 +76,8 @@ test('actual extension keeps current red and complete source facts through log/r
   for(const i of [2,3,4,5]){
     const current=latestWorkflow(thoughtPrompts[i]);
     assert.match(current,/^\[verification workflow: current decision\]\nEXECUTION FAILURE:/);
-    assert.match(current,/Recorded command: "npm test"/);
+    assert.ok(current.includes(JSON.stringify(configuredShell.replace(/[\x00-\x1f\x7f]/g,' '))),
+      'the exact actual command remains visible, including its recognized workspace prefix');
     assert.ok(current.includes(fact),'entire source distinction and caveat must survive delivery');
     assert.doesNotMatch(current,/HYPOTHESIS_SENTINEL|\[working-checkpoint/);
     assert.equal(result.turns[i-1].verificationWorkflow.phase,'failure');

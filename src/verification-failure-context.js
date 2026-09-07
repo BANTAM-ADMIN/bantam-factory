@@ -1,5 +1,6 @@
 import {hasShellControlOutsideQuotes,splitShellWords} from './shell-lex.js';
 import {canonicalEncode} from './factory/fact-fabric.js';
+import {workspacePrefixedCommand} from './contract-audit-recovery.js';
 
 const HASH=/^[a-f0-9]{64}$/;
 const SOURCES=new Set(['shell','automatic','scoped','landing','completion']);
@@ -22,6 +23,30 @@ function configuredExecution(actual,configured){
   const timeout=/^--test-timeout=([1-9]\d*)$/.exec(a[2]??'');
   return Boolean(timeout&&Number(timeout[1])>=5000&&Number(timeout[1])<=60000
     &&a.filter((_,i)=>i!==2).every((v,i)=>v===b[i]));
+}
+// Advisory recognition only: no shell rewriting or proof promotion. Reuse the
+// acceptance module's existing exact-workspace cd shape, after recognizing only
+// terminal whitespace and a literal stderr-to-stdout merge. Neither changes the
+// command's status. Required setup, extra commands, masks and file redirects are
+// deliberately not normalized.
+function shellVerifierCommand(value,workspace,cwd){
+  if(!command(value))return null;
+  let text=value.trim(),quote=null;
+  if(/[\0\r\n$`]/.test(text))return null;
+  const merge=/[ \t]+2>&1$/.exec(text);
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(ch==='\\'&&quote!=="'"){i++;continue;}
+    if(quote){if(ch===quote)quote=null;continue;}
+    if(ch==="'"||ch==='"'){quote=ch;continue;}
+    if(merge&&i===merge.index){
+      const backslashes=/\\+$/.exec(text.slice(0,i))?.[0].length??0;
+      if(backslashes%2)return null;
+      text=text.slice(0,i).trimEnd();break;
+    }
+  }
+  if(quote)return null;
+  return words(text)?text:workspacePrefixedCommand(text,workspace,cwd);
 }
 function entries(turn,index){
   if(!record(turn)||turn.controllerStop||turn.shellScopeRollback?.violations?.length)return [];
@@ -47,18 +72,24 @@ function counts(value,status){
 function measured(entry,{generation,configuredCommand,workspace}){
   const p=entry.verificationEvidence,s=entry.shellExecution;
   if(!record(p)||p.schema!==1||!SOURCES.has(p.source)||!clean(p)||!HASH.test(p.outputSha256??'')
-    ||p.generation!==generation||p.cwd!==workspace||p.configuredCommand!==configuredCommand
+    ||p.generation!==generation||p.cwd!==workspace
     ||!command(p.command)||!command(p.executedCommand)||p.statusScope!=='execution'||p.statusCommand!==p.executedCommand
-    ||!configuredExecution(p.executedCommand,configuredCommand)
     ||!integer(p.exitCode)||p.exitCode>255||!['pass','fail'].includes(p.status)
     ||(p.status==='fail'?p.exitCode===0:p.exitCode!==0))return null;
   if(p.source==='shell'&&!s)return null;
   if(s!=null){
     if(!record(s)||!clean(s)||!HASH.test(s.outputSha256??'')
-      ||['command','executedCommand','generation','exitCode','cwd','workspaceReadOnly','sandbox']
+      ||!command(s.command)||p.command.trim()!==s.command.trim()
+      ||['executedCommand','generation','exitCode','cwd','workspaceReadOnly','sandbox']
         .some(k=>(p[k]??null)!==(s[k]??null)))return null;
   }
-  if(p.source!=='shell'&&!same(p.command,configuredCommand))return null;
+  if(p.source==='shell'){
+    const actual=shellVerifierCommand(p.executedCommand,workspace,s.cwd);
+    const requested=shellVerifierCommand(p.command,workspace,s.cwd);
+    if((p.configuredCommand!=null&&p.configuredCommand!==configuredCommand)
+      ||!configuredExecution(actual,configuredCommand)||!configuredExecution(requested,configuredCommand))return null;
+  }else if(p.configuredCommand!==configuredCommand||!same(p.command,configuredCommand)
+    ||!configuredExecution(p.executedCommand,configuredCommand))return null;
   const observedCounts=counts(p.counts,p.status);
   if(observedCounts===false||(observedCounts&&p.countsScope!=='single-execution'))return null;
   return {status:p.status,command:p.executedCommand,generation,exitCode:p.exitCode,counts:observedCounts,

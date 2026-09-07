@@ -1,5 +1,8 @@
 # RepoBrief: GPT-6 Astra and local 27B project cards
 
+> Privacy note: workstation paths and connection examples below are placeholders,
+> not the original operator settings. Historical measurements are unchanged.
+
 This is the original comparison. Subsequent harness changes and reruns are
 recorded separately in [Context delivery fixes](CONTEXT-DELIVERY-FIXES-2026-09-06.md).
 
@@ -161,14 +164,14 @@ linked fixes report; unrelated work, including `bench/repro/`, remains untouched
 ## Application handoff
 
 The completed BANTAM–Astra application is at
-`/home/operator/Desktop/PROJECTAI/testcode/repobrief`. Its application, package
+`/path/to/repobrief`. Its application, package
 and supplied tests are byte-identical to the passing card-3 candidate; the
 operator added only its handoff README. It requires Node 20+ and Git, with no
 dependencies to install. A read-only status invocation against the real BANTAM
 working tree also succeeded.
 
 ```sh
-cd /home/operator/Desktop/PROJECTAI/testcode/repobrief
+cd /path/to/repobrief
 node bin/repobrief.js status --repo /path/to/project --json
 node bin/repobrief.js snapshot --repo /path/to/project --name handoff
 node bin/repobrief.js verify --repo /path/to/project --label tests -- npm test

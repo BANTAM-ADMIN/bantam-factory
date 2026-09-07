@@ -89,7 +89,8 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
       const auth='/home/ubuntu/.codex/auth.json';fs.accessSync(auth,fs.constants.R_OK);
       let readonly=false;try{fs.accessSync(auth,fs.constants.W_OK)}catch{readonly=true}
       if(!readonly)throw Error('auth mount is not readonly');
-      if(fs.existsSync('/home/operator/.codex')||fs.existsSync('/home/ubuntu/.codex/config.toml'))throw Error('unexpected host config');
+      const hostConfig=${JSON.stringify(path.join(os.homedir(), '.codex'))};
+      if((hostConfig!=='/home/ubuntu/.codex'&&fs.existsSync(hostConfig))||fs.existsSync('/home/ubuntu/.codex/config.toml'))throw Error('unexpected host config');
       cp.execFileSync('git',['init','--quiet']);cp.execFileSync('git',['add','container-write-probe.txt']);
       cp.execFileSync('git',['-c','user.name=Container Probe','-c','user.email=probe@invalid','commit','--quiet','-m','confined probe']);
       console.log(JSON.stringify({node:process.version,codex:cp.execFileSync('/opt/codex/bin/codex',['--version'],{encoding:'utf8'}).trim(),npm:cp.execFileSync('npm',['--version'],{encoding:'utf8'}).trim(),git:cp.execFileSync('git',['--version'],{encoding:'utf8'}).trim(),authReadonly:readonly,workspaceWrite:true,hostConfigAbsent:true}));`;

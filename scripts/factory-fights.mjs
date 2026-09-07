@@ -12,6 +12,7 @@ import {runProcess} from '../src/process-runner.js';
 import {startModelRecorder} from './fight-model-proxy.mjs';
 import {codexSessionUsage,serverCounters,counterDelta} from './fight-usage.mjs';
 import {factoryKit} from './factory-card-catalog.mjs';
+import {verifyCompetitorRegistration} from '../src/competitor-registry.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
@@ -44,7 +45,7 @@ export function cleanFightEnv(overrides={}) {
   return {...env,NO_COLOR:'1',...overrides};
 }
 
-export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,verificationWorkspaceReadOnly=false,terminalClosure=false}) {
+export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={}}) {
   if(!FIGHT_ARMS.includes(arm))throw Error('unknown arm');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
   if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
@@ -52,7 +53,8 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
     return {exe:process.execPath,args:[path.join(ROOT,'scripts',arm==='deepseek-local-27b'?'deepseek-fight-cli.mjs':'peer-fight-cli.mjs'),
       ...(arm==='deepseek-local-27b'?[]:['--arm',arm]),'--workspace',workspace,'--task-file',path.join(dir,'task.md'),
       '--output',path.join(dir,'native'),'--endpoint',endpoint,'--model',model,'--timeout-seconds',String(Math.ceil(timeoutMs/1000)),
-      '--max-output-tokens',String(peerOutputTokens)],env:{}};
+      '--max-output-tokens',String(peerOutputTokens),
+      ...(peerExecutables[arm]?['--executable',peerExecutables[arm].executable,'--executable-sha256',peerExecutables[arm].sha256]:[])],env:{}};
   }
   const command=cardCommand(arm,task,workspace,dir);
   command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions')};
@@ -148,13 +150,18 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
   if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
   const selectedKit=factoryKit(kitId),kitRoot=selectedKit.root;if(cards===undefined)cards=selectedKit.cards;
   const plan=fightPlan({arms,cards,kitId,repetitions});
+  if(!peerExecutables||typeof peerExecutables!=='object'||Array.isArray(peerExecutables))throw Error('invalid peer executable selections');
+  for(const [name,record]of Object.entries(peerExecutables)){
+    if(!['hermes','opencode'].includes(name)||!arms.includes(name))throw Error('unsupported or unselected peer executable');
+    verifyCompetitorRegistration(record);
+  }
   const needsLocal=arms.some(arm=>LOCAL.has(arm));
   const model=needsLocal?await inspect(endpoint):null;
   const kitSeal=treeHashes(kitRoot),runtimeSeal=sourceSeal();
@@ -168,7 +175,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,codexModel:'gpt-6-astra',codexEffort:'medium',
-      verificationWorkspaceReadOnly,terminalClosure,
+      verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',
       sampling:'native configured values, retained in local wire requests',
       outputPolicy:'BANTAM separates up-to-4096 reasoning and up-to-8192 action requests; peers share their declared output allowance between reasoning and action. Native input reservation/compaction may depend on the declared output allowance.',
@@ -196,7 +203,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     fs.mkdirSync(path.join(dir,'native-sessions'));
     const recorder=LOCAL.has(arm)?await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')}):null;
     const countersBefore=recorder?await optionalServerCounters(endpoint):null;
-    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure});
+    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure,peerExecutables});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
     let result,wireUsage;

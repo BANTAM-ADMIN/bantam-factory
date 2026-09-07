@@ -1,6 +1,7 @@
 // Managed stock profile. Existing user models/servers are never replaced.
 import fs from 'node:fs';
 import os from 'node:os';
+import {bantamConfigDirectory} from './config-directory.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -25,15 +26,16 @@ export const TIEL_PROFILES={
 };
 export const isTielProfile=profile=>Object.hasOwn(TIEL_PROFILES,profile);
 export const stockRuntimeFlags=plan=>['--spec-type','--ctx-checkpoints',...(isTielProfile(plan.profile)?['--cpu-moe','--spec-draft-cpu-moe']:['--no-mmproj-offload'])];
-export const stockRoot=(home=os.homedir())=>path.join(home,'.bantam','stock','davidau-27b');
-export const managedRegistryPath=(home=os.homedir())=>path.join(home,'.bantam','managed-models.json');
-export function stockPlan({home=os.homedir(),profile='72k-cpu-vision'}={}){
+export const stockRoot=home=>path.join(bantamConfigDirectory(home),'stock','davidau-27b');
+export const managedRegistryPath=home=>path.join(bantamConfigDirectory(home),'managed-models.json');
+export function stockPlan({home,configDir,profile='72k-cpu-vision'}={}){
+ const base=bantamConfigDirectory(home,configDir);
  if(isTielProfile(profile)){
-  const root=path.join(home,'.bantam','stock','tiel-35b-a3b');
+  const root=path.join(base,'stock','tiel-35b-a3b');
   return {profile,...TIEL_PROFILES[profile],root,files:TIEL_FILES.map(f=>({...f,dest:path.join(root,f.file),url:`https://huggingface.co/${TIEL_REPO}/resolve/${TIEL_REVISION}/${encodeURIComponent(f.file)}`})),bytes:TIEL_FILES[0].bytes};
  }
  if(!Object.hasOwn(STOCK_PROFILES,profile))throw Error('Unknown stock profile');
- const root=stockRoot(home);
+ const root=path.join(base,'stock','davidau-27b');
  return {profile,...STOCK_PROFILES[profile],root,files:STOCK_FILES.map(f=>({...f,dest:path.join(root,f.file),url:`https://huggingface.co/${STOCK_REPO}/resolve/${STOCK_REVISION}/${encodeURIComponent(f.file)}`})),bytes:STOCK_FILES.reduce((n,f)=>n+f.bytes,0)};
 }
 export async function fileMatches(file,artifact){
@@ -80,7 +82,7 @@ export function stockServerArgs(plan,{port=8085}={}){
   '--batch-size','8192','--ubatch-size','1024','--spec-type','draft-mtp','--spec-draft-n-max','3','--perf','--metrics'];
 }
 const quote=s=>"'"+s.replaceAll("'","'\"'\"'")+"'";
-export function registerStockProfiles({home=os.homedir(),server,node=process.execPath,family='davidau'}={}){
+export function registerStockProfiles({home,server,node=process.execPath,family='davidau'}={}){
  if(!['davidau','tiel'].includes(family))throw Error('Unknown stock family');
  const file=managedRegistryPath(home);let entries=[];
  if(fs.existsSync(file)){entries=JSON.parse(fs.readFileSync(file,'utf8'));if(!Array.isArray(entries))throw Error('Invalid managed registry');}
@@ -89,7 +91,8 @@ export function registerStockProfiles({home=os.homedir(),server,node=process.exe
  const root=stockPlan({home,profile:Object.keys(profiles)[0]}).root;fs.mkdirSync(root,{recursive:true});
  for(const [profile,p]of Object.entries(profiles)){
   const name=family==='tiel'?profile:'davidau-'+profile,config=path.join(root,profile+'.json'),script=path.join(root,profile+'.sh');
-  const body=JSON.stringify({schema:1,profile,server,home},null,2)+'\n';
+  const location=home===undefined&&process.env.BANTAM_CONFIG_DIR!==undefined?{configDir:bantamConfigDirectory()}:{home:home??os.homedir()};
+  const body=JSON.stringify({schema:1,profile,server,...location},null,2)+'\n';
   const sh=`#!/usr/bin/env bash\nset -euo pipefail\nexec ${quote(node)} ${quote(launcher)} ${quote(config)}\n`;
   for(const [dest,value]of [[config,body],[script,sh]]){
    if(fs.existsSync(dest)&&fs.readFileSync(dest,'utf8')!==value)throw Error(`Managed configuration differs; refusing overwrite: ${dest}`);

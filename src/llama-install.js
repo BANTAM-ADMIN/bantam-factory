@@ -10,6 +10,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { bantamConfigDirectory } from "./config-directory.js";
 
 export const RELEASES_LATEST_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
 
@@ -80,5 +81,5 @@ export function extractArchive({ archive, dest, run }) {
 
 /** Default install root for fetched llama.cpp binaries. */
 export function llamaInstallRoot() {
-  return path.join(process.env.HOME || process.cwd(), ".bantam", "llama");
+  return path.join(bantamConfigDirectory(), "llama");
 }

@@ -7,9 +7,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runProcess } from "../src/process-runner.js";
+import {executablePath,verifyCompetitorRegistration} from '../src/competitor-registry.js';
+import {nonRootIdentity,identityFiles,discoverPeerTools,linkedLibraries} from '../src/linux-peer-runtime.js';
 
 const SELF = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(SELF), "..");
@@ -50,6 +52,8 @@ function validateOptions(options) {
   if (!Number.isInteger(options.timeoutSeconds) || options.timeoutSeconds < 1 || options.timeoutSeconds > 1800) throw new Error('timeout must be 1..1800 seconds');
   outputBudget(options.maxOutputTokens);
   for (const name of ['workspace', 'taskFile', 'output']) absolute(options[name], name);
+  if(options.executable!==undefined)absolute(options.executable,'executable');
+  if(options.executableSha256!==undefined&&(!options.executable||!/^[a-f0-9]{64}$/.test(options.executableSha256)))throw Error('executable SHA-256 requires an explicit executable');
   if (['/', os.homedir(), REPO].includes(path.resolve(options.workspace))) throw new Error('workspace must be a disposable candidate directory');
   normalizeEndpoint(options.endpoint);
 }
@@ -61,7 +65,7 @@ function outputBudget(value = 8192) {
 
 export function parseOptions(argv) {
   const values = {};
-  const names = new Set(["arm", "workspace", "task-file", "output", "endpoint", "model", "timeout-seconds", "max-output-tokens"]);
+  const names = new Set(["arm", "workspace", "task-file", "output", "endpoint", "model", "timeout-seconds", "max-output-tokens", "executable", "executable-sha256"]);
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--probe") { values.probe = true; continue; }
     const key = argv[i].replace(/^--/, "");
@@ -74,7 +78,9 @@ export function parseOptions(argv) {
   const timeoutSeconds = values["timeout-seconds"] === undefined ? 600 : Number(values["timeout-seconds"]);
   if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1800) throw new Error("timeout must be 1..1800 seconds");
   const maxOutputTokens = outputBudget(values['max-output-tokens'] === undefined ? 8192 : Number(values['max-output-tokens']));
-  return { arm: values.arm, workspace: values.workspace, taskFile: values["task-file"], output: values.output, endpoint: normalizeEndpoint(values.endpoint), model: values.model, timeoutSeconds, maxOutputTokens, probe: values.probe === true };
+  const result={ arm: values.arm, workspace: values.workspace, taskFile: values["task-file"], output: values.output, endpoint: normalizeEndpoint(values.endpoint), model: values.model, timeoutSeconds, maxOutputTokens, probe: values.probe === true,
+    ...(values.executable?{executable:absolute(values.executable,'executable')}:{}),...(values['executable-sha256']?{executableSha256:values['executable-sha256']}: {})};
+  validateOptions(result);return result;
 }
 
 export function nativeConfig({ arm, endpoint, model, maxOutputTokens = 8192 }) {
@@ -100,23 +106,26 @@ export function nativeConfig({ arm, endpoint, model, maxOutputTokens = 8192 }) {
   };
 }
 
-export function discoverRuntime(arm) {
-  const executable = fs.realpathSync(execFileSync("which", [arm], { encoding: "utf8" }).trim());
-  const runtime = { arm, executable, tools: ["/usr/bin/node", "/usr/bin/git"], npm: "/usr/lib/node_modules/npm", libraries: [], mounts: [] };
+export function discoverRuntime(arm,{executable:chosen,executableSha256}={}) {
+  const executable = executableSha256?verifyCompetitorRegistration({executable:chosen,sha256:executableSha256}):executablePath(chosen??execFileSync("which", [arm], { encoding: "utf8",timeout:3000 }).trim());
+  const runtime = { arm, executable, ...discoverPeerTools(),identity:nonRootIdentity(),libraries: [], mounts: [] };
+  let nativeBinary=executable;
   if (arm === "opencode") {
     const packageFile = path.resolve(executable, "..", "..", "package.json");
-    runtime.version = JSON.parse(fs.readFileSync(packageFile, "utf8")).version;
+    try{runtime.version=JSON.parse(fs.readFileSync(packageFile,'utf8')).version??'unknown';}catch{runtime.version='unknown (standalone binary; see offline probe version)';}
     runtime.mounts.push({ source: executable, target: "/opt/opencode" });
     runtime.entry = ["/opt/opencode"];
   } else if (arm === "hermes") {
-    const python = fs.readFileSync(executable, "utf8").split("\n", 1)[0].replace(/^#!/, "");
+    let python = fs.readFileSync(executable, "utf8").split("\n", 1)[0].replace(/^#!/, "").trim();
+    if(/^\/usr\/bin\/env python3?(?:\.\d+)?$/.test(python))python=execFileSync('which',[python.split(' ')[1]],{encoding:'utf8',timeout:3000}).trim();
     if (!path.isAbsolute(python) || python.includes(" ")) throw new Error("Hermes requires an absolute Python interpreter shebang");
-    const info = JSON.parse(execFileSync(python, ["-c", "import importlib.util,json,sys; s=importlib.util.find_spec('hermes_cli'); print(json.dumps({'root':str(s.submodule_search_locations[0]),'prefix':sys.prefix,'version':f'{sys.version_info.major}.{sys.version_info.minor}'}))"], { encoding: "utf8", timeout: 10000 }));
+    const info = JSON.parse(execFileSync(python, ["-c", "import importlib.util,json,sys,sysconfig; s=importlib.util.find_spec('hermes_cli'); assert s is not None, 'hermes_cli is not installed in the selected interpreter'; print(json.dumps({'root':str(s.submodule_search_locations[0]),'prefix':sys.base_prefix,'site':sysconfig.get_path('purelib'),'version':f'{sys.version_info.major}.{sys.version_info.minor}'}))"], { encoding: "utf8", timeout: 10000 }));
     const codeRoot = path.dirname(info.root);
     const versionText = fs.readFileSync(path.join(info.root, "__init__.py"), "utf8");
     runtime.version = `${versionText.match(/__version__\s*=\s*"([^"]+)"/)?.[1] ?? "unknown"} (${versionText.match(/__release_date__\s*=\s*"([^"]+)"/)?.[1] ?? "unknown"})`;
     runtime.pythonVersion = info.version;
-    runtime.mounts.push({ source: fs.realpathSync(python), target: "/opt/python/bin/python" }, { source: path.join(info.prefix, "lib"), target: "/opt/python/lib" });
+    nativeBinary=fs.realpathSync(python);
+    runtime.mounts.push({ source: nativeBinary, target: "/opt/python/bin/python" }, { source: path.join(info.prefix, "lib"), target: "/opt/python/lib" },{source:info.site,target:'/opt/site-packages'});
     // Code/data assets only: never bind the installed checkout root, .env,
     // logs, project siblings, or the operator's Hermes home into the container.
     for (const entry of fs.readdirSync(codeRoot, { withFileTypes: true })) {
@@ -124,14 +133,9 @@ export function discoverRuntime(arm) {
     }
     // Append, do not prepend, third-party packages: this installation also has
     // an obsolete enum backport which must not shadow Python's stdlib enum.
-    runtime.entry = ["/opt/python/bin/python", "-S", "-c", `import sys,runpy; sys.path.append('/opt/python/lib/python${info.version}/site-packages'); runpy.run_module('hermes_cli.main',run_name='__main__')`];
+    runtime.entry = ["/opt/python/bin/python", "-S", "-c", `import sys,runpy; sys.path.append('/opt/site-packages'); runpy.run_module('hermes_cli.main',run_name='__main__')`];
   } else throw new Error("unknown native arm");
-  const libraries = new Set();
-  for (const file of [...runtime.tools, runtime.executable]) {
-    if (arm === "hermes" && file === runtime.executable) continue;
-    for (const match of execFileSync("ldd", [file], { encoding: "utf8" }).matchAll(/(?:=>\s+|^\s*)(\/[^\s]+)\s+\(/gm)) libraries.add(match[1]);
-  }
-  runtime.libraries = [...libraries];
+  runtime.libraries = linkedLibraries([...runtime.tools,nativeBinary]);
   runtime.executableDigest = sha(fs.readFileSync(executable));
   return runtime;
 }
@@ -139,6 +143,7 @@ export function discoverRuntime(arm) {
 export function buildDockerArgs({ options, runtime, control, state, cidfile, name }) {
   validateOptions(options);
   if (runtime.arm !== options.arm) throw new Error('runtime arm mismatch');
+  const {uid,gid}=nonRootIdentity(runtime.identity);
   if (!/^bantam-peer-[a-z0-9-]+$/.test(name)) throw new Error("invalid peer container name");
   const mount = (source, target, readonly = true) => ["--mount", `type=bind,src=${absolute(source, "mount source")},dst=${absolute(target, "mount target")}${readonly ? ",readonly" : ""}`];
   const env = {
@@ -154,27 +159,31 @@ export function buildDockerArgs({ options, runtime, control, state, cidfile, nam
     HERMES_WRITE_SAFE_ROOT: "/workspace", HERMES_INFERENCE_MODEL: options.model,
     OPENAI_BASE_URL: options.endpoint, OPENAI_API_KEY: "local-no-credential",
     PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8",
+    GIT_EXEC_PATH:'/opt/git-core',
     ...(runtime.arm === "hermes" ? { PYTHONHOME: "/opt/python", PYTHONPATH: "/opt/hermes" } : {}),
   };
   return ["run", "--rm", "--pull", "never", "--init", "--name", name, "--cidfile", absolute(cidfile, "cidfile"),
-    "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", "1000:1000",
+    "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", `${uid}:${gid}`,
     "--pids-limit", "384", "--memory", "4g", "--cpus", "2",
     "--network", options.probe ? "none" : "host",
-    "--tmpfs", "/tmp:rw,nosuid,nodev,size=768m,mode=1777", "--tmpfs", "/home/ubuntu:rw,nosuid,nodev,size=128m,uid=1000,gid=1000,mode=700",
+    "--tmpfs", "/tmp:rw,nosuid,nodev,size=768m,mode=1777", "--tmpfs", `/home/ubuntu:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid},mode=700`,
     ...mount(options.workspace, "/workspace", false), ...mount(state, "/state", false), ...mount(control, "/control"),
     ...(options.arm === 'hermes' ? [...mount(path.join(control, 'native-config.json'), '/state/hermes/config.yaml'), ...mount(path.join(control, 'empty.env'), '/state/hermes/.env')] : []),
     ...mount(SELF, "/opt/peer/scripts/peer-fight-cli.mjs"), ...mount(path.join(REPO, "src/process-runner.js"), "/opt/peer/src/process-runner.js"),
+    ...['competitor-registry.js','linux-peer-runtime.js','config-directory.js'].flatMap(file=>mount(path.join(REPO,'src',file),'/opt/peer/src/'+file)),
+    ...mount(path.join(control,'passwd'),'/etc/passwd'),...mount(path.join(control,'group'),'/etc/group'),
     ...mount(path.join(REPO, "package.json"), "/opt/peer/package.json"),
     ...runtime.mounts.flatMap(row => mount(row.source, row.target)),
-    ...runtime.tools.flatMap(file => mount(file, file)), ...runtime.libraries.flatMap(file => mount(fs.realpathSync(file), file)),
-    ...mount("/usr/lib/git-core", "/usr/lib/git-core"), ...mount("/usr/share/git-core", "/usr/share/git-core"), ...mount(runtime.npm, "/opt/npm"),
+    ...(runtime.toolMounts??runtime.tools.map(file=>({source:file,target:file}))).flatMap(t=>mount(t.source,t.target)), ...runtime.libraries.flatMap(file => mount(fs.realpathSync(file), file)),
+    ...mount(runtime.gitCore??'/usr/lib/git-core', '/opt/git-core'), ...mount(runtime.npm, "/opt/npm"),
     ...Object.entries(env).flatMap(([key, value]) => ["--env", `${key}=${value}`]), "--workdir", "/workspace", IMAGE,
     "/usr/bin/node", "/opt/peer/scripts/peer-fight-cli.mjs", "--inside"];
 }
 
-export async function runPeer(options, { runtime = discoverRuntime(options.arm), processRunner = runProcess, signal = null } = {}) {
+export async function runPeer(options, { runtime = discoverRuntime(options.arm,options), processRunner = runProcess, signal = null } = {}) {
   validateOptions(options);
-  if (process.platform !== "linux" || process.arch !== "x64" || process.getuid?.() !== 1000 || process.getgid?.() !== 1000) throw new Error("tested peer runtime requires Linux x64 and uid/gid 1000");
+  if (process.platform !== "linux" || process.arch !== "x64") throw new Error("peer runtime currently requires Linux x64");
+  nonRootIdentity(runtime.identity);
   const workspace = fs.realpathSync(absolute(options.workspace, "workspace"));
   const output = canonicalFuturePath(absolute(options.output, "output"));
   if (["/", os.homedir(), REPO].includes(workspace) || !fs.statSync(workspace).isDirectory()) throw new Error("workspace must be a disposable candidate directory");
@@ -186,6 +195,7 @@ export async function runPeer(options, { runtime = discoverRuntime(options.arm),
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const control = path.join(output, "control"), state = path.join(output, "native");
   fs.mkdirSync(control); fs.mkdirSync(state);
+  for(const [file,content]of Object.entries(identityFiles(runtime.identity)))fs.writeFileSync(path.join(control,file),content,{flag:'wx',mode:0o600});
   if (options.arm === 'hermes') fs.mkdirSync(path.join(state, 'hermes'));
   const name = `bantam-peer-${options.arm}-${crypto.randomUUID()}`, cidfile = path.join(output, "container.cid");
   writeJson(path.join(control, "native-config.json"), nativeConfig(options));
@@ -211,7 +221,7 @@ export async function runPeer(options, { runtime = discoverRuntime(options.arm),
   const joinedSignal = signal ? AbortSignal.any([signal, cancellation.signal]) : cancellation.signal;
   try {
     execution = await processRunner("docker", dockerArgs, { timeoutMs: (options.timeoutSeconds + 15) * 1000, signal: joinedSignal, maxBuffer: 32 * 1024 * 1024,
-      onOutput: ({ stream, text }) => { fs.appendFileSync(path.join(output, `${stream}.log`), text); (stream === "stderr" ? process.stderr : process.stdout).write(text); } });
+      onOutput: ({ stream, text }) => { fs.appendFileSync(path.join(output, `${stream}.log`), text); if(!options.probe)(stream === "stderr" ? process.stderr : process.stdout).write(text); } });
   } catch (error) {
     execution = { code: null, signal: null, error: String(error.message ?? error) };
   } finally {
@@ -247,10 +257,14 @@ async function runInside() {
   const version = execFileSync(exe, [...prefix, "--version"], { encoding: "utf8", timeout: 15000 });
   writeJson("/state/native-version.json", { output: version.trim(), arm: config.arm });
   if (config.probe) {
-    const help = execFileSync(exe, [...prefix, ...(config.arm === "opencode" ? ["run"] : []), "--help"], { encoding: "utf8", timeout: 30000 });
-    fs.writeFileSync("/state/help.txt", help);
+    const help = spawnSync(exe, [...prefix, ...(config.arm === "opencode" ? ["run"] : []), "--help"], { encoding: "utf8", timeout: 30000,stdio:['ignore','pipe','pipe'],maxBuffer:2*1024*1024 });
+    fs.writeFileSync('/state/help.stdout.txt',help.stdout??'');fs.writeFileSync('/state/help.stderr.txt',help.stderr??'');
+    if(help.error||help.status!==0)throw Error('Native help probe failed; inspect saved help output.');
     fs.accessSync('/workspace', fs.constants.W_OK);
-    process.stdout.write(JSON.stringify({ arm: config.arm, version: version.trim(), probe: true, hostHomeAbsent: !fs.existsSync("/home/operator"), candidateWritable: true }) + "\n");
+    const proof={arm:config.arm,version:version.trim(),probe:true,candidateWritable:true,uid:process.getuid(),gid:process.getgid(),home:os.homedir()};
+    if(proof.home!=='/home/ubuntu')throw Error('Native runtime did not resolve its isolated container home');
+    writeJson('/state/probe.json',proof);
+    process.stdout.write(JSON.stringify(proof) + "\n");
     return 0;
   }
   const task = fs.readFileSync("/control/task.txt", "utf8");
@@ -258,7 +272,7 @@ async function runInside() {
     // Installed Hermes 0.20 resolves providers from HERMES_HOME/config.yaml,
     // not HERMES_CONFIG or OPENAI_BASE_URL. Refuse to start a conversation if
     // its own provider resolver selects anything except this run's proxy.
-    const check = "import sys,json; sys.path.append(f'/opt/python/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages'); from hermes_cli.runtime_provider import resolve_runtime_provider; from hermes_cli.config import load_config; r=resolve_runtime_provider(requested='custom',target_model=sys.argv[1]); c=load_config(); assert r.get('base_url','').rstrip('/') == sys.argv[2], 'Hermes resolved outside the recording endpoint'; assert c['model']['max_tokens'] == int(sys.argv[3]), 'Hermes output limit mismatch'; print(json.dumps({'provider':r.get('provider'),'base_url':r.get('base_url'),'maxOutputTokens':c['model']['max_tokens']}))";
+    const check = "import sys,json; sys.path.append('/opt/site-packages'); from hermes_cli.runtime_provider import resolve_runtime_provider; from hermes_cli.config import load_config; r=resolve_runtime_provider(requested='custom',target_model=sys.argv[1]); c=load_config(); assert r.get('base_url','').rstrip('/') == sys.argv[2], 'Hermes resolved outside the recording endpoint'; assert c['model']['max_tokens'] == int(sys.argv[3]), 'Hermes output limit mismatch'; print(json.dumps({'provider':r.get('provider'),'base_url':r.get('base_url'),'maxOutputTokens':c['model']['max_tokens']}))";
     const resolved = execFileSync(exe, ['-S', '-c', check, config.model, config.endpoint, String(config.maxOutputTokens)], { encoding: 'utf8', timeout: 15000 });
     writeJson('/state/provider-check.json', JSON.parse(resolved.trim()));
   }

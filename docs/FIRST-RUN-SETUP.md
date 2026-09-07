@@ -35,7 +35,7 @@ HTTP syntax alone is not proof of compatible constrained generation. A chat
 schema test succeeding once is an observed capability check, not a guarantee
 that every future response obeys it; actions are still validated locally.
 
-Use `http://192.168.1.20:8080`, `192.168.1.20:8080`, or a reverse-proxy URL
+Use `http://192.168.1.20:8080`, `192.168.1.20:8080` (example addresses), or a reverse-proxy URL
 such as `https://models.example/llama/v1`. Embedded URL credentials are refused.
 An optional API key is entered hidden; unencrypted HTTP to a non-loopback server
 requires an additional warning/confirmation before sending a key. Prefer HTTPS.
@@ -164,3 +164,23 @@ remain useful without Hermes, OpenCode, or DeepSeek Harness. Any future optional
 comparison pack needs separate installation consent; published reference runs
 must remain distinguishable from tests executed on this user's machine.
 See [bring-your-own comparison design and current boundaries](BRING-YOUR-OWN-COMPARISONS.md).
+
+## Test a second checkout without replacing your working installation
+
+Use that checkout's explicit `bin/bantamfactory` path; do not run `npm link`,
+change PATH or replace an existing launcher. Set `BANTAM_CONFIG_DIR` to a new
+absolute directory for each test installation:
+
+```bash
+BANTAM_CONFIG_DIR=/absolute/private/install-test/config /absolute/new-checkout/bin/bantamfactory setup
+BANTAM_CONFIG_DIR=/absolute/private/install-test/config /absolute/new-checkout/bin/bantamfactory cards --list
+```
+
+This isolates BANTAM's saved connection, settings, competitor registrations,
+managed-model registry, stock downloads and managed llama runtime directory.
+It does not change `HOME`, `CODEX_HOME`, provider authentication, your shell
+launcher or a running model. Workspace-local preferences/evidence still belong
+to the working directory, so run tests from a disposable project directory too.
+Legacy optional services and provider-owned settings are not a complete sandbox;
+do not enable them as part of a no-side-effects setup test. The normal default
+remains `~/.bantam`. A relative, empty or filesystem-root override is rejected.

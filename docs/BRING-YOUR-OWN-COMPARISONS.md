@@ -2,8 +2,9 @@
 
 Status: September 7, 2026. `bantamfactory cards` now provides a guided front door
 to the frozen factory cards, participant selection, prerequisite checks, explicit
-execution consent and automatic local replay/export generation. Persistent
-installation-folder registration and generic agent-API adapters remain planned.
+execution consent and automatic local replay/export generation. Hermes/OpenCode
+support persistent installation-folder registration and offline readiness checks.
+Other installation adapters and generic agent APIs still need work.
 Model setup does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Code.
 
 ## Start a card
@@ -56,15 +57,16 @@ need additional adaptation for this recorded comparison flow. The historical
 lane ID `bantam-local-27b` is retained for evidence compatibility, not a check
 that the user's selected model has 27B parameters.
 
-Preflight checks selected executables and Docker/image availability; it does not
-pull images or prove compatibility of every harness version. Missing runtime
+Preflight checks selected executables and Docker/image availability, then runs
+selected Hermes/OpenCode offline startup checks before any scored contender.
+It does not pull images or prove compatibility of every harness version. Missing runtime
 prerequisites fail before contender execution. All local inference contenders
 run serially. Frontier work may overlap; use `--serial` to serialize everything.
 
 ## What works today
 
 - `scripts/peer-fight-cli.mjs` runs installed Hermes/OpenCode in disposable
-  outer containers. Runtime discovery uses the executable on PATH; for Hermes
+  outer containers. Runtime discovery uses the registered executable or PATH; for Hermes
   it also resolves that environment's installed Python package. It does not
   copy the operator's whole home or reuse personal harness memory/configuration.
 - `scripts/deepseek-fight-cli.mjs` uses a separately prepared, identified
@@ -79,15 +81,35 @@ run serially. Frontier work may overlap; use `--serial` to serialize everything.
 
 Run `node scripts/peer-fight-cli.mjs --help` to inspect its actual interface.
 Supply a disposable workspace, task file, new output directory, exact model ID
-and local recording endpoint. An executable outside PATH can be exposed using
-a command-scoped PATH; pointing at an arbitrary folder or remote agent URL is
-not currently a supported generic registration mechanism. These are advanced
-runner interfaces beneath the guided `cards` command.
+and local recording endpoint. These are advanced runner interfaces beneath the
+guided `cards` command.
+
+## Point at an existing installation
+
+```bash
+bantamfactory cards --register hermes --path /path/to/hermes-install
+bantamfactory cards --register opencode --path /path/to/opencode-executable
+bantamfactory cards --check --arms hermes,opencode --yes
+```
+
+Registration resolves a bounded set of known executable locations and saves
+the exact executable path and SHA-256. It does not run the tool, authorize an
+account or install anything. A changed registered executable requires explicit
+re-registration; a missing one does not silently fall back to a different PATH
+installation. Registration currently supports only Hermes and OpenCode.
+
+The offline check requires explicit consent, uses network-disabled disposable
+containers, and verifies version/help startup, writable candidate space, an
+isolated home and cleanup. It makes no model requests and does not certify task
+quality or metering. Its report is retained separately from scored evidence.
+The peer adapter supports Linux x64 with a non-root numeric UID/GID; it discovers
+Node/Git/npm and Hermes Python locations instead of assuming this workstation's
+paths. Unknown packaging layouts can still need an adapter change.
 
 ## Remaining product flow
 
-The guided entry point is implemented. Complete its portability, installed-folder
-registration and agent-API support while keeping comparison setup separate from
+The guided entry point is implemented. Complete its portability, remaining installed-folder
+adapters and agent-API support while keeping comparison setup separate from
 the initial model chooser:
 
 1. Offer “Compare with my tools” after BANTAM's own readiness check. Detect

@@ -165,7 +165,7 @@ test("published DeepSeek standard profile transmits 32K cap and persists scripte
     if (bash && !toolResult) {
       emit({ role: "assistant", tool_calls: [{ index: 0, id: "smoke-bash", type: "function", function: {
         name: "bash", arguments: JSON.stringify({
-          command: "test ! -e /home/operator/.codex && test ! -e /var/run/docker.sock && test ! -w /opt/deepseek/package-lock.json && printf 'DEEPSEEK_SMOKE_OK\\n' > smoke.txt",
+          command: `test ! -e '${path.join(os.homedir(), '.codex').replaceAll("'", "'\"'\"'")}' && test ! -e /var/run/docker.sock && test ! -w /opt/deepseek/package-lock.json && printf 'DEEPSEEK_SMOKE_OK\\n' > smoke.txt`,
           description: "Check isolation and create smoke fixture",
         }),
       } }] });

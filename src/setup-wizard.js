@@ -22,7 +22,7 @@ export async function startManagedStock(entry){
 export function nvidiaMemory(){
  try{return Number(execFileSync('nvidia-smi',['--query-gpu=memory.total','--format=csv,noheader,nounits'],{encoding:'utf8',timeout:3000}).trim().split('\n')[0]);}catch{return null;}
 }
-export async function setupWizard({ask,out,hidden,advanced=false,profile=null,yes=false,home=os.homedir(),
+export async function setupWizard({ask,out,hidden,advanced=false,profile=null,yes=false,home,
  choose=chooseFirstRun,Client=ModelClient,install=installStockFiles,installLlama,findLlama=findInstalledLlama,
  gpuMemory=nvidiaMemory,systemMemory=os.totalmem,platform=process.platform,fetchImpl=fetch,
  checkRuntime=(server,plan)=>{const help=execFileSync(server,['--help'],{encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});

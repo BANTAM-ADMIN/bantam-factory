@@ -1,5 +1,8 @@
 # Tiel local-worker qualification — 2026-09-06
 
+> Privacy note: workstation paths and connection examples below are placeholders,
+> not the original operator settings. Historical measurements are unchanged.
+
 For the accessible model comparison and product implications, start with
 [Local workers: the 27B baseline and the 35B-A3B opportunity](LOCAL-WORKER-STRATEGY.md).
 This document preserves the detailed experimental record rather than replacing
@@ -37,7 +40,7 @@ This report covers single-worker, 72K-requested-context, MTP1 qualification, beg
 - Pinned revision: `199cff20cda0575344172543809cb0f990bfbceb`.
 - Artifact: [Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf](https://huggingface.co/peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP/blob/199cff20cda0575344172543809cb0f990bfbceb/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf).
 - Exact size: `18,629,540,384` bytes; whole-file SHA256: `bf12bfacb04f587be6eecd578a5dc3d06861797d3a4cf81b1fad3d72b29dbbce`.
-- Local file and exact server model ID: `/home/operator/Desktop/nai/local-models/models/TIEL35BA3B/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf`.
+- Local file and exact server model ID: `/path/to/models/TIEL35BA3B/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf`.
 - Observed server quantization description: `IQ4_XS - 4.25 bpw`. This is a roughly 35B-total-parameter MoE with about 3B active parameters, not a 3B-resident-weight model.
 - The optional `mmproj-BF16.gguf` was also downloaded: `902,822,016` bytes, verified SHA256 `d9ce31026d1cb1f3f8d5152e2e2a014d9d2b302b6c93a7dc07bb0a0487f52837`. It was not loaded or vision-qualified in this series.
 
@@ -47,7 +50,7 @@ Local provenance root throughout this report is `.bantam/acceptance/2026-09-06/t
 
 ## Runtime actually tested
 
-Installed llama.cpp: `0.2.0-dev`, build `2814`, commit `b21e4de74567f5eef213765c9476a843c2e43f0d`; endpoint reports `b2814-b21e4de74`. The invoked path was `/home/operator/Desktop/nai/local-models/llama.cpp/build/bin/llama-server`; the process executable resolved to that repository's `build3/bin/llama-server`. No llama.cpp rebuild was required for these tests.
+Installed llama.cpp: `0.2.0-dev`, build `2814`, commit `b21e4de74567f5eef213765c9476a843c2e43f0d`; endpoint reports `b2814-b21e4de74`. The invoked path was `/path/to/llama.cpp/build/bin/llama-server`; the process executable resolved to that repository's `build3/bin/llama-server`. No llama.cpp rebuild was required for these tests.
 
 The coding run requested context `72000`; the server allocated `72192`, one slot, non-unified KV, and integrated `draft-mtp` with maximum draft length `1`. It was text-only: no mmproj, vision/video/audio all false. The operator's startup GPU snapshot was `19,638 MiB` used and `4,443 MiB` free. That is an observed startup reading, not peak memory or a promise that all longer/concurrent workloads fit.
 
@@ -118,7 +121,7 @@ The new runners are [factory-local-variant.mjs](../scripts/factory-local-variant
 The following records the coding invocation from the repository root; its existing output is intentionally not overwritable. Any repeat needs a new evidence directory and explicit GPU availability, with the intended server already running:
 
 ```bash
-tiel_model=/home/operator/Desktop/nai/local-models/models/TIEL35BA3B/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf
+tiel_model=/path/to/models/TIEL35BA3B/Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf
 tiel_evidence="$PWD/.bantam/acceptance/2026-09-06/tiel-qualification"
 node scripts/factory-local-variant.mjs \
   --output "$tiel_evidence/factory-c72000-s1-mtp1" \

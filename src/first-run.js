@@ -1,5 +1,6 @@
 // First-run choices are explicit. Discovery sends no prompts or credentials.
-import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import fs from 'node:fs';import path from 'node:path';
+import {bantamConfigDirectory} from './config-directory.js';
 import {execFileSync} from 'node:child_process';
 export const COMMON_MODEL_PORTS=[8085,8080,8000,1234,5000,18086,11434];
 export function normalizeServerUrl(input){
@@ -20,14 +21,14 @@ export async function discoverModelServers({fetchImpl=fetch,ports=COMMON_MODEL_P
 export function codexAvailable({run=execFileSync,command='codex'}={}){
  try{run(command,['--version'],{timeout:3000,stdio:'ignore'});return true;}catch{return false;}
 }
-export const connectionPath=(home=os.homedir())=>path.join(home,'.bantam','connection.json');
-export function loadConnection(home=os.homedir()){
+export const connectionPath=home=>path.join(bantamConfigDirectory(home),'connection.json');
+export function loadConnection(home){
  try{const c=JSON.parse(fs.readFileSync(connectionPath(home),'utf8'));if(c.kind==='codex'&&c.consent==='cloud-context-v1')return c;
   if(c.kind==='local'&&typeof c.name==='string')return c;
   if(c.kind==='api'&&normalizeServerUrl(c.apiUrl)===c.apiUrl&&typeof c.model==='string'&&['llamacpp','vllm','chat'].includes(c.dialect))return c;
  }catch{}return null;
 }
-export function saveConnection(value,home=os.homedir()){
+export function saveConnection(value,home){
  const dest=connectionPath(home);fs.mkdirSync(path.dirname(dest),{recursive:true});
  fs.writeFileSync(dest,JSON.stringify(value,null,2)+'\n',{mode:0o600});fs.chmodSync(dest,0o600);return dest;
 }

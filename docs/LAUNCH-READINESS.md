@@ -8,6 +8,7 @@ a verified private local archive outside the working tree. They remain in Git
 history. Keep this repository private pending the full secret/personal-data
 audit and an explicitly approved history-cleanup or clean-public-repository
 process. New public cards require review; see the [archive policy](fights/README.md).
+The [privacy audit record](PRIVACY-RELEASE-AUDIT.md) records checks and remaining gates.
 
 | Requirement | Current evidence | Remaining qualification/work |
 |---|---|---|
@@ -17,7 +18,7 @@ process. New public cards require review; see the [archive policy](fights/README
 | Claude Code only when explicitly requested | Removed implicit REPL/default-picker Claude selection; direct CLI agent corner retained | Put explicit Claude agent comparison under the new frozen-card/isolation flow; do not use it as a model/teacher/judge |
 | Optional recommended model download | Pinned DavidAU artifacts and three context/vision configurations; consent/integrity/startup inference tests | Clean-machine installation; physical 92K and GPU-vision fit under real workloads |
 | Lower-VRAM option | Explicit experimental Tiel 32K CPU-expert profile; GPU/RAM admission tests | Actual 8–16GB systems, occupied-context fit, repeated accepted coding completions, complete performance accounting |
-| Easy installed-harness comparison | `bantamfactory cards` chooser, plans, consent, Docker/image checks, existing peer runners | User-supplied installation directories/executables, native DeepSeek installations, version-specific readiness, portable Codex and explicit Claude adapters |
+| Easy installed-harness comparison | `bantamfactory cards` chooser, plans, consent; Hermes/OpenCode path registration and offline readiness checks; discovered Node/Git/Python and non-root UID/GID | Native DeepSeek installations, additional packaging layouts, portable Codex and explicit Claude adapters |
 | Live progress and polished replay | CLI progress plus local static replay/export; dynamic participant counts; frozen workspaces and independent grading | Unified visual live view and clean-machine browser/runner exercises; do not treat a static replay as live streaming |
 | Fair, auditable accounting | Local HTTP recorder, native receipts, independent grades, completion separately recorded | Require complete accounting for efficiency claims across every supported adapter; preserve unavailable metrics rather than inventing totals |
 | Community sharing/learning | Portable evidence format; validation; no implicit execution/promotion | End-user privacy preview and governed import/qualification workflow |
@@ -29,6 +30,12 @@ results are evidence of those configurations and attempts, not guarantees about
 the newest installer, a new model, or another user's hardware.
 
 ## Verification records
+
+The subsequent installed-peer/config-isolation change passed 4,108 host tests,
+zero failures and 76 skips. All 15 opt-in installed Hermes/OpenCode scripted
+tool-loop tests passed with no real model or cloud inference. These prove
+the checked installed versions can start and execute the scripted tool path,
+not that every version or all five comparison adapters are qualified.
 
 The final September 7 cards-front-door change passed the full host regression suite:
 4,092 passed, zero failed, 76 skipped. Focused coverage exercises actual CLI

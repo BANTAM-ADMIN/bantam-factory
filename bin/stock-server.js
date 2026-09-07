@@ -9,7 +9,7 @@ import {checkStockReadiness} from '../src/stock-readiness.js';
 try{
  const config=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
  if(config.schema!==1||typeof config.server!=='string'||!path.isAbsolute(config.server))throw Error('Invalid managed server config');
- const plan=stockPlan({home:config.home,profile:config.profile});
+ const plan=stockPlan({home:config.home,configDir:config.configDir,profile:config.profile});
  for(const f of plan.files)if(!fs.existsSync(f.dest)||fs.statSync(f.dest).size!==f.bytes)throw Error(`Missing/incomplete model artifact: ${f.dest}`);
  const occupied=await new Promise(resolve=>{const s=net.connect({host:'127.0.0.1',port:8085});s.setTimeout(1000);s.once('connect',()=>{s.destroy();resolve(true);});s.once('error',()=>resolve(false));s.once('timeout',()=>{s.destroy();resolve(true);});});
  if(occupied)throw Error('Port 8085 is occupied. Connect to that server or stop it yourself; BANTAM will not replace it.');

@@ -5,11 +5,11 @@
 // environment variables still override for scripted runs, and a missing or
 // corrupt file is simply "no preferences" — never an error.
 import fs from "node:fs";
-import os from "node:os";
+import { bantamConfigDirectory } from "../config-directory.js";
 import path from "node:path";
 
-export function settingsPath(home = os.homedir()) {
-  return path.join(home, ".bantam", "settings.json");
+export function settingsPath(home) {
+  return path.join(bantamConfigDirectory(home), "settings.json");
 }
 
 export function loadUserSettings(file = settingsPath()) {

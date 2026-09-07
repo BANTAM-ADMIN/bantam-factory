@@ -22,7 +22,6 @@ Recorded measurements retain the date and configuration of their own artifacts.
 | Compare the current factory across six runtimes | [Fresh factory fight cards](FRESH-FACTORY-FIGHTS-2026-09-06.md) | New independent work orders, same-weights local comparisons, sealed evidence and replay |
 | Read the completed six-runtime comparison | [Fresh factory results](FRESH-FACTORY-RESULTS-2026-09-06.md) | All 18 V2 attempts; artifact correctness, completion, costs and limits kept separate |
 | Inspect the separate native Sol/Terra follow-up | [Frontier evidence package](fights/README.md) | Six additional runs, not merged into the main series; private evidence and verification instructions |
-| Plan the product showcase and community launch | [BANTAM launch plan](BANTAM-LAUNCH-PLAN.md) | Strategy: familiar Workbench, evidence-backed Arena, private sharing and implementation prerequisites |
 | Exchange machine-readable fight evidence | [Portable fight-card observations](FIGHT-CARD-EXCHANGE.md) | Passive bounded validation, evidence hashes, and local qualification before trust |
 | Inspect measured context and verification overhead | [Fresh factory context audit](FRESH-FACTORY-CONTEXT-AUDIT-2026-09-06.md) | Reconstructed Astra deltas, batching, completion guards, local reasoning, and metering limits |
 | Choose local, Codex, or DeepSeek runtimes | [Model runtimes and improvement](MODEL-RUNTIMES-AND-IMPROVEMENT.md) | Current runtime guide; live catalogs and local registries remain authoritative |

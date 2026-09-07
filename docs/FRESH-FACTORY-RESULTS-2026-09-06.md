@@ -318,5 +318,4 @@ Release checks completed after presentation and packaging changes:
 The delivered scope is the benchmark machinery, qualified cards, private
 receipts and polished Arena. The shared recorded-run Workbench integration,
 public material review and first-time-user onboarding trial remain launch
-items in the [launch plan](BANTAM-LAUNCH-PLAN.md); they are not certified by
-this test pass.
+items; they are not certified by this test pass.

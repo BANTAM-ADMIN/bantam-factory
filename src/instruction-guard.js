@@ -90,7 +90,7 @@ export function instructionPathPolicy(workspace, invariants) {
     : path.posix.basename(relative) === named;
   const policy = (name, { structural = true } = {}) => {
     const relative = normalize(name);
-    if (relative === null) return "instruction-forbidden";
+    if (relative === null) return "outside-workspace";
     const candidates = [relative];
     // Resolve existing symlink aliases as well as the path the action names.
     try {

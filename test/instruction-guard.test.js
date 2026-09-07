@@ -120,6 +120,31 @@ function testFixture(t) {
   return root;
 }
 
+test("external scratch paths remain denied without falsely labeling them protected public tests", t => {
+  const workspace = testFixture(t), outside = fixture(t);
+  const { editGuard } = composeInstructionGuards({ workspace, instruction: existingTestsInstruction });
+  const absolute = path.join(outside, "new-check.mjs");
+  const relative = path.relative(workspace, absolute);
+  for (const name of [absolute, relative]) {
+    assert.equal(editGuard(name), "outside-workspace");
+    const note = editScopeRefusal({ a: "write_file", p: name, content: "throw Error('not written');" }, editGuard);
+    assert.match(note, /outside this workspace; direct file edits are confined to workspace paths/);
+    assert.match(note, /The edit was NOT applied/);
+    assert.match(note, /permitted workspace path/);
+    assert.match(note, /temporary fixtures are not the check script itself/);
+    assert.doesNotMatch(note, /immutable|task explicitly forbids|Existing supplied tests/);
+  }
+  assert.match(editScopeRefusal({ a: "patch", edits: [
+    { p: "test/new.test.js", content: "allowed" }, { p: absolute, content: "denied" },
+  ] }, editGuard), /outside this workspace/);
+  assert.equal(editGuard("test/new.test.js"), null, "new in-workspace checks remain permitted");
+  assert.equal(editGuard("test/base.test.js"), "instruction-forbidden");
+  assert.match(editScopeRefusal({ a: "write_file", p: "test/base.test.js", content: "denied" }, editGuard),
+    /immutable: the task explicitly forbids changing it/);
+  assert.equal(fs.existsSync(absolute), false);
+  assert.equal(fs.readFileSync(path.join(workspace, "test/base.test.js"), "utf8"), "// supplied assertions\n");
+});
+
 test("public coordinated prohibition names package.json and the existing-tests class", () => {
   const inv = extractImmutable(existingTestsInstruction);
   assert.equal(inv.mode, "forbid");assert.deepEqual(inv.forbidden, ["package.json"]);

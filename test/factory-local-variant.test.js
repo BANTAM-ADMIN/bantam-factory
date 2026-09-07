@@ -99,6 +99,19 @@ test('experimental assertion station requires a recorded explicit runner opt-in'
   assert.deepEqual(enabled.env,{...baseline.env,BANTAM_CONTRACT_ASSERTION_STATION:'on'});
 });
 
+test('one DONE-only allowance is an explicit option, not an inherited work-budget increase',()=>{
+  const prefix=['--output',base.output,'--label',base.label,'--variant-id',base.variantId];
+  assert.equal(variantOptions(base).terminalClosure,false);
+  assert.equal(parseVariantArgs([...prefix,'--terminal-closure']).terminalClosure,true);
+  assert.throws(()=>parseVariantArgs([...prefix,'--terminal-closure','--terminal-closure']),/duplicate/);
+  assert.throws(()=>variantOptions({...base,terminalClosure:1}),/boolean/);
+  const context={task:'UNCHANGED WORK ORDER',workspace:'/tmp/tiel/ws',dir:'/tmp/tiel',endpoint:'http://127.0.0.1:9191',modelId:'actual-model'};
+  const baseline=localVariantCommand(context),enabled=localVariantCommand({...context,terminalClosure:true});
+  assert.deepEqual(enabled.args,baseline.args);
+  assert.deepEqual(enabled.env,{...baseline.env,BANTAM_TERMINAL_CLOSURE:'1'});
+  assert.equal(enabled.args[enabled.args.indexOf('--max-turns')+1],'60');
+});
+
 test('public and hidden grading reuse readonly offline Docker and exact five-group protocol without launching candidates',async()=>{
   const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),card='job-planner';
   const descriptor=JSON.parse(fs.readFileSync(path.join(root,'examples/fights/factory-2026-09-06',card,'card.json'),'utf8'));

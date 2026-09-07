@@ -296,6 +296,39 @@ function orderedReceiptCommand(proof, shell, { generation, workspace }) {
   return command;
 }
 
+// Diagnostic context only. Validate historical receipts at their own generation
+// to explain why a formerly successful check is now stale; never credit it in
+// the current-generation acceptance calculation below.
+function staleFocusedCheck(turns, auditIndex, generation, configured, workspace) {
+  if (!Number.isSafeInteger(generation) || generation < 1) return null;
+  let prior = null;
+  for (let index = auditIndex + 1; index < turns.length; index++) {
+    const turn = turns[index];
+    if (!turn || turn.controllerStop || turn.shellScopeRollback?.violations?.length || turn.contractAssertion) continue;
+    const entries = Object.hasOwn(turn, "verificationReceipts") ? orderedTurnReceipts(turn, index)
+      : turn.verificationEvidence || turn.shellExecution ? [turn] : null;
+    for (const entry of entries ?? []) {
+      const proof = entry.verificationEvidence, shell = entry.shellExecution;
+      const oldGeneration = (proof ?? shell)?.generation;
+      if (!Number.isSafeInteger(oldGeneration) || oldGeneration < 0 || oldGeneration >= generation) continue;
+      const command = orderedReceiptCommand(proof, shell, { generation: oldGeneration, workspace });
+      if (command && isFocusedAuditCommand(command, configured)) prior = { command, generation: oldGeneration, turn: index };
+    }
+  }
+  if (!prior) return null;
+  const changed = new Set(), latest = new Map();
+  for (const turn of turns.slice(prior.turn + 1)) {
+    const paths = turn?.sourceEditedByShell === true && Array.isArray(turn.shellChangedPaths) ? [...turn.shellChangedPaths] : [];
+    if (turn?.editApplied === true) paths.push(turn.parsedAction?.p);
+    for (const file of paths) if (sourcePath(file) && !/[\x00-\x1f\x7f]/.test(file)) changed.add(file);
+    for (const file of changed) if (Object.hasOwn(turn?.workspaceCoherence?.fingerprints ?? {}, file)) {
+      latest.set(file, turn.workspaceCoherence.fingerprints[file]);
+    }
+  }
+  const changedPaths = [...changed].slice(0, 6);
+  return { ...prior, changedPaths, removedPaths: changedPaths.filter(file => latest.get(file) === "missing") };
+}
+
 export function pendingContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
   let auditIndex = -1;
   for (let index = turns.length - 1; index >= 0; index--) {
@@ -376,6 +409,7 @@ export function pendingContractAudit(turns = [], { generation, configuredCommand
   return { turn: auditIndex, promptSha256: audit.promptSha256 ?? null,
     report: String(audit.report ?? ""), sources: audit.sources ?? [], focusedTurn, projectTurn,
     configuredCommand: configured || null,
+    staleFocus: focusedTurn === null ? staleFocusedCheck(turns, auditIndex, generation, configured, workspace) : null,
     generation: Number.isSafeInteger(generation) && generation >= 0 ? generation : null,
     needsFocused: focusedTurn === null,
     needsProject: Boolean(configured && !projectAfterFocused),
@@ -393,13 +427,17 @@ export function contractAuditRecoveryNote(pending) {
       + "Do not repeat the focused check or emit DONE yet. Another runner, selector or package script is not interchangeable with this configured command, even if its output looks equivalent. Do not append echoed status, filters or other shell commands.";
   }
   const report = String(pending.report ?? "");
-  return `[contract-audit-recovery] Next: assert the current diagnostic; missing ${pending.missing?.join(" + ") || "current executable evidence"}. An observed task-valid failure outranks the unverified audit hypothesis. Test the actual API or real CLI (Node: spawnSync(process.execPath,[entry,...args])); assert child.status and output against the public contract. Run the focused launcher directly${configured ? `, then exactly: ${configured}` : ""}. No echoes or filters.\n`
-    + "Replace console.log(condition) with assert.ok(condition), or assert.deepEqual(actual, expected), bound to node:assert/strict and the actual public API result. Printing true/false, an echoed exit code, or an earlier broad green suite is not that assertion. Create or repair the small check file in a separate edit if needed; do not combine its launch with setup, filters or status-printing suffixes.\n"
-    + "Establish one valid-path case first using writable temporary fixtures and expectations derived from the public contract. Assert the actual output, not merely absence of an exception. If that case fails, inspect its error and fix the demonstrated implementation/fixture defect before adding zero-work or other boundary cases. Establish that one case and its launcher work before scaling a fuzz run.\n"
-    + "For a Node CLI, execute the real entry file with spawnSync(process.execPath, [entry, ...args], {encoding: 'utf8'}). Assert child.status and stdout/stderr as the public contract requires, for example assert.equal(child.status, expectedStatus, child.stderr). Do not simulate the CLI by changing process.argv inside a node -e surrogate. Other CLIs require their actual runtime. The entry, arguments and expected values must come from the real task, not this pattern.\n"
+  const stale = pending.staleFocus;
+  const brief = value => String(value).replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 160);
+  const staleNote = stale ? `Workspace changed since the successful focused check (generation ${stale.generation} -> ${pending.generation}): ${brief(stale.changedPaths?.map(file => `${file}${stale.removedPaths?.includes(file) ? " (removed)" : ""}`).join(", ") || "changed source generation")}. Earlier ${JSON.stringify(brief(stale.command))} is stale, not current proof. Keep intended check scripts; recreate a removed check or use a fresh direct assertion. Finish cleanup BEFORE final focused/project verification; DONE requires the unchanged verified tree.\n` : "";
+  return `[contract-audit-recovery] ${staleNote}Next: assert the current diagnostic; missing ${pending.missing?.join(" + ") || "current executable evidence"}. An observed task-valid failure outranks the unverified audit hypothesis. Test the actual API or real CLI (Node: spawnSync(process.execPath,[entry,...args])); assert child.status and output against the public contract. Run the focused launcher directly${configured ? `, then exactly: ${configured}` : ""}. No echoes or filters.\n`
+    + "Replace console.log(condition) with assert.ok(condition) or assert.deepEqual(actual, expected), bound to node:assert/strict and the actual public API result. Printouts and earlier broad green suites are not assertions. Create/repair the check separately; launch directly without setup, filters or status-printing suffixes.\n"
+    + "Establish one valid-path case first with writable temporary fixtures and public-contract expectations. Assert actual output. Fix a demonstrated implementation/fixture defect before zero-work or other boundary cases; establish that case and its launcher before scaling a fuzz run.\n"
+    + "For a Node CLI, use spawnSync(process.execPath, [entry, ...args], {encoding: 'utf8'}). Assert exit and stdout/stderr against the public contract: assert.equal(child.status, expectedStatus, child.stderr). Do not simulate the CLI by changing process.argv in node -e. Other CLIs require their actual runtime. Derive entry, arguments and expected values from the task.\n"
     + "Accepted launch shapes: `node --test test/edge.test.js`, `node check-api.mjs`, `python check_api.py`, or a direct inline assertion. JavaScript assertion shape (supply actual/expected from the public call first): `node -e 'const assert=require(\"node:assert/strict\"); assert.deepEqual(actual, expected);'`. Run the check directly; the check's own exit must measure the assertion.\n"
     + (configured ? `After the focused assertion, execute exactly this configured project command:\n${configured}\n` : "")
-    + "The audit below is a falsifiable model hypothesis, NOT an established defect or an authoritative expected value. Reject unsupported predictions with an executable counterexample; do not change correct behavior to satisfy the review. Repair only a demonstrated defect. Focused and project receipts must be fresh on the same source generation; an edit or model prose supplies neither. These receipts show execution, not oracle correctness or complete contract coverage. No extra turns are granted.\n"
+    + "Keep intended regression checks; clean temporary fixtures before final verification. For JSON comparisons, parse the actual output and compare structured values with assert.deepEqual instead of manually escaping nested JSON literals.\n"
+    + "The audit below is a falsifiable model hypothesis, NOT an established defect or an authoritative expected value. Reject unsupported predictions with an executable counterexample; do not change correct behavior to satisfy the review. Repair only a demonstrated defect. Focused and project receipts must be fresh on the same source generation; an edit or model prose supplies neither. These receipts show execution, not oracle correctness or complete contract coverage. No extra work turns are granted; any explicitly configured terminal allowance is DONE-only.\n"
     + `Unverified review from turn ${pending.turn + 1} (bounded excerpt):\n${report.slice(0, 700)}`
     + (report.length > 700 ? "\n[Review excerpt truncated; the full audit remains recorded.]" : "");
 }

@@ -7,6 +7,7 @@ import { runAgent } from "../src/agent.js";
 import { RunCheckpoint } from "../src/run-checkpoint.js";
 import { buildArtifact } from "../src/artifact.js";
 import { pendingContractAudit } from "../src/contract-audit-recovery.js";
+import { clipKeepingControllerAnnotation } from "../src/prompt.js";
 
 const TASK = "Implement and export synchronous collectItems(token, items) in src/items.js. items must be an array. token must be a nonempty string for every call, including empty arrays. Return an array preserving order. Invalid inputs must throw an Error. Run npm test.";
 const BAD = "export function collectItems(token, items) { if (!Array.isArray(items)) throw Error('items'); const result = []; for (const item of items) { if (typeof token !== 'string' || !token.length) throw Error('token'); result.push(item); } return result; }\n";
@@ -191,6 +192,58 @@ test("a fresh focused inline assertion immediately receives exact project verifi
   assert.equal(project.verificationEvidence.auditPromptSha256, result.turns[1].contractStateAudit.promptSha256);
   assert.equal(project.verificationEvidence.status, "pass");
   assert.deepEqual(checkpoint.turns()[2].verificationReceipts, result.turns[2].verificationReceipts);
+});
+
+test("cleanup after verified focus explains stale receipts and requires a fresh check before DONE", async (t) => {
+  const workspace = fixture(t);
+  const checkScript = "import assert from 'node:assert/strict'; import {collectItems} from './src/items.js'; assert.throws(() => collectItems('', [])); assert.deepEqual(collectItems('valid', [2, 1]), [2, 1]);\n";
+  const focused = { a: "shell", c: "node check-api.mjs" };
+  const { result, checkpoint } = await run(workspace, [edit(GOOD),
+    { a: "write_file", p: "check-api.mjs", content: checkScript }, VERIFY, focused,
+    { a: "shell", c: "rm -f check-api.mjs" }, DONE,
+    { a: "write_file", p: "check-api.mjs", content: checkScript }, focused,
+    { a: "read_file", p: "src/items.js" }, { a: "list_dir", p: "." }, DONE,
+  ], {
+    extensionTrajectory: true, prefixMode: "immutable",
+    shellSandbox: process.env.BANTAM_LIVE_SANDBOX_TEST === "1" ? "docker" : "host",
+    verificationWorkspaceReadOnly: process.env.BANTAM_LIVE_SANDBOX_TEST === "1",
+  });
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+  assert.equal(result.metrics.contractAuditRecoveryVerifies, 2, JSON.stringify(result.turns.map(turn => ({
+    action: turn.action, observation: turn.observation?.slice(0, 280), generation: turn.shellExecution?.generation,
+    changed: turn.shellChangedPaths, done: turn.doneAccepted,
+  }))));
+  const first = result.turns[3], cleanup = result.turns[4], fresh = result.turns[7];
+  assert.equal(first.verificationReceipts.entries.length, 2);
+  assert.equal(first.verificationReceipts.entries[1].verificationEvidence.status, "pass");
+  assert.match(first.observation, /Focused command: "node check-api\.mjs"/);
+  assert.match(first.observation, /Keep intended check scripts; temporary fixtures are different/);
+  assert.equal(cleanup.verificationEvidence, null, "pure deletion does not invent a test execution");
+  assert.equal(cleanup.shellExecution.invalidated, true);
+  assert.deepEqual(cleanup.shellChangedPaths, ["check-api.mjs"]);
+  const previous = first.verificationEvidence.generation;
+  assert.equal(cleanup.shellExecution.generation, previous + 1);
+  assert.ok(cleanup.observation.includes(`generation ${previous} -> ${previous + 1}`));
+  assert.match(cleanup.observation, /Verification invalidated.*check-api\.mjs/);
+  assert.match(cleanup.observation, /Deleting a check script also changes the verified workspace/);
+  assert.equal(result.turns[5].doneAccepted, false, "stale focus/project must not be accepted after cleanup");
+  assert.equal(fresh.verificationReceipts.entries.length, 2);
+  assert.equal(fresh.verificationReceipts.entries[0].shellExecution.executedCommand, focused.c);
+  assert.equal(fresh.verificationReceipts.entries[1].verificationEvidence.command, "npm test");
+  assert.equal(fresh.verificationReceipts.entries[1].verificationEvidence.status, "pass");
+  assert.ok(fresh.verificationEvidence.generation > cleanup.shellExecution.generation);
+  for (const turn of result.turns.slice(8, 10)) assert.doesNotMatch(turn.observation, /Verification invalidated/);
+  assert.equal(result.turns.at(-1).doneAccepted, true, "read/list preserve the freshly verified tree");
+  assert.equal(fs.readFileSync(path.join(workspace, "src/items.js"), "utf8"), GOOD);
+  assert.equal(fs.readFileSync(path.join(workspace, "check-api.mjs"), "utf8"), checkScript);
+  assert.equal(checkpoint.turns()[4].observation, cleanup.observation);
+  for (const [turn, marker] of [[first, "[auto-verify]"], [cleanup, "[scope]"]]) {
+    const executive = turn.observation.slice(turn.observation.indexOf(marker)).split("\n")[0];
+    assert.ok(executive.length < 700, "the complete repair directive fits the existing controller annotation budget");
+    const delivered = clipKeepingControllerAnnotation(turn.observation
+      + "\n[working-checkpoint; model hypothesis]\n" + "stale scratch-cleanup plan ".repeat(1200));
+    assert.ok(delivered.includes(executive), "clipping must retain the actual cleanup/closure directive");
+  }
 });
 
 test("real CLI assertions expose broken argv forwarding behind API-green and permit verified recovery", async (t) => {

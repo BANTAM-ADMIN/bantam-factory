@@ -4,9 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { composeExcludeVerbs } from "../src/turn-mask.js";
-import { latestVerificationRecovery, verificationRecoveryNote } from "../src/verification-recovery.js";
+import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedFocusedFailure, focusedFailureReminder } from "../src/verification-recovery.js";
 import { runAgent } from "../src/agent.js";
-import { contextUpdatePromptText } from "../src/prompt.js";
+import { contextUpdatePromptText, clipKeepingControllerAnnotation } from "../src/prompt.js";
+import { VERIFICATION_RECEIPTS_SCHEMA } from "../src/contract-audit-recovery.js";
 import { actionPromptMenuLine, LINE_EDIT_FEATURE } from "../src/action-protocol.js";
 
 test("recovery reads typed evidence, survives repeated reads, and retires on a measured pass", () => {
@@ -20,6 +21,94 @@ test("recovery reads typed evidence, survives repeated reads, and retires on a m
   const unclear = latestVerificationRecovery([{ verificationEvidence: { status: "unverified", command: "node verify.mjs | tail" } }]);
   assert.match(verificationRecoveryNote(unclear), /INCONCLUSIVE/);
   assert.match(verificationRecoveryNote(unclear), /original turn budget still applies/);
+});
+
+const reminderOptions = { generation: 6, workspace: "/fixture/workspace", configuredCommand: "npm test" };
+function reminderEntry(command, exitCode = 0, generation = 6) {
+  const shellExecution = { command, executedCommand: command, exitCode, generation,
+    cwd: reminderOptions.workspace, workspaceReadOnly: false, sandbox: "host",
+    invalidated: false, blocked: false, timedOut: false, interrupted: false,
+    outputSha256: "a".repeat(64) };
+  return { shellExecution, verificationEvidence: { ...shellExecution, schema: 1, source: "shell",
+    status: exitCode === 0 ? "pass" : "fail", statusScope: "execution", statusCommand: command,
+    counts: null, countsScope: "single-execution", outputSha256: "b".repeat(64) } };
+}
+function reminderTurn(index, entries) {
+  return { ...entries.at(-1), verificationReceipts: { schema: VERIFICATION_RECEIPTS_SCHEMA,
+    authority: "controller-execution-order", turn: index,
+    entries: entries.map((entry, sequence) => ({ ...entry, sequence })) } };
+}
+
+test("a failed focused command survives unrelated green diagnostics and broad verification", () => {
+  // Receipt projection of Stream's real check_audit -> dbg2 -> landing sequence:
+  // the diagnostic process exits zero while printing a child's failure.
+  const command = "node /tmp/check_audit.mjs";
+  const project = reminderEntry("npm test");
+  project.verificationEvidence.source = "landing"; project.shellExecution = null;
+  const turns = [reminderTurn(0, [reminderEntry(command, 1)]),
+    { ...reminderTurn(1, [reminderEntry("node /tmp/dbg2.mjs")]), observation: 'status 2\nstderr "bad input"' },
+    reminderTurn(2, [project])];
+  const failure = latestUnresolvedFocusedFailure(turns, reminderOptions);
+  assert.deepEqual(failure, { command, generation: 6, turn: 0, exitCode: 1, historical: false });
+  assert.match(focusedFailureReminder(failure), /different green command or printed diagnostic does not show this check passed/);
+  assert.equal(latestUnresolvedFocusedFailure([...turns, reminderTurn(3, [reminderEntry(command)])], reminderOptions), null);
+  assert.equal(latestUnresolvedFocusedFailure([{ ...reminderEntry(command, 1) }], reminderOptions)?.command, command,
+    "fully bound legacy execution remains readable without inventing an envelope");
+});
+
+test("ordered receipts retain a focused failure beside same-turn landing green and clear only an actual later match", () => {
+  const command = "node check-api.mjs", failed = reminderEntry(command, 1);
+  const project = reminderEntry("npm test");
+  project.verificationEvidence.source = "landing"; project.shellExecution = null;
+  const row = reminderTurn(0, [failed, project]); row.shellExecution = failed.shellExecution;
+  assert.equal(latestUnresolvedFocusedFailure([row], reminderOptions)?.command, command);
+  const normalized = reminderEntry(command);
+  normalized.shellExecution.command = normalized.verificationEvidence.command = `${command}; echo EXIT=$?`;
+  assert.equal(latestUnresolvedFocusedFailure([row, reminderTurn(1, [normalized])], reminderOptions), null,
+    "clearing binds the actually executed command, not its normalized-away passive echo");
+  assert.equal(latestUnresolvedFocusedFailure([reminderTurn(0, [reminderEntry(command), failed])], reminderOptions)?.command, command);
+  assert.equal(latestUnresolvedFocusedFailure([reminderTurn(0, [failed, reminderEntry(command)])], reminderOptions), null);
+});
+
+test("source changes make a failed check historical rather than claiming the new code is defective", () => {
+  const command = "node check-api.mjs", turns = [reminderTurn(0, [reminderEntry(command, 1, 5)])];
+  const failure = latestUnresolvedFocusedFailure(turns, reminderOptions);
+  assert.equal(failure.historical, true);
+  const note = focusedFailureReminder(failure);
+  assert.match(note, /historical evidence, not a claim the current code is defective/);
+  assert.doesNotMatch(note, /failure was observed on the current generation/);
+  assert.ok(latestUnresolvedFocusedFailure([...turns, reminderTurn(1, [reminderEntry(command, 0, 4)])], reminderOptions),
+    "older-generation green cannot settle a newer failure");
+  assert.equal(latestUnresolvedFocusedFailure([...turns, reminderTurn(1, [reminderEntry(command, 0, 6)])], reminderOptions), null);
+  const delivered = clipKeepingControllerAnnotation("output\n" + note + "\n[working-checkpoint; model hypothesis]\n" + "old plan ".repeat(3000));
+  assert.ok(note.length < 700 && delivered.includes(note));
+});
+
+test("malformed, mismatched, invalidated and masked receipts neither invent failure nor erase one", () => {
+  const command = "node check-api.mjs", failed = reminderTurn(0, [reminderEntry(command, 1)]);
+  const mutations = [
+    row => { row.verificationReceipts.authority = "worker"; },
+    row => { row.verificationReceipts.turn = 99; },
+    row => { row.verificationReceipts.entries[0].sequence = 2; },
+    row => { row.verificationReceipts.entries[0].verificationEvidence.outputSha256 = "missing"; },
+    row => { row.verificationReceipts.entries[0].shellExecution.executedCommand = `${command}; true`; },
+    row => { row.verificationReceipts.entries[0].verificationEvidence.statusCommand = "node other-check.mjs"; },
+    row => { row.verificationReceipts.entries[0].shellExecution.cwd = "/elsewhere"; },
+    row => { row.verificationReceipts.entries[0].shellExecution.invalidated = true; },
+    row => { row.verificationReceipts.entries[0].verificationEvidence.counts = { passed: 0, failed: 0, total: 0 }; },
+    row => { row.verificationEvidence = { ...row.verificationEvidence, command: "forged alias" }; },
+  ];
+  for (const mutate of mutations) {
+    const row = reminderTurn(1, [reminderEntry(command)]); mutate(row);
+    assert.ok(latestUnresolvedFocusedFailure([failed, row], reminderOptions), mutate.toString());
+  }
+  for (const execution of [reminderEntry(`${command}; true`, 1), reminderEntry("node -e 'console.log(false)'", 1),
+    { verificationEvidence: { status: "fail", command }, shellExecution: null }]) {
+    assert.equal(latestUnresolvedFocusedFailure([reminderTurn(0, [execution])], reminderOptions), null);
+  }
+  const malformed = reminderTurn(0, [reminderEntry(command, 1)]);
+  malformed.verificationReceipts = Object.create({ schema: VERIFICATION_RECEIPTS_SCHEMA });
+  assert.equal(latestUnresolvedFocusedFailure([malformed], reminderOptions), null);
 });
 
 test("duplicate recovery leaves shell available without overriding caller or document policy", () => {
@@ -132,6 +221,32 @@ async function runPhase(workspace, actions, options = {}) {
   });
   return { result, calls, events };
 }
+
+test("real failed check stays in delivered context after print-only success and retires after its fresh pass", async t => {
+  const workspace = phaseFixture(t);
+  fs.writeFileSync(path.join(workspace, "check-api.mjs"),
+    "import assert from 'node:assert/strict'; import value from './target.js'; assert.equal(value, 'ready');\n");
+  fs.writeFileSync(path.join(workspace, "debug.mjs"),
+    "import value from './target.js'; console.log('observed value:', value);\n");
+  const { result, calls } = await runPhase(workspace, [
+    { a: "write_file", p: "target.js", content: 'module.exports = "broken";\n' },
+    { a: "shell", c: "node check-api.mjs" }, { a: "shell", c: "node debug.mjs" },
+    { a: "write_file", p: "target.js", content: PHASE_IMPLEMENTATION },
+    { a: "shell", c: "node check-api.mjs" }, { a: "shell", c: PHASE_VERIFY },
+    { a: "done", summary: "The corrected result passes the focused and configured checks." },
+  ], { extensionTrajectory: true, prefixMode: "immutable", progressAwareness: false });
+  assert.equal(result.turns[1].shellExecution.exitCode, 1);
+  assert.equal(result.turns[2].shellExecution.exitCode, 0);
+  assert.match(result.turns[2].observation, /observed value: broken/);
+  assert.match(result.turns[2].observation, /\[diagnosis\] Unresolved focused-check observation: "node check-api\.mjs"/);
+  assert.match(calls[3].prompt, /different green command or printed diagnostic does not show this check passed/);
+  assert.match(result.turns[3].observation, /historical evidence, not a claim the current code is defective/);
+  assert.equal(result.turns[4].shellExecution.exitCode, 0);
+  assert.doesNotMatch(result.turns[4].observation, /Unresolved focused-check observation/);
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+  assert.equal(result.metrics.contractAudits ?? 0, 0, "the reminder adds no model review calls");
+  assert.equal(result.turns.length, 7, "the advisory adds neither actions nor execution budget");
+});
 
 test("post-edit progress recovery keeps shell open for distinct inconclusive checks after a public pass", async (t) => {
   const workspace = phaseFixture(t);

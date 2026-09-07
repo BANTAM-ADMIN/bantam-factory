@@ -28,7 +28,8 @@ import { isTestCommand, isDeliverableRun, isInlineEvalProbe } from "./logic/deli
 import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer, unicodeUnitGauge, shipTheGeneratorSteer, enumerateContractNote } from "./logic/probe-discipline.js";
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "./verification-evidence.js";
-import { latestVerificationRecovery, verificationRecoveryNote } from "./verification-recovery.js";
+import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedFocusedFailure, focusedFailureReminder } from "./verification-recovery.js";
+import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote } from "./terminal-closure.js";
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
@@ -396,6 +397,7 @@ async function runAgentCore({
   workspace,
   model = new ModelClient(),
   maxTurns = 30,
+  terminalClosureTurns = process.env.BANTAM_TERMINAL_CLOSURE === "1" ? 1 : 0,
   maxInvalidPerTurn = 3,
   verificationScript = null,
   profileText = null,   // standing operator preferences (see src/operator-profile.js)
@@ -686,6 +688,7 @@ async function runAgentCore({
   observationTransform = null,
   onEvent = () => {},
 }) {
+  terminalClosureAllowance(terminalClosureTurns);
   if (verificationPolicy !== "always" && verificationPolicy !== "after_edit") {
     throw new TypeError(`unknown verification policy: ${verificationPolicy}`);
   }
@@ -1214,6 +1217,8 @@ async function runAgentCore({
 
   const metrics = {
     turns: 0,
+    terminalClosure: { workTurnLimit: maxTurns, allowance: terminalClosureTurns,
+      granted: false, used: false, grantedTurn: null, usedTurn: null, generation: null },
     contextUpdatesIncluded: 0,
     contextUpdatesOmitted: 0,
     contextUpdatePromptReceipts: [],
@@ -1998,7 +2003,10 @@ async function runAgentCore({
   const recoverySnapshotKeys = new Set(restoredContextUpdates
     .filter((update) => update?.kind === "edit-recovery")
     .flatMap((update) => (update.paths ?? []).map((entry) => `${entry.path}:${update.generation}`)));
-  while (turns.length < maxTurns && !done && !interrupted) {
+  let terminalClosureAvailable = false;
+  while ((turns.length < maxTurns || terminalClosureAvailable) && !done && !interrupted) {
+    const terminalClosureTurn = turns.length >= maxTurns && terminalClosureAvailable;
+    if (terminalClosureTurn) terminalClosureAvailable = false;
     let executionShadowPhaseForTurn = null;
     let executionShadowBoundariesForTurn = [];
     // Context recovery (AIMD): if a past overflow trimmed history (historyCap went finite), gently
@@ -2021,9 +2029,20 @@ async function runAgentCore({
         turns.push({ action: null, observation: frameInjection(m) });
         onEvent({ type: "injection", message: typeof m === "string" ? m : m.text, kind: typeof m === "string" ? "user" : m.kind });
       }
+      if (terminalClosureTurn && (msgs || []).some(Boolean)) break;
     }
     onEvent({ type: "turn_start", turn: metrics.turns });
     detectExternalWorkspaceChanges("turn_start");
+    if (terminalClosureTurn) {
+      if (workspaceEditGeneration !== metrics.terminalClosure.generation || pendingExternalChanges.size
+          || doneVerificationProof?.verification?.status !== "pass") {
+        onEvent({ type: "terminal_closure", phase: "revoked", reason: "verification-generation-changed" });
+        break;
+      }
+      metrics.terminalClosure.used = true;
+      metrics.terminalClosure.usedTurn = turns.length;
+      onEvent({ type: "terminal_closure", phase: "used", ...metrics.terminalClosure });
+    }
     const maskedVerbForTurn = nextMaskedVerb;
     nextMaskedVerb = null;
     const documentRevisionTurn = documentRevisionRequired;
@@ -2110,7 +2129,9 @@ async function runAgentCore({
       enabledActionDefinitions({ features: turnActionFeatures })
         .map((definition) => definition.verb),
     );
-    const excludeThisTurn = [...new Set(requestedExclusions)]
+    const excludeThisTurn = [...new Set(terminalClosureTurn
+      ? [...callerExcludedActions, ...[...enabledTurnVerbs].filter(verb => verb !== "done")]
+      : requestedExclusions)]
       .filter((verb) => enabledTurnVerbs.has(verb));
     // The forceBuildEdit veto is a single-turn escalation: consume it once the mask has been composed.
     if (forceBuildEdit && useGrammar) forceBuildEdit = false;
@@ -2364,8 +2385,10 @@ async function runAgentCore({
       onEvent({ type: "execution_state_shadow", ...executionShadow });
     }
 
-    for (let attempt = 0; attempt <= maxInvalidPerTurn; attempt++) {
-      const historyForPrompt = repairObs
+    for (let attempt = 0; attempt <= (terminalClosureTurn ? 0 : maxInvalidPerTurn); attempt++) {
+      const historyForPrompt = terminalClosureTurn
+        ? [...turns, { observation: terminalClosureNote(maxTurns) }]
+        : repairObs
         ? [...turns, { observation: repairObs }]
         : (forceWrapUp
           ? [...turns, { observation: verificationRecoveryTurn
@@ -2652,7 +2675,7 @@ async function runAgentCore({
       let assistantPrefill = bareHistory ? bareTurnPrefill : model.assistantPrefill;
       let turnReasoning = null;
       const synthesisThisAttempt = preEditSynthesisTurn && attempt === 0;
-      if (thinkingAvailable && shouldThink(thinkMode, {
+      if (!terminalClosureTurn && thinkingAvailable && shouldThink(thinkMode, {
         turnIndex: turns.length,
         lastObservation: prevObs,
         lastWasInvalid: attempt > 0,
@@ -2939,6 +2962,20 @@ async function runAgentCore({
       ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
     };
     onEvent(actionEvent);
+    // A grammar-free caller or noncompliant sampler must not turn the closing
+    // allowance into one more tool action. Stop before any executor/query or
+    // automatic post-action verification path can run it.
+    if (terminalClosureTurn && action.a !== "done") {
+      const observation = "[terminal-closure] Closing allowance refused: only done was permitted. No tool or mutation executed; completion remains unresolved.";
+      turns.push({ i: turns.length, action, parsedAction: action, rawOutput, reasoning, protocolViolation,
+        observation, verificationEvidence: null, shellExecution: null, tookMs: nowMs() - turnStart,
+        ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
+        ...(modelCallIndex !== null ? { modelCallIndex } : {}) });
+      metrics.turns++;
+      onEvent({ type: "terminal_closure", phase: "refused", action: action.a });
+      onEvent({ type: "observation", ...turns.at(-1) });
+      break;
+    }
     if (action.a === "write_batch") {
       onEvent({
         type: "write_batch_manifest",
@@ -3641,9 +3678,18 @@ async function runAgentCore({
       onEvent({ type: "smoke_nudge", deliverable, edits: editCount });
     }
     if (directEditSucceeded || shellChangedWorkspace) {
+      const priorVerifiedGeneration = doneVerificationProof?.generation === workspaceEditGeneration
+        && doneVerificationProof.verification?.status === "pass"
+        && doneVerificationProof.evidence?.status === "pass" ? workspaceEditGeneration : null;
       workspaceChangedDuringRun = true;
       hasAuthoredWork = true;
       workspaceEditGeneration++;
+      if (priorVerifiedGeneration !== null) {
+        const changed = [...new Set([...directEditPaths, ...shellChangedPaths])];
+        const shown = changed.slice(0, 2).map(p => JSON.stringify(String(p).slice(0, 90))).join(", ");
+        result.observation += `\n[scope] Verification invalidated: workspace generation ${priorVerifiedGeneration} -> ${workspaceEditGeneration}; changed ${shown || "workspace files"}${changed.length > 2 ? ` (+${changed.length - 2} more)` : ""}.`
+          + ` Earlier PASS receipts describe generation ${priorVerifiedGeneration}, not this tree. Deleting a check script also changes the verified workspace. Finish necessary cleanup BEFORE the final focused check and configured project check; keep intended checks. Obtain fresh receipts before DONE.`;
+      }
       if (previewFailureSequence) {
         previewFailureSequence = notePreviewFailureEdit(previewFailureSequence);
       }
@@ -5403,17 +5449,35 @@ async function runAgentCore({
       if (status === "pass") {
         blindEditStreak = probeStreak = turnsSinceVerify = editsSinceFullVerify = 0;
         unverifiedEditSteerGiven = false;
-        result.observation += "\nThe focused and configured project receipts are now complete on this source generation. Do not repeat them or make unrelated edits; request done when the task is complete.";
+        const focusedCommand = shellReceipt?.executedCommand;
+        const focusedLabel = typeof focusedCommand === "string"
+          ? ` Focused command${focusedCommand.length > 180 ? " (excerpt)" : ""}: ${JSON.stringify(focusedCommand.slice(0, 180))}.` : "";
+        result.observation += `\n[auto-verify] The focused and configured project receipts are now complete on generation ${workspaceEditGeneration}.${focusedLabel}`
+          + " Keep intended check scripts; temporary fixtures are different. Clean fixtures or other optional files BEFORE final verification, not after it. Any further workspace edit or deletion invalidates these receipts. If the task is complete, request DONE on this unchanged tree.";
       }
     }
     if (landingPassNote !== null) {
       const pending = collectionAuditEnabled ? currentAuditState() : null;
+      if (landingPassNote === 0 && terminalClosureEligible({
+        allowance: terminalClosureTurns, used: metrics.terminalClosure.used,
+        turnsUsed: turns.length + 1, workTurnLimit: maxTurns, action, proof: doneVerificationProof,
+        generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
+        verificationWorkspaceReadOnly, pendingAudit: pending, interrupted,
+        controllerStopped: controllerStop || result.controllerStop, resultDone: result.done, callerExcludedActions,
+        freshEvidence: verificationReceipts.entries.some(entry => entry.verificationEvidence?.status === "pass"
+          && entry.verificationEvidence.generation === workspaceEditGeneration),
+      })) {
+        terminalClosureAvailable = true;
+        Object.assign(metrics.terminalClosure, { granted: true, grantedTurn: turns.length, generation: workspaceEditGeneration });
+        onEvent({ type: "terminal_closure", phase: "granted", ...metrics.terminalClosure });
+      }
       result.observation += pending
         ? `\n[completion state] Project green is not yet completion: ${pending.missing.join(" + ")} remains. ${landingPassNote === 0 ? "No actions remain; completion is unresolved." : pending.needsFocused
           ? "Next action: run the focused API assertion directly, without pipes, status echoes or another command. Do not edit merely to satisfy a review; demonstrate or disprove its claim."
           : `Next action: run the configured project check directly (${verificationScript}) on this unchanged tree.`} Do not emit done while this evidence is missing.`
         : landingPassNote === 0
-          ? "\n[completion state] Verification requirements are satisfied, but no actions remain for an accepted done."
+          ? terminalClosureAvailable ? `\n${terminalClosureNote(maxTurns)}`
+            : "\n[completion state] Verification requirements are satisfied, but no actions remain for an accepted done."
           : landingPassNote <= 1
             ? "\n[completion state] The current checks and audit-recovery requirements are satisfied. Emit done now with the verified result and any remaining limitations. Disclose leftover scratch; do not spend the final action on optional cleanup. Any necessary edit still requires verification."
             : "\n[completion state] The current checks and audit-recovery requirements are satisfied. Finish without optional changes; any necessary edit requires fresh verification before done.";
@@ -6030,6 +6094,18 @@ async function runAgentCore({
       }
     }
     metrics.progresslessTurns = progresslessTurns;
+
+    // Keep the failed focused command visible when later diagnostics or a
+    // different suite go green. This is context only: it cannot change a gate,
+    // action mask, execution budget, or acceptance result.
+    if (!result.done && !result.controllerStop && !interrupted) {
+      const failure = latestUnresolvedFocusedFailure([...turns, {
+        verificationEvidence: verificationReceipt(result.verificationEvidence), shellExecution: shellReceipt,
+        ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
+        controllerStop: result.controllerStop, shellScopeRollback: result.shellScopeRollback,
+      }], { generation: workspaceEditGeneration, workspace: exec.realWorkspace, configuredCommand: verificationScript });
+      if (failure) result.observation += `\n${focusedFailureReminder(failure)}`;
+    }
 
     // Normalize evaluator-only volatility only after every controller-owned
     // addition (auto-verification, completion audit, test focus, etc.). Doing
@@ -7087,6 +7163,10 @@ export function editScopeRefusal(action, guard) {
   for (const p of editPaths(action)) {
     const reason = guard(p);
     if (!reason) continue;
+    if (reason === "outside-workspace") {
+      return `[scope] ${p} is outside this workspace; direct file edits are confined to workspace paths. The edit was NOT applied.`
+        + " Create any new check in a permitted workspace path. Let the check create temporary fixtures with os.tmpdir() or the runtime's equivalent; temporary fixtures are not the check script itself. Create the check separately, then run its launcher directly.";
+    }
     const why = reason === "grader"
       ? "it is part of the grader for this task"
       : reason === "instruction-forbidden"

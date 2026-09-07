@@ -21,6 +21,37 @@ const check = (command = "node --test test/edge.test.js", generation = 1, execut
 };
 const project = () => check("npm test");
 
+test("stale focus context names observed cleanup without granting stale execution credit", () => {
+  const removed = { sourceEditedByShell: true, shellChangedPaths: ["check-api.mjs"],
+    workspaceCoherence: { fingerprints: { "check-api.mjs": "missing" } } };
+  const turns = [audit, check("node check-api.mjs"), project(), removed];
+  const before = JSON.stringify(turns);
+  const pending = pendingContractAudit(turns, { ...options, generation: 2 });
+  assert.deepEqual(pending.missing, ["focused-execution", "project-verification"]);
+  assert.deepEqual(pending.staleFocus, { command: "node check-api.mjs", generation: 1, turn: 1,
+    changedPaths: ["check-api.mjs"], removedPaths: ["check-api.mjs"] });
+  const note = clipKeepingControllerAnnotation("[repetition] Repeated DONE is blocked.\n" + contractAuditRecoveryNote(pending) + "\nworking note ".repeat(1000));
+  for (const phrase of [/generation 1 -> 2/, /check-api.mjs \(removed\)/, /not current proof/, /cleanup BEFORE/]) assert.match(note, phrase);
+  assert.equal(JSON.stringify(turns), before, "context projection cannot mutate evidence");
+  assert.equal(pendingContractAudit([...turns, check("node check-api.mjs", 2), check("npm test", 2)], { ...options, generation: 2 }), null);
+  assert.equal(pendingContractAudit([audit, check("node check-api.mjs"), project(), { parsedAction: { a: "read_file", p: "check-api.mjs" } }], options), null);
+});
+
+test("stale focus advice rejects failed, forged and mismatched receipt aliases and bounds paths", () => {
+  const clean = check("node check-api.mjs");
+  for (const row of [check("node check-api.mjs", 1, { exitCode: 1 }),
+    { ...clean, verificationEvidence: { ...clean.verificationEvidence, source: "model" } },
+    { ...clean, shellExecution: { ...clean.shellExecution, command: "node check-other.mjs" } },
+    { ...clean, verificationReceipts: { schema: "forged" } },
+    { ...clean, controllerStop: { kind: "stop" } }]) {
+    assert.equal(pendingContractAudit([audit, row], { ...options, generation: 2 }).staleFocus, null);
+  }
+  const paths = ["../escape", "/absolute", "newline\nfile", ...Array.from({length: 20}, (_, i) => `file${i}.js`)];
+  const pending = pendingContractAudit([audit, clean, { sourceEditedByShell: true, shellChangedPaths: paths }], { ...options, generation: 2 });
+  assert.deepEqual(pending.staleFocus.changedPaths, paths.slice(3, 9));
+  assert.deepEqual(pending.staleFocus.removedPaths, [], "changed is not evidence of removal");
+});
+
 test("audit prose and same-turn or old-generation green cannot discharge a new review", () => {
   for (const turns of [[audit], [check(), audit], [{ ...audit, ...check() }], [audit, { observation: "All tests pass" }], [audit, check(undefined, 0)]]) {
     assert.equal(pendingContractAudit(turns, options)?.promptSha256, "audit-hash");
@@ -260,7 +291,7 @@ test("unavailable/state-only audits and unbound probe projections do not invent 
 
 test("recovery names missing stages and requires a real public API assertion without arbitrary edits or oracle claims", () => {
   const note = contractAuditRecoveryNote(pendingContractAudit([audit], options));
-  for (const phrase of [/actual public API/, /zero-work/, /before scaling a fuzz run/, /Repair only a demonstrated defect/, /No extra turns/, /focused-execution/, /project-verification/, /node --test test\/edge.test.js/, /python check_api.py/, /not oracle correctness/]) assert.match(note, phrase);
+  for (const phrase of [/actual public API/, /zero-work/, /before scaling a fuzz run/, /Repair only a demonstrated defect/, /No extra work turns/, /DONE-only/, /focused-execution/, /project-verification/, /node --test test\/edge.test.js/, /python check_api.py/, /not oracle correctness/]) assert.match(note, phrase);
   assert.equal(contractAuditRecoveryNote(null), "");
 });
 

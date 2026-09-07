@@ -27,7 +27,7 @@ export function variantKit(kitId=DEFAULT_KIT_ID) {
 }
 
 export function variantOptions(options={}) {
-  const {output,label,variantId,kitId=DEFAULT_KIT_ID,modelId=null,modelFile=null,timeoutMs=600000,endpoint='http://127.0.0.1:8085',verificationWorkspaceReadOnly=false,contractAssertionStation=false}=options;
+  const {output,label,variantId,kitId=DEFAULT_KIT_ID,modelId=null,modelFile=null,timeoutMs=600000,endpoint='http://127.0.0.1:8085',verificationWorkspaceReadOnly=false,contractAssertionStation=false,terminalClosure=false}=options;
   const kit=variantKit(kitId),cards=options.cards===undefined?kit.cards:options.cards;
   if(!path.isAbsolute(output??''))throw Error('--output must be an absolute, fresh evidence directory');
   if(typeof label!=='string'||!label.trim()||label.length>200||/[\r\n\x00-\x1f]/.test(label))throw Error('--label must name the actual model variant');
@@ -38,9 +38,10 @@ export function variantOptions(options={}) {
   if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('--timeout-seconds must be 1..600');
   if(typeof verificationWorkspaceReadOnly!=='boolean')throw Error('verificationWorkspaceReadOnly must be a boolean');
   if(typeof contractAssertionStation!=='boolean')throw Error('contractAssertionStation must be a boolean');
+  if(typeof terminalClosure!=='boolean')throw Error('terminalClosure must be a boolean');
   const url=new URL(endpoint);
   if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.pathname!=='/'||url.search||url.hash)throw Error('--endpoint must be a loopback HTTP origin without credentials');
-  return {output,label:label.trim(),variantId,kitId,arm:`bantam-local-${variantId}`,modelId,modelFile,cards:[...cards],timeoutMs,endpoint:url.origin,verificationWorkspaceReadOnly,contractAssertionStation};
+  return {output,label:label.trim(),variantId,kitId,arm:`bantam-local-${variantId}`,modelId,modelFile,cards:[...cards],timeoutMs,endpoint:url.origin,verificationWorkspaceReadOnly,contractAssertionStation,terminalClosure};
 }
 
 export function parseVariantArgs(args) {
@@ -48,6 +49,10 @@ export function parseVariantArgs(args) {
     ['--model-id','modelId'],['--model-file','modelFile'],['--cards','cards'],['--timeout-seconds','timeoutMs']]);
   const options={};
   for(let i=0;i<args.length;i++){
+    if(args[i]==='--terminal-closure'){
+      if(Object.hasOwn(options,'terminalClosure'))throw Error('duplicate --terminal-closure');
+      options.terminalClosure=true;continue;
+    }
     if(args[i]==='--contract-assertion-station'){
       if(Object.hasOwn(options,'contractAssertionStation'))throw Error('duplicate --contract-assertion-station');
       options.contractAssertionStation=true;continue;
@@ -63,12 +68,13 @@ export function parseVariantArgs(args) {
   return variantOptions(options);
 }
 
-export function localVariantCommand({task,workspace,dir,endpoint,modelId,verificationWorkspaceReadOnly=false,contractAssertionStation=false}) {
+export function localVariantCommand({task,workspace,dir,endpoint,modelId,verificationWorkspaceReadOnly=false,contractAssertionStation=false,terminalClosure=false}) {
   // This legacy key selects a command recipe, not the recorded model identity.
   // Keep the exact prior baseline's Qwen profile, 60 turns and request budgets.
   const {exe,args,env}=freshCommand({arm:'bantam-local-27b',task,workspace,dir,endpoint,model:modelId,probeEnabled:true});
   if(verificationWorkspaceReadOnly){args.push('--verify-workspace-read-only');env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
   if(contractAssertionStation)env.BANTAM_CONTRACT_ASSERTION_STATION='on';
+  if(terminalClosure)env.BANTAM_TERMINAL_CLOSURE='1';
   return {exe,args,env}; // Do not copy historical corner/name/subtitle metadata.
 }
 
@@ -202,9 +208,12 @@ export async function runLocalVariant(input) {
     label,variantId,kitId:selectedKit.id,arm,modelId:model.id,expectedModelId:options.modelId,modelFile:fileReceipt,modelFileSha256:fileReceipt?.sha256??null,endpoint,
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),sourceSeal:runtimeSeal,kitSeal,
     design:`New separately identified local-model variant on the frozen ${selectedKit.id} factory kit. One serial BANTAM run per selected card, fresh identical starters, no teacher or operator repairs. Historical cards remain unchanged. Different tasks/model/quantization/server settings prevent treating this as a pure harness ablation or statistical ranking.`,
-    limits:{wallMs:timeoutMs,bantamTurns:60,reasoningPredict:4096,actionPredict:8192},
+    limits:{wallMs:timeoutMs,bantamTurns:60+(options.terminalClosure?1:0),bantamWorkTurns:60,
+      terminalClosureAllowance:options.terminalClosure?1:0,reasoningPredict:4096,actionPredict:8192},
     configuration:{bantamContext:'extension/immutable',profile:'qwen',probeEnabled:true,teacher:false,
       contractAssertionStation:options.contractAssertionStation,
+      terminalClosure:{enabled:options.terminalClosure,allowance:options.terminalClosure?1:0,
+        policy:'At most one additional DONE-only attempt after final work action establishes current configured PASS with no pending audit. No extra work, reasoning rail, or automatic acceptance; ordinary DONE gates remain enforced.'},
       verificationEnvironment:{profile:options.verificationWorkspaceReadOnly?'configured-readonly-v1':'legacy-writable-live-verifier',
         configuredWorkspaceReadOnly:options.verificationWorkspaceReadOnly,manualShellWorkspaceReadOnly:false,
         independentGradingWorkspaceReadOnly:true,temporaryDirectory:'/tmp',
@@ -231,7 +240,7 @@ export async function runLocalVariant(input) {
       fs.mkdirSync(path.join(dir,'native-sessions'));
       const recorder=await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')});
       const before=await optionalCounters(endpoint);
-      const command=localVariantCommand({task,workspace,dir,endpoint:recorder.endpoint,modelId:model.id,verificationWorkspaceReadOnly:options.verificationWorkspaceReadOnly,contractAssertionStation:options.contractAssertionStation});
+      const command=localVariantCommand({task,workspace,dir,endpoint:recorder.endpoint,modelId:model.id,verificationWorkspaceReadOnly:options.verificationWorkspaceReadOnly,contractAssertionStation:options.contractAssertionStation,terminalClosure:options.terminalClosure});
       write(path.join(dir,'command.json'),command);
       process.stdout.write(`${card} / ${label}: started\n`);
       let result,usage;

@@ -129,3 +129,20 @@ test('last-work-turn focused assertion plus actual controller project check can 
   assert.equal(proofTurn.verificationReceipts.entries[1].verificationEvidence.configuredCommand,'npm test');
   assert.equal(result.metrics.terminalClosure.grantedTurn,2);assert.equal(result.turns[3].doneAccepted,true);
 });
+
+
+test('wall reserve grants the real agent a closing action while ordinary turns remain', async t => {
+  const realNow = Date.now.bind(Date); let offset = 0, calls = 0;
+  t.mock.method(Date, 'now', () => realNow() + offset);
+  const actions = [WRITE, VERIFY, DONE];
+  const {result, events} = await run(fixture(t), [], {maxTurns:60, wallDeadlineMs:600000, terminalClosureTurns:1,
+    model:{assistantPrefill:'', actTemperature:null, async complete(){
+      calls++; assert.ok(actions.length, 'no unbounded closure calls');
+      const action = actions.shift(); if (calls === 2) offset = 560000;
+      return {content:JSON.stringify(action),tokens:1,stoppedEos:true};
+    }}});
+  assert.equal(calls,3);
+  assert.equal(result.reachedDone,true,result.turns.at(-1).observation);
+  assert.equal(result.turns.at(-1).doneAccepted,true);
+  assert.ok(events.some(e => e.type === 'terminal_closure' && e.phase === 'used'));
+});

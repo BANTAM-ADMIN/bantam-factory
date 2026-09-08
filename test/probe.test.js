@@ -88,6 +88,20 @@ function mountedVolumes(args) {
   return args.flatMap((value, index) => value === "-v" ? [args[index + 1]] : []);
 }
 
+test('a failed setup explains missing copied inputs and the actual isolated paths', async t => {
+  const root = workspace(t);
+  for (const inputs of [[], [{p:'src/x.js'}]]) {
+    const process = fakeRunner([succeeded({code:1,stderr:"ENOENT: open 'src/x.js'"})]);
+    const result = await runProbe(root, action({inputs}), {processRunner:process.runner});
+    assert.equal(result.probeEvidence.projection.reason, 'setup_failed');
+    assert.match(result.observation, inputs.length ? /subject\/src\/x.js/ : /Copied inputs: none/);
+    assert.match(result.observation, /declare it in inputs/);
+    assert.match(result.observation, /normal shell action/);
+    assert.equal(process.stages.length,1,'failed setup does not run witness or check');
+    assert.equal(fs.readFileSync(path.join(root,'src/x.js'),'utf8'),'export const answer = 42;\n');
+  }
+});
+
 test("successful probe has ordered, source-bound stage receipts and only a scoped assertion pass", async (t) => {
   const root = workspace(t);
   const spec = action();

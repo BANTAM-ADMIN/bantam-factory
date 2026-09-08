@@ -288,7 +288,11 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
     }
     return out;
   };
-  const snapshot = () => ({ hud: hudSnapshot(), overlays: overlaySnapshot() });
+  const snapshot = () => ({ hud: hudSnapshot(), overlays: overlaySnapshot(),
+    pauseControls: [...document.querySelectorAll('button, [role=button], input[type=button]')]
+      .filter(visible).map(describe).filter(el => /\\b(?:pause|paused|resume)\\b/i.test(el?.text || '')),
+    visibleCanvas: [...document.querySelectorAll('canvas')].some(visible),
+  });
   const numericHudValue = (snap, name) => {
     const hud = snap?.hud ?? [];
     const exact = hud.find((item) => new RegExp("^" + name + "(?:[-_](?:val|value))?$", "i").test(item.id || ""));
@@ -338,7 +342,7 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
       .join("\\n");
     return /\\b(?:press|hit|type|key)\\s+(?:the\\s+)?(?:p|key\\s*p)\\b[^\\n]{0,50}\\bpause\\b/i.test(text)
       || /\\bpause\\b[^\\n]{0,50}\\b(?:press|hit|type|key)\\s+(?:the\\s+)?(?:p|key\\s*p)\\b/i.test(text)
-      || /\\b(?:pause|paused|resume)\\b/i.test(controls);
+      || /\\bp\\s*[:—–-]?\\s*pause\\b|\\bpause\\s*[:(—–-]\\s*p\\b/i.test(text + '\\n' + controls);
   };
   const primaryControl = () => {
     const candidates = [...document.querySelectorAll("button, input[type=button], input[type=submit], [role=button], a[href]")]
@@ -491,10 +495,14 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
 
       const firstPause = pauseOverlays(I.snapshots.afterPause1);
       const secondPause = pauseOverlays(I.snapshots.afterPause2);
-      if (firstPause.length && secondPause.length) {
+      const resumeControl = snap => (snap?.pauseControls || []).some(el => /\\bresume\\b/i.test(el.text || ''));
+      const controlToggled = !resumeControl(I.snapshots.afterKeys) && resumeControl(I.snapshots.afterPause1);
+      if ((firstPause.length && secondPause.length) || (controlToggled && resumeControl(I.snapshots.afterPause2))) {
         I.issues.push("P opened a visible pause overlay, but the second P did not close it; keyboard pause cannot toggle back to play.");
-      } else if (advertisedKeyboardPause() && !firstPause.length) {
-        I.issues.push("Pause is advertised, but the first dispatched P did not expose a visible pause overlay.");
+      } else if (advertisedKeyboardPause() && !firstPause.length && !controlToggled) {
+        if (I.snapshots.afterPause1.visibleCanvas) {
+          I.notes.push('Pause is advertised, but no DOM pause indicator changed. Canvas-drawn state is outside this DOM check; verify pause/resume with a focused behavior assertion or visual check.');
+        } else I.issues.push("Pause is advertised, but the first dispatched P did not expose a visible pause indicator.");
       }
     } catch (e) {
       I.issues.push("Interaction smoke crashed: " + String(e && e.message || e).slice(0, 300));

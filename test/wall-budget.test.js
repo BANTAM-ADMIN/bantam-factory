@@ -12,7 +12,7 @@ test("silent when no wall budget is known — most runs have none", () => {
 test("names the budget and says which one actually kills the run", () => {
   const line = wallBudgetLine({ budgetMs: 1_800_000, elapsedMs: 600_000 });
   assert.match(line, /10m used of 30m \(33%\)/);
-  assert.match(line, /killed on TIME, not on turns/);
+  assert.match(line, /wall deadline and configured turn cap both apply/);
 });
 
 test("escalates past halfway, and hard near the end", () => {

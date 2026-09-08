@@ -124,11 +124,17 @@ export function renderProbeEvidence(receipt) {
   const { projection } = receipt;
   const lines = [
     `[probe] ${projection.status}: ${projection.reason}`,
+    receipt.inputs?.length
+      ? `Copied inputs (read-only, relative to /probe): ${clipText(receipt.inputs.map(input => JSON.stringify('subject/' + input.p)).join(', '), 600)}`
+      : 'Copied inputs: none. Project files are not present in this isolated experiment.',
     "Scope: model-designed experiment on copied inputs; NOT task verification.",
     "A passed witness means its assertion exited zero, not independent proof of semantic coverage.",
     "Fixture files and /tmp persist across stages of this experiment; a new probe starts empty.",
     `Evidence: ${receipt.experimentId}; input ${receipt.sourceDigest}`,
   ];
+  if (projection.reason === 'setup_failed') {
+    lines.splice(2, 0, 'If setup needs a project file, declare it in inputs as {"p":"relative/path"} and read "subject/relative/path" from /probe. Use a normal shell action to run checks directly in the project workspace.');
+  }
   // Front-load every phase before any model-produced output can consume space.
   for (const entry of receipt.stages) {
     const state = !entry.executed ? "SKIPPED"

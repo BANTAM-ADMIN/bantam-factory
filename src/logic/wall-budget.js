@@ -39,5 +39,5 @@ export function wallBudgetLine({ budgetMs = null, elapsedMs = 0 } = {}) {
     urgency = " Past halfway — prefer finishing a working version over improving an unfinished one.";
   }
   return `[budget] wall clock: ${mins(used)} used of ${mins(budget)} (${pct(share)}%), ~${mins(left)} left.`
-    + ` This run is killed on TIME, not on turns.${urgency}`;
+    + ` The wall deadline and configured turn cap both apply; reserve time for verification and the final response.${urgency}`;
 }

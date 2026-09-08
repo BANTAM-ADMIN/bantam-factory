@@ -15,14 +15,21 @@ export class ForemanQueue {
     if (!Array.isArray(batch) || !batch.length || batch.length > 8 || this.jobs.length + batch.length > this.maxJobs) throw Error('job admission limit exceeded');
     const known = new Set(this.jobs.map(j => j.id));
     const rows = batch.map(input => {
-      if (!input || Object.keys(input).some(k => !['id','worker','task','context','verify','dependsOn'].includes(k))) throw Error('invalid job fields');
+      if (!input || Object.keys(input).some(k => !['id','worker','task','context','verify','dependsOn','resumeFrom'].includes(k))) throw Error('invalid job fields');
       const worker = input.worker ?? 'local';
       if (!this.workers.has(worker)) throw Error('worker not enabled by operator');
       if (typeof input.id !== 'string' || !/^[a-z][a-z0-9-]{0,47}$/.test(input.id) || known.has(input.id)) throw Error('job ID must be unique: lowercase initial letter, then lowercase letters/digits/hyphens, 1..48 characters (no underscores)');
       for (const key of ['task','context','verify']) if (typeof input[key] !== 'string' || !input[key].trim() || input[key].length > (key === 'verify' ? 2000 : 16000)) throw Error(`invalid job ${key}`);
       if (!Array.isArray(input.dependsOn) || new Set(input.dependsOn).size !== input.dependsOn.length || input.dependsOn.some(id => !known.has(id))) throw Error('dependencies must name earlier jobs; cycles and forward references are rejected');
+      const resumeFrom = input.resumeFrom ?? '';
+      if (typeof resumeFrom !== 'string') throw Error('resumeFrom must be a job ID or empty');
+      if (resumeFrom) {
+        const source = this.jobs.find(j => j.id === resumeFrom);
+        if (!source || !['failed','cancelled'].includes(source.status) || !source.finishedAt || !source.result?.recoverySnapshot) throw Error('resumeFrom requires a settled failed/cancelled job with a retained snapshot');
+        if (input.dependsOn.length) throw Error('a recovery resumes its original snapshot; use a subsequent job for new dependencies');
+      }
       known.add(input.id);
-      return { ...structuredClone(input), worker, lane: worker === 'local' ? 'local' : 'codex', status: 'queued', queuedAt: Date.now() };
+      return { ...structuredClone(input), resumeFrom, worker, lane: worker === 'local' ? 'local' : 'codex', status: 'queued', queuedAt: Date.now() };
     });
     this.jobs.push(...rows); // Validate the WHOLE batch before accepting any job.
     for (const row of rows) this.emit('job.queued', structuredClone(row));
@@ -58,7 +65,8 @@ export class ForemanQueue {
       // Defer execution so active is installed even for a synchronous test executor.
       const running = Promise.resolve().then(() => {
         if (control.signal.aborted) throw Error('job cancelled before execution');
-        return this.execute(structuredClone(job), structuredClone(deps), control.signal, progress);
+        const recovery = job.resumeFrom ? this.jobs.find(j => j.id === job.resumeFrom) : null;
+        return this.execute(structuredClone(job), structuredClone(deps), control.signal, progress, structuredClone(recovery));
       })
         .then(result => { job.result = result; job.status = control.signal.aborted ? 'cancelled' : result?.pass === true ? 'passed' : 'failed'; },
           error => { job.status = control.signal.aborted ? 'cancelled' : 'failed'; job.result = { pass: false, error: String(error?.message ?? error) }; })

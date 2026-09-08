@@ -304,3 +304,28 @@ test('interaction checks admit render-loop UI updates while retaining broken har
     assert.deepEqual(report.pointerOcclusions,[]);
   }
 });
+
+
+test('canvas pause controls are observed without requiring a DOM overlay', {skip:compositeSkipReason(_chromiumSkip,_networkSkip)}, t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(),'bantam-preview-canvas-pause-'));
+  t.after(() => fs.rmSync(workspace,{recursive:true,force:true}));
+  for (const mode of ['toggle','stuck','canvas-only','button-only']) {
+    fs.writeFileSync(path.join(workspace,'index.html'), `<main><h1>Orbit Game</h1>
+      <p>${mode === 'button-only' ? 'Take a break whenever you like.' : 'P pause'}</p>
+      <canvas width="200" height="300"></canvas><button id="pause">Pause</button></main>
+      <script>let paused=false;
+      const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+      function draw(){ctx.clearRect(0,0,200,300);ctx.fillText(paused?'PAUSED':'PLAYING',20,20);}
+      document.addEventListener('keydown',e=>{if(e.key==='p' && '${mode}'!=='button-only'){
+        paused=${mode === 'stuck' ? 'true' : '!paused'};
+        if('${mode}'!=='canvas-only')document.querySelector('#pause').textContent=paused?'Resume':'Pause';draw();
+      }});draw();</script>`);
+    const report=runPreviewSync(workspace,'index.html',{interact:true,realtimeProbe:false});
+    assert.equal(report.interaction.completed,true,mode);
+    if(mode==='stuck') assert.match(report.interaction.issues.join(' '),/second P did not close/);
+    else assert.deepEqual(report.interaction.issues,[],mode);
+    if(mode==='canvas-only') assert.match(report.interaction.notes.join(' '),/outside this DOM check/);
+    if(mode==='toggle') assert.ok(report.interaction.snapshots.afterPause1.pauseControls.some(c=>c.text==='Resume'));
+    if(mode==='button-only') assert.doesNotMatch(report.interaction.notes.join(' '),/Pause is advertised/);
+  }
+});

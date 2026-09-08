@@ -149,11 +149,27 @@ export function foremanWorkerContext(job, dependencies, task = '') {
   const outcomes = dependencies.map(j => ({ id: j.id, status: j.status,
     verified: j.result?.verification?.pass === true, integrated: j.result?.integrated === true,
     changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null }));
-  return `${task ? `OVERALL OPERATOR BRIEF (project context):\n${task}\n\nYour assigned milestone contributes to this full goal. Preserve its applicable constraints; do not deliver unrelated milestones or claim the whole project is done. The supervisor owns final integration and full-task acceptance.\n\n` : ''}SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
+  return `${task ? `OVERALL OPERATOR BRIEF (project context):\n${task}\n\nYour assigned milestone contributes to this full goal. Preserve its applicable constraints; do not deliver unrelated milestones or claim the whole project is done. The supervisor owns final integration and full-task acceptance.\n\n` : ''}${job.resumeFrom ? `RECOVERY: Your workspace already contains the retained, UNVERIFIED work from ${job.resumeFrom}. Inspect it here; no sibling-job or host paths are accessible. Repair and verify it before completion. Other jobs may have integrated since this snapshot; conflicts are checked at integration.\n\n` : ''}SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
 }
 export function foremanWorkerTask(task, job, dependencies = null) {
   const contract = `YOUR ASSIGNED MILESTONE:\n${job.task}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features. Preserve applicable constraints from the overall brief supplied as project context. Retain executable assertions for behavior you change; printing a status is not an assertion.`;
   return dependencies === null ? contract : `${contract}\n\n${foremanWorkerContext(job, dependencies, task)}`;
+}
+
+// Recovery is a new private worker on retained bytes, never a promotion. Its
+// original baseline makes the normal integration transaction detect newer,
+// overlapping candidate edits while preserving independent integrations.
+export function materializeForemanWorker({store, candidate, job, recovery, ws, before}) {
+  if (job.resumeFrom) {
+    if (recovery?.id !== job.resumeFrom || !['failed','cancelled'].includes(recovery.status)
+        || !recovery.finishedAt || !recovery.result?.recoverySnapshot || !recovery.result?.snapshot) throw Error('invalid recovery source');
+    store.materialize(recovery.result.recoverySnapshot, ws);
+    store.materialize(recovery.result.snapshot, before);
+    return {commit: recovery.result.snapshot, recoveredFrom: recovery.id, recoverySnapshot: recovery.result.recoverySnapshot};
+  }
+  const snapshot = store.capture(candidate, {message: `dispatch ${job.id}`});
+  store.materialize(snapshot.commit, ws); store.materialize(snapshot.commit, before);
+  return snapshot;
 }
 
 export async function runForeman(plan, { log = () => {} } = {}) {
@@ -176,11 +192,10 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   const stop = () => ac.abort(); process.once('SIGINT', stop); process.once('SIGTERM', stop);
   const remaining = () => Math.max(1, plan.timeoutMs - (Date.now() - started));
   const check = async (ws, command, signal = ac.signal) => runShellProcess(ws, command, { shellSandbox: 'docker', shellNetwork: false, workspaceReadOnly: true, timeoutMs: Math.min(60000, remaining()), signal });
-  const execute = async (job, dependencies, signal, progress) => {
+  const execute = async (job, dependencies, signal, progress, recovery) => {
     const dir = path.join(plan.output, 'jobs', job.id); fs.mkdirSync(dir, { recursive: true });
-    const snapshot = store.capture(candidate, { message: `dispatch ${job.id}` });
     const ws = path.join(dir, 'ws'), before = path.join(dir, 'baseline');
-    store.materialize(snapshot.commit, ws); store.materialize(snapshot.commit, before);
+    const snapshot = materializeForemanWorker({store, candidate, job, recovery, ws, before});
     const task = foremanWorkerTask(plan.task, job, dependencies);
     fs.writeFileSync(path.join(dir, 'task.md'), task, { mode: 0o600 });
     const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids, { mode: 0o700 }); fs.mkdirSync(sessions, { mode: 0o700 });
@@ -227,15 +242,17 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'native process did not complete; recorded responses may omit in-flight usage' };
     }
     const accepted = job.worker !== 'local' || acceptedBantamCompletion(readJson(path.join(dir, 'run.json')));
+    const after = store.capture(ws, {message: `settled ${job.id}`});
     const checked = await check(ws, job.verify, signal); write(path.join(dir, 'verification.json'), checked);
     const verification = brief(checked);
     const record = { pass: clean(result) && accepted && verification.pass, acceptedCompletion: accepted, verification, usage, integrated: false, snapshot: snapshot.commit,
+      recoverySnapshot: after.commit, recoveredFrom: snapshot.recoveredFrom ?? null,
       process: { code: result.code, timedOut: Boolean(result.timedOut), aborted: Boolean(result.aborted), bufferExceeded: Boolean(result.bufferExceeded) } };
     if (record.pass && !signal.aborted && !ac.signal.aborted) {
       // Capture immutable candidate bytes before transaction planning. Every
       // integration below is synchronous, so the two worker completions cannot
       // interleave their shared-candidate writes.
-      const after = store.capture(ws, { message: `finished ${job.id}` }), sealed = path.join(dir, 'sealed'); store.materialize(after.commit, sealed);
+      const sealed = path.join(dir, 'sealed'); store.materialize(after.commit, sealed);
       try {
         record.changedFiles = integrateForemanCandidate({ candidate, before, sealed, transactionRoot: path.join(plan.output, 'integrations'), id: job.id, verification });
         record.integrated = true;

@@ -5086,7 +5086,7 @@ async function runAgentCore({
         ? `Your last check of the deliverable FAILED (${String(redCheck.reason)}). Fix that error FIRST — a done over a red check will be refused. Then land with what IS done.`
         : `Land now: finish the smallest complete piece, then wrap up with what IS done and what remains, ending with "Next: <the one step you would take next>" — the user can accept it with a single Enter.`}`;
     }
-    if (!interactive && !result.done && !interrupted && turnsRemaining >= 0 && turnsRemaining <= landingWindow) {
+    if (!interactive && !result.done && !interrupted && turnsRemaining >= 0 && (turnsRemaining <= landingWindow || wallDeadlineReached())) {
       let landingNote = `\n[budget] ${turnsRemaining} turn${turnsRemaining === 1 ? "" : "s"} left after this one.`;
       // Name the requirement still untouched, not just the countdown.
       const untouched = untouchedNamedPaths(taskNamedPaths, editedPathsThisRun);
@@ -5097,7 +5097,7 @@ async function runAgentCore({
           + ` and this run has not edited ${untouched.length === 1 ? "it" : "them"} yet.`
           + ` If that is deliberate, say so in your done summary; otherwise do it now.`;
       }
-      if (turnsRemaining <= 2 && verificationScript) {
+      if ((turnsRemaining <= 2 || wallDeadlineReached()) && verificationScript) {
         // The model/automatic path may already have run this configured suite
         // on this exact generation. Preserve that execution's source and full
         // command instead of erasing compound-scope evidence with a repeat.
@@ -5747,7 +5747,7 @@ async function runAgentCore({
     }
     if (landingPassNote !== null) {
       const pending = collectionAuditEnabled ? currentAuditState() : null;
-      if (landingPassNote === 0 && terminalClosureEligible({
+      if ((landingPassNote === 0 || wallDeadlineReached()) && terminalClosureEligible({
         allowance: terminalClosureTurns, used: metrics.terminalClosure.used,
         turnsUsed: turns.length + 1, workTurnLimit: maxTurns, deadlineReached: wallDeadlineReached(), action, proof: doneVerificationProof,
         generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
@@ -5765,7 +5765,7 @@ async function runAgentCore({
         ? `\n[completion state] Project green is not yet completion: ${pending.missing.join(" + ")} remains. ${landingPassNote === 0 ? "No actions remain; completion is unresolved." : pending.needsFocused
           ? "Next action: run the focused API assertion directly, without pipes, status echoes or another command. Do not edit merely to satisfy a review; demonstrate or disprove its claim."
           : `Next action: run the configured project check directly (${verificationScript}) on this unchanged tree.`} Do not emit done while this evidence is missing.`
-        : landingPassNote === 0
+        : landingPassNote === 0 || terminalClosureAvailable
           ? terminalClosureAvailable ? `\n${terminalClosureNote(maxTurns)}`
             : "\n[completion state] Verification requirements are satisfied, but no actions remain for an accepted done."
           : landingPassNote <= 1

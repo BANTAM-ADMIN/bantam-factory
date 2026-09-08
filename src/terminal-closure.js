@@ -45,5 +45,5 @@ export function terminalClosureEligible({allowance, used, turnsUsed, workTurnLim
 }
 
 export function terminalClosureNote(workTurnLimit) {
-  return `[terminal-closure] The ${workTurnLimit} work-turn budget is exhausted. The controller grants ONE additional DONE-only action because current-generation verification is green and no audit checkpoint remains. Emit {"a":"done","summary":"..."} with the verified result and remaining limitations. No tools, reads, edits, cleanup or extra work are permitted. This is not automatic acceptance: every existing completion gate still applies.`;
+  return `[terminal-closure] The work budget has reached its ${workTurnLimit}-turn cap or wall-clock closing reserve. The controller grants ONE additional DONE-only action because current-generation verification is green and no audit checkpoint remains. Emit {"a":"done","summary":"..."} with the verified result and remaining limitations. No tools, reads, edits, cleanup or extra work are permitted. This is not automatic acceptance: every existing completion gate still applies.`;
 }

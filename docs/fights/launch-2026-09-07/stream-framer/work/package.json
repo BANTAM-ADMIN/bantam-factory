@@ -181,6 +181,45 @@
           }
         ]
       }
+    },
+    {
+      "path": "pi.json",
+      "bytes": 139275,
+      "sha256": "cd1e0a0eb698fda8d687655a70eca5f88a8c6ede961dbc0aafb66d2c224b310a",
+      "arm": "pi",
+      "wallMs": 600007,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 28,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "The clock ran out while it traced a broken frame.",
+        "paragraphs": [
+          {
+            "text": "Pi wrote a decoder and a larger test suite, adjusted base64 validation, and repaired test edits. Its project test run still reported ten failures. A one-byte transport probe then showed an emoji cut in half, and Pi began instrumenting the parser.",
+            "actions": [
+              "action-10",
+              "action-13",
+              "action-14",
+              "action-21",
+              "action-23"
+            ]
+          },
+          {
+            "text": "At the ten-minute boundary the saved implementation passed one of five independent groups. Chunk boundaries, field parsing, invalid-input handling, and CLI checks still failed. BANTAM FACTORY completed the same work order in 432.7 seconds with all five groups passing.",
+            "actions": [
+              "action-23",
+              "action-28"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

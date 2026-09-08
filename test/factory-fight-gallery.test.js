@@ -45,7 +45,7 @@ test('gallery keeps all planned tasks, complete rosters, timeout and partial-acc
   assert.equal(card.rows.length,2);assert.equal(card.rows[0].passed,true);assert.equal(card.rows[1].passed,false);
   assert.match(html,/OUTPUT_ONLY/);assert.match(html,/600\.0s/);assert.match(html,/Partial accounting disclosed/);
   assert.match(html,new RegExp('1\\/'+PLANNED));assert.match(html,/Not published yet/);assert.match(html,/1\/1/);
-  assert.doesNotMatch(html,/<script[^>]+src=|<iframe|<img[^>]+src="https?:/i);
+  assert.doesNotMatch(html,/<script[^>]+src="(?:https?:)?\/\/|<iframe|<img[^>]+src="https?:/i);
   assert.deepEqual(writeFightGallery({root}),{published:1,planned:PLANNED});
   assert.throws(()=>writeFightGallery({root}),/Refusing to replace/);
   assert.deepEqual(writeFightGallery({root,replace:true}),{published:1,planned:PLANNED});

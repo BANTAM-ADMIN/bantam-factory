@@ -13,12 +13,13 @@
 <meta name="theme-color" content="#101916">
 <link rel="icon" href="assets/showcase/img/bantam-mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/showcase/style.css">
+<link rel="stylesheet" href="assets/showcase/chrome.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top">
-  <a class="brand" href="#"><canvas id="headerRooster" width="22" height="22" aria-hidden="true"></canvas><span>BANTAM FACTORY</span></a>
+<header class="factory-top">
+  <a class="factory-brand" href="#" aria-label="BANTAM FACTORY home"><canvas id="headerRooster" width="22" height="22" aria-hidden="true"></canvas><span>BANTAM FACTORY</span></a>
   <nav aria-label="Site">
     <a href="fights.html#fights">Fights</a>
     <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/README.md">Docs</a>
@@ -135,6 +136,15 @@ bantamfactory setup</pre>
   <p><a href="fights.html#fights">Open the fight gallery</a></p>
 </section>
 
+<section class="band factory-comic sandbox-comic" aria-labelledby="sandbox-heading">
+  <h2 id="sandbox-heading">Big ideas. Their own workshop.</h2>
+  <p>The project is its workspace. Model shell commands run inside Docker with the network off by default. In an interactive session, you approve network access when a job needs it.</p>
+  <figure>
+    <div class="comic-strip" tabindex="0" role="region" aria-label="Three-panel sandbox workshop comic; scroll horizontally on small screens"><a href="assets/bantam-sandbox-v1.png" aria-label="Open the sandbox workshop comic at full size"><img src="assets/bantam-sandbox-v1.png" alt="An orange chicken receives a project inside a glass workshop, enthusiastically builds at its workbench, then presents a little arcade cabinet. The desk and computer outside stay tidy." width="2048" height="683" loading="lazy" decoding="async"></a></div>
+    <figcaption><span>A place to build. A boundary around the work.</span><a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/SECURITY.md">How the sandbox works ↗</a></figcaption>
+  </figure>
+</section>
+
 <section class="band limits" id="before">
   <h2>Before you install.</h2>
   <p>A few things worth knowing so the first run goes the way you expect.</p>
@@ -147,12 +157,11 @@ bantamfactory setup</pre>
   </ul>
 </section>
 
-<section class="strut" aria-label="An easter egg">
-  <figure class="term term--strut" id="strutTerm"></figure>
-  <div class="strut-copy">
-    <p>And it can strut.</p>
-    <p class="fine">Five animations, drawn in half-block characters at 22 columns, shipped in the repo. Run <code>bantam strut</code> in any truecolor terminal.</p>
-  </div>
+<section class="band lab-contact" id="contact" aria-labelledby="contact-heading">
+  <p class="contact-label">THE LAB IS OPEN</p>
+  <h2 id="contact-heading">Talk to the lab.</h2>
+  <p>Questions, ideas, or business inquiries? We’d like to hear from you.</p>
+  <a class="contact-email" href="mailto:bantamfactory@gmail.com">bantamfactory@gmail.com <span aria-hidden="true">↗</span></a>
 </section>
 
 </main>
@@ -170,6 +179,7 @@ bantamfactory setup</pre>
 
 <!-- FIGHT_PREVIEW -->
 <script src="assets/showcase/rooster.js"></script>
+<script src="assets/showcase/brand.js"></script>
 <script src="assets/showcase/demos.js"></script>
 <script src="assets/showcase/site.js"></script>
 </body>

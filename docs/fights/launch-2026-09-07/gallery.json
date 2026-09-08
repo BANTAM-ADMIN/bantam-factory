@@ -10,7 +10,7 @@
       "number": "01",
       "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
       "recorded": true,
-      "sourceSha256": "559cb271b867bf5ba93eddc724dbdd647af61350a4c75eda7b3743ce9e3ce7f9",
+      "sourceSha256": "e60d97dad8046fa872791b89b9a12c2d1f11d37c62b35c72d84d998cffcc0619",
       "reviewedDemo": true,
       "reviewedWork": true,
       "rows": [
@@ -148,6 +148,37 @@
             "quantization": "Q4_K_P",
             "contextTokens": 72192
           }
+        },
+        {
+          "label": "Pi",
+          "model": "Qwen 27B · same local model",
+          "arm": "pi",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 350719,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 25365,
+              "milliseconds": 335841.21400000004,
+              "measuredRequests": 19,
+              "totalRequests": 19
+            },
+            "prefill": {
+              "tokens": 6248,
+              "milliseconds": 9265.845000000001,
+              "measuredRequests": 19,
+              "totalRequests": 19
+            },
+            "evidenceSha256": "fa4536c7ad7ac273c6996aa365fce69314c0163755659d16da17bcde16341e5d",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -158,7 +189,7 @@
       "number": "02",
       "description": "Check every preimage, then apply a set of compatible edits as one transaction.",
       "recorded": true,
-      "sourceSha256": "59ea4ed66add7f6c43bdcf2d59238cde8417d03589d1fbfb1c5365e6c4478805",
+      "sourceSha256": "e1ca3d9cef8efeceeb4dc574700e6da767cc55df7afb8ba63a42e106ca18bb87",
       "reviewedWork": true,
       "rows": [
         {
@@ -295,6 +326,37 @@
             "quantization": "Q4_K_P",
             "contextTokens": 72192
           }
+        },
+        {
+          "label": "Pi",
+          "model": "Qwen 27B · same local model",
+          "arm": "pi",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 457159,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 28979,
+              "milliseconds": 430304.25500000006,
+              "measuredRequests": 32,
+              "totalRequests": 32
+            },
+            "prefill": {
+              "tokens": 16234,
+              "milliseconds": 19057.857000000004,
+              "measuredRequests": 32,
+              "totalRequests": 32
+            },
+            "evidenceSha256": "53ae8a464f9c51c02071befb72307c5d1f60ea7579fda1aa9d5e26b6538e6041",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -305,7 +367,7 @@
       "number": "03",
       "description": "Recover complete events across arbitrary byte chunks, with explicit stream termination.",
       "recorded": true,
-      "sourceSha256": "e21cd0a6d7d1d2032c0dad024884d5cae299985202de96ae235df81bef33a5a1",
+      "sourceSha256": "e2d956fcbc6c3c61fbd55832f688d132c46af835263f48c5cdd48d322420fc8f",
       "reviewedWork": true,
       "rows": [
         {
@@ -437,6 +499,37 @@
               "totalRequests": 9
             },
             "evidenceSha256": "0986339a6c3eedd704a2ecbfb787b46b33c48685c41acbc27df5c376a6effe12",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Pi",
+          "model": "Qwen 27B · same local model",
+          "arm": "pi",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 1,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 34457,
+              "milliseconds": 536569.42,
+              "measuredRequests": 24,
+              "totalRequests": 25
+            },
+            "prefill": {
+              "tokens": 14600,
+              "milliseconds": 16195.742,
+              "measuredRequests": 24,
+              "totalRequests": 25
+            },
+            "evidenceSha256": "6a42f3550d85d6c3d22845a6c67245293b90b3ad29dd5a5b9eca77d220ede5c8",
             "hardware": "rtx-4090-24gb",
             "hardwareBasis": "operator-confirmed",
             "quantization": "Q4_K_P",

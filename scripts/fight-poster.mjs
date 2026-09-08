@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 
 const E=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const FIGHT_BRAND_FILES=Object.freeze([
-  'bantam-rooster-v1.png','barlow-condensed-800.ttf','manrope-400.ttf','manrope-700.ttf',
+  'bantam-rooster-v1.png','bantam-sandbox-v1.png','barlow-condensed-800.ttf','manrope-400.ttf','manrope-700.ttf',
   'barlow-OFL.txt','manrope-OFL.txt','bantam-factory-stations.png','chicken-problems.png','gsap-3.14.2.min.js','gsap-NOTICE.txt',
 ]);
 export function fightBrandFiles(){

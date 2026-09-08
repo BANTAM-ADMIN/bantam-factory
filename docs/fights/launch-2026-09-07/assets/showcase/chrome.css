@@ -1,0 +1,26 @@
+/* The same paper, type and masthead throughout the factory. */
+@font-face{font-family:Manrope;src:url(fonts/manrope-400.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:Manrope;src:url(fonts/manrope-700.woff2) format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:'Barlow Condensed';src:url(fonts/barlow-condensed-800.woff2) format('woff2');font-weight:800;font-display:swap}
+:root{--factory-paper:#d7d9ce;--factory-ink:#17211c;--factory-gold:#e8a33d}
+body{background-color:var(--factory-paper);background-image:linear-gradient(#17211c11 1px,transparent 1px),linear-gradient(90deg,#17211c11 1px,transparent 1px);background-size:32px 32px;background-position:center 6px;color:var(--factory-ink);font-family:Manrope,'Segoe UI',system-ui,sans-serif}
+body::before{content:'';display:block;height:6px;background:var(--factory-gold)}
+.factory-top{box-sizing:border-box;max-width:1280px;width:100%;margin:0 auto;padding:22px clamp(20px,4vw,48px) 0;display:flex;align-items:center;justify-content:space-between;gap:24px;border:0}
+.factory-top .factory-brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:800 24px/1 'Barlow Condensed','Arial Narrow',Impact,sans-serif;letter-spacing:.02em;color:var(--factory-ink);white-space:nowrap}
+.factory-brand canvas{display:block;width:38px;height:38px;image-rendering:pixelated;flex:none}
+.factory-top nav{display:flex;align-items:center;gap:clamp(16px,3vw,32px)}
+.factory-top nav a{color:var(--factory-ink);text-decoration:none;font:700 15px/1.55 Manrope,system-ui,sans-serif;padding-bottom:2px;border-bottom:2px solid transparent}
+.factory-top nav a:hover,.factory-top nav a[aria-current=page]{border-color:var(--factory-gold)}
+.factory-top :focus-visible{outline:3px solid #92600f;outline-offset:4px}
+.factory-fights{--bg:#d7d9ce;--panel:#e3e5da;--panel2:#caced0;--paper:#d7d9ce;--ink:#17211c;--muted:#56605a;--line:#bcc2b5;--yellow:#e8a33d;--gold:#92600f;--sans:Manrope,'Segoe UI',system-ui,sans-serif;--display:'Barlow Condensed','Arial Narrow',Impact,sans-serif}
+.factory-fights .shell{width:calc(100% - 2 * clamp(20px,4vw,48px));max-width:1184px}
+.factory-fights .harness-scores{grid-template-columns:repeat(auto-fit,minmax(175px,1fr))}
+.factory-fights .card-description{font-size:14px;line-height:1.7}
+.factory-fights .score-name,.factory-fights .score-row>strong{font-size:13px}
+.factory-fights .score-row .status{font-size:10px}
+.factory-fights .card-links{font-size:11px}
+.factory-fights .card,.factory-fights .featured{background:var(--panel)}
+.factory-fights .lane.bantam{background:#e5dfc9}
+.factory-fights .poster-kicker,.factory-fights .eyebrow{color:#80520c}
+@media(max-width:700px){.factory-top{gap:16px}.factory-top .factory-brand span{display:none}.factory-brand canvas{width:32px;height:32px}.factory-top nav{gap:18px}.factory-top nav a{font-size:14px}.factory-fights .harness-scores{grid-template-columns:repeat(2,minmax(0,1fr))}.factory-fights .card-description{font-size:14px}.factory-fights .score-name,.factory-fights .score-row>strong{font-size:12px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}

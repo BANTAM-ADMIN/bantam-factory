@@ -258,7 +258,7 @@
   // ---------- page ----------
   function init() {
     // Hero: the big pixel bird.
-    for (const heroCanvas of [document.getElementById('headerRooster'), document.getElementById('heroRooster')]) {
+    for (const heroCanvas of [document.getElementById('heroRooster')]) {
       if (!heroCanvas || !R) continue;
       let seen = true;
       new IntersectionObserver(([e]) => { seen = e.isIntersecting; }).observe(heroCanvas);
@@ -323,24 +323,6 @@
         if (e.isIntersecting && !played && !DESKTOP.matches) { played = true; term.play(demo); }
       }, { threshold: 0.25 }).observe(mount);
     });
-
-    // The strut: every animation, in a loop, while it is on screen.
-    const strutMount = document.getElementById('strutTerm');
-    if (strutMount && R) {
-      const term = new Term(strutMount);
-      term.titleEl.textContent = 'bantam strut';
-      term.append(SHELL + 'bantam strut');
-      const spriteEl = term.append('', 'sprite');
-      const label = term.append('');
-      const render = (a, i) => {
-        spriteEl.innerHTML = spriteRows(a, i).join('\n');
-        label.innerHTML = mark(`[d]${padEnd(a, 6)} ${String(i + 1).padStart(2)}/${R.anims[a].frames.length} @ ${R.anims[a].fps}fps   Ctrl-C to stop[/]`);
-      };
-      render('idle', 0);
-      let seen = false;
-      new IntersectionObserver(([e]) => { seen = e.isIntersecting; }).observe(strutMount);
-      if (!REDUCED) animate(render, () => seen);
-    }
 
     // Copy buttons.
     document.querySelectorAll('[data-copy]').forEach((btn) => {

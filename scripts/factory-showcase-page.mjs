@@ -6,7 +6,7 @@ import {performanceView} from './fight-performance.mjs';
 const E=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROOT=new URL('../site/',import.meta.url);
 export const SHOWCASE_STATIC_FILES=Object.freeze([
-  'style.css','site.js','demos.js','rooster.js','hardware.json','img/bantam-mark.svg',
+  'style.css','chrome.css','brand.js','site.js','demos.js','rooster.js','hardware.json','img/bantam-mark.svg',
   'fonts/barlow-condensed-800.woff2','fonts/manrope-400.woff2','fonts/manrope-700.woff2',
   'fonts/source-code-pro-400.woff2','fonts/source-code-pro-600.woff2',
   'fonts/barlow-OFL.txt','fonts/manrope-OFL.txt','fonts/source-code-pro-OFL.txt',
@@ -59,7 +59,7 @@ export function renderShowcaseResults(data){
 export function renderShowcaseSpeeds(data){
   const rows=data.cards.filter(c=>c.recorded).flatMap(c=>c.rows);
   const views=arm=>rows.filter(r=>arm.includes(r.arm)).map(r=>performanceView(r.performance)).filter(v=>v&&!v.partial&&v.generationRate!==null);
-  const local=views(['bantam-local-27b']),peers=views(['hermes','opencode','deepseek-local-27b']);
+  const local=views(['bantam-local-27b']),peers=views(['hermes','opencode','deepseek-local-27b','pi']);
   const range=vs=>{const rates=vs.map(v=>v.generationRate);return `${Math.min(...rates).toFixed(1)}–${Math.max(...rates).toFixed(1)}`;};
   if(!local.length)return '';
   const rigs=[...new Set(local.map(v=>v.hardware).filter(Boolean))];

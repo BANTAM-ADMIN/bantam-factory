@@ -11,8 +11,8 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 80169,
-      "sha256": "9238a2d92d9e0ae13d26afff2fbf570c0674af851a0fcc7cbce6c504871c9ce4"
+      "bytes": 80129,
+      "sha256": "33cc2ab02e5ca5fe3fe4d79b64e724f79c0772f4bea856f3fb4170b9ef0b8f65"
     },
     {
       "path": "fight-card.json",

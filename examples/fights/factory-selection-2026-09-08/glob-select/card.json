@@ -1,0 +1,1 @@
+{"id":"glob-select","title":"Glob select","shape":"build","deliverables":["glob-select.js"],"protected":["package.json","test/public.test.js"],"groups":["wildcards-and-segment-boundaries","globstar-and-zero-segments","character-classes-and-escapes","negation-order-and-decisions","validation-and-cli-contract"]}

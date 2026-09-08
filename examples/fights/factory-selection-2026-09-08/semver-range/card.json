@@ -1,0 +1,1 @@
+{"id":"semver-range","title":"Semver range","shape":"repair","deliverables":["semver-range.js"],"protected":["package.json","test/public.test.js"],"groups":["core-precedence-and-build-metadata","prerelease-ordering-rules","comparator-sets-and-unions","prerelease-range-admission","validation-and-cli-contract"]}

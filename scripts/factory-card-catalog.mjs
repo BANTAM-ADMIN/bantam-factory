@@ -7,6 +7,7 @@ export const FACTORY_KITS = Object.freeze({
   'factory-2026-09-06': Object.freeze(['receipt-reducer', 'snapshot-drift', 'job-planner']),
   'factory-2026-09-07': Object.freeze(['context-packet', 'patch-transaction', 'stream-framer']),
   'factory-controls-2026-09-07': Object.freeze(['redaction-plan', 'retry-budget']),
+  'factory-selection-2026-09-08': Object.freeze(['glob-select', 'path-scope', 'semver-range']),
 });
 export const PUBLIC_FACTORY_CARDS = Object.freeze(Object.fromEntries(Object.entries({
   'receipt-reducer': {title:'Receipt reducer',kind:'BUILD',number:'01',description:'Turn a noisy stream of events into a trustworthy account of what happened.'},
@@ -17,6 +18,9 @@ export const PUBLIC_FACTORY_CARDS = Object.freeze(Object.fromEntries(Object.entr
   'stream-framer': {title:'Stream framer',kind:'REPAIR',number:'03',description:'Recover complete events across arbitrary byte chunks, with explicit stream termination.'},
   'redaction-plan': {title:'Redaction plan',kind:'BUILD',number:'01',description:'Remove selected literals deterministically, with an exact edit receipt and byte accounting.'},
   'retry-budget': {title:'Retry budget',kind:'REPAIR',number:'02',description:'Respect backoff, server retry hints and a hard remaining-time budget without overflow.'},
+  'glob-select': {title:'Glob select',kind:'BUILD',number:'01',description:'Match paths against glob patterns, last pattern deciding, with a receipt per path.'},
+  'path-scope': {title:'Path scope',kind:'EXTEND',number:'02',description:'Decide whether a path stays inside a workspace root, without trusting a shared prefix.'},
+  'semver-range': {title:'Semver range',kind:'REPAIR',number:'03',description:'Order versions by real precedence and admit prereleases into a range only when invited.'},
 }).map(([id,metadata])=>[id,Object.freeze(metadata)])));
 
 export function factoryKit(id='factory-2026-09-06') {

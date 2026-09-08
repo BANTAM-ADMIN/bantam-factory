@@ -1,0 +1,1 @@
+{"id":"path-scope","title":"Path scope","shape":"extend","deliverables":["path-scope.js"],"protected":["package.json","test/public.test.js"],"groups":["preserved-helper-and-normalization","traversal-and-root-clamping","prefix-collisions-and-boundaries","hostile-names-and-relative-receipts","validation-and-cli-contract"]}

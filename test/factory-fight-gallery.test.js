@@ -101,3 +101,9 @@ test('Pages workflow is explicit public-only main-branch publication of staged a
   assert.doesNotMatch(yaml,/^\s+(?:push|pull_request):/m);
   assert.match(yaml,/path: fight-pages/);assert.match(yaml,/stageFightGallery/);
 });
+
+test('gallery page declares its own inline icon so hosting roots never 404 on a favicon request',t=>{
+  const html=renderFightGallery(buildFightGallery(fixture(t).root));
+  assert.match(html,/<link rel="icon" href="data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+">/);
+  assert.doesNotMatch(html,/<link[^>]+href="https?:/i);
+});

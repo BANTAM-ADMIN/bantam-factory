@@ -75,7 +75,7 @@ Native Claude Code Sonnet, Opus and Fable ran the same work orders as
 [separately recorded references](docs/fights/launch-2026-09-07/references/README.md),
 shown on the gallery page beside BANTAM's own attempts.
 
-[Browse the fight gallery](docs/fights/launch-2026-09-07/index.html) ·
+[Browse the live fight gallery](https://bantam-admin.github.io/bantam-factory/) ·
 [Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md) ·
 [See the native Claude references](docs/fights/launch-2026-09-07/references/README.md)
 

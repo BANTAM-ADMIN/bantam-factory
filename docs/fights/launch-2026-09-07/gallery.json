@@ -338,10 +338,69 @@
           "accountingComplete": true
         }
       ]
+    },
+    {
+      "id": "redaction-plan",
+      "title": "Redaction plan",
+      "kind": "BUILD",
+      "number": "01",
+      "description": "Remove selected literals deterministically, with an exact edit receipt and byte accounting.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "retry-budget",
+      "title": "Retry budget",
+      "kind": "REPAIR",
+      "number": "02",
+      "description": "Respect backoff, server retry hints and a hard remaining-time budget without overflow.",
+      "recorded": false,
+      "rows": []
     }
   ],
   "references": {
     "cards": [
+      {
+        "id": "stream-framer",
+        "title": "Stream framer",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "Recover complete events across arbitrary byte chunks, with explicit stream termination.",
+        "recorded": true,
+        "sourceSha256": "caf0f09f63a7d16c1a6218414bb78780378f267b855fa6c2e6cf7826b57e9807",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 125876,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 185662,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 128257,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
       {
         "id": "receipt-reducer",
         "title": "Receipt reducer",

@@ -50,7 +50,8 @@ BANTAM, accounting limitations and conditions are retained. Native Claude Code
 Sonnet, Opus and Fable references are published beside the cards as separately
 recorded packages. Two further work orders from the controls kit are recording;
 pending runs are not results. The gallery is deployed through the explicit
-GitHub Pages workflow.
+GitHub Pages workflow at <https://bantam-admin.github.io/bantam-factory/>;
+the first publication was revision `bc0f12f`.
 
 Native Sol and Terra are explicit optional contenders, not additions to the
 default quota-consuming roster. Their isolated runner and portable accounting

@@ -7,11 +7,19 @@ Release scope: a public beta centered on existing model servers on Linux.
 Managed hardware profiles and the optional Astra foreman retain their stated
 experimental limits; new supervisor experiments are deferred, not launch gates.
 
-Privacy gate: archived raw cards are outside the working tree. The approved
-history cleanup and final remote audit are in progress. Keep the repository
-private until the publication gate is explicitly cleared. New public cards
+Privacy gate: archived raw cards and known historical identifiers have been
+removed from the cleaned history. A fresh private repository now holds that
+history at the original URL; the previous repository remains private. Keep the
+release repository private until hosted CI passes and publication is explicitly
+approved. New public cards
 require review; see the [archive policy](fights/README.md).
 The [privacy audit record](PRIVACY-RELEASE-AUDIT.md) records checks and remaining gates.
+
+Before publication: confirm green CI on the exact release revision, approve
+the visibility change, then create a beta tag/release describing the supported
+Linux bring-your-own-server path and experimental options. Hosting the reviewed
+static fight card and announcements are separate opt-in publication steps.
+No additional model or supervisor experiments are required for this beta gate.
 
 | Requirement | Current evidence | Remaining qualification/work |
 |---|---|---|

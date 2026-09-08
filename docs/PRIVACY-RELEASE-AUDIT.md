@@ -1,6 +1,7 @@
 # Privacy release audit — September 7, 2026
 
-Status: **release-candidate audit in progress; repository remains private**.
+Status: **cleaned release candidate in a fresh private repository; final CI and
+explicit publication approval remain required**.
 The checks below distinguish completed evidence from the final publication gate.
 
 ## Completed checks and cleanup
@@ -67,5 +68,37 @@ old independent clones cannot be certified erased by a local history rewrite.
 - Package command metadata now includes `bantamfactory` alongside `bantam` and
   the lockfile matches the package name/version. No global command was relinked.
 
-The final remote revision, history scan, clean-install smoke test and CI outcome
-must be recorded before marking this candidate cleared for publication.
+## Clean repository handoff
+
+The approved cleanup removed 263 historical raw-card paths and replaced known
+operator/workstation/private-project identifiers throughout reachable history.
+A verified private Git bundle, raw evidence archive and commit map retain the
+originals. The resulting tip tree is identical to the prepared release tree;
+source changes for installation and CI were separately committed and tested.
+
+Gitleaks scanned all 78 cleaned commits (14.20 MB of scanned changes) with no
+leaks found. A separate scan of 2,203 historical blobs found no targeted operator
+or private-project identifiers. Remaining home paths and email strings were
+reviewed as container paths, placeholders and synthetic fixtures. These are
+bounded checks, not a guarantee that every possible sensitive datum is absent.
+
+GitHub still served an old removed commit by SHA after the force-push. Therefore,
+the old repository was kept private under an archive name, and a fresh private
+repository was created at the original project URL with only cleaned history.
+That old commit returns HTTP 404 in the new repository. Do not push old clones,
+private bundles, old tags or archived run data into the new repository.
+
+All 44 prior Actions runs had their available logs backed up privately before
+removal. Their results were not rewritten; the private logs retain failures.
+The clean repository starts a new CI record. No releases, hosted Pages or
+release artifacts were migrated.
+
+An isolated GitHub clone installed its two locked dependencies, registered both
+commands under a disposable prefix, and launched `bantamfactory --help` without
+relinking the operator's installation. The source package was separately unpacked
+and scanned. The package remains marked private to prevent accidental npm
+publication; that does not prevent a public GitHub source release.
+
+Local qualification: 4,159 tests passed, zero failed, 76 skipped, plus the new
+installed-command test passed separately. Hosted CI must pass on the release
+revision before publication. The repository visibility has not been changed.

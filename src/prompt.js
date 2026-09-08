@@ -251,7 +251,7 @@ const SUCCESSFUL_INLINE_SHELL_MIN_CHARS = 800;
 // `done-gate`, `progress-awareness`, `grounding` and `open_files`. Several are
 // steers added THIS session that could be clipped away before the model read
 // them. `stderr` stays out deliberately: it is tool output wearing a bracket.
-const CONTROLLER_ANNOTATION_RE = /^\[(?:auto-verify|scoped-verify|completion-audit|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|progress-awareness|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|budget|peer|pipe-guard|cross-file|open_files|implementation-response|done-gate|grounding)\b/im;
+const CONTROLLER_ANNOTATION_RE = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|progress-awareness|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|budget|peer|pipe-guard|cross-file|open_files|implementation-response|done-gate|grounding)\b/im;
 
 // A read observation is sometimes more than a source snapshot: the controller
 // may append a trusted verification verdict or repair directive after executing
@@ -283,6 +283,22 @@ const CONTROLLER_ANNOTATION_RE = /^\[(?:auto-verify|scoped-verify|completion-aud
 // HEAD — the verdict, the diagnosis, the steer — while its tail is quoted tool
 // output. So keep each block's head and let the quoted output go.
 const ANNOTATION_HEAD_CHARS = 700;
+
+// The rule above holds for a block whose tail is quoted tool output. It is
+// false for a block that is authored guidance end to end and carries its
+// task-specific payload last. Measured 2026-09-08: the requirement checklist,
+// appended to the completion audit, began 2,139 characters into a 7,669
+// character block and was deleted on every run of every card, so a
+// countermeasure that had been measured, extended twice and shipped was read
+// by the model exactly never.
+//
+// Such a block is preserved whole. It is safe to do so because it is bounded
+// by construction rather than by whatever a tool printed: at most 8 quotes of
+// at most 140 characters plus fixed prose. The largest any of the 21 published
+// work orders produces is 899 characters; the cap below leaves headroom and
+// still refuses to let a malformed block consume the observation budget.
+const PRESERVED_ANNOTATION_RE = /^\[requirement-checklist\b/i;
+const PRESERVED_ANNOTATION_CHARS = 1600;
 
 function controllerAnnotationStarts(text) {
   const starts = [];
@@ -321,9 +337,12 @@ export function clipKeepingControllerAnnotation(observation, enabled = true, max
   const blocks = starts.map((start, i) => {
     const end = i + 1 < starts.length ? starts[i + 1] : full.length;
     const block = full.slice(start, end);
-    return block.length <= ANNOTATION_HEAD_CHARS
+    const budget = PRESERVED_ANNOTATION_RE.test(block)
+      ? PRESERVED_ANNOTATION_CHARS
+      : ANNOTATION_HEAD_CHARS;
+    return block.length <= budget
       ? block
-      : `${block.slice(0, ANNOTATION_HEAD_CHARS).trimEnd()}\n… [${block.length - ANNOTATION_HEAD_CHARS} chars of quoted output clipped] …\n`;
+      : `${block.slice(0, budget).trimEnd()}\n… [${block.length - budget} chars of quoted output clipped] …\n`;
   });
   const kept = blocks.join("");
 

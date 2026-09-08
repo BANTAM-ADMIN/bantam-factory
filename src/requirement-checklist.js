@@ -122,9 +122,18 @@ export function requirementChecklistEnabled(
   return /^(1|true|yes|on)$/i.test(String(value ?? ""));
 }
 
-/** Audit-hint suffix quoting the task's own named requirements, or "". */
+// Its own controller annotation, like every sibling audit message, rather than
+// prose appended to one. Measured 2026-09-08 across four ansi-wrap attempts and
+// every other card: appended inline, the checklist landed 2,139 characters into
+// a 7,669-character completion-audit block, and the prompt clipper keeps a
+// block's first 700 characters. The countermeasure was computed on every run of
+// every card and read by the model on none of them. A block of its own is
+// short enough to survive whole.
+export const REQUIREMENT_CHECKLIST_MARKER = "[requirement-checklist]";
+
+/** Audit-hint annotation quoting the task's own named requirements, or "". */
 export function requirementChecklistSuffix(task) {
   const items = extractRequirements(task);
   if (!items.length) return "";
-  return ` This task explicitly names: ${items.map((x) => `[${x}]`).join(" · ")}. Trace each named bound, literal, and rejection through the current code — the visible tests may cover none of them.`;
+  return `\n\n${REQUIREMENT_CHECKLIST_MARKER} This task explicitly names: ${items.map((x) => `[${x}]`).join(" · ")}. Trace each named bound, literal, and rejection through the current code — the visible tests may cover none of them.`;
 }

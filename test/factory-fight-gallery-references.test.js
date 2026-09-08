@@ -87,3 +87,11 @@ test('a reference package with an unrecorded row or a mismatched card is refused
   fs.writeFileSync(source,JSON.stringify(data));
   assert.throws(()=>buildFightGallery(root),/recorded|hash|package/);
 });
+
+test('gallery header links to the references section only when references exist',t=>{
+  const withRefs=renderFightGallery(buildFightGallery(gallery(t)));
+  assert.match(withRefs,/<section class="references" id="references"/);
+  assert.match(withRefs,/<a class="nav-link" href="#references">Frontier references[^<]*<\/a>/);
+  const without=renderFightGallery(buildFightGallery(gallery(t,{referenceCards:[]})));
+  assert.doesNotMatch(without,/#references/);
+});

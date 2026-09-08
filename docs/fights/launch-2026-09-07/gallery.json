@@ -345,8 +345,70 @@
       "kind": "BUILD",
       "number": "01",
       "description": "Remove selected literals deterministically, with an exact edit receipt and byte accounting.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "0d4b17f4f8d97ca9768f3b9ada2fe0c2887e27e506b5cd38cd26df6ece9fe12f",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 175640,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 391761,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Hermes",
+          "arm": "hermes",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 116972,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Sol",
+          "arm": "codex-sol",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 241160,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Terra",
+          "arm": "codex-terra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 134275,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     },
     {
       "id": "retry-budget",
@@ -354,8 +416,70 @@
       "kind": "REPAIR",
       "number": "02",
       "description": "Respect backoff, server retry hints and a hard remaining-time budget without overflow.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "82e8c07329b24e90a01b45758c35a724dc459572d17ffe82464bd73c89142646",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 141654,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 445841,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Hermes",
+          "arm": "hermes",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 562038,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 137291,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Sol",
+          "arm": "codex-sol",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 231835,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Terra",
+          "arm": "codex-terra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 143182,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     }
   ],
   "references": {

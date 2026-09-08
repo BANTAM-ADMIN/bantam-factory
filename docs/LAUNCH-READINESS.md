@@ -39,18 +39,20 @@ experiments are required for this beta gate.
 
 ## Fresh evidence
 
-The [launch gallery](fights/launch-2026-09-07/index.html) now contains all six
-launch cards and 27 recorded system attempts. BANTAM passed Context Packet in
-58.1s, Patch Transaction in 81.8s, Receipt Reducer in 112.5s, Snapshot Drift in
-124.3s and Job Planner in 193.2s; its Stream Framer attempt timed out at 4/5.
-On the same local 27B, DeepSeek Harness took 442.7s, 465.8s and 483.5s on the
-three six-system cards and Hermes 577.6s, 497.0s and a 2/5 timeout. All
-competitor results, including the native Codex lanes that were faster than
-BANTAM, accounting limitations and conditions are retained. Native Claude Code
-Sonnet, Opus and Fable references are published beside the cards as separately
-recorded packages. Two further work orders from the controls kit are recording;
-pending runs are not results. The gallery is deployed through the explicit
-GitHub Pages workflow at <https://bantam-admin.github.io/bantam-factory/>;
+The [launch gallery](fights/launch-2026-09-07/index.html) now contains all
+eight planned work orders and 39 recorded system attempts. BANTAM passed
+Context Packet in 58.1s, Patch Transaction in 81.8s, Receipt Reducer in 112.5s,
+Snapshot Drift in 124.3s, Retry Budget in 141.7s, Redaction Plan in 175.6s and
+Job Planner in 193.2s; its Stream Framer attempt timed out at 4/5. On the same
+local 27B across the five six-system cards, DeepSeek Harness took between
+391.8s and 483.5s and Hermes between 497.0s and 577.6s where it finished, with
+two timeouts. All competitor results, including the native Codex lanes that
+were faster than BANTAM, accounting limitations and conditions are retained,
+as is the redaction-plan observation that BANTAM made 45 requests and used
+2.1× DeepSeek's input tokens. Native Claude Code Sonnet, Opus and Fable
+references are published beside all six launch cards as separately recorded
+packages, eighteen attempts, all 5/5. The gallery is deployed through the
+explicit GitHub Pages workflow at <https://bantam-admin.github.io/bantam-factory/>;
 the first publication was revision `bc0f12f`.
 
 Native Sol and Terra are explicit optional contenders, not additions to the

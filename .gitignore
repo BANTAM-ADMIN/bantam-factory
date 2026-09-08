@@ -16,3 +16,6 @@ BANTAM-LAUNCH-PLAN.md
 
 # Browser automation output from the Playwright plugin.
 .playwright-mcp/
+
+# Session worktrees created by Claude Code.
+.claude/worktrees/

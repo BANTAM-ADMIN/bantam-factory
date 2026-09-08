@@ -81,6 +81,13 @@ the newest installer, a new model, or another user's hardware.
 
 ## Verification records
 
+The eight-work-order gallery revision `3c499f7` passed hosted CI with 4,273
+tests, 4,181 passing, zero failing and the rest skipped, after one
+Chromium-gated preview test failed on the runner on the first attempt and
+passed unchanged on rerun; the same revision passed locally. The six-card
+revision `bc0f12f` passed hosted CI on its first run. Both revisions were
+published through the Pages workflow only after those green results.
+
 The subsequent installed-peer/config-isolation change passed 4,108 host tests,
 zero failures and 76 skips. All 15 opt-in installed Hermes/OpenCode scripted
 tool-loop tests passed with no real model or cloud inference. These prove

@@ -1,0 +1,1 @@
+{"id":"retry-budget","title":"Retry budget","shape":"repair","deliverables":["retry-budget.js"],"protected":["package.json","test/public.test.js"],"groups":["exponential-backoff-and-cap","retry-hints-and-budget-boundaries","huge-attempts-zero-and-safe-arithmetic","validation-and-immutability","cli-and-error-contract"]}

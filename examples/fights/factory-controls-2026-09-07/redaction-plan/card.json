@@ -1,0 +1,1 @@
+{"id":"redaction-plan","title":"Redaction plan","shape":"build","deliverables":["redaction-plan.js"],"protected":["package.json","test/public.test.js"],"groups":["literal-matching-and-edit-receipts","overlap-priority-and-single-pass","unicode-bytes-and-opaque-identities","validation-and-immutability","cli-and-error-contract"]}

@@ -6,6 +6,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FACTORY_KITS = Object.freeze({
   'factory-2026-09-06': Object.freeze(['receipt-reducer', 'snapshot-drift', 'job-planner']),
   'factory-2026-09-07': Object.freeze(['context-packet', 'patch-transaction', 'stream-framer']),
+  'factory-controls-2026-09-07': Object.freeze(['redaction-plan', 'retry-budget']),
 });
 export const PUBLIC_FACTORY_CARDS = Object.freeze(Object.fromEntries(Object.entries({
   'receipt-reducer': {title:'Receipt reducer',kind:'BUILD',number:'01',description:'Turn a noisy stream of events into a trustworthy account of what happened.'},
@@ -14,6 +15,8 @@ export const PUBLIC_FACTORY_CARDS = Object.freeze(Object.fromEntries(Object.entr
   'context-packet': {title:'Context packet',kind:'BUILD',number:'01',description:'Fit complete, attributable context sections into a strict UTF-8 byte budget.'},
   'patch-transaction': {title:'Patch transaction',kind:'EXTEND',number:'02',description:'Check every preimage, then apply a set of compatible edits as one transaction.'},
   'stream-framer': {title:'Stream framer',kind:'REPAIR',number:'03',description:'Recover complete events across arbitrary byte chunks, with explicit stream termination.'},
+  'redaction-plan': {title:'Redaction plan',kind:'BUILD',number:'01',description:'Remove selected literals deterministically, with an exact edit receipt and byte accounting.'},
+  'retry-budget': {title:'Retry budget',kind:'REPAIR',number:'02',description:'Respect backoff, server retry hints and a hard remaining-time budget without overflow.'},
 }).map(([id,metadata])=>[id,Object.freeze(metadata)])));
 
 export function factoryKit(id='factory-2026-09-06') {

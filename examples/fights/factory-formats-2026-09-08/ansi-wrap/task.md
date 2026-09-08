@@ -16,7 +16,11 @@ Display width counts one per code point, except that a code point in the ranges
 U+1100 to U+115F, U+2E80 to U+A4CF, U+AC00 to U+D7A3, U+F900 to U+FAFF,
 U+FE30 to U+FE4F, U+FF00 to U+FF60 or U+FFE0 to U+FFE6 counts two. A surrogate
 pair is one code point. A code point of width two never straddles a line: if it
-does not fit, the line ends first.
+does not fit on the current line, the line ends first. A code point wider than
+`width` itself never fits anywhere and must still occupy a line alone: that
+line exceeds `width` and reports the code point's own display width. Such a
+code point must not be dropped, must not be split, and must not be preceded by
+an empty line.
 
 Break the text into lines no wider than `width`, filling each line as far as
 it will go. Break at the last space that leaves the line no wider than

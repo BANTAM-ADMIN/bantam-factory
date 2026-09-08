@@ -43,8 +43,8 @@ Example: `evaluateHand(['Ah','2c','3d','4s','5h'])` returns
 straight.
 
 CLI: `node poker-hand.js INPUT_JSON_FILE`. Require exactly one file argument.
-The JSON is a non-null, non-array object `{hands}` where `hands` is a dense
-array of hands; extra fields are ignored. Print exactly `{results, best}` as one
+The JSON is a non-null, non-array object `{hands}` where `hands` must be a
+dense, nonempty array of hands; extra fields are ignored. Print exactly `{results, best}` as one
 JSON value followed by newline, exit 0, and write no stderr. `results` is each
 hand's evaluation in input order, and `best` is the array of input indices of
 the strongest hands, ascending, holding more than one index on an exact tie.

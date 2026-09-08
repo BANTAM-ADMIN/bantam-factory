@@ -42,8 +42,29 @@ function comparisonSummary(series){
     local:countFamily('local'),frontier:countFamily('astra')};
 }
 
+// Spotlight the local factory, not the whole roster's combined pass rate.
+// Missing attempts stay in its denominator; accepted artifacts without clean
+// completion must not turn into a verified-finish headline.
+function localFactoryHeadline(summary){
+  const rows=summary.rows.filter(row=>row.arm==='bantam-local-27b');
+  if(!rows.length)return {score:`${summary.passed}/${summary.total}`,label:'attempts passed and completed',detail:'Recorded system comparison'};
+  const passed=rows.filter(row=>row.recorded===true&&row.outcome==='PASS'&&row.accepted===true
+    &&row.completed===true&&row.publicExit===0&&row.hiddenExit===0&&row.protectedChanges===0
+    &&valid(row.groupsTotal)&&row.groupsTotal>0&&row.groupsPassed===row.groupsTotal);
+  if(rows.length===1){
+    const row=rows[0];
+    return {score:passed.length?groupText(row):(row.recorded===true?(row.outcome==='PASS'?'UNVERIFIED':row.outcome):'PENDING'),
+      label:passed.length?'BANTAM · checks passed. Work completed.':'BANTAM · recorded outcome',
+      detail:row.recorded===true?`${seconds(row.wallMs)} elapsed · ${groupText(row)} acceptance groups`:'Attempt not yet recorded'};
+  }
+  const timed=rows.every(row=>row.recorded===true&&valid(row.wallMs));
+  return {score:`${passed.length}/${rows.length}`,label:'BANTAM · tasks passed and completed',
+    detail:timed?`${seconds(rows.reduce((sum,row)=>sum+row.wallMs,0))} summed run time`:'Full-cohort time not yet available'};
+}
+
 function recordedComparisonShare(data){
   const s=comparisonSummary(comparisonSeries(data)),one=s.cards.length===1;
+  const hero=localFactoryHeadline(s);
   const title=one?s.cards[0].title:'Recorded factory comparison';
   const brand=BRAND.replace(/<svg[^>]*>/,'<svg x="70" y="48" width="52" height="52" viewBox="0 0 100 100" color="#e8a33d">');
   const details=one&&s.rows.length<=6?s.rows.map((row,i)=>`<text x="70" y="${319+i*30}" fill="#202923" font-family="Arial,sans-serif" font-size="19">${E(row.label)}</text><text x="780" y="${319+i*30}" text-anchor="end" fill="#526058" font-family="monospace" font-size="18">${E(row.outcome)}</text><text x="1130" y="${319+i*30}" text-anchor="end" fill="#202923" font-family="monospace" font-size="19">${E(seconds(row.wallMs))}</text>`).join('')
@@ -53,12 +74,13 @@ function recordedComparisonShare(data){
   <text x="137" y="83" fill="#202923" font-family="Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="4">BANTAM</text>
   <text x="1130" y="79" text-anchor="end" fill="#526058" font-family="monospace" font-size="14">RECORDED / SYSTEM COMPARISON</text>
   <text x="70" y="171" fill="#202923" font-family="Arial,sans-serif" font-size="52" font-weight="700">${E(String(title).slice(0,46))}</text>
-  <text x="70" y="264" fill="#202923" font-family="Arial,sans-serif" font-size="82" font-weight="700">${s.passed}/${s.total}</text>
-  <text x="355" y="233" fill="#202923" font-family="Arial,sans-serif" font-size="25" font-weight="700">attempts passed and completed</text>
-  <text x="355" y="267" fill="#526058" font-family="Arial,sans-serif" font-size="18">${s.cards.length} work order${s.cards.length===1?'':'s'} · ${s.systems} systems · ${s.recorded}/${s.total} attempts recorded</text>
+  <text x="70" y="253" fill="#202923" font-family="Arial,sans-serif" font-size="${hero.score.length>5?30:72}" font-weight="700">${E(hero.score)}</text>
+  <text x="355" y="221" fill="#202923" font-family="Arial,sans-serif" font-size="25" font-weight="700">${E(hero.label)}</text>
+  <text x="355" y="253" fill="#526058" font-family="Arial,sans-serif" font-size="18">${E(hero.detail)}</text>
+  <text x="70" y="288" fill="#526058" font-family="Arial,sans-serif" font-size="16">${s.cards.length} work order${s.cards.length===1?'':'s'} · ${s.systems} systems · ${s.recorded}/${s.total} attempts recorded</text>
   ${details}<line x1="70" y1="491" x2="1130" y2="491" stroke="#c8cec2"/>
   <text x="70" y="526" fill="#202923" font-family="Arial,sans-serif" font-size="18">${s.accepted}/${s.total} artifacts accepted · ${s.local} local configurations · ${s.frontier} frontier reference${s.frontier===1?'':'s'}</text>
-  <text x="70" y="559" fill="#526058" font-family="Arial,sans-serif" font-size="17">Recorded outcomes, not a reliability estimate. Frontier models are not the local model.</text>
+  <text x="70" y="559" fill="#526058" font-family="Arial,sans-serif" font-size="17">${s.passed}/${s.total} attempts passed and completed across the roster. Frontier models are distinct.</text>
   <text x="70" y="600" fill="#526058" font-family="monospace" font-size="13">PUBLIC MEASUREMENTS · PRIVATE TRANSCRIPTS OMITTED · NOTHING AUTOMATICALLY PUBLISHED</text></svg>`;
 }
 
@@ -149,7 +171,8 @@ export function renderLaunchPage(input,{previewImage='share-card.svg',presentati
   const share=renderShareCard(data,{presentation});
   const description=qualification?'BANTAM local qualification: build, extend and repair useful tools. Recorded outcomes, elapsed times and token receipts.':generic?'Recorded factory comparison. Actual work orders, system outcomes, elapsed times and token receipts.':'BANTAM recorded factory results. Same local model, different harnesses. Inspect outcomes, actual clocks and token receipts.';
   const socialDescription=qualification?'Recorded local-worker qualification. Accepted projects and clean completion are separate; no reliability estimate.':generic?`${summary.cards.length} work orders, ${summary.systems} systems, ${summary.recorded} recorded attempts. Local and frontier models are distinct.`:'Recorded results. Same local 27B model, different harnesses. Three tasks, one recorded repeat.';
-  const recordedPlate=`<aside class="result-plate" aria-label="Recorded system comparison"><div class="plate-top"><span class="eyebrow">Recorded / system comparison</span><span class="plate-number">${summary.cards.length} WORK ORDER${summary.cards.length===1?'':'S'}</span></div><div class="hero-number">${summary.passed}/${summary.total}</div><h2>attempts passed and completed.</h2><p>${summary.cards.map(card=>E(card.title)).join('<br>')||'No recorded work orders.'}</p><div class="mini-comparison"><div><span>Systems included</span><strong>${summary.systems}</strong></div><div><span>Attempts recorded</span><strong>${summary.recorded}/${summary.total}</strong></div></div><p class="plate-note">Artifacts accepted: ${summary.accepted}/${summary.total}. Artifact acceptance and clean completion are separate.<br>Every included attempt counts. Not a reliability estimate or a general speed claim.</p></aside>`;
+  const hero=localFactoryHeadline(summary);
+  const recordedPlate=`<aside class="result-plate" aria-label="Recorded system comparison"><div class="plate-top"><span class="eyebrow">Recorded / system comparison</span><span class="plate-number">${summary.cards.length} WORK ORDER${summary.cards.length===1?'':'S'}</span></div><div class="hero-number"${hero.score.length>5?' style="font-size:clamp(1.5rem,4vw,3rem)"':''}>${E(hero.score)}</div><h2>${E(hero.label)}.</h2><p>${E(hero.detail)}</p><p>${summary.cards.map(card=>E(card.title)).join('<br>')||'No recorded work orders.'}</p><div class="mini-comparison"><div><span>Systems included</span><strong>${summary.systems}</strong></div><div><span>Attempts recorded</span><strong>${summary.recorded}/${summary.total}</strong></div></div><p class="plate-note">${summary.passed}/${summary.total} attempts passed and completed across the roster.<br>Artifacts accepted: ${summary.accepted}/${summary.total}. Artifact acceptance and clean completion are separate.<br>Every included attempt counts. Not a reliability estimate or a general speed claim.</p></aside>`;
   const recordedMethod=`<section><h3>The recorded comparison</h3><p>${summary.cards.length} included work order${summary.cards.length===1?'':'s'}: ${summary.cards.map(card=>`${E(card.kind)} — ${E(card.title)} (repeat ${card.repeat})`).join('; ')||'none'}. ${summary.systems} systems and ${summary.recorded}/${summary.total} recorded attempts. Every arm receives the supplied materials for its work order; independent acceptance checks remain separate from worker tests.</p><p>Local configurations and frontier references are distinguished in each lane. A frontier result is not a same-model comparison. All included outcomes remain visible; missing results are not zero-cost runs and do not count as passes. No winner or aggregate speed claim is inferred.</p><p>Configuration, native tool policies, sampling, cache state, run order and hardware can affect these observations. The public projection does not establish their equality or the execution schedule. This is not a controlled context-only ablation or a reliability estimate. No held-out-task claim is made; prior development exposure is not excluded.</p></section>`;
   const qualificationPlate=`<aside class="result-plate" aria-label="Recorded local qualification"><div class="plate-top"><span class="eyebrow">BANTAM / local qualification</span><span class="plate-number">${q.total} WORK ORDERS</span></div><div class="hero-number">${q.total?`${q.passed}/${q.total}`:'—'}</div><h2>tasks passed and completed.</h2><p>${E(q.model)}<br>Build. Extend. Repair.</p><div class="mini-comparison"><div><span>Summed run time</span><strong>${duration(q.wallMs)}</strong></div><div><span>Attempts recorded</span><strong>${q.recorded}/${q.total}</strong></div></div><p class="plate-note">Artifacts accepted: ${q.acceptedCards}/${q.total}. Independent checks passed; factory completion is separate.<br>All included tasks count, including failures and unrecorded work.<br>One qualification cohort, not a model comparison or reliability estimate.</p></aside>`;
   const qualificationMethod=`<section><h3>The qualification</h3><p>${q.total} included work orders: ${q.cards.map(card=>`${E(card.kind)} — ${E(card.title)}`).join('; ')||'no recorded qualification cohort'}. This is BANTAM-only local-worker qualification, not a comparison against other harnesses or models. Independent acceptance checks are separate from the worker's own tests.</p><p>The score requires both an accepted project and clean completion, with passing public and independent checks and no protected-file changes. Every included task remains in the denominator. Missing results are not failures, but do not count as passes. Summed run time is unknown if any included attempt lacks a measured duration.</p><p>One cohort does not establish a reliability rate or general capability. Recorded configuration, sampling and cache state can affect results. This does not measure every later harness revision. Public measurements omit private execution context and source.</p></section>`;

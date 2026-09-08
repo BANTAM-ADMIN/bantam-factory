@@ -1,10 +1,11 @@
 # BANTAM
 
-**Your model. Your hardware. A coding factory that earns its finish.**
+**Your model. Your hardware. A better coding factory.**
 
 BANTAM turns a local language model into a working coding agent: one that reads
 your project, builds features, repairs bugs, runs checks, and leaves evidence
-you can inspect. Keep your model. Give it a better way to work.
+you can inspect. Built to get more speed, accuracy and useful work from the
+model you already run—not to sell you another model subscription.
 
 The idea is industrial, not magical. Break difficult work into clear jobs.
 Put the right context at each station. Catch mistakes with checks, not wishes.
@@ -44,16 +45,18 @@ Fight cards put BANTAM and other coding systems on the same work order, with
 the same starting files and independent acceptance checks. See the result,
 the elapsed time, and the accounting behind it. Then run a comparison yourself.
 
-[![Open the recorded Context Packet comparison](docs/fights/context-packet-2026-09-07-public/share/share-card.png)](docs/fights/context-packet-2026-09-07-public/share/index.html)
+[![BANTAM: Context Packet, 5/5 in 58.1 seconds](docs/fights/launch-2026-09-07/context-packet/share/share-card.png)](docs/fights/launch-2026-09-07/context-packet/share/index.html)
 
-In this recorded Context Packet comparison, **BANTAM passed 5/5 in 124.6 seconds;
-Hermes passed 5/5 in 589.0 seconds**, using the same local 27B weights.
-OpenCode reached its output limit without completing the implementation.
-[Open the replay and full accounting](docs/fights/context-packet-2026-09-07-public/README.md).
+In the latest recorded Context Packet comparison, **BANTAM's local 27B passed
+5/5 in 58.1 seconds; native Astra passed 5/5 in 110.6 seconds**. OpenCode,
+using the same local weights as BANTAM, produced a passing artifact but reached
+the 600-second limit without clean completion.
+[Open the replay and full accounting](docs/fights/launch-2026-09-07/context-packet/README.md).
 
 That is a measured win on this attempt, not a universal ranking. The card retains
-the output-budget differences and incomplete Hermes request-level accounting.
-Results stay attached to their actual model, configuration and factory version.
+OpenCode's partial request-level accounting and separates its passing artifact
+from its unfinished run. Frontier comparisons use a different model; same-model
+comparisons isolate the local weights, not every configuration difference.
 
 ### Put BANTAM against your own tools
 
@@ -173,5 +176,5 @@ show the evidence, build the fix, and prove it catches the mistake.
 [Contributing](CONTRIBUTING.md) · [Factory doctrine](docs/FACTORY-MODEL.md) ·
 [Technical guide](docs/GUIDE.md) · [License](LICENSE)
 
-Public-beta release candidate. Model research and historical qualification
-records live in the documentation—not in the product's promise.
+Public-beta release candidate. Bring your model. Bring your hardest useful task.
+Put the factory to work.

@@ -1,18 +1,29 @@
-# Fight-card archive and publication policy
+# BANTAM fights
+
+Real work orders. Independent checks. Recorded clocks and token receipts.
+
+## Latest factory
+
+[Context packet · launch series](launch-2026-09-07/context-packet/README.md):
+BANTAM 5/5 in **58.1s**, native Astra 5/5 in **110.6s**, OpenCode 5/5 artifact
+but no clean completion at its **600s** time limit. Watch the replay, download
+the share image, and inspect the accounting. The remaining launch-series cards
+are running; they are not yet published results.
+
+## Earlier reviewed comparison
+
+[Context packet · Hermes comparison](context-packet-2026-09-07-public/README.md):
+BANTAM 5/5 in 124.6s, Hermes 5/5 in 589.0s, OpenCode 0/5 in 157.8s.
+This is a separate earlier attempt with different output-budget settings, not
+another task or a repeat of the latest configuration. Its caveats remain attached.
+
+## Historical records
 
 The old generated fight cards, replay pages, raw logs, evidence archives,
 showcases and share images have been moved to a private local archive outside
 this repository. Historical result discussions elsewhere in the documentation
 refer to those archived runs, not to a currently distributed public showcase.
 Reusable work orders, graders and generators remain in the repository.
-
-## Fresh reviewed card
-
-[Context packet — September 7, 2026](context-packet-2026-09-07-public/README.md)
-includes a presentation, replay and downloadable share image. One same-model
-attempt per system: BANTAM 5/5 in 124.6 seconds, Hermes 5/5 in 589.0 seconds,
-OpenCode 0/5 in 157.8 seconds. Read the linked accounting and output-budget
-caveats before drawing comparisons; this is not a reliability study.
 
 ## Publication policy
 

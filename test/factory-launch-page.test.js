@@ -58,6 +58,27 @@ function fourCornerFixture({missing=false}={}) {
 const visibleProse=html=>html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
   .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');
 
+test('local factory headlines earn their finish without claiming a win over a faster frontier', () => {
+  const data=fourCornerFixture();
+  for(const render of [renderLaunchPage,renderShareCard]) {
+    const prose=visibleProse(render(data));
+    assert.match(prose,/5\/5\s+BANTAM · checks passed\. Work completed\./);
+    assert.match(prose,/2\.0s elapsed · 5\/5 acceptance groups/);
+    assert.doesNotMatch(prose,/BANTAM wins|BANTAM is fastest/);
+  }
+  const row=data.series[0].cards[0].rows.find(row=>row.arm==='bantam-local-27b');
+  for(const change of [{outcome:'OUTPUT_ONLY',completed:false},{outcome:'FAIL',hiddenExit:1},
+    {outcome:'PASS',completed:true,hiddenExit:0,protectedChanges:1},
+    {recorded:false,outcome:'NOT RECORDED',wallMs:null}]) {
+    Object.assign(row,change);
+    for(const render of [renderLaunchPage,renderShareCard]) {
+      const prose=visibleProse(render(data));
+      assert.doesNotMatch(prose,/BANTAM · checks passed\. Work completed\./);
+      assert.match(prose,/BANTAM · recorded outcome/);
+    }
+  }
+});
+
 function embedded(html) {
   const block = html.match(/<script\b(?=[^>]*\bid=["']launch-data["'])(?=[^>]*\btype=["']application\/json["'])[^>]*>([\s\S]*?)<\/script>/i);
   assert.ok(block, 'public data must be independently inspectable');

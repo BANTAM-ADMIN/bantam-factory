@@ -11,6 +11,8 @@ export const SHOWCASE_STATIC_FILES=Object.freeze([
   'fonts/source-code-pro-400.woff2','fonts/source-code-pro-600.woff2',
   'fonts/barlow-OFL.txt','fonts/manrope-OFL.txt','fonts/source-code-pro-OFL.txt',
   'examples/tetris/index.html','examples/tetris/BANTAMTETRIS.html','examples/tetris/build.json',
+  'examples/arcade/index.html','examples/arcade/arcade.css','examples/arcade/arcade.js','examples/arcade/builds.json','examples/arcade/attempts.json',
+  'examples/arcade/astra-cli.html','examples/arcade/astra-cli.json','examples/arcade/astra-factory.html','examples/arcade/astra-factory.json',
 ]);
 const ARMS=Object.freeze([
   ['bantam-local-27b','BANTAM FACTORY','Qwen 27B, local'],
@@ -27,7 +29,7 @@ function read(name){
   return fs.readFileSync(file);
 }
 export function showcaseAssets(){
-  for(const name of ['.','fonts','img','examples','examples/tetris']){
+  for(const name of ['.','fonts','img','examples','examples/tetris','examples/arcade']){
     const stat=fs.lstatSync(new URL(name,ROOT));
     if(!stat.isDirectory()||stat.isSymbolicLink())throw Error('Expected plain showcase directory');
   }

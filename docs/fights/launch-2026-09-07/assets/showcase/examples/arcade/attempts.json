@@ -1,0 +1,90 @@
+{
+  "schema": "bantam.arcade-attempt-index.v1",
+  "attempts": [
+    {
+      "id": "codex-astra",
+      "kind": "fresh build",
+      "startedAt": "2026-09-08T21:22:49.375Z",
+      "wallMs": 404937,
+      "completed": true,
+      "projectChecksPassed": true,
+      "artifactSha256": "e8c0dcb4842255fd5b1663a71cf8521f35aaf6a980f7b729d75986f9f7eb1589",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f"
+    },
+    {
+      "id": "bantam-codex-astra",
+      "kind": "fresh build",
+      "startedAt": "2026-09-08T21:29:35.128Z",
+      "wallMs": 600310,
+      "completed": false,
+      "projectChecksPassed": true,
+      "artifactSha256": "1847bc6ac582032d2994f9432187bcf18eb818aeb9c6303b3a978fd079e0df76",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f"
+    },
+    {
+      "id": "bantam-codex-astra-fixed",
+      "kind": "fresh build",
+      "startedAt": "2026-09-08T21:59:26.779Z",
+      "wallMs": 420169,
+      "completed": true,
+      "projectChecksPassed": true,
+      "artifactSha256": "39924c7e673179299e8b5ec05c5ed8d9de4df1dd95ad64adf0c4ebbf93bbcf4a",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f"
+    },
+    {
+      "id": "bantam-local-27b",
+      "kind": "fresh build",
+      "startedAt": "2026-09-08T21:32:19.066Z",
+      "wallMs": 559500,
+      "completed": false,
+      "projectChecksPassed": true,
+      "artifactSha256": "10dfdb636a51e95253f8a6725f1c76caefb0fb6fe586af9798004f1197e21ef4",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f"
+    },
+    {
+      "id": "local-round-2",
+      "kind": "refinement",
+      "startedAt": "2026-09-08T21:47:35.145Z",
+      "wallMs": 583333,
+      "completed": false,
+      "projectChecksPassed": false,
+      "artifactSha256": "47cb3429f94616afe0d382b535f6baf39697a2aa1bee9397a8dd9c1f0d8e03c5",
+      "taskSha256": "5bc5e2225f19ac94a515a584543c34d7f84b7730511962107408496589f26969"
+    },
+    {
+      "id": "local-phone-repair",
+      "kind": "refinement",
+      "startedAt": "2026-09-08T22:06:38.874Z",
+      "wallMs": 561856,
+      "completed": false,
+      "projectChecksPassed": false,
+      "artifactSha256": "df6f4ee87357e65a19201246b1438dacf4f20ba16ac1642c31ed6c59b8994358",
+      "taskSha256": "e9e22d4aa9b738a7556f3a59233c4811f948d08239d3684d45302ae8bcfcdc18"
+    },
+    {
+      "id": "astra-supervised-local",
+      "kind": "supervisor diagnostic",
+      "startedAt": "2026-09-08T22:22:59.049Z",
+      "wallMs": 337776,
+      "completed": false,
+      "reason": "foreman deadline or cancellation",
+      "supervisorCalls": 14,
+      "operatorStopped": true
+    },
+    {
+      "id": "astra-supervised-local-fixed",
+      "kind": "supervisor diagnostic",
+      "startedAt": "2026-09-08T22:29:10.346Z",
+      "wallMs": 591590,
+      "completed": false,
+      "reason": "supervisor observed-token admission limit reached",
+      "supervisorCalls": 23,
+      "operatorStopped": false
+    }
+  ],
+  "notes": [
+    "The playable Astra factory build follows preview fixes. Earlier attempts and local refinements remain recorded here.",
+    "Native and wrapped Astra fresh builds had 10-minute limits. The supervisor diagnostics exposed a Bash-only verifier and render-loop preview misclassification; those are corrected in the next qualification run.",
+    "Generated games have no maintainer edits. Raw prompts, account data and model reasoning remain private."
+  ]
+}

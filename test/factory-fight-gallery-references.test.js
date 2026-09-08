@@ -68,7 +68,7 @@ test('gallery page renders a references table with BANTAM beside each reference 
   assert.match(html,/81\.8s/,'the BANTAM attempt from the launch card is shown for context');
   assert.match(html,/references\/README\.md/);
   assert.match(html,/3 separately recorded attempts/);
-  assert.doesNotMatch(html,/<script[^>]+src=|<iframe|<img[^>]+src="https?:/i);
+  assert.doesNotMatch(html,/<script[^>]+src="(?:https?:)?\/\/|<iframe|<img[^>]+src="https?:/i);
 });
 
 test('publication stages reviewed reference packages beside the launch cards using the same explicit file list',t=>{

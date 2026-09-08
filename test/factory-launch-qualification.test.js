@@ -103,7 +103,7 @@ test('explicit qualification selects first variant for both static results and r
   const defaultHtml=renderLaunchPage(data);
   assert.match(prose(defaultHtml),/Recorded system comparison/);
   assert.match(prose(defaultHtml),/0\/1\s*attempts passed and completed/);
-  assert.match(prose(defaultHtml),/No winner or aggregate speed claim is inferred/);
+  assert.match(prose(defaultHtml),/Elapsed times and completion status are reported separately/);
   assert.doesNotMatch(prose(defaultHtml),/less recorded time|50%|DeepSeek/);
   assert.doesNotMatch(renderShareCard(data),/less recorded time|50%|DeepSeek/);
   assert.deepEqual(replaySelection(defaultHtml),comparison.cards);

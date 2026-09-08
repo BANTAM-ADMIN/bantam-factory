@@ -24,7 +24,15 @@ const UNIT_BOUND_RE = /\b\d+[\s-]*(?:bit|digit|byte|char|character|word|item|ele
 // 2. rejection demands: sentences that require error behavior.
 const REJECT_SENTENCE_RE = /[^.!?\n]*\b(?:must\s+(?:not\s+)?(?:throw|reject|error|mutate|modify)|throws?\s+(?:an?\s+)?(?:Error|TypeError|RangeError|exception)|is\s+invalid|are\s+invalid|invalid\s+when|reject(?:s|ed)?\s+\w|errors?\s+must)\b[^.!?\n]*[.!?]?/gi;
 
-// 3. short quoted literals: task-named inputs/outputs, not prose quotations.
+// 3. collection shape demands: a named input's element preconditions. Their
+// violations are rejection cases that visible tests routinely never touch.
+// Measured 2026-09-08 on glob-select: a candidate implemented six of the seven
+// constraints in one such sentence, dropped "unique", ticked the requirement
+// off in its own done reasoning, and shipped with green tests throughout.
+// Gated on a shape word so ordinary "must be" prose stays out.
+const COLLECTION_SHAPE_RE = /[^.!?\n]*\bmust\s+be\s+(?:an?\s+)?[^.!?\n]*?\b(?:dense|unique|distinct|nonempty|non-empty|non-null|non-array)\b[^.!?\n]*[.!?]?/gi;
+
+// 4. short quoted literals: task-named inputs/outputs, not prose quotations.
 // Double quotes only: single quotes double as apostrophes in prose, and the
 // pair ("it's ... don't") captures garbage fragments (measured 2026-08-15:
 // say's checklist quoted ["s fine to stop at"]).
@@ -49,6 +57,10 @@ export function extractRequirements(task) {
 
   // rejection-demand sentences first: they carry the most contract per char.
   for (const m of source.matchAll(REJECT_SENTENCE_RE)) push(m[0]);
+
+  // collection shape demands: the precondition sentence names several element
+  // constraints at once, and dropping one of them still leaves tests green.
+  for (const m of source.matchAll(COLLECTION_SHAPE_RE)) push(m[0]);
 
   // numeric bounds — prefer comparator phrases, then unit-attached numbers.
   for (const m of source.matchAll(BOUND_PREFIX_RE)) {

@@ -83,6 +83,10 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
       // The wall budget this runner actually enforces, so verified-green work
       // can close out instead of being killed mid-turn at the limit.
       command.env.BANTAM_DEADLINE_MS=String(timeoutMs);
+      // Quote the work order's own named requirements back at completion. The
+      // generic audit fires and is bypassed when a candidate re-reads a
+      // precondition, ticks it off and ships on green starter tests.
+      command.env.BANTAM_REQUIREMENT_CHECKLIST='1';
     }
     if(verificationWorkspaceReadOnly){command.args.push('--verify-workspace-read-only');command.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
     if(terminalClosure)command.env.BANTAM_TERMINAL_CLOSURE='1';

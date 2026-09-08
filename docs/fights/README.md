@@ -53,21 +53,20 @@ on the same local weights. Astra was 2.7× quicker on this attempt. BANTAM's
 
 ## Selection series
 
-Three work orders about choosing and resolving. One recorded system each so
-far: a single-lane card is an observation, not a comparison, and each card
-says so rather than letting a one-row table imply a win.
+Three work orders about choosing and resolving, each recorded against native
+Codex Astra. All six attempts passed 5/5; the clock went both ways.
 
-[Glob select](launch-2026-09-07/glob-select/README.md): BANTAM 5/5 in
-**264.1s**, 91.3% prefix reuse over 27 requests. The hidden group exercises a
-uniqueness precondition the visible tests never touch.
+[Path scope](launch-2026-09-07/path-scope/README.md): **BANTAM 75.1s, Astra
+107.9s.** The local 27B was 1.44x quicker at deciding whether a path stays
+inside a workspace root without trusting a shared string prefix.
 
-[Path scope](launch-2026-09-07/path-scope/README.md): BANTAM 5/5 in **75.1s**,
-the quickest pass in the gallery. Deciding whether a path stays inside a
-workspace root without trusting a shared string prefix.
+[Glob select](launch-2026-09-07/glob-select/README.md): BANTAM 264.1s, **Astra
+155.8s.** Astra was 1.70x quicker. BANTAM read 6.5x Astra's input tokens to
+reach the same result, at 91.3% prefix reuse over 27 requests.
 
-[Semver range](launch-2026-09-07/semver-range/README.md): BANTAM 5/5 in
-**399.9s**, the heaviest published card at 66 requests and 1.7M input tokens
-against under 25K output.
+[Semver range](launch-2026-09-07/semver-range/README.md): BANTAM 399.9s,
+**Astra 136.2s.** Astra's widest margin at 2.94x. This is the heaviest card
+BANTAM has published: 66 requests, 1.7M input tokens, under 25K output.
 
 ## Native Claude Code references
 

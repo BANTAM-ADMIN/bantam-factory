@@ -488,7 +488,7 @@
       "number": "01",
       "description": "Match paths against glob patterns, last pattern deciding, with a receipt per path.",
       "recorded": true,
-      "sourceSha256": "c51293be1d41a5c894e7329382a6ef596ef538b4ba2e461c2fd67c2536340529",
+      "sourceSha256": "b111d611ccf99f3862bdca199e00acff4aa69bfb11348eabba7bdf730a1cdc43",
       "rows": [
         {
           "label": "BANTAM · local",
@@ -496,6 +496,16 @@
           "outcome": "PASS",
           "passed": true,
           "wallMs": 264143,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 155782,
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
@@ -509,7 +519,7 @@
       "number": "02",
       "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
       "recorded": true,
-      "sourceSha256": "768e7744fa8a583f8d1650b22c3ecd159b58a7ab5ccd81e09db187e4fb7eefb4",
+      "sourceSha256": "e4d72d607da1e9c287f1ca759392afafb1107cc9867fee7fc19c7be83b13d172",
       "rows": [
         {
           "label": "BANTAM · local",
@@ -517,6 +527,16 @@
           "outcome": "PASS",
           "passed": true,
           "wallMs": 75104,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 107931,
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
@@ -530,7 +550,7 @@
       "number": "03",
       "description": "Order versions by real precedence and admit prereleases into a range only when invited.",
       "recorded": true,
-      "sourceSha256": "0f55ec00f725a769beab429b755acb87e274a33ceaf184250c897e7e499b6d98",
+      "sourceSha256": "e8509414f5702a63659cc4ab619f9e5f06d5f68ef70889a12147bfd0129cd050",
       "rows": [
         {
           "label": "BANTAM · local",
@@ -538,6 +558,16 @@
           "outcome": "PASS",
           "passed": true,
           "wallMs": 399879,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 136165,
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true

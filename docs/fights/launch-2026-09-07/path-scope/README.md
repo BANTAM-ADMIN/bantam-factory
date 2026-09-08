@@ -11,10 +11,12 @@ outside it; the root itself is inside it.
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
 | BANTAM · local 27B | PASS | 5/5 | 75.1 s |
+| Codex · native Astra | PASS | 5/5 | 107.9 s |
 
-One system is recorded on this work order so far. BANTAM completed accepted
-work and passed every acceptance group. At 75.1 seconds it is the second
-quickest recorded pass in the gallery, behind context packet at 58.1 s.
+Both systems completed accepted work and passed every acceptance group. The
+local 27B was 1.44× quicker than the frontier CLI on this attempt. At 75.1
+seconds it is the second quickest recorded pass in the gallery, behind context
+packet at 58.1 s.
 
 ## Tokens and prefix reuse
 
@@ -22,29 +24,38 @@ quickest recorded pass in the gallery, behind context packet at 58.1 s.
 |---|---:|---:|---:|---:|
 | BANTAM · all 16 requests | 125,827 | 5,025 | 96,652 | 29,175 |
 | BANTAM · separate idle-bounded server window | 125,770 | 5,020 | 96,600 | 29,170 |
+| Astra · native aggregate | 103,844 | 2,423 | 90,240 | 13,604 |
 
-Prefix reuse was 76.8% across 16 requests, the lowest ratio on any published
-card and a direct consequence of the short run: fewer turns means the fixed
-prompt preamble is amortized over less reused context. Input already includes
-cached input: do not add those columns together. Server attribution assumes no
-other inference client used the endpoint during the window.
+BANTAM's prefix reuse was 76.8% across 16 requests, the lowest ratio on any
+published card and a direct consequence of the short run: fewer turns means
+the fixed prompt preamble is amortized over less reused context. Astra spent
+17.5% fewer input tokens and 51.8% fewer output tokens while taking longer in
+wall time, so this card is a case where token economy and clock disagree.
+
+Input already includes cached input: do not add those columns together. A
+native aggregate is not a per-request wire recording, and the two systems'
+meters must not be forced to agree. Server attribution assumes no other
+inference client used the endpoint during the window.
 
 ## Conditions and provenance
 
-Recorded on frozen factory source
+The two lanes were recorded separately, not simultaneously, on the same frozen
+kit, starter bytes and independent grader. BANTAM ran on frozen factory source
 `7d6d304a419e99da3bfdf347f8fc47a67a147791`, which derives the history window
-from the served context, reserves a final action against the wall budget, and
-quotes the assignment's own named requirements back into the completion audit.
-The manifest records a 72,192-token served window, a 173,260-character history
-budget, a 600-second wall deadline and a 48-second closure reserve.
+from the served context and reserves a final action against the wall budget;
+its manifest records a 72,192-token served window, a 173,260-character history
+budget, a 600-second wall deadline and a 48-second closure reserve. Astra ran
+its own native CLI, tools and policies on frozen source
+`f236c47ac813fd67e71ee45ec50e817e25143dbc`.
 
 The local contender used the existing Qwen 27B Q4_K_P control, 72K context and
 CPU vision projection, not the recommended DavidAU download. Local inference
 was serial. No manual repairs, teacher requests or post-result changes to the
-candidate were made.
+candidates were made.
 
-One recorded attempt is an observation, not an expected value, and a
-single-system card is not a comparison. Public exports contain allowlisted
-measurements and replay counters, not private source, prompts or machine
-paths. Raw evidence remains private. Package hashes check generated assets,
-excluding this README; they do not attest authorship or authorize execution.
+These are different models on one development task: an individual observation,
+not a ranking or a held-out reliability study. Public exports contain
+allowlisted measurements and replay counters, not private source, prompts or
+machine paths. Raw evidence remains private. Package hashes check generated
+assets, excluding this README; they do not attest authorship or authorize
+execution.

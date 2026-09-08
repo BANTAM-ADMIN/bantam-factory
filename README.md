@@ -73,14 +73,14 @@ native Codex Astra, Sol and Terra:
 | [Build a redaction planner](docs/fights/launch-2026-09-07/redaction-plan/README.md) | **175.6s · PASS 5/5** | 391.8s · PASS 5/5 | 600s limit · TIMEOUT, artifact 5/5 | Astra 117.0s · PASS 5/5 |
 | [Repair a retry controller](docs/fights/launch-2026-09-07/retry-budget/README.md) | **141.7s · PASS 5/5** | 445.8s · PASS 5/5 | 562.0s · PASS 5/5 | Astra 137.3s · PASS 5/5 |
 
-Three selection work orders carry one recorded system each so far. A
-single-lane card is an observation, not a comparison, and each one says so:
+Three selection work orders against native Codex Astra. All six attempts
+passed every acceptance group; the clock went both ways:
 
-| Work order | BANTAM · local 27B | Other systems |
-|---|---:|---|
-| [Match paths against globs](docs/fights/launch-2026-09-07/glob-select/README.md) | **264.1s · PASS 5/5** | not yet recorded |
-| [Keep a path inside its workspace](docs/fights/launch-2026-09-07/path-scope/README.md) | **75.1s · PASS 5/5** | not yet recorded |
-| [Resolve a semver range](docs/fights/launch-2026-09-07/semver-range/README.md) | **399.9s · PASS 5/5** | not yet recorded |
+| Work order | BANTAM · local 27B | Native Astra |
+|---|---:|---:|
+| [Keep a path inside its workspace](docs/fights/launch-2026-09-07/path-scope/README.md) | **75.1s · PASS 5/5** | 107.9s · PASS 5/5 |
+| [Match paths against globs](docs/fights/launch-2026-09-07/glob-select/README.md) | 264.1s · PASS 5/5 | **155.8s · PASS 5/5** |
+| [Resolve a semver range](docs/fights/launch-2026-09-07/semver-range/README.md) | 399.9s · PASS 5/5 | **136.2s · PASS 5/5** |
 
 Native Claude Code Sonnet, Opus and Fable ran the same work orders as
 [separately recorded references](docs/fights/launch-2026-09-07/references/README.md),

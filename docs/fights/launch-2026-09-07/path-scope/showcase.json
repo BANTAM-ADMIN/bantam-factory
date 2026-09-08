@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T13:30:12.791Z",
+  "generatedAt": "2026-09-08T15:08:58.357Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -16,14 +16,14 @@
       "startedAt": "2026-09-08T13:28:45.234Z",
       "finishedAt": "2026-09-08T13:30:12.535Z",
       "counts": {
-        "observed": 1,
-        "planned": 1,
-        "accepted": 1,
-        "completed": 1,
-        "pass": 1,
-        "groupsMeasured": 1,
-        "groupsPassed": 5,
-        "groupsTotal": 5
+        "observed": 2,
+        "planned": 2,
+        "accepted": 2,
+        "completed": 2,
+        "pass": 2,
+        "groupsMeasured": 2,
+        "groupsPassed": 10,
+        "groupsTotal": 10
       },
       "cards": [
         {
@@ -243,6 +243,139 @@
               "events": [],
               "timedEvents": 75,
               "untimedEvents": 11,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-path-scope-r1-lane2",
+              "arm": "codex-astra",
+              "label": "Codex · Astra",
+              "model": "GPT-6 Astra · native CLI",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 107931,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 103844,
+                  "outputTokens": 2423,
+                  "cacheHitTokens": 90240,
+                  "freshInputTokens": 13604
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 103844,
+                  "outputTokens": 2423,
+                  "cacheHitTokens": 90240,
+                  "freshInputTokens": 13604
+                },
+                "server": null,
+                "complete": true,
+                "requests": 7,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": 7,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": 7,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": 7,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": 7,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [
+                {
+                  "t": 10206,
+                  "inputTokens": 13454,
+                  "outputTokens": 97,
+                  "cacheHitTokens": 9600,
+                  "freshInputTokens": 3854,
+                  "partial": false
+                },
+                {
+                  "t": 18636,
+                  "inputTokens": 27124,
+                  "outputTokens": 171,
+                  "cacheHitTokens": 19200,
+                  "freshInputTokens": 7924,
+                  "partial": false
+                },
+                {
+                  "t": 29017,
+                  "inputTokens": 41223,
+                  "outputTokens": 336,
+                  "cacheHitTokens": 32640,
+                  "freshInputTokens": 8583,
+                  "partial": false
+                },
+                {
+                  "t": 50878,
+                  "inputTokens": 55625,
+                  "outputTokens": 940,
+                  "cacheHitTokens": 45952,
+                  "freshInputTokens": 9673,
+                  "partial": false
+                },
+                {
+                  "t": 55350,
+                  "inputTokens": 70655,
+                  "outputTokens": 971,
+                  "cacheHitTokens": 59904,
+                  "freshInputTokens": 10751,
+                  "partial": false
+                },
+                {
+                  "t": 100502,
+                  "inputTokens": 86320,
+                  "outputTokens": 2353,
+                  "cacheHitTokens": 74752,
+                  "freshInputTokens": 11568,
+                  "partial": false
+                },
+                {
+                  "t": 106565,
+                  "inputTokens": 103844,
+                  "outputTokens": 2423,
+                  "cacheHitTokens": 90240,
+                  "freshInputTokens": 13604,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 51,
+              "untimedEvents": 0,
               "stopReasons": [],
               "files": [],
               "inventory": [],

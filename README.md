@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="#quick-start"><strong>Get started</strong></a> ·
-  <a href="https://bantam-admin.github.io/bantam-factory/"><strong>Watch the fights</strong></a> ·
+  <a href="https://bantam-admin.github.io/bantam-factory/fights.html"><strong>Watch the fights</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/tetris/index.html">Play what it built</a> ·
   <a href="docs/README.md">Docs</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
@@ -66,6 +66,10 @@ action and the files they delivered.
 - **Check and repair.** Use real test results to guide the next attempt.
 - **Make the next job easier.** Build reusable tools for the work you keep doing.
 - **Put your hardware to work.** Run a local model, or bring your Codex account.
+
+Already use Codex? Connect your signed-in CLI during setup and put its model
+inside the factory. **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
+Same brief. Two complete games. Every recorded action and the delivered files.
 
 <a id="start-with-what-you-already-have"></a>
 

@@ -72,4 +72,4 @@ be installed.
 The supported beta path is Linux or WSL2. Native Windows is unsupported;
 macOS is untested. The default Docker sandbox depends on Linux host tools.
 
-**[Watch the fights](https://bantam-admin.github.io/bantam-factory/) · [Improve the factory](SELF-IMPROVEMENT.md) · [Docs](README.md)**
+**[Watch the fights](https://bantam-admin.github.io/bantam-factory/fights.html) · [Improve the factory](SELF-IMPROVEMENT.md) · [Docs](README.md)**

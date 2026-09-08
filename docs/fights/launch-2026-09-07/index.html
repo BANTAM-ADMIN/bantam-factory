@@ -32,10 +32,11 @@
 <section class="hero">
   <div class="hero-heading"><h1>Your model is the worker.<br>Give it a factory.</h1><a class="hero-watch" href="#stage">See it work <span aria-hidden="true">↓</span></a></div>
   <figure class="hero-factory"><a href="assets/bantam-factory-stations.png" aria-label="View the chicken factory illustration at full size"><img src="assets/bantam-factory-stations.png" alt="One chicken struggles to draw a person. In BANTAM FACTORY, a line of chickens each adds one simple part, producing complete drawings." width="1774" height="887" fetchpriority="high"></a><figcaption>Big jobs. Chicken problems. <span>A whole job becomes a line of small, checked steps.</span></figcaption></figure>
+  <section class="hero-proof" aria-labelledby="proof-heading"><div class="proof-heading"><h2 id="proof-heading">Same 27B. Faster finishes.</h2><p>Selected fights. Both completed the job.<br>NVIDIA RTX 4090 · 24 GB · Same local weights.</p></div><div class="proof-fights"><a class="proof-fight" href="context-packet/share/index.html#card=context-packet&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=hermes"><strong>8.8<span>×</span></strong><span class="proof-peer">faster than Hermes</span><span class="proof-job">Context packet <span aria-hidden="true">↗</span></span><span class="proof-times">Factory 58.1 s · Hermes 512.2 s</span></a><a class="proof-fight" href="patch-transaction/share/index.html#card=patch-transaction&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=opencode"><strong>6.8<span>×</span></strong><span class="proof-peer">faster than OpenCode</span><span class="proof-job">Patch transaction <span aria-hidden="true">↗</span></span><span class="proof-times">Factory 81.8 s · OpenCode 559.0 s</span></a><a class="proof-fight" href="context-packet/share/index.html#card=context-packet&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=pi"><strong>6.0<span>×</span></strong><span class="proof-peer">faster than Pi</span><span class="proof-job">Context packet <span aria-hidden="true">↗</span></span><span class="proof-times">Factory 58.1 s · Pi 350.7 s</span></a><a class="proof-fight" href="receipt-reducer/share/index.html#card=receipt-reducer&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=deepseek-local-27b"><strong>3.9<span>×</span></strong><span class="proof-peer">faster than DeepSeek Harness</span><span class="proof-job">Receipt reducer <span aria-hidden="true">↗</span></span><span class="proof-times">Factory 112.5 s · DeepSeek Harness 442.7 s</span></a></div></section>
   <div class="hero-row">
     <div class="hero-copy">
-      <p class="lede">BANTAM FACTORY is an open source coding factory for the model you already run. Ask it for something, and it builds the factory around your local model: the context, the tools, and the checks to get the work done fast, on your own hardware.</p>
-      <div class="install">
+      <p class="lede">Build an app. Fix a stubborn bug. Automate the boring part. BANTAM FACTORY gives your model the tools, context, and checks to finish the job—on your own hardware, or with your Codex account.</p>
+      <div class="install" id="install">
 <pre id="installCmd">git clone https://github.com/BANTAM-ADMIN/bantam-factory.git
 cd bantam-factory
 npm ci
@@ -45,6 +46,7 @@ bantamfactory setup</pre>
         <button type="button" class="copy" data-copy="#installCmd">Copy</button>
       </div>
       <p class="install-then">Then open any project, run <code>bantamfactory</code>, and ask for what you want.</p>
+      <p class="fine install-needs">Linux / WSL2 · Node.js 20+ · Git · Docker<br>Setup connects your local model or signed-in Codex CLI.</p>
       <p class="hero-links">
         <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/GETTING-STARTED.md">Read the getting started guide</a>
         <a href="fights.html">Watch the fights</a>

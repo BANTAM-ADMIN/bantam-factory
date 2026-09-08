@@ -32,10 +32,11 @@
 <section class="hero">
   <div class="hero-heading"><h1>Your model is the worker.<br>Give it a factory.</h1><a class="hero-watch" href="#stage">See it work <span aria-hidden="true">↓</span></a></div>
   <figure class="hero-factory"><a href="assets/bantam-factory-stations.png" aria-label="View the chicken factory illustration at full size"><img src="assets/bantam-factory-stations.png" alt="One chicken struggles to draw a person. In BANTAM FACTORY, a line of chickens each adds one simple part, producing complete drawings." width="1774" height="887" fetchpriority="high"></a><figcaption>Big jobs. Chicken problems. <span>A whole job becomes a line of small, checked steps.</span></figcaption></figure>
+  <!-- FIGHT_HIGHLIGHTS -->
   <div class="hero-row">
     <div class="hero-copy">
-      <p class="lede">BANTAM FACTORY is an open source coding factory for the model you already run. Ask it for something, and it builds the factory around your local model: the context, the tools, and the checks to get the work done fast, on your own hardware.</p>
-      <div class="install">
+      <p class="lede">Build an app. Fix a stubborn bug. Automate the boring part. BANTAM FACTORY gives your model the tools, context, and checks to finish the job—on your own hardware, or with your Codex account.</p>
+      <div class="install" id="install">
 <pre id="installCmd">git clone https://github.com/BANTAM-ADMIN/bantam-factory.git
 cd bantam-factory
 npm ci
@@ -45,6 +46,7 @@ bantamfactory setup</pre>
         <button type="button" class="copy" data-copy="#installCmd">Copy</button>
       </div>
       <p class="install-then">Then open any project, run <code>bantamfactory</code>, and ask for what you want.</p>
+      <p class="fine install-needs">Linux / WSL2 · Node.js 20+ · Git · Docker<br>Setup connects your local model or signed-in Codex CLI.</p>
       <p class="hero-links">
         <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/GETTING-STARTED.md">Read the getting started guide</a>
         <a href="fights.html">Watch the fights</a>

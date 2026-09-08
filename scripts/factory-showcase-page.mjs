@@ -36,6 +36,21 @@ export function showcaseAssets(){
   return SHOWCASE_STATIC_FILES.map(name=>['assets/showcase/'+name,read(name)]);
 }
 const seconds=ms=>Number.isFinite(ms)&&ms>=0?(ms/1000).toFixed(1)+' s':'Time not recorded';
+export function renderShowcaseHighlights(data){
+  const selections=[['hermes','context-packet'],['opencode','patch-transaction'],['pi','context-packet'],['deepseek-local-27b','receipt-reducer']];
+  const cards=showcaseRows(data),sameModel=/^Qwen 27B · same local (?:model|weights)$/,rigs=[];
+  const highlights=selections.flatMap(([arm,id])=>{
+    const card=cards.find(c=>c.id===id),factory=card?.rows.find(r=>r?.arm==='bantam-local-27b'),peer=card?.rows.find(r=>r?.arm===arm);
+    if(!factory?.passed||!peer?.passed||!sameModel.test(factory.model)||!sameModel.test(peer.model)
+      ||!Number.isFinite(factory.wallMs)||!Number.isFinite(peer.wallMs)||factory.wallMs<=0||peer.wallMs/factory.wallMs<1.05)return [];
+    const hash=new URLSearchParams({card:id,view:'results',layout:'compare',left:factory.arm,right:peer.arm});
+    rigs.push(performanceView(factory.performance)?.hardware??null);
+    return [`<a class="proof-fight" href="${id}/share/index.html#${E(hash)}"><strong>${(peer.wallMs/factory.wallMs).toFixed(1)}<span>×</span></strong><span class="proof-peer">faster than ${E(peer.label)}</span><span class="proof-job">${E(card.title)} <span aria-hidden="true">↗</span></span><span class="proof-times">Factory ${seconds(factory.wallMs)} · ${E(peer.label)} ${seconds(peer.wallMs)}</span></a>`];
+  });
+  if(!highlights.length)return '';
+  const rig=rigs.every(r=>r&&r===rigs[0])?`${E(rigs[0])} · `:'';
+  return `<section class="hero-proof" aria-labelledby="proof-heading"><div class="proof-heading"><h2 id="proof-heading">Same 27B. Faster finishes.</h2><p>Selected fights. Both completed the job.<br>${rig}Same local weights.</p></div><div class="proof-fights">${highlights.join('')}</div></section>`;
+}
 export function showcaseRows(data){
   return data.cards.filter(c=>c.recorded).map(card=>{
     const metadata=PUBLIC_FACTORY_CARDS[card.id];
@@ -77,6 +92,7 @@ export function renderFactoryShowcase(data,{intro=false}={}){
     html=html.replace(marker,()=>value);
   };
   insert('FIGHT_RESULTS',renderShowcaseResults(data));
+  insert('FIGHT_HIGHLIGHTS',renderShowcaseHighlights(data));
   insert('FIGHT_SPEEDS',renderShowcaseSpeeds(data));
   const hardware=JSON.parse(read('hardware.json'));
   insert('FIGHT_PREVIEW',`<script id="fight-preview" type="application/json">${JSON.stringify(preview).replace(/</g,'\\u003c')}</script><script id="hardware-preview" type="application/json">${JSON.stringify(hardware).replace(/</g,'\\u003c')}</script>`);

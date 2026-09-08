@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {renderFactoryShowcase,renderShowcaseResults,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
+import {renderFactoryShowcase,renderShowcaseResults,renderShowcaseHighlights,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
 
 const gallery=()=>({cards:[{id:'context-packet',recorded:true,rows:[
   {arm:'bantam-local-27b',model:'Qwen 27B · same local weights',wallMs:58123,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5},
@@ -29,6 +29,19 @@ test('Pi joins the public table only when a reviewed attempt exists',()=>{
   data.cards[0].rows.push({arm:'pi',model:'Qwen 27B · same local weights',wallMs:87654,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5});
   const html=renderShowcaseResults(data);
   assert.match(html,/>Pi</);assert.match(html,/87\.7 s/);
+});
+test('hero speedups require two completed same-model records and use their actual wall times',()=>{
+  const data=gallery(),before=structuredClone(data);
+  assert.match(renderShowcaseHighlights(data),/>8\.8<span>×/);
+  assert.deepEqual(data,before);
+  const peer=data.cards[0].rows[1];peer.wallMs=290615;
+  assert.match(renderShowcaseHighlights(data),/>5\.0<span>×/);
+  peer.passed=false;peer.outcome='TIMEOUT';
+  assert.equal(renderShowcaseHighlights(data),'');
+  peer.passed=true;peer.model='A different model';
+  assert.equal(renderShowcaseHighlights(data),'');
+  peer.model='Qwen 27B · same local weights';peer.wallMs=58000;
+  assert.equal(renderShowcaseHighlights(data),'');
 });
 
 test('the scrolling race shares the table records and never includes private fields or archived references',()=>{

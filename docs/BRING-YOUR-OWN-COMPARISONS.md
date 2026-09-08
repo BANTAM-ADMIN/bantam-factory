@@ -4,7 +4,7 @@ A fight card is a job with a fixed starting point, independent checks, and a
 recorded result. Watch the agents work, compare them side by side, and inspect
 what actually passed.
 
-**[Watch the public fights →](https://bantam-admin.github.io/bantam-factory/)**
+**[Watch the public fights →](https://bantam-admin.github.io/bantam-factory/fights.html)**
 
 ## Start with BANTAM FACTORY
 

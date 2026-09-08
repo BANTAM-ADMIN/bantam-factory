@@ -868,7 +868,7 @@ describe('prompt-resident source recovery', () => {
       interactive: true, useGrammar: false, grounding: false, wallDeadlineMs: 600000,
       shellSandbox: 'host' });
     assert.match(model.prompts[0], /\[budget\] wall clock:.*of 10m/);
-    assert.match(model.prompts[0], /killed on TIME/);
+    assert.match(model.prompts[0], /wall deadline and configured turn cap both apply/);
   });
 
   it('reanchors the exact task near the action boundary by default', async (t) => {

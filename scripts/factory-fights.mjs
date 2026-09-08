@@ -13,6 +13,7 @@ import {startModelRecorder} from './fight-model-proxy.mjs';
 import {codexSessionUsage,serverCounters,counterDelta,settleServerCounters} from './fight-usage.mjs';
 import {factoryKit} from './factory-card-catalog.mjs';
 import {verifyCompetitorRegistration} from '../src/competitor-registry.js';
+import {projectFightProgress,progressKey} from '../src/factory-card-progress.js';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
@@ -150,7 +151,7 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null,deepseekReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null,deepseekReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters,onProgress=()=>{}}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
@@ -188,6 +189,14 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   }
   const save=()=>{write(path.join(output,'manifest.json'),manifest);fs.writeFileSync(path.join(output,'RESULTS.md'),markdown(manifest));};
   save();
+  const active=new Map();
+  const publish=()=>{
+    const snapshot=projectFightProgress(manifest,active);
+    const temporary=path.join(output,'progress.json.tmp');write(temporary,snapshot);fs.renameSync(temporary,path.join(output,'progress.json'));
+    try{onProgress(snapshot);}catch{/* An observer cannot change a contender's result. */}
+  };
+  publish();
+  const progressTimer=setInterval(()=>{try{publish();}catch{/* Final publication below reports persistence failures. */}},1000);
   const runQueue=async(queue)=>{for(const item of queue){
     if(fs.existsSync(path.join(output,'STOP_AFTER_CURRENT'))){manifest.stoppedEarly='Operator requested stop at a clean contender boundary; no active run was interrupted.';break;}
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or kit changed after freeze');
@@ -206,15 +215,18 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure,peerExecutables});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
+    const current={phase:'running',startedAt:Date.now(),exchanges:recorder?.exchanges};active.set(progressKey(item),current);publish();
     let result,wireUsage;
     try {result=await contender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs,events:[],arm});}
     finally {wireUsage=recorder?await recorder.close():null;}
+    current.workElapsedMs=result?.wallMs;current.phase='settling';publish();
     const settlement=recorder?await settle(endpoint):null;
     const countersAfter=settlement?.after??null;
     const serverUsage=recorder?counterDelta(countersBefore,countersAfter):null;
     if(recorder)write(path.join(dir,'server-usage.json'),{before:countersBefore,after:countersAfter,delta:serverUsage,settlement});
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during contender run; no score issued');
     const tampered=changedSealedFiles(Object.fromEntries(Object.entries(materials).filter(([p])=>p==='package.json'||p.startsWith('test/'))),workspace);
+    current.phase='grading';publish();
     const grading=await grade(workspace,card,{kitId});
     for(const [label,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
       fs.writeFileSync(path.join(dir,`${label}.stdout.log`),record.stdout);fs.writeFileSync(path.join(dir,`${label}.stderr.log`),record.stderr);
@@ -240,18 +252,23 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
       usage,serverUsage,nativeMetadata:native,nativeLaunch,nativeUsage:cliUsage,
       finalFiles:treeHashes(workspace,{excludeGenerated:true}),operatorInterventions:0};
     if(JSON.stringify(sourceSeal())!==JSON.stringify(runtimeSeal)||!exactSeal(kitSeal,kitRoot))throw Error('source or grader changed during judging; no score issued');
-    write(path.join(dir,'result.json'),row);manifest.results.push(row);save();
+    write(path.join(dir,'result.json'),row);manifest.results.push(row);active.delete(progressKey(item));save();publish();
     process.stdout.write(`${manifest.results.length}/${plan.length} ${card} ${arm}: ${outcome}, ${(row.wallMs/1000).toFixed(1)}s, ${row.grade?.groups.filter(g=>g.pass).length??0}/${row.grade?.groups.length??0} groups\n`);
     if(settlement?.observedBusy&&!settlement.settled){
       manifest.stoppedEarly='Local queue stopped: endpoint remained unsettled after contender cleanup; see server-usage.json. No following local contender was launched.';
       save();process.stdout.write(manifest.stoppedEarly+'\n');break;
     }
   }};
-  if(parallelQueues)await Promise.all([runQueue(plan.filter(item=>LOCAL.has(item.arm))),runQueue(plan.filter(item=>!LOCAL.has(item.arm)))]);
-  else await runQueue(plan);
+  try{
+    if(parallelQueues){
+      const queues=await Promise.allSettled([runQueue(plan.filter(item=>LOCAL.has(item.arm))),runQueue(plan.filter(item=>!LOCAL.has(item.arm)))]);
+      const failed=queues.find(q=>q.status==='rejected');if(failed)throw failed.reason;
+    }else await runQueue(plan);
+  }catch(error){manifest.error={at:new Date().toISOString(),message:error.message};manifest.finishedAt=new Date().toISOString();manifest.complete=false;save();throw error;}
+  finally{clearInterval(progressTimer);publish();}
   manifest.finishedAt=new Date().toISOString();manifest.complete=manifest.results.length===plan.length;
   manifest.sourceMismatches=changedSealedFiles(runtimeSeal,ROOT);manifest.kitMismatches=changedSealedFiles(kitSeal,kitRoot);save();
-  process.stdout.write(`Evidence: ${output}\n`);return manifest;
+  publish();process.stdout.write(`Evidence: ${output}\n`);return manifest;
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

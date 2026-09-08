@@ -23,6 +23,8 @@ bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-r
 bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
 # Also generate a sanitized local page, without uploading anything:
 bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --public --yes
+# Watch the complete frozen build/extend/repair set:
+bantamfactory cards --card all --arms bantam-local-27b,hermes --live --public --yes
 ```
 
 The default kit is `factory-2026-09-07`: context-packet, patch-transaction and
@@ -44,6 +46,22 @@ summary page, JSON and package hashes. It excludes raw prompts, source, private
 paths and transcripts; preserves failed outcomes, measured timings and accounting
 gaps; and does not upload anything. Review only that directory for sharing.
 The surrounding evidence and default `fight-cards.html` are still private.
+
+`--live` prints a token-protected loopback URL after consent and readiness checks.
+The read-only browser receives numeric receipt updates and running/settling/grading
+phases; reconnecting or closing the page never launches or stops a contender.
+It does not expose prompts, source, private paths or account details. A completed
+run leaves `live-public.html`, a standalone public snapshot, beside the private
+evidence. The live server closes when the command finishes; keep the standalone
+page or the `--public` replay for later viewing. Only those identified derivatives
+are sanitized—not their surrounding evidence directory.
+
+Live counters update when usage receipts arrive, not token-by-token. In-flight
+totals are explicitly “so far”; missing request receipts and unavailable frontier
+usage remain unknown. The final result still comes from independent grading,
+with artifact acceptance distinct from process completion. Browser disconnects
+do not erase recorded progress; `progress.json` retains the latest public snapshot.
+One local inference queue is serial even when a frontier queue runs alongside it.
 
 Local counter windows now retain post-cleanup observations in each contender's
 `server-usage.json`. The runner waits up to ten seconds for two unchanged idle

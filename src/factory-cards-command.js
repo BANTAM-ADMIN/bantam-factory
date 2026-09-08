@@ -12,6 +12,7 @@ import {checkPeerReadiness,readinessLocation} from './peer-readiness.js';
 import {checkCodexReadiness} from './codex-readiness.js';
 import {nonRootIdentity} from './linux-peer-runtime.js';
 import {checkDeepseekReadiness} from './deepseek-readiness.js';
+import {startLiveFight,renderLiveFight} from './factory-card-live.js';
 
 const LOCAL=new Set(['bantam-local-27b','hermes','opencode','deepseek-local-27b']);
 export const CARDS_HELP=`BANTAM FACTORY · fight cards
@@ -28,10 +29,11 @@ bantamfactory cards --replay DIR    Rebuild replay/export from saved evidence; n
 bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
 bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
 
-Options: --kit ID (default factory-2026-09-07), --card ID, --arms ID,...,
+Options: --kit ID (default factory-2026-09-07), --card ID|all, --arms ID,...,
          --endpoint URL, --out NEW-DIRECTORY, --timeout-seconds 1..600,
          --repetitions 1..3, --serial, --list, --replay DIR, --check, --dry-run, --yes, --help
          --public (also generate an allowlisted public summary; never upload)
+         --live (token-protected loopback viewer; saves live-public.html when finished)
          --register hermes|opencode|deepseek --path PATH (save location only; no execution)
 
 No rival installations, model downloads, cloud requests or uploads occur from
@@ -94,15 +96,15 @@ export function normalizeCardEndpoint(value){
 }
 export function makeCardsPlan(args,{cwd=process.cwd(),now=()=>new Date(),connection=loadConnection(),registrations={}}={}){
  const kitId=args.kit??'factory-2026-09-07',kit=factoryKit(kitId);
- const card=args.card??kit.cards[0],arms=typeof args.arms==='string'?args.arms.split(',').map(a=>a.trim()):['bantam-local-27b'];
+ const card=args.card??kit.cards[0],cards=card==='all'?[...kit.cards]:[card],arms=typeof args.arms==='string'?args.arms.split(',').map(a=>a.trim()):['bantam-local-27b'];
  const repetitions=Number(args.repetitions??1),timeoutMs=Number(args['timeout-seconds']??600)*1000;
  if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('timeout-seconds must be 1..600');
- fightPlan({kitId,cards:[card],arms,repetitions});
+ fightPlan({kitId,cards,arms,repetitions});
  const endpoint=arms.some(a=>LOCAL.has(a))?normalizeCardEndpoint(args.endpoint??(connection?.kind==='api'&&connection.dialect==='llamacpp'?connection.apiUrl:'http://127.0.0.1:8085')):null;
  const output=path.resolve(cwd,args.out??path.join('.bantam','fight-cards',now().toISOString().replace(/[:.]/g,'-')));
  if(fs.existsSync(output))throw Error('Choose a new output directory; existing evidence is never overwritten.');
  const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name==='deepseek'?'deepseek-local-27b':name)).map(([name,r])=>[name,{executable:r.executable,sha256:r.sha256}]));
- return {kitId,cards:[card],arms,repetitions,timeoutMs,output,endpoint,parallelQueues:!args.serial,...(Object.keys(peerExecutables).length?{peerExecutables}:{})};
+ return {kitId,cards,arms,repetitions,timeoutMs,output,endpoint,parallelQueues:!args.serial,...(Object.keys(peerExecutables).length?{peerExecutables}:{})};
 }
 export function preflightCards(plan,{exec=execFileSync,participants=discoverCardParticipants()}={}){
  const check=(exe,args,label)=>{try{exec(exe,args,{stdio:'ignore',timeout:5000});}catch{throw Error(`${label}. Nothing has been installed; fix this prerequisite and retry.`);}};
@@ -121,8 +123,8 @@ export function preflightCards(plan,{exec=execFileSync,participants=discoverCard
 export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(s),interactive=Boolean(process.stdin.isTTY&&process.stderr.isTTY),
  discover=discoverCardParticipants,findExecutable=findCardExecutable,servers=discoverModelServers,connection=loadConnection(),
  registry=readCompetitorRegistry,register=registerCompetitor,
- preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness,checkCodex=checkCodexReadiness,checkDeepseek=checkDeepseekReadiness,showcase=writeShowcase}={}){
- const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check','public']);
+ preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness,checkCodex=checkCodexReadiness,checkDeepseek=checkDeepseekReadiness,showcase=writeShowcase,startLive=startLiveFight}={}){
+ const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check','public','live']);
  for(const key of Object.keys(args))if(!allowed.has(key))throw Error(`Unknown cards option: --${key}`);
  if(args.help){out(CARDS_HELP);return 0;}
  if(args.register!==undefined||args.path!==undefined){
@@ -209,7 +211,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   plan.peerReadiness=await checkPeers({arms:peerArms,peerExecutables:plan.peerExecutables,output});
  }
  let manifest;
- try{manifest=await run(plan);}
+ const viewer=args.live?await startLive():null;
+ if(viewer)out(`Live comparison (read-only, local token URL): ${viewer.url}\nClosing the browser does not stop the comparison.\n`);
+ try{
+ try{manifest=await run(plan,viewer?{onProgress:viewer.publish}:{});}
  finally{
   if(fs.existsSync(path.join(plan.output,'manifest.json'))){
    try{exportCard(plan.output);}
@@ -224,4 +229,13 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   out(`Public summary (review before sharing): ${summary.output}\nOnly that public subdirectory is sanitized. Do not share the surrounding raw evidence.\n`);
  }
  return manifest?.complete&&manifest.results.every(r=>r.pass)?0:1;
+ }finally{
+  if(viewer){try{
+   if(fs.existsSync(plan.output)){
+    const file=path.join(plan.output,'live-public.html');
+    fs.writeFileSync(file,renderLiveFight(viewer.snapshot()),{flag:'wx',mode:0o600});
+    out(`Standalone public snapshot: ${file}\nOnly this page is sanitized; surrounding raw evidence stays private.\n`);
+   }
+  }finally{await viewer.close();}}
+ }
 }

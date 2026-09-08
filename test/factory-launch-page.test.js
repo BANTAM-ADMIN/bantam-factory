@@ -247,6 +247,7 @@ test('actual Chromium verifies mobile/desktop replay, exports, accessibility and
       const expectedInputs=${JSON.stringify(expectedInputs)};
       expect('displayOrder',JSON.stringify([...document.querySelectorAll('.lane')].map(n=>n.dataset.arm))===JSON.stringify(Object.keys(expectedInputs)));
       expect('groupHeadings',document.querySelectorAll('.lane-group').length===2);
+      expect('frontierGroupIsNotAstraOnly',[...document.querySelectorAll('.lane-group')].some(h=>h.textContent==='Frontier references · different models from the local worker'));
       expect('counterBinding',[...document.querySelectorAll('.lane')].every(n=>Number(n.querySelector('.token-inputTokens').textContent.replaceAll(',',''))===expectedInputs[n.dataset.arm]));
       expect('accessibleButtons',[...document.querySelectorAll('button')].every(b=>(b.getAttribute('aria-label')||b.textContent).trim()));
       expect('accessibleTimeline',Boolean(get('timeline').getAttribute('aria-label')||get('timeline').labels?.length));

@@ -27,6 +27,12 @@ native Astra passed **5/5 in 160.7s**. BANTAM timed out at 4/5 and OpenCode at
 loss, not an omitted run. Four of the six launch work orders are now published;
 the remaining comparisons are running and are not yet published results.
 
+## Additional native Claude references
+
+[Claude Sonnet and Opus · two work orders, four attempts](claude-references-2026-09-07/README.md).
+All four passed 5/5 with complete native aggregate token/cache accounting.
+These were run separately and are not silently merged into the original cards.
+
 ## Earlier reviewed comparison
 
 [Context packet · Hermes comparison](context-packet-2026-09-07-public/README.md):

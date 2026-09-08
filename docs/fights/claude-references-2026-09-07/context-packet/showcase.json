@@ -1,0 +1,195 @@
+{
+  "schema": "bantam.factory-showcase.v1",
+  "mode": "public",
+  "generatedAt": "2026-09-08T03:22:18.421Z",
+  "privacy": {
+    "redacted": true,
+    "rawEvidenceIncluded": false,
+    "policy": "Explicit numeric/public-task allowlist; private logs, paths, source, prompts, group names and configuration omitted."
+  },
+  "series": [
+    {
+      "id": "series-1",
+      "title": "Factory system comparison",
+      "kind": "comparison",
+      "complete": true,
+      "startedAt": "2026-09-08T03:15:39.194Z",
+      "finishedAt": null,
+      "counts": {
+        "observed": 2,
+        "planned": 2,
+        "accepted": 2,
+        "completed": 2,
+        "pass": 2,
+        "groupsMeasured": 2,
+        "groupsPassed": 10,
+        "groupsTotal": 10
+      },
+      "cards": [
+        {
+          "id": "s1-context-packet-r1",
+          "card": "context-packet",
+          "title": "Context packet",
+          "kind": "BUILD",
+          "number": "01",
+          "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+          "repeat": 1,
+          "rows": [
+            {
+              "id": "s1-context-packet-r1-lane1",
+              "arm": "claude-sonnet",
+              "label": "Claude · Sonnet",
+              "model": "Claude Sonnet · native CLI alias",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 62237,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 439451,
+                  "outputTokens": 5700,
+                  "cacheHitTokens": 398100,
+                  "freshInputTokens": 41351
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 439451,
+                  "outputTokens": 5700,
+                  "cacheHitTokens": 398100,
+                  "freshInputTokens": 41351
+                },
+                "server": null,
+                "complete": true,
+                "requests": null,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [],
+              "events": [],
+              "timedEvents": 41,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-context-packet-r1-lane2",
+              "arm": "claude-opus",
+              "label": "Claude · Opus",
+              "model": "Claude Opus · native CLI alias",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 67268,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 139205,
+                  "outputTokens": 5794,
+                  "cacheHitTokens": 112339,
+                  "freshInputTokens": 26866
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 139205,
+                  "outputTokens": 5794,
+                  "cacheHitTokens": 112339,
+                  "freshInputTokens": 26866
+                },
+                "server": null,
+                "complete": true,
+                "requests": null,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [],
+              "events": [],
+              "timedEvents": 25,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

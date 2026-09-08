@@ -63,7 +63,8 @@ More completed work orders, including the misses:
 | [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 600s limit · TIMEOUT 4/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
 
 [Browse the fight gallery](docs/fights/launch-2026-09-07/index.html) ·
-[Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md)
+[Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md) ·
+[See the native Claude references](docs/fights/claude-references-2026-09-07/README.md)
 
 The first two tasks show measured wins; the stream parser shows a real miss.
 These are individual attempts, not a universal ranking. The cards retain

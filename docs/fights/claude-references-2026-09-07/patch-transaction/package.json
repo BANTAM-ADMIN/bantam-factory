@@ -1,0 +1,17 @@
+{
+  "schema": "bantam.factory-showcase-package.v1",
+  "private": false,
+  "redacted": true,
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 58666,
+      "sha256": "9cd5241729e6291a0cfca1e64fef410cd5b6675b798b26663c97a5088563cdeb"
+    },
+    {
+      "path": "showcase.json",
+      "bytes": 6485,
+      "sha256": "ac14e4ad549b412ade440e8f7cf12fa1ba95eae83955be507a489e1b031db015"
+    }
+  ]
+}

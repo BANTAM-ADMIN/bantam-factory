@@ -80,7 +80,7 @@
       const local=current().rows.filter(row=>row.family==='local');
       const localCount=new Set(local.map(row=>row.arm)).size;
       const localLabel=local.every(row=>row.model==='Qwen 27B · same local weights')?'Same local 27B weights':'Local worker configurations';
-      const g=presentation==='qualification'?`BANTAM local qualification · ${r.model}`:(r.family==='astra'?`Frontier reference · ${r.model}, not the local model`:`${localLabel} · ${localCount===4?'four':localCount} different harness${localCount===1?'':'es'}`);
+      const g=presentation==='qualification'?`BANTAM local qualification · ${r.model}`:(r.family==='astra'?'Frontier references · different models from the local worker':`${localLabel} · ${localCount===4?'four':localCount} different harness${localCount===1?'':'es'}`);
       const heading=g!==group?`<h4 class="lane-group">${e(g)}</h4>`:'';group=g;
       return `${heading}<article class="lane ${r.bantam?'bantam':''}" data-arm="${e(r.arm)}" data-row="${i}" aria-label="${e(r.label)}"><div class="lane-main"><div><h4 class="lane-name">${e(r.label)}</h4><span class="lane-model">${e(r.model)}</span></div><div class="lane-track" aria-hidden="true"><div class="lane-bar"></div></div><strong class="lane-time"></strong><span class="lane-status status"></span></div><dl class="lane-metrics">${fields.map(([f,l])=>`<div class="metric"><dt>${l}</dt><dd class="token-${f}">Unknown</dd></div>`).join('')}</dl><div class="lane-tail"><div class="lane-proof"><span class="project"></span><span class="finish"></span><span class="groups"></span><span class="receipt-scope"></span></div><details><summary>Receipt & checks</summary><div class="lane-details">${accounting(r)}</div></details></div></article>`;
     }).join('');

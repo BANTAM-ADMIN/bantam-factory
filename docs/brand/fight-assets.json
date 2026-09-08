@@ -45,6 +45,11 @@
       "path": "gsap-NOTICE.txt",
       "bytes": 213,
       "sha256": "0af108ab71750fcf7b8b4ff6380a487acc597d14cd4bb1821c9b84a7c5969f38"
+    },
+    {
+      "path": "chicken-problems.png",
+      "bytes": 1903169,
+      "sha256": "75a5eecb56c315f1e684b629787273a7a259d8893f8b372a7509e86919fd7286"
     }
   ]
 }

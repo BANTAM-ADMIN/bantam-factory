@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BANTAM FACTORY</title>
+<meta name="description" content="BANTAM FACTORY is an open source coding factory for the model you already run. It gives a small local model the context, tools, and checks to finish real jobs on your own hardware.">
+<meta property="og:title" content="BANTAM FACTORY — your model is the worker. Give it a factory.">
+<meta property="og:description" content="An open source coding factory for the model you already run. Recorded fight cards: Qwen 27B on one RTX 4090, checked work, real clocks.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://bantam-admin.github.io/bantam-factory/assets/bantam-factory-stations.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101916">
+<link rel="icon" href="assets/showcase/img/bantam-mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/showcase/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="#"><canvas id="headerRooster" width="22" height="22" aria-hidden="true"></canvas><span>BANTAM FACTORY</span></a>
+  <nav aria-label="Site">
+    <a href="fights.html#fights">Fights</a>
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/README.md">Docs</a>
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="hero-heading"><h1>Your model is the worker.<br>Give it a factory.</h1><a class="hero-watch" href="#stage">See it work <span aria-hidden="true">↓</span></a></div>
+  <figure class="hero-factory"><a href="assets/bantam-factory-stations.png" aria-label="View the chicken factory illustration at full size"><img src="assets/bantam-factory-stations.png" alt="One chicken struggles to draw a person. In BANTAM FACTORY, a line of chickens each adds one simple part, producing complete drawings." width="1774" height="887" fetchpriority="high"></a><figcaption>Big jobs. Chicken problems. <span>A whole job becomes a line of small, checked steps.</span></figcaption></figure>
+  <div class="hero-row">
+    <div class="hero-copy">
+      <p class="lede">BANTAM FACTORY is an open source coding factory for the model you already run. Ask it for something, and it builds the factory around your local model: the context, the tools, and the checks to get the work done fast, on your own hardware.</p>
+      <div class="install">
+<pre id="installCmd">git clone https://github.com/BANTAM-ADMIN/bantam-factory.git
+cd bantam-factory
+npm ci
+docker pull alpine:3
+npm link
+bantamfactory setup</pre>
+        <button type="button" class="copy" data-copy="#installCmd">Copy</button>
+      </div>
+      <p class="install-then">Then open any project, run <code>bantamfactory</code>, and ask for what you want.</p>
+      <p class="hero-links">
+        <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/GETTING-STARTED.md">Read the getting started guide</a>
+        <a href="fights.html#fights">Watch the fights</a>
+      </p>
+    </div>
+    <aside class="hero-next"><canvas id="heroRooster" width="22" height="22" role="img" aria-label="The animated BANTAM pixel rooster"></canvas><h2>Your next tool.<br>Your hardest bug.<br>Your own factory.</h2><p>Watch a job move through the worker, the stations, and the supervisor.</p><a href="#stage">Take the tour ↓</a><a href="fights.html#fights">Open the fight cards ↗</a><!-- INTRO_LINK --></aside>
+  </div>
+</section>
+
+<section class="stage" id="stage" aria-label="What a session looks like">
+  <div class="stage-term">
+    <figure class="term term--stage" id="stageTerm" aria-live="off"></figure>
+    <p class="term-cap" id="stageCap"></p>
+  </div>
+
+  <div class="stories">
+    <article class="story" data-demo="job">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Give it a job.</h2>
+      <p>Open a folder and ask, the way you'd ask Claude Code or Codex: build me this, fix that, write the script that does the boring part. BANTAM FACTORY builds a factory around your local model and hammers out the work to your spec, fast.</p>
+      <p class="fine">These walkthroughs condense recorded work with Qwen 27B on one RTX 4090. This one built a byte-budgeted context packer from a one-page work order, all checks green, in 58.1 seconds.</p>
+    </article>
+
+    <article class="story" data-demo="repair">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Check. Repair. Check again.</h2>
+      <p>A test result is the factory's instruction, not its report card. When the suite fails, the failing test and its reason go straight back to the worker as the next thing to fix. Reading and reasoning do not count as verification; running does.</p>
+      <p class="fine">Stream framer, a repair job. The starter dropped the last line of a stream that arrived one byte at a time. The failure named the test, the worker made two edits, and the suite passed.</p>
+    </article>
+
+    <article class="story" data-demo="stations">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Stations that push back.</h2>
+      <p>Between the model and your files sit stations. They compare an edit against the file before it lands, list every other place a changed symbol is used, and notice when the worker has edited eight times without running anything. Then they say so, in the same feed the model reads.</p>
+      <p class="fine">Each message here was printed during a recorded run. None of them are decoration: a station that refuses an edit refuses it, and a station that runs the tests for the worker reports the result.</p>
+    </article>
+
+    <article class="story" data-demo="review">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Reviewed before it's called done.</h2>
+      <p>A supervisor reads the delivered work against the job and proposes a case it might get wrong. The worker has to run it. A console message is not enough to close the case: the factory keeps an executable assertion as regression cover, then runs your check once more on the final files.</p>
+      <p class="fine">Here the supervisor questioned fractional byte limits. The implementation already rejected them, and the proof stayed in the workspace as a contract check.</p>
+    </article>
+
+    <article class="story" data-demo="ring">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Put it in the ring.</h2>
+      <p>A fight card is one job, one starting point, independent checks, and a recorded clock. Same task, same local model, different harness. Bring your own competitor and run the card yourself; the terminal prints a local page with every action and every file each contender delivered.</p>
+      <p class="fine">Context packet: BANTAM FACTORY finished in 58.1 seconds. Hermes, running the same Qwen 27B, took 512.2 seconds. <a href="context-packet/share/index.html#card=context-packet&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=hermes">Open the card</a>.</p>
+    </article>
+
+    <article class="story" data-demo="sandbox">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>A workshop with walls.</h2>
+      <p>You choose the project the factory can edit. Its file tools refuse paths that escape that workspace, including through symlinks. Shell commands run in Docker by default, with networking off and the container's system files read-only.</p>
+      <p class="fine">Need something from the internet? The interactive session asks you first. Here an edit outside the project is refused, and a declined network request stays blocked. The factory can work on the files inside the project you gave it.</p>
+    </article>
+
+    <article class="story" data-demo="hardware">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Your hardware. Or your Codex account.</h2>
+      <p>Run a local model through llama.cpp, or point the factory at a signed-in Codex CLI. Setup checks Node, Docker, and the model server, and offers a guided model download for supported NVIDIA GPUs. Vision and faster decoding are add-ons you choose; nothing optional is bundled.</p>
+      <p class="fine">Shell commands from the model run in a Docker sandbox with the network off. An interactive session asks before it turns the network on.</p>
+    </article>
+
+    <article class="story" data-demo="improve">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>The factory improves the factory.</h2>
+      <p>Every job leaves a record of friction: rejected edits, invalid outputs, runs that overran their turn budget. The self-improvement cycle reads that record, picks a weakness, builds a candidate change in a separate copy, and tests it against the protected baseline before anything is promoted.</p>
+      <p class="fine">You start the cycle. It is experimental, and nothing changes the running code on its own. <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/SELF-IMPROVEMENT.md">How a cycle works</a>.</p>
+    </article>
+  </div>
+</section>
+
+<section class="band" id="fights">
+  <div class="fight-heading"><div><h2>SMALL MODEL.<br><span>HEAVY HITTER.</span></h2><p>Same job. Same model. See what the factory changes.</p></div><img src="assets/bantam-rooster-v1.png" alt="A copper-feathered bantam rooster with a sweeping dark tail." width="1232" height="1296" loading="lazy"></div>
+  <!-- FIGHT_RESULTS -->
+  <!-- FIGHT_SPEEDS -->
+  <p><a href="fights.html#fights">Open the fight gallery</a></p>
+</section>
+
+<section class="band limits" id="before">
+  <h2>Before you install.</h2>
+  <p>A few things worth knowing so the first run goes the way you expect.</p>
+  <ul>
+    <li><b>Linux or WSL2.</b> Node.js 20 or newer, Git, and Docker. The sandbox is the official alpine image. Native Windows is unsupported and macOS is untested.</li>
+    <li><b>A model.</b> Either a llama.cpp server with a capable model (the recorded cards use a 27B model at 4-bit, which wants a 24 GB GPU) or an installed, signed-in Codex CLI. Setup walks through both.</li>
+    <li><b>Checks are optional, and worth it.</b> Add <code>--verify "npm test"</code> and the factory runs your tests after its edits and repairs from the failures.</li>
+    <li><b>Run records stay private.</b> Saved runs can contain your code and prompts. Fight cards have a separate, reviewed public export.</li>
+    <li><b>Self-improvement is opt-in.</b> It is experimental, runs only when you start it, and never applies a change that has not passed its checks.</li>
+  </ul>
+</section>
+
+<section class="strut" aria-label="An easter egg">
+  <figure class="term term--strut" id="strutTerm"></figure>
+  <div class="strut-copy">
+    <p>And it can strut.</p>
+    <p class="fine">Five animations, drawn in half-block characters at 22 columns, shipped in the repo. Run <code>bantam strut</code> in any truecolor terminal.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>BANTAM FACTORY is open source under the Apache-2.0 license. Fight results come from reviewed run records. Walkthroughs condense recorded sessions and maintainer command output; their captions identify the source.</p>
+  <nav aria-label="Footer">
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory">GitHub</a>
+    <a href="fights.html#fights">Fight gallery</a>
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/README.md">Docs</a>
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/CONTRIBUTING.md">Contribute</a>
+    <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/SECURITY.md">Security</a>
+  </nav>
+</footer>
+
+<!-- FIGHT_PREVIEW -->
+<script src="assets/showcase/rooster.js"></script>
+<script src="assets/showcase/demos.js"></script>
+<script src="assets/showcase/site.js"></script>
+</body>
+</html>

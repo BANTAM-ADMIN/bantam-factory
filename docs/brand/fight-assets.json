@@ -1,0 +1,50 @@
+{
+  "schema": "bantam.fight-brand.v1",
+  "files": [
+    {
+      "path": "bantam-rooster-v1.png",
+      "bytes": 1888962,
+      "sha256": "844ba0110396a0905dbfd97f2ad3ac398a9c0f1c82a4afdbe4c3b63ac51b8a91"
+    },
+    {
+      "path": "barlow-condensed-800.ttf",
+      "bytes": 87556,
+      "sha256": "73bc9e17231e9073780d3c81574c7253cecd5645c93544df1a935054b39a364f"
+    },
+    {
+      "path": "manrope-400.ttf",
+      "bytes": 94972,
+      "sha256": "a13d9b41b0a471ce58f0e46d377fa3cc76615e4632c3b15eb397caadf7a13f0a"
+    },
+    {
+      "path": "manrope-700.ttf",
+      "bytes": 94928,
+      "sha256": "b9584e099e0e7f1e1e914c3037aabb9010c50346a3ce8df5eeeeecc0563044d8"
+    },
+    {
+      "path": "barlow-OFL.txt",
+      "bytes": 4377,
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+    },
+    {
+      "path": "manrope-OFL.txt",
+      "bytes": 4384,
+      "sha256": "e01b637272e0cbdfb240184dd98ea5cc671556d9894dae2668d92ab2c906787c"
+    },
+    {
+      "path": "bantam-factory-stations.png",
+      "bytes": 1854075,
+      "sha256": "4b133e81061ab689d982804474f3dc5930504a3cdd1c0089d81aeb309e285b28"
+    },
+    {
+      "path": "gsap-3.14.2.min.js",
+      "bytes": 72779,
+      "sha256": "c174bfce53a729418d57a8ad8625e7247c793a22fef8e2851e3cfa3de9cd8280"
+    },
+    {
+      "path": "gsap-NOTICE.txt",
+      "bytes": 213,
+      "sha256": "0af108ab71750fcf7b8b4ff6380a487acc597d14cd4bb1821c9b84a7c5969f38"
+    }
+  ]
+}

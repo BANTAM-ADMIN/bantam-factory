@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meet BANTAM FACTORY · 18-second introduction</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>*{box-sizing:border-box}body{margin:0;background:#20251f;color:#e4ded0;font:13px/1.6 Arial,sans-serif}.player{max-width:1280px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:0 0 18px}h1{font-size:16px;margin:0}a{color:inherit;text-underline-offset:4px}.viewport{width:100%;aspect-ratio:16/9;position:relative;overflow:hidden;background:#e4ded0}iframe{border:0;position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}.controls{display:flex;gap:16px;align-items:center;padding:18px 0}button{border:1px solid #f1bf36;background:#f1bf36;color:#20251f;font-weight:bold;padding:10px 22px;cursor:pointer;min-width:90px}input{accent-color:#f1bf36;flex:1;min-width:70px}output{font:12px monospace;white-space:nowrap}.note{font-size:11px;color:#bbc4b1}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #f1bf36;outline-offset:4px}@media(max-width:600px){.player{padding:14px}header{font-size:11px}h1{font-size:13px}.controls{gap:10px}button{padding:9px 13px;min-width:70px}output{font-size:10px}}</style></head><body><main class="player"><header><h1>BANTAM FACTORY · Meet your factory</h1><a href="../../fights.html">All fights ↗</a></header><div class="viewport"><iframe id="film" src="index.html" title="BANTAM FACTORY animated introduction"></iframe></div><div class="controls"><button id="play" disabled>Play</button><label for="seek" hidden>Introduction playback position</label><input id="seek" type="range" min="0" max="18" step="0.01" value="0" aria-label="Introduction playback position" disabled><output id="time">0:00 / 0:18</output></div><p class="note">18-second introduction · Sound off · <a href="../../context-packet/share/index.html#card=context-packet&amp;view=results&amp;layout=compare&amp;left=bantam-local-27b&amp;right=hermes">Open the complete recorded fight →</a></p></main><script>(function introPlayerBrowser(){
+  const frame=document.getElementById('film'),play=document.getElementById('play'),seek=document.getElementById('seek'),time=document.getElementById('time');
+  let tl=null;
+  function size(){frame.style.transform='scale('+frame.parentElement.clientWidth/1920+')';}
+  new ResizeObserver(size).observe(frame.parentElement);size();
+  function update(){const t=Math.min(18,tl.time());seek.value=t;time.textContent='0:'+String(Math.floor(t)).padStart(2,'0')+' / 0:18';play.textContent=tl.paused()?'Play':'Pause';}
+  frame.addEventListener('load',async()=>{
+    await frame.contentDocument.fonts.ready;
+    tl=frame.contentWindow.__timelines?.['bantam-intro'];
+    if(!tl){time.textContent='Could not load introduction';return;}
+    // Extend the player's hold, not the composition's render duration.
+    tl.to({hold:0},{hold:1,duration:Math.max(0,18-tl.duration())},tl.duration());
+    tl.pause(1.4);seek.disabled=false;play.disabled=false;
+    tl.eventCallback('onUpdate',update);tl.eventCallback('onComplete',()=>{tl.pause();update();play.textContent='Replay';});
+    play.onclick=()=>{if(tl.time()>=17.99)tl.restart();else if(tl.paused())tl.play();else tl.pause();update();};
+    seek.oninput=()=>{tl.pause(Number(seek.value));update();};
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){tl.pause();update();}});
+    update();
+  });
+})();</script></body></html>

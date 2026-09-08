@@ -1,3 +1,5 @@
+import {SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
+import {FIGHT_BRAND_FILES} from '../scripts/fight-poster.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -84,7 +86,7 @@ test('publication requires the full planned card set and copies only the explici
   for(const id of Object.keys(PUBLIC_FACTORY_CARDS).filter(id=>id!=='context-packet'))fixture(t,{root,id});
   fs.writeFileSync(path.join(root,'context-packet','private-run.json'),'PRIVATE_DO_NOT_UPLOAD');
   fs.writeFileSync(path.join(root,'private.txt'),'PRIVATE_DO_NOT_UPLOAD');
-  assert.deepEqual(stageFightGallery({root,output}),{cards:PLANNED,files:2+PLANNED*9});
+  assert.deepEqual(stageFightGallery({root,output}),{cards:PLANNED,files:3+PLANNED*9+FIGHT_BRAND_FILES.length+SHOWCASE_STATIC_FILES.length});
   assert.equal(fs.existsSync(path.join(output,'private.txt')),false);
   assert.equal(fs.existsSync(path.join(output,'context-packet','private-run.json')),false);
   assert.equal(fs.readFileSync(path.join(output,'context-packet','README.md'),'utf8'),'Public test notes');

@@ -208,7 +208,7 @@ test('share graphics retain all twelve contenders and published links remain sco
   const svg=renderShareCard(data);
   for(let i=0;i<12;i++)assert.ok(svg.includes('>System '+i+'</text>'));
   const html=renderLaunchPage(data,{previewImage:'share-card.png',publishedPath:'references/patch-transaction/share/index.html'});
-  assert.match(html,/href="\.\.\/\.\.\/\.\.\/index.html"/);
+  assert.match(html,/href="\.\.\/\.\.\/\.\.\/fights.html"/);
   assert.match(html,/og:image" content="https:\/\/bantam-admin.github.io\/bantam-factory\/references\/patch-transaction\/share\/share-card.png"/);
   assert.throws(()=>renderLaunchPage(data,{publishedPath:'../private/index.html'}),/Invalid published/);
 });

@@ -3,17 +3,20 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp
 export function renderWorkLane(entry) {
   const E = escape;
   return `<section class="recorded-work" data-work-arm="${E(entry.arm)}" data-work-sha="${E(entry.sha256)}">
-    <nav class="work-views" aria-label="${E(entry.arm)} recorded work">${[['story','Story'],['actions',`Actions · ${entry.actions}`],['files',`Files · ${entry.files}`],['checks','Tests']].map(([id,label]) => `<button type="button" data-work-view="${id}" aria-pressed="${id==='story'}">${E(label)}</button>`).join('')}</nav>
+    <nav class="work-views" aria-label="${E(entry.arm)} recorded work">${[['story','Story'],['actions',`Actions · ${entry.actions}`],['files',`Files · ${entry.files}`],['checks','Tests'],['terminal','Replay log']].map(([id,label]) => `<button type="button" data-work-view="${id}" aria-pressed="${id==='story'}">${E(label)}</button>`).join('')}</nav>
     <div class="work-story"><h5>${E(entry.explanation.title)}</h5>${entry.explanation.paragraphs.map(p => `<p>${E(p.text)}</p>${p.actions.length?`<div class="story-evidence"><button type="button" data-evidence="${E(p.actions.join(','))}">Show the evidence ↗</button></div>`:''}`).join('')}
     <div class="work-delivery"><span>${entry.changedFiles} workspace change${entry.changedFiles===1?'':'s'}</span><button type="button" data-work-view="files">Open the work →</button></div></div>
     <div class="work-content" hidden aria-live="polite"></div>
+    <div class="work-terminal-panel" hidden><div class="work-terminal" data-playing="false"><div class="work-terminal-head"><span>TERMINAL / RECORDED WORK</span><button type="button" data-follow-terminal aria-pressed="true">Following ↓</button></div><div class="work-terminal-log" tabindex="0" role="region" aria-label="Recorded terminal messages"><div class="terminal-entries"></div><p class="terminal-cursor">Opening the recorded work…</p></div><div class="work-terminal-foot"><span class="terminal-state">Loading</span><span class="terminal-position">0.0s</span></div></div><p class="terminal-timing-note">Messages follow saved times. “By” marks a response available by the next recorded turn.</p></div>
     <div class="work-download"><a href="../work/${E(entry.path)}" download>Download action record & files ↓</a><span>Recorded work</span></div>
   </section>`;
 }
 
-export function fightWorkBrowser() {
+export function fightWorkBrowser(replayEvents) {
   'use strict';
   const cache = new Map();
+  const terminals = new WeakMap();
+  let replay = window.__launchState?.() ?? {t:0,mode:'results',playing:false};
   const E = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
   const printed = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   const seconds = value => typeof value === 'number' ? (value/1000).toFixed(1) + 's' : 'Sequence only';
@@ -43,6 +46,61 @@ export function fightWorkBrowser() {
       return JSON.parse(new TextDecoder().decode(bytes));
     })().catch(error => {cache.delete(expected); throw error;}));
     return cache.get(expected);
+  }
+  function terminalState(section) {
+    if(!terminals.has(section))terminals.set(section,{following:true,work:null,events:null,pending:null,count:0,clock:-1,error:null});
+    return terminals.get(section);
+  }
+  function follow(section,enabled) {
+    const state=terminalState(section);state.following=enabled;
+    const button=section.querySelector('[data-follow-terminal]');
+    button.setAttribute('aria-pressed',String(enabled));button.textContent=enabled?'Following ↓':'Follow latest ↓';
+    if(enabled){const log=section.querySelector('.work-terminal-log');log.scrollTop=log.scrollHeight;}
+  }
+  function paintTerminal(section) {
+    const state=terminalState(section);
+    if(!state.work)return;
+    const {work,events}=state,ended=replay.mode==='results'||replay.t>=work.wallMs;
+    const at=ended?work.wallMs:replay.t;
+    const visible=events.filter(event=>event.atMs<=at);
+    const entries=section.querySelector('.terminal-entries'),log=section.querySelector('.work-terminal-log');
+    const rewind=at<state.clock||visible.length<state.count;
+    if(rewind){entries.replaceChildren();state.count=0;}
+    const changed=visible.length!==state.count;
+    if(changed){
+      const fragment=document.createDocumentFragment();
+      for(const event of visible.slice(state.count)){
+        const item=document.createElement('article');item.className='terminal-entry';item.dataset.kind=event.kind;item.dataset.terminalEvent=event.id;
+        const when=event.precision==='untimed'?'untimed':event.precision==='final'?'final':(event.precision==='by'?'by ':'')+seconds(event.atMs);
+        item.innerHTML=`<div class="terminal-entry-head"><time>${E(when)}</time><strong>${E(event.title)}</strong></div>${event.body?`<pre><code>${E(event.body)}</code></pre>`:''}`;
+        fragment.append(item);
+      }
+      entries.append(fragment);state.count=visible.length;
+    }
+    state.clock=at;
+    section.querySelector('.work-terminal').dataset.playing=String(replay.playing&&!ended);
+    const cursor=section.querySelector('.terminal-cursor');cursor.hidden=ended;cursor.textContent='Waiting for the next recorded message';
+    section.querySelector('.terminal-state').textContent=ended?'Run ended · '+work.outcome:replay.playing?'Replaying recorded work':'Replay paused';
+    section.querySelector('.terminal-position').textContent=seconds(at);
+    if((changed||rewind)&&state.following)log.scrollTop=log.scrollHeight;
+  }
+  function syncReplay() {
+    document.querySelectorAll('.recorded-work').forEach(section=>{
+      section.dataset.replay=String(replay.mode==='replay');
+      const active=replay.mode==='replay'||section.dataset.currentView==='terminal';
+      section.querySelector('.work-terminal-panel').hidden=!active;
+      if(!active||section.closest('.lane')?.hidden)return;
+      const state=terminalState(section);
+      if(state.work){paintTerminal(section);return;}
+      if(state.pending||state.error)return;
+      state.pending=load(section).then(work=>{
+        state.work=work;state.events=replayEvents(work);
+        if(section.isConnected)paintTerminal(section);
+      }).catch(error=>{
+        state.error=error.message;
+        if(section.isConnected){section.querySelector('.terminal-cursor').textContent=error.message;section.querySelector('.terminal-state').textContent='Record unavailable';}
+      }).finally(()=>{state.pending=null;});
+    });
   }
   function actionsView(work) {
     const stages = work.stations?.filter(s=>s.type==='station.started') ?? [];
@@ -85,8 +143,9 @@ export function fightWorkBrowser() {
     section.querySelectorAll('.work-views [data-work-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.workView===view)));
     section.querySelector('.work-story').hidden = view !== 'story';
     const content = section.querySelector('.work-content');
-    content.hidden = view === 'story';
-    if (view === 'story') return;
+    content.hidden = view === 'story' || view === 'terminal';
+    syncReplay();
+    if (view === 'story' || view === 'terminal') return;
     content.innerHTML = '<p class="work-help">Opening the recorded work…</p>';
     try {
       const work = await load(section);
@@ -105,6 +164,7 @@ export function fightWorkBrowser() {
       section.dataset.mounted='true';
       section.addEventListener('click',async event=>{
         const button=event.target.closest('button');if(!button)return;
+        if(button.hasAttribute('data-follow-terminal')){follow(section,!terminalState(section).following);return;}
         if(button.dataset.evidence) {await show(section,'actions',button.dataset.evidence);return;}
         if(button.dataset.workView) {await show(section,button.dataset.workView);return;}
         if(button.dataset.fileView) {section.dataset.fileView=button.dataset.fileView;paintFile(section,await load(section));return;}
@@ -116,11 +176,17 @@ export function fightWorkBrowser() {
         }
       });
       section.addEventListener('change',async event=>{if(event.target.matches('[data-file-picker]'))paintFile(section,await load(section));});
+      section.querySelector('.work-terminal-log').addEventListener('scroll',event=>{
+        const log=event.currentTarget;
+        if(terminalState(section).following&&log.scrollHeight-log.clientHeight-log.scrollTop>50)follow(section,false);
+      },{passive:true});
       // Arrow keys inside code/file controls belong to the work viewer.
       section.addEventListener('keydown',event=>event.stopPropagation());
     });
+    syncReplay();
   }
   document.addEventListener('fight-lanes-built',mount);
+  document.addEventListener('fight-replay-tick',event=>{replay=event.detail;syncReplay();});
   mount();
 }
 

@@ -1,3 +1,5 @@
+import {SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
+import {FIGHT_BRAND_FILES} from '../scripts/fight-poster.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -76,8 +78,8 @@ test('publication stages reviewed reference packages beside the launch cards usi
   for(const name of ['README.md','index.html','showcase.json','package.json','share/index.html','share/fight-card.json','share/package.json','share/share-card.png','share/share-card.svg'])
     assert.ok(fs.existsSync(path.join(output,'references','context-packet',name)),`staged references/context-packet/${name}`);
   assert.ok(fs.existsSync(path.join(output,'references','README.md')));
-  assert.match(fs.readFileSync(path.join(output,'index.html'),'utf8'),/references\/context-packet\/share\/index\.html/);
-  assert.equal(staged.files,2+LAUNCH_CARDS.length*9+1+9);
+  assert.match(fs.readFileSync(path.join(output,'fights.html'),'utf8'),/references\/context-packet\/share\/index\.html/);
+  assert.equal(staged.files,3+LAUNCH_CARDS.length*9+1+9+FIGHT_BRAND_FILES.length+2+SHOWCASE_STATIC_FILES.length);
 });
 
 test('a reference package with an unrecorded row or a mismatched card is refused',t=>{

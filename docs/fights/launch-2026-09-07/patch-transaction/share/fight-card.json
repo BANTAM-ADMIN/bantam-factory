@@ -2,7 +2,7 @@
   "schema": "bantam.launch-fight-card.v1",
   "generatedAt": "2026-09-08T02:27:10.629Z",
   "source": {
-    "sha256": "375d0a2c1978208789817f3476e9a713e5ac06453c535ba6758ca0455dbbfeb4",
+    "sha256": "c911fee793c2a70beeed6f74889e584b49daacd1b525faaaa447940fb94bef16",
     "schema": "bantam.factory-showcase.v1"
   },
   "comparison": null,
@@ -227,6 +227,26 @@
                 },
                 "gaps": []
               },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 5018,
+                  "milliseconds": 60735.57299999999,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 18003,
+                  "milliseconds": 10952.833000000002,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "d02f69ab0b036eb2738345bfbce298d4e1bca6948aad65b979fcd370dbae10d3",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
               "tokenUpdates": [
                 {
                   "t": 3269,
@@ -436,6 +456,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 35018,
+                  "milliseconds": 520863.897,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "prefill": {
+                  "tokens": 49991,
+                  "milliseconds": 29214.626,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "evidenceSha256": "ca1f1576c2db112058d88c45ba67ffe7ed9d568d0846082074a8a655b9979835",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {

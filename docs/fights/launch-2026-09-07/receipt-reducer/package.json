@@ -5,13 +5,13 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 78926,
-      "sha256": "8e7471601bc267974c880d13353b9f23e83a9cb361a340ddf1c54b66a9e800a0"
+      "bytes": 82816,
+      "sha256": "c85f0e9af45ba3a2d242070e8ad531ef21e225ba69d06912a1fac0a4870ea071"
     },
     {
       "path": "showcase.json",
-      "bytes": 37578,
-      "sha256": "4782e60d69712bb50d789ef8fdfdee1f34bab89d6237dc23d340e59df577ee41"
+      "bytes": 40020,
+      "sha256": "6b861ee37a6895457257acabb3265e20650b5123b190b0bf6fbaae7481ed9ad2"
     }
   ]
 }

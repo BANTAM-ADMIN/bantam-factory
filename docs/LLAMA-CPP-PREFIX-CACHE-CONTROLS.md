@@ -1,9 +1,8 @@
 # llama.cpp prefix-cache controls — measured on this machine
 
-Companion to [PREFIX-CACHE-AND-SHARED-KV.md](PREFIX-CACHE-AND-SHARED-KV.md) and
-[context-trajectories.md](context-trajectories.md). Those say what BANTAM does
-with the cache; this says what the server can be told to do, and **what it
-actually did when asked**.
+Companion to the historical [prefix-cache measurements](PREFIX-CACHE-AND-SHARED-KV.md).
+This records what the server could be told to do, and **what it actually did
+when asked**.
 
 Rig and raw data: [`tools/prefix-cache-bench/`](../tools/prefix-cache-bench/).
 Every number below is `timings.cache_n` and wall-clock from a real request, run

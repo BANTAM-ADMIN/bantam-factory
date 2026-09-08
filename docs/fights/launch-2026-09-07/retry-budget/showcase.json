@@ -304,7 +304,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 9969,
+                  "milliseconds": 113948.30900000002,
+                  "measuredRequests": 23,
+                  "totalRequests": 23
+                },
+                "prefill": {
+                  "tokens": 30945,
+                  "milliseconds": 18741.175,
+                  "measuredRequests": 23,
+                  "totalRequests": 23
+                },
+                "evidenceSha256": "8ff5fbc427dd977a958202c74fa3bf5abe631d8ce6e11d5612e4746ae53dc442",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-retry-budget-r1-lane2",
@@ -506,7 +526,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 27046,
+                  "milliseconds": 427646.369,
+                  "measuredRequests": 15,
+                  "totalRequests": 15
+                },
+                "prefill": {
+                  "tokens": 13635,
+                  "milliseconds": 10909.500000000002,
+                  "measuredRequests": 15,
+                  "totalRequests": 15
+                },
+                "evidenceSha256": "71097fe1c43a5db0a966ce4d4ce2162884c5f365cc8ad07ccf6f80426ddd5b72",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-retry-budget-r1-lane3",
@@ -808,7 +848,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 33214,
+                  "milliseconds": 522284.8900000002,
+                  "measuredRequests": 25,
+                  "totalRequests": 26
+                },
+                "prefill": {
+                  "tokens": 29386,
+                  "milliseconds": 21118.409,
+                  "measuredRequests": 25,
+                  "totalRequests": 26
+                },
+                "evidenceSha256": "33eaf05fe4074ee2b3f649204f038fc790ae5bcd1c87c548f93beef1bf6e79f0",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-retry-budget-r1-lane4",

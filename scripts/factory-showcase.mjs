@@ -8,6 +8,7 @@ import {gzipSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
 import {buildReplayLane,normalizeReplayUsage,replayLineDiff} from './factory-fight-replay.mjs';
 import {deriveSavedWireUsage} from './fight-usage-report.mjs';
+import {derivePerformance,publicPerformance,performanceView,validateHardware} from './fight-performance.mjs';
 import {factoryKit, PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -116,6 +117,10 @@ function publicIdentity(row){
   const tiel=row.model==='Tiel 35B-A3B · IQ4_XS'&&/^bantam-local-[a-z0-9][a-z0-9-]{0,119}$/.test(row.arm??'');
   return {arm:'bantam-local-variant',label:tiel?'BANTAM · Tiel':'BANTAM · local variant',model:tiel?'Tiel 35B-A3B · IQ4_XS':'Explicit local variant',family:'local',bantam:true};
 }
+function performanceFields(row){
+  const performance=row.family==='local'?publicPerformance(row.performance):null;
+  return performance?{performance}:{};
+}
 
 /** Strict public projection: no arbitrary metadata strings, paths, code or logs. */
 export function publicShowcaseData(privateData){
@@ -130,11 +135,12 @@ export function publicShowcaseData(privateData){
           recorded:r.recorded===true,outcome:OUTCOMES.has(r.outcome)?r.outcome:'NOT RECORDED',
           accepted:BOOL(r.accepted),completed:BOOL(r.completed),wallMs:N(r.wallMs),groupsPassed:N(r.groupsPassed),groupsTotal:N(r.groupsTotal),
           publicExit:N(r.publicExit),hiddenExit:N(r.hiddenExit),protectedChanges:N(r.protectedChanges),
-          accounting:publicAccounting(r.accounting),tokenUpdates:numericUpdates(r.tokenUpdates),events:[],timedEvents:N(r.timedEvents),untimedEvents:N(r.untimedEvents),
+          accounting:publicAccounting(r.accounting),...performanceFields({...r,...publicIdentity(r)}),tokenUpdates:numericUpdates(r.tokenUpdates),events:[],timedEvents:N(r.timedEvents),untimedEvents:N(r.untimedEvents),
           stopReasons:[],files:[],inventory:[],warnings:[],artifactCount:0,artifactBytes:0}))};})}))};
 }
 
-export function buildShowcase({roots,mode='private',limits={},now=new Date().toISOString()}){
+export function buildShowcase({roots,mode='private',limits={},now=new Date().toISOString(),localHardware=null}){
+  validateHardware(localHardware);
   if(!['private','public'].includes(mode)||!Array.isArray(roots)||roots.length<1||roots.length>12)throw Error('requires 1..12 series roots and explicit private/public mode');
   const series=[],payloads=[],seen=new Set();
   for(const [si,input]of roots.entries()){
@@ -143,6 +149,14 @@ export function buildShowcase({roots,mode='private',limits={},now=new Date().toI
     const manifestPath=path.join(root,'manifest.json'),stat=fs.lstatSync(manifestPath);
     if(!stat.isFile()||stat.isSymbolicLink()||stat.size>8*1024*1024)throw Error('invalid manifest file');
     const raw=fs.readFileSync(manifestPath),m=JSON.parse(raw);
+    let contextTokens=null;
+    const modelSnapshot=path.join(root,'local-model.json');
+    if(fs.existsSync(modelSnapshot)){
+      const info=fs.lstatSync(modelSnapshot);
+      if(info.isFile()&&!info.isSymbolicLink()&&info.size<=8*1024*1024){
+        try{contextTokens=readJSON(modelSnapshot).props?.default_generation_settings?.n_ctx??null;}catch{}
+      }
+    }
     if(!['bantam.factory-fights.v1','bantam.factory-local-variant.v1'].includes(m.schema))throw Error('unsupported showcase series schema');
     const kit=factoryKit(m.kitId??'factory-2026-09-06');
     if(!Array.isArray(m.plan)||!Array.isArray(m.results)||m.plan.length>200||m.results.length>200)throw Error('invalid series records');
@@ -168,6 +182,10 @@ export function buildShowcase({roots,mode='private',limits={},now=new Date().toI
         publicExit:N(result?.publicExit),hiddenExit:N(result?.hiddenExit),protectedChanges:Array.isArray(result?.tampered)?result.tampered.length:null,
         accounting:usageProjection(result,report),meteringValidationError:reportError};
       delete row.result;
+      if(system.family==='local'){
+        const performance=derivePerformance(report,{hardware:localHardware,modelId:m.modelId,contextTokens});
+        if(performance)row.performance=performance;
+      }
       if(report){const content=JSON.stringify(report,null,2)+'\n';built.payload.artifacts.push({path:'derived/saved-wire-usage.json',content,encoding:'utf8',embedded:true,
         size:Buffer.byteLength(content),sha256:SHA(content),synthetic:true,binding:'derived from saved body hashes; original receipts unchanged'});}
       if(reportError)row.warnings.push(`Saved metering evidence did not validate: ${reportError}; no repaired totals substituted.`);
@@ -205,12 +223,12 @@ export function renderShowcase({data,payloads}){
 </main></div><dialog id="inspector"><header><div><p class="eyebrow" id="inspector-kicker">RECORDED EVIDENCE</p><h2 id="inspector-title">Inspect the work</h2></div><button id="close-inspector" aria-label="Close evidence inspector">✕</button></header><nav id="inspector-tabs" aria-label="Evidence sections"></nav><div id="inspector-body"></div></dialog>
 <noscript><div class="nojs">Interactive controls require JavaScript. Open “Complete static score sheets” above to inspect every recorded outcome. Private compressed evidence additionally requires browser DecompressionStream support.</div></noscript>
 <script id="showcase-data" type="application/json">${J(data)}</script>${payloads.map(p=>`<script id="evidence-${E(p.id)}" type="application/octet-stream">${p.data}</script>`).join('')}
-<script>const lineDiff=${replayLineDiff.toString()};const acceptanceAt=${showcaseAcceptanceAt.toString()};const sameModelObservation=${sameModelObservation.toString()};(${client.toString()})();</script></body></html>`;
+<script>const lineDiff=${replayLineDiff.toString()};const acceptanceAt=${showcaseAcceptanceAt.toString()};const sameModelObservation=${sameModelObservation.toString()};(${client.toString()})(${J(Object.fromEntries(data.series.flatMap(s=>s.cards.flatMap(c=>c.rows.map(r=>[r.id,performanceView(r.performance)])))))});</script></body></html>`;
 }
 
-export function writeShowcase({roots,output,mode='private',limits={}}){
+export function writeShowcase({roots,output,mode='private',limits={},localHardware=null}){
   if(typeof output!=='string'||!path.isAbsolute(output)||fs.existsSync(output))throw Error('showcase output must be a fresh absolute directory');
-  const built=buildShowcase({roots,mode,limits}),html=renderShowcase(built),json=JSON.stringify(built.data,null,2)+'\n';
+  const built=buildShowcase({roots,mode,limits,localHardware}),html=renderShowcase(built),json=JSON.stringify(built.data,null,2)+'\n';
   fs.mkdirSync(output,{recursive:true,mode:0o700});
   const files=[['index.html',html],['showcase.json',json]];
   for(const [name,content]of files)fs.writeFileSync(path.join(output,name),content,{flag:'wx',mode:0o600});
@@ -226,7 +244,7 @@ const CSS=String.raw`
 .lane-grid.single .lane{grid-template-areas:'top metrics' 'accept metrics' 'scope scope' 'activity activity' 'buttons buttons'}.lane-grid.single .meter-scope{grid-area:scope}.lane-grid.single .activity{margin-top:0}
 `;
 
-function client(){
+function client(performanceViews){
   'use strict';
   const data=JSON.parse(document.getElementById('showcase-data').textContent),$=id=>document.getElementById(id),
     metricNames={inputTokens:'INPUT',outputTokens:'OUTPUT',cacheHitTokens:'CACHED INPUT',freshInputTokens:'FRESH INPUT'},
@@ -294,6 +312,11 @@ function client(){
     const lane=el('article',undefined,'lane'+(row.bantam?' bantam':'')+(row.family==='astra'?' native-astra':''));lane.dataset.lane=row.id;
     const stage=acceptanceAt(row,{results,t}),{ended}=stage,top=el('div',undefined,'lane-top'),name=el('div'),clock=el('div',undefined,'lane-clock');
     append(name,el('div',row.model,'lane-family'),el('h3',row.label),badge(ended?row.outcome:'REPLAYING'));
+    const perf=performanceViews[row.id];
+    if(perf){
+      if(perf.hardware)name.append(el('p',perf.hardware,'lane-hardware'));
+      if(ended)name.append(el('p',`${perf.generation} generation${perf.partial?' · measured subset':''}`,'lane-performance'));
+    }
     append(clock,el('strong',ended?sec(row.wallMs):sec(Math.min(t,row.wallMs??t))),el('span',ended?'RECORDED WALL':'RECORDED ELAPSED'));append(top,name,clock);
     const progress=el('div',undefined,'lane-bar'),bar=el('i');bar.style.width=(ended?100:row.wallMs?Math.min(100,t/row.wallMs*100):0)+'%';progress.append(bar);
     const acceptance=el('div',undefined,'acceptance');append(acceptance,
@@ -337,6 +360,13 @@ function client(){
     try{
       if(inspectorTab==='accounting'){
         const a=row.accounting;body.append(el('h3','One system. Different measurement scopes.'));
+        const perf=performanceViews[row.id];
+        if(perf){
+          body.append(el('h3','Local hardware & speed'));
+          body.append(el('p',`${perf.hardware??'Hardware not recorded'} · ${perf.quantization??'Quantization not recorded'} · ${perf.contextTokens??'?'} context tokens`));
+          body.append(dataTable(['Phase','Speed','Coverage'],[['Generation',perf.generation,perf.generationCoverage],['Fresh prompt processing',perf.prefill,perf.prefillCoverage]]));
+          body.append(el('p','Rates divide summed server token counts by summed phase times. Generation speed excludes prompt processing, tools and tests. GPU identity is operator-confirmed.'));
+        }
         body.append(el('p','Input includes cached input. Fresh = input − cache. These rows overlap: never add native or global counts to recorded wire totals.'));
         body.append(dataTable(['Scope','Input','Output','Cached','Fresh'],[['Full run',...Object.keys(metricNames).map(k=>fmt(a.full[k]))],
           ...(a.subset?[['Measured wire subset',...Object.keys(metricNames).map(k=>fmt(a.subset[k]))]]:[]),
@@ -389,7 +419,7 @@ function client(){
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  try{const args=process.argv.slice(2),roots=[];let output=null,mode='private';for(let i=0;i<args.length;i++){
-    if(args[i]==='--series')roots.push(args[++i]);else if(args[i]==='--output')output=args[++i];else if(args[i]==='--mode')mode=args[++i];else throw Error('usage: factory-showcase.mjs --series ABS_RUN [--series ABS_RUN] --output ABS_NEW_DIRECTORY --mode private|public');
-  }console.log(JSON.stringify(writeShowcase({roots,output,mode})));}catch(error){console.error(error.message);process.exitCode=1;}
+  try{const args=process.argv.slice(2),roots=[];let output=null,mode='private',localHardware=null;for(let i=0;i<args.length;i++){
+    if(args[i]==='--series')roots.push(args[++i]);else if(args[i]==='--output')output=args[++i];else if(args[i]==='--mode')mode=args[++i];else if(args[i]==='--local-hardware')localHardware=args[++i];else throw Error('usage: factory-showcase.mjs --series ABS_RUN [--series ABS_RUN] --output ABS_NEW_DIRECTORY --mode private|public [--local-hardware rtx-4090-24gb]');
+  }console.log(JSON.stringify(writeShowcase({roots,output,mode,localHardware})));}catch(error){console.error(error.message);process.exitCode=1;}
 }

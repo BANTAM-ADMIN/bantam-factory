@@ -648,7 +648,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 24787,
+                  "milliseconds": 292752.6480000001,
+                  "measuredRequests": 66,
+                  "totalRequests": 66
+                },
+                "prefill": {
+                  "tokens": 132490,
+                  "milliseconds": 79863.79999999999,
+                  "measuredRequests": 66,
+                  "totalRequests": 66
+                },
+                "evidenceSha256": "c7a9e2eec948bd6d3160f0b07d41906c5598543fd78d9d0d60b194cbc6a91c91",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-semver-range-r1-lane2",

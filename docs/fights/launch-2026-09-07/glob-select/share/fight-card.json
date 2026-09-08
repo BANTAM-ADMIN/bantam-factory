@@ -2,7 +2,7 @@
   "schema": "bantam.launch-fight-card.v1",
   "generatedAt": "2026-09-08T15:08:58.380Z",
   "source": {
-    "sha256": "b111d611ccf99f3862bdca199e00acff4aa69bfb11348eabba7bdf730a1cdc43",
+    "sha256": "f2599528714ae11fd11cd580d552e9be95a3ed3f1c14fefd458125c1f77caa9d",
     "schema": "bantam.factory-showcase.v1"
   },
   "comparison": null,
@@ -109,6 +109,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 19280,
+                  "milliseconds": 227447.92100000003,
+                  "measuredRequests": 27,
+                  "totalRequests": 27
+                },
+                "prefill": {
+                  "tokens": 43949,
+                  "milliseconds": 26744.498999999996,
+                  "measuredRequests": 27,
+                  "totalRequests": 27
+                },
+                "evidenceSha256": "eeede64314eb7a97847d15096565b7a9bc07b0a6ca9a54d9ef2e58d667020c88",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {

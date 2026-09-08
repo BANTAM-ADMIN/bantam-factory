@@ -27,6 +27,34 @@ showcase JSON, downloadable measurements and source seals byte for byte.
 It does not run models, overwrite the input, add unpublished tasks, or upload.
 The browser runs with its own profile and GPU acceleration disabled.
 
+### Hardware and generation speed
+
+Public cards can carry allowlisted hardware and numeric server-timing receipts.
+The published local 27B runs used an operator-confirmed RTX 4090 with 24 GB VRAM,
+Q4_K_P weights and 72,192 configured context tokens. Hosted contenders do not
+inherit that GPU label.
+
+Generation speed is the sum of recorded `predicted_n` divided by the sum of
+`predicted_ms` in seconds. Fresh prompt speed uses `prompt_n` and `prompt_ms`.
+These are weighted phase rates, separate from the full task clock. Every rate
+carries measured-request coverage; incomplete coverage stays a labeled subset.
+The exporter re-reads hash-verified response bodies, including streamed responses.
+It does not average request rates, count cache hits as fresh processing, or
+substitute total task time for generation time.
+
+Fresh showcase exports derive timing receipts automatically. To confirm the
+hardware for a settled local run, add `--local-hardware rtx-4090-24gb` to the
+`factory-showcase.mjs` command. This is an explicit operator assertion; the
+exporter's current GPU is never used as historical evidence.
+
+An optional fourth argument to `refresh-fight-presentation.mjs` accepts a reviewed
+`bantam.fight-performance-supplement.v1` JSON file. Each card binds its original
+public `sourceSha256`, and each local row binds `arm` and `wallMs` to the existing
+result. Only the strict public performance fields are added. The fresh output
+regenerates derived JSON and hash manifests; outcomes, clocks, and token totals
+remain unchanged. Timings and the hardware assertion are included in the
+downloadable public measurements. The supplement does not publish raw evidence.
+
 Open the output's `index.html`. Check the gallery, a solo card where available,
 a comparison, phone layout, replay controls, and image/JSON downloads. Copy
 reviewed presentation changes back to the corresponding committed packages;

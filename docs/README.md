@@ -58,9 +58,8 @@ Recorded measurements retain the date and configuration of their own artifacts.
 - [codexapi as a model](CODEXAPI-BRIDGE.md) — the chat dialect, held-open
   sessions, the startup picker entry that launches the bridge, and the fight
   corners with the scoreboard; measured 2026-08-24/25.
-- [Context trajectories](context-trajectories.md) and
-  [scheduled skepticism](scheduled-skepticism.md) describe bounded-context and
-  review mechanisms.
+- [Prefix-cache controls](LLAMA-CPP-PREFIX-CACHE-CONTROLS.md) records server-cache
+  measurements. [Scheduled skepticism](scheduled-skepticism.md) covers review mechanisms.
 
 ## BANTAMFACTORY
 

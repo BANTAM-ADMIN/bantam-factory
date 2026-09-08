@@ -30,6 +30,9 @@ and feedback to build it. When a check fails, the failure feeds the next repair.
 
 Same task. Same local Qwen 27B. Both systems passed in each comparison below.
 
+The local rig: **one RTX 4090 · 24 GB**. BANTAM's recorded generation speed
+across the published cards: **82.6–105.2 tokens/second**.
+
 | BANTAM vs. | BANTAM finished | Watch the fight |
 | --- | --- | --- |
 | **Hermes** | **5.1× faster** · 112.5s vs. 577.6s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |

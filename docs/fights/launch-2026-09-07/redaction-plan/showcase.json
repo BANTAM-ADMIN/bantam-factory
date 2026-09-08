@@ -320,7 +320,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 10210,
+                  "milliseconds": 105233.38100000001,
+                  "measuredRequests": 25,
+                  "totalRequests": 25
+                },
+                "prefill": {
+                  "tokens": 31466,
+                  "milliseconds": 19248.495,
+                  "measuredRequests": 25,
+                  "totalRequests": 25
+                },
+                "evidenceSha256": "309e4588d0cd7977e5c48857c6ad78a3c3b170926e1c6fc59f3b01a13f66e590",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-redaction-plan-r1-lane2",
@@ -530,7 +550,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 24252,
+                  "milliseconds": 368809.75600000005,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 27136,
+                  "milliseconds": 16613.688,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "f81d6efa3f968341f43c4c36e64e6ce390271ad4ad07d79c213b888521046e12",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-redaction-plan-r1-lane3",
@@ -824,7 +864,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 34573,
+                  "milliseconds": 541309.302,
+                  "measuredRequests": 24,
+                  "totalRequests": 25
+                },
+                "prefill": {
+                  "tokens": 62726,
+                  "milliseconds": 34851.826,
+                  "measuredRequests": 24,
+                  "totalRequests": 25
+                },
+                "evidenceSha256": "d982130ca6a09161716c6262df065d0da7c1728572976675f3dfc03a36cbdd30",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-redaction-plan-r1-lane4",

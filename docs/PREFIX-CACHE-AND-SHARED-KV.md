@@ -42,8 +42,7 @@ holds on this rig and has been withdrawn.** Re-measured 2026-08-28 (build
 `113cc17`): rebuild finished every run and was *faster end-to-end* than extension
 (339.4 s vs 352.1 s), because rebuild's own reuse has climbed to 83.2% against
 extension's 90.8%, and extension's failures each bought an escalation. Nothing
-timed out in either arm. See `docs/context-trajectories.md` and
-`docs/evidence/2026-08-28-strictness-rerun-summary.md`.
+timed out in either arm. See the dated [August 28 rerun summary](evidence/2026-08-28-strictness-rerun-summary.md).
 
 The bare-history think remedy is default-on in extension mode, so the single
 flag `BANTAM_PROMPT_TRAJECTORY=extension` is the whole switch.

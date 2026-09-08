@@ -5,29 +5,29 @@
   "presentation": "comparison",
   "rawEvidenceIncluded": false,
   "source": {
-    "sha256": "e5170880682c075fc968c7ea1c0b9dd8001593e004d623112dcae08e8788125d",
+    "sha256": "98659aefb9e84a10921e4977b11182a8d105a614aad7231e18d52fea6cbb13bb",
     "schema": "bantam.factory-showcase.v1"
   },
   "files": [
     {
       "path": "index.html",
-      "bytes": 74417,
-      "sha256": "0ff6ce1786da4d7f34c844128de943b20a33d374fef3d322d7813522aabb823a"
+      "bytes": 79750,
+      "sha256": "4be881dd8988a1bcc3afb32e622b56dd1ac91c6ba7d30282bc71031b36c50fa3"
     },
     {
       "path": "fight-card.json",
-      "bytes": 24299,
-      "sha256": "0af47004c4331fa50e3cc3ec415fe1a60c5bfc572947b01305d6f9c7dd961266"
+      "bytes": 25906,
+      "sha256": "f2dbe37dd3b6283f1899111fb8f917ca7a86eab05c15c6076a62f5fd48ba6c53"
     },
     {
       "path": "share-card.svg",
-      "bytes": 8095,
-      "sha256": "2724d5f7d10ad8d2a39c2a2e2ae6bf24566506561cc4565d2da100f9de77341e"
+      "bytes": 8248,
+      "sha256": "46c4ad66870c5873079f0e51c980b3a04f520ec5943edbc611477e604e61a4cb"
     },
     {
       "path": "share-card.png",
-      "bytes": 74972,
-      "sha256": "bf7eb71b87ae73e6da436d5a375a27d818ddadc853decb92b633013602a9d3d5"
+      "bytes": 80952,
+      "sha256": "6bbe855b017479c8348654db883eb48d31c2232240bfd10d41a2915de739920f"
     }
   ]
 }

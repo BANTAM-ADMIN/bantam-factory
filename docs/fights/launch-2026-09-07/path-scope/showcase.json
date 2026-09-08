@@ -248,7 +248,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 5025,
+                  "milliseconds": 53701.70200000001,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 29175,
+                  "milliseconds": 14938.257,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "ca1346030569ec9d323f1b9f74d7c3107eed9bc528abfce8207a1eadea2e087c",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-path-scope-r1-lane2",

@@ -183,7 +183,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 36392,
+                  "milliseconds": 569137.459,
+                  "measuredRequests": 6,
+                  "totalRequests": 7
+                },
+                "prefill": {
+                  "tokens": 48784,
+                  "milliseconds": 23628.181,
+                  "measuredRequests": 6,
+                  "totalRequests": 7
+                },
+                "evidenceSha256": "a65c39319c9724b7a2e959426badfd7bdd7cd2fc3626b578e7580cc642819b90",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-stream-framer-r1-lane2",
@@ -715,7 +735,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 29812,
+                  "milliseconds": 351691.797,
+                  "measuredRequests": 40,
+                  "totalRequests": 40
+                },
+                "prefill": {
+                  "tokens": 58615,
+                  "milliseconds": 38511.291999999994,
+                  "measuredRequests": 40,
+                  "totalRequests": 40
+                },
+                "evidenceSha256": "8caf26346664385fe03327bf33434412b62f2aa646c78a5d1a890bd8ea63a3e7",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             }
           ]
         }

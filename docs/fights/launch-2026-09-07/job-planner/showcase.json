@@ -280,7 +280,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 16718,
+                  "milliseconds": 166368.453,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "prefill": {
+                  "tokens": 34904,
+                  "milliseconds": 19418.414,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "evidenceSha256": "20c7eab48b5f5305a61cdd4399f78fc1be3e2543c92db7e8b80d570e0ded795c",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-job-planner-r1-lane2",
@@ -490,7 +510,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 32153,
+                  "milliseconds": 465383.21900000004,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 13702,
+                  "milliseconds": 11672.007999999998,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "88e738bcbe8b19521a6a6afedfa4fb1e27532f5b03dab090f791facd698a8fa9",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-job-planner-r1-lane3",
@@ -688,7 +728,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 34848,
+                  "milliseconds": 570691.756,
+                  "measuredRequests": 12,
+                  "totalRequests": 13
+                },
+                "prefill": {
+                  "tokens": 24077,
+                  "milliseconds": 13453.303,
+                  "measuredRequests": 12,
+                  "totalRequests": 13
+                },
+                "evidenceSha256": "f12bc3434a9672d50f362e60cf22d9144861632a14973405f8b1161ec9561409",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-job-planner-r1-lane4",

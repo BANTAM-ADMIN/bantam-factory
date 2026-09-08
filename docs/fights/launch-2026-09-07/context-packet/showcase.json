@@ -232,7 +232,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 4206,
+                  "milliseconds": 39962.513999999996,
+                  "measuredRequests": 14,
+                  "totalRequests": 14
+                },
+                "prefill": {
+                  "tokens": 15996,
+                  "milliseconds": 9799.479999999998,
+                  "measuredRequests": 14,
+                  "totalRequests": 14
+                },
+                "evidenceSha256": "e3e5d62bb4bbad5e556fa8d601c03c8044fa9accc12de0e54c418cd09654fba6",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-context-packet-r1-lane2",
@@ -550,7 +570,27 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0
+              "artifactBytes": 0,
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 38632,
+                  "milliseconds": 532871.7470000001,
+                  "measuredRequests": 27,
+                  "totalRequests": 28
+                },
+                "prefill": {
+                  "tokens": 90499,
+                  "milliseconds": 48697.739,
+                  "measuredRequests": 27,
+                  "totalRequests": 28
+                },
+                "evidenceSha256": "7aa9caa84e49d3db8b31b2a8bd74a36bfc44fe4fc9fd811d88a600adc953153a",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              }
             },
             {
               "id": "s1-context-packet-r1-lane3",

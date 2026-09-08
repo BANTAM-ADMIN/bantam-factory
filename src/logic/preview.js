@@ -92,6 +92,34 @@ export function findHtmlEntries(workspace, { maxDepth = 3, limit = 20 } = {}) {
  * Run one preview synchronously. Returns the runner's report plus screenshotPath.
  * Throws only on runner-level failure (no chromium, runner crash) — page errors are data.
  */
+// Measured on CI across four runs 2026-09-08: a Chromium launch on a GitHub
+// runner intermittently hangs, burns its whole budget whatever the budget is,
+// and writes no PNG. It struck three different browser-driven tests in three
+// separate runs and left the fourth green. An undersized budget, a profile
+// collision between concurrent launches and CPU starvation were each tested
+// and dropped, and none reproduces locally: the browser is a nondeterministic
+// external process here, not a failing assertion.
+//
+// A hang that produced nothing is the one safe thing to retry -- no partial
+// result to corrupt, nothing to undo. Bounded, and counted on the report,
+// because a preview that quietly costs twice its budget is worse than one
+// that says it did.
+const PREVIEW_BROWSER_ATTEMPTS = 2;
+const PREVIEW_BROWSER_ATTEMPTS_MAX = 4;
+
+/** How many times a hung browser launch is attempted before giving up. */
+export function previewBrowserAttempts(env = process.env) {
+  const raw = String(env?.BANTAM_PREVIEW_BROWSER_ATTEMPTS ?? "").trim();
+  if (!/^\d+$/.test(raw)) return PREVIEW_BROWSER_ATTEMPTS;
+  const value = Number(raw);
+  return value >= 1 && value <= PREVIEW_BROWSER_ATTEMPTS_MAX ? value : PREVIEW_BROWSER_ATTEMPTS;
+}
+
+/** True when the browser hung and wrote no pixels: transient, safe to repeat. */
+function browserHungWithoutPixels(report) {
+  return Boolean(report?.browserTimedOut) && Number(report?.screenshotBytes ?? 0) <= 0;
+}
+
 export function runPreviewSync(workspace, entryRel, {
   chromium = chromiumBinary(),
   network = previewNetworkEnabled(),
@@ -101,11 +129,14 @@ export function runPreviewSync(workspace, entryRel, {
   timeoutMs = interact ? 8000 : 25000,
   virtualTimeMs = interact ? 3000 : 8000,
   realtimeProbe = interact,
+  attempts = previewBrowserAttempts(),
+  runRunner = (argv) => execFileSync(process.execPath, argv,
+    { encoding: "utf8", timeout: timeoutMs + 15000, maxBuffer: 32 * 1024 * 1024 }),
 } = {}) {
   if (!chromium) throw new Error("no chromium/chrome binary found (set BANTAM_CHROMIUM)");
   const shotDir = makeScratchDir("bantam-preview-");
   const screenshot = path.join(shotDir, "preview.png");
-  const out = execFileSync(process.execPath, [
+  const argv = [
     RUNNER, path.resolve(workspace), entryRel,
     JSON.stringify({
       screenshot,
@@ -118,9 +149,17 @@ export function runPreviewSync(workspace, entryRel, {
       virtualTimeMs,
       realtimeProbe,
     }),
-  ], { encoding: "utf8", timeout: timeoutMs + 15000, maxBuffer: 32 * 1024 * 1024 });
-  const report = JSON.parse(out);
-  if (!report.ok) throw new Error(report.error || "preview runner failed");
+  ];
+  const limit = Math.max(1, Number(attempts) || 1);
+  let report = null;
+  let retries = 0;
+  for (let attempt = 1; attempt <= limit; attempt++) {
+    report = JSON.parse(runRunner(argv));
+    if (!report.ok) throw new Error(report.error || "preview runner failed");
+    if (attempt === limit || !browserHungWithoutPixels(report)) break;
+    retries++;
+  }
+  report.browserRetries = retries;
   // The docstring always promised this field; nothing delivered it. Callers
   // (vision review, the operator, a see-your-work gate) need the pixels' path.
   report.screenshotPath = fs.existsSync(screenshot) ? screenshot : null;

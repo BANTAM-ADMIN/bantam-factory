@@ -280,3 +280,27 @@ test('phone previews measure the requested CSS viewport below the Chromium windo
   assert.deepEqual(report.layout.page, { w: 320, h: 844 });
   assert.ok(report.screenshotBytes > 0);
 });
+
+test('interaction checks admit render-loop UI updates while retaining broken hard-drop failures', { skip: compositeSkipReason(_chromiumSkip, _networkSkip) }, t => {
+  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-preview-frame-ui-'));
+  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+  for(const broken of [false,true]){
+    fs.writeFileSync(path.join(workspace,'index.html'), `<main>
+      <p>Space: Hard Drop. Press P to pause.</p><button id="start">Start</button>
+      <p>Score <span id="score">0</span></p><style>#overlay.hidden{opacity:0;pointer-events:none}</style><div id="overlay" class="hidden">Paused. Resume play.<button>Resume</button></div>
+      </main><script>
+      let playing=false, paused=false, score=0;
+      document.querySelector('#start').onclick=function(){playing=true;this.blur();};
+      document.addEventListener('keydown',e=>{if(!playing)return;if(e.key==='p')paused=!paused;
+        if(e.key===' '&&!paused)score+=${broken ? 0 : 30};});
+      function render(){document.querySelector('#score').textContent=score;
+        document.querySelector('#overlay').className=paused?'':'hidden';requestAnimationFrame(render);}
+      requestAnimationFrame(render);
+      </script>`);
+    const report=runPreviewSync(workspace,'index.html',{interact:true,realtimeProbe:false});
+    assert.equal(report.interaction.completed,true);
+    if(broken)assert.match(report.interaction.issues.join('\n'),/value did not change/);
+    else assert.deepEqual(report.interaction.issues,[]);
+    assert.deepEqual(report.pointerOcclusions,[]);
+  }
+});

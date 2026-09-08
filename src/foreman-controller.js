@@ -33,6 +33,14 @@ export function summarizeJobs(queue) {
       usage: j.result.usage ? Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens','freshInputTokens'].map(k => [k,j.result.usage[k] ?? null])) : null,
     } : null }));
 }
+export async function waitForForemanUpdate(queue, signal) {
+  const before = JSON.stringify(queue.snapshot());
+  do {
+    await queue.wait();
+    if (signal?.aborted) throw Error('foreman deadline or cancellation');
+  } while (queue.pending && JSON.stringify(queue.snapshot()) === before);
+}
+
 export async function driveForeman({ task, initial, model, execute, inspect, verify, emit = () => {},
   signal, validateJobs = async () => {}, codexWorkers = [], maxJobs = 12, maxDecisions = 40, maxSupervisorTokens = 150000 }) {
   const queue = new ForemanQueue({ execute, emit, signal, codexWorkers, maxJobs });
@@ -72,7 +80,7 @@ export async function driveForeman({ task, initial, model, execute, inspect, ver
         if (action.action !== 'enqueue' && action.jobs.length) throw Error('only enqueue accepts jobs');
         if (action.action === 'enqueue') { await validateJobs(action.jobs); queue.submit(action.jobs); observation = { admitted: action.jobs.map(j => j.id) }; }
         else if (action.action === 'cancel') { queue.cancel(action.target); observation = { cancellationRequested: action.target }; }
-        else if (action.action === 'wait') { await queue.wait(); observation = { waited: true }; }
+        else if (action.action === 'wait') { await waitForForemanUpdate(queue, signal); observation = { waited: true }; }
         else if (['read','list','evidence','check'].includes(action.action)) observation = await inspect(action, queue);
         else if (action.action === 'finish') {
           if (queue.pending) throw Error('cannot finish with outstanding jobs');

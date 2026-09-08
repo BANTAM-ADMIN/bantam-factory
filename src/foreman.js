@@ -192,7 +192,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
         recorder = await startModelRecorder({ upstream: plan.endpoint, output: path.join(dir, 'wire') });
         const contextFile = path.join(dir, 'supporting-context.txt');
         fs.writeFileSync(contextFile, foremanWorkerContext(job, dependencies), { mode: 0o600 });
-        command = freshCommand({ arm: 'bantam-local-27b', task: foremanWorkerTask(plan.task, job), workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, timeoutMs: remaining() });
+        command = freshCommand({ arm: 'bantam-local-27b', task: foremanWorkerTask(plan.task, job), workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, contextTokens: current.props?.default_generation_settings?.n_ctx, timeoutMs: remaining() });
         command.args.push('--supporting-context-file', contextFile);
         command.args[command.args.indexOf('--verify') + 1] = job.verify;
       } else {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { driveForeman, summarizeJobs, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
+import { driveForeman, summarizeJobs, waitForForemanUpdate, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
 import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, cleanupForemanContainers } from '../src/foreman.js';
 import { runProcess } from '../src/process-runner.js';
 import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
@@ -161,4 +161,11 @@ test('verifier admission rejects Bash syntax before any worker starts and accept
     execute: async j => {executed.push(j.id);return {pass:true};}, inspect:async()=>({}), verify:async()=>({pass:true})});
   assert.deepEqual(executed, ['corrected']);assert.equal(result.pass, true);
   assert.match(m.prompts[1], /cannot parse in POSIX/);
+});
+
+test('idle wait wakeups do not spend another supervisor call until worker state changes', async()=>{
+  let waits=0;const queue={pending:true,snapshot:()=>[{status:waits<4?'running':'passed'}],wait:async()=>{waits++;if(waits===4)queue.pending=false;}};
+  await waitForForemanUpdate(queue);assert.equal(waits,4);
+  const ac=new AbortController();
+  await assert.rejects(waitForForemanUpdate({pending:true,snapshot:()=>[],wait:async()=>ac.abort()},ac.signal),/cancellation/);
 });

@@ -63,18 +63,24 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
   // then quiesce only at the end of interaction mode so Chromium can return the
   // evidence it already gathered.
   let haltAnimationFrames = false;
-  const pendingAnimationFrames = new Set();
+  const pendingAnimationFrames = new Map();
+  let stepAnimationFrames = false, nextSteppedFrame = -1;
   const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
   const nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
   window.requestAnimationFrame = (callback) => {
     if (haltAnimationFrames) return 0;
+    if (stepAnimationFrames) {
+      const id = nextSteppedFrame--;
+      pendingAnimationFrames.set(id, callback);
+      return id;
+    }
     let id = 0;
     id = nativeRequestAnimationFrame((time) => {
       pendingAnimationFrames.delete(id);
       if (haltAnimationFrames) return;
       callback.call(window, time);
     });
-    pendingAnimationFrames.add(id);
+    pendingAnimationFrames.set(id, callback);
     return id;
   };
   window.cancelAnimationFrame = (id) => {
@@ -113,9 +119,15 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
       });
     });
   }
+  const boundAnimationFrames = () => {
+    stepAnimationFrames = true;
+    // Keep the scheduled callbacks: the next control may only change game state,
+    // with its visible score/overlay updated by the already-scheduled renderer.
+    for (const id of pendingAnimationFrames.keys()) if (id >= 0) nativeCancelAnimationFrame(id);
+  };
   const stopAnimationFrames = () => {
     haltAnimationFrames = true;
-    for (const id of pendingAnimationFrames) nativeCancelAnimationFrame(id);
+    for (const id of pendingAnimationFrames.keys()) if (id >= 0) nativeCancelAnimationFrame(id);
     pendingAnimationFrames.clear();
   };
   let node = null;
@@ -165,10 +177,21 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
   };
   setInterval(flush, 150);
   const push = (arr, v) => { if (arr.length < 50) { arr.push(String(v).slice(0, 500)); } flush(); };
-  // Event handlers and ordinary DOM/HUD updates are synchronous. Yield only to
-  // microtasks between steps so framework state can flush without advancing
-  // virtual time through an application's expensive render loop.
-  const settle = () => Promise.resolve();
+  // Two bounded frame batches also admit render-loop and double-rAF UI updates.
+  // Do not fast-forward virtual time through an endless game/WebGL loop.
+  const settle = async () => {
+    await Promise.resolve();
+    if (!stepAnimationFrames || haltAnimationFrames) return;
+    for (let frame = 0; frame < 2; frame++) {
+      const callbacks = [...pendingAnimationFrames.entries()];
+      for (const [id, callback] of callbacks) {
+        if (!pendingAnimationFrames.delete(id)) continue;
+        try { callback.call(window, performance.now()); }
+        catch (error) { S.pageErrors.push(String(error?.message || error).slice(0, 500)); }
+      }
+      await Promise.resolve();
+    }
+  };
   const visible = (el) => {
     if (!el || !el.isConnected) return false;
     if (el.hidden || el.getAttribute?.("aria-hidden") === "true"
@@ -199,7 +222,8 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
     ].join(",");
     for (const el of document.querySelectorAll(selector)) {
       if (out.length >= 12 || !visible(el) || el.disabled
-          || el.getAttribute?.("aria-disabled") === "true") continue;
+          || el.getAttribute?.("aria-disabled") === "true"
+          || getComputedStyle(el).pointerEvents === "none") continue;
       const rect = el.getBoundingClientRect();
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
@@ -241,7 +265,7 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
     for (const el of document.querySelectorAll("[id], [role=dialog], .overlay, .modal, .screen")) {
       const classes = [...(el.classList || [])];
       const overlayClass = classes.some((name) => /^(overlay|modal|screen)(?:-|$)/i.test(name));
-      const overlayId = /(?:pause|game.?over|start).*(?:screen|overlay|modal)|(?:screen|overlay|modal).*(?:pause|game.?over|start)/i.test(el.id || "");
+      const overlayId = /^(?:overlay|modal|screen)$|(?:pause|game.?over|start).*(?:screen|overlay|modal)|(?:screen|overlay|modal).*(?:pause|game.?over|start)/i.test(el.id || "");
       const dialogRole = el.getAttribute("role") === "dialog";
       if (!(overlayClass || overlayId || dialogRole) || !overlayVisible(el)) continue;
       const identity = [el.id, classes.join(" "), el.getAttribute("role") || ""].join(" ");
@@ -401,9 +425,9 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
       if (primary) {
         // A start click commonly activates an endless WebGL/game render loop.
         // Load-only preview already exercised rendering; this mode is a bounded
-        // control/state probe, so freeze animation before activation rather than
+        // control/state probe, so step animation around each control rather than
         // asking virtual time to render thousands of SwiftShader frames.
-        stopAnimationFrames();
+        boundAnimationFrames();
         try { primary.focus({ preventScroll: true }); } catch { primary.focus?.(); }
         I.actions.push("click-primary");
         I.lastAction = "click-primary";
@@ -416,7 +440,7 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
         await settle();
         I.startMethod = "primary-control";
       } else if (advertisedKeyboardStart()) {
-        stopAnimationFrames();
+        boundAnimationFrames();
         I.startMethod = "keyboard-enter";
         dispatchKey("Enter", "Enter");
         await settle();

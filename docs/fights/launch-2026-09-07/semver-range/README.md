@@ -11,22 +11,25 @@ invocation, including when no versions are offered.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 399.9 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 399.9 s |
 | Codex · native Astra | PASS | 5/5 | 136.2 s |
 
 Both systems completed accepted work and passed every acceptance group. Astra
-was 2.94× quicker, its widest margin over BANTAM in the selection series. This
-is the heaviest card BANTAM has published, at 66 requests.
+was 2.94× quicker, its widest margin over BANTAM FACTORY in the selection series. This
+is the heaviest card BANTAM FACTORY has published, at 66 requests.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 66 requests | 1,701,335 | 24,787 | 1,568,845 | 132,490 |
-| BANTAM · separate idle-bounded server window | 1,701,290 | 24,790 | 1,568,800 | 132,490 |
+| BANTAM FACTORY · all 66 requests | 1,701,335 | 24,787 | 1,568,845 | 132,490 |
+| BANTAM FACTORY · separate idle-bounded server window | 1,701,290 | 24,790 | 1,568,800 | 132,490 |
 | Astra · native aggregate | 97,141 | 3,665 | 86,016 | 11,125 |
 
-BANTAM's prefix reuse was 92.2% across 66 requests, the highest request count
+BANTAM FACTORY's prefix reuse was 92.2% across 66 requests, the highest request count
 on any published card. It consumed 1.7M input tokens while emitting under 25K
 output tokens, so almost all of the cost is re-read context rather than
 generation, and 17.5× Astra's input to reach the same passing result. On a
@@ -41,7 +44,7 @@ inference client used the endpoint during the window.
 ## Conditions and provenance
 
 The two lanes were recorded separately, not simultaneously, on the same frozen
-kit, starter bytes and independent grader. BANTAM ran on frozen factory source
+kit, starter bytes and independent grader. BANTAM FACTORY ran on frozen factory source
 `7d6d304a419e99da3bfdf347f8fc47a67a147791`, which derives the history window
 from the served context and reserves a final action against the wall budget;
 its manifest records a 72,192-token served window, a 173,260-character history
@@ -60,3 +63,5 @@ allowlisted measurements and replay counters, not private source, prompts or
 machine paths. Raw evidence remains private. Package hashes check generated
 assets, excluding this README; they do not attest authorship or authorize
 execution.
+
+</details>

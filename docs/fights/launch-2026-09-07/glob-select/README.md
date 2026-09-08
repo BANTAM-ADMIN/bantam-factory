@@ -11,22 +11,25 @@ crosses a path separator.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 264.1 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 264.1 s |
 | Codex · native Astra | PASS | 5/5 | 155.8 s |
 
 Both systems completed accepted work and passed every acceptance group,
 including the hidden group that exercises the uniqueness precondition the
 visible tests never touch. Astra was 1.70× quicker on this attempt.
 
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
+
 ## Tokens and prefix reuse
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 27 requests | 503,914 | 19,280 | 459,965 | 43,949 |
-| BANTAM · separate idle-bounded server window | 503,950 | 19,280 | 460,000 | 43,950 |
+| BANTAM FACTORY · all 27 requests | 503,914 | 19,280 | 459,965 | 43,949 |
+| BANTAM FACTORY · separate idle-bounded server window | 503,950 | 19,280 | 460,000 | 43,950 |
 | Astra · native aggregate | 77,389 | 4,409 | 63,104 | 14,285 |
 
-BANTAM's prefix reuse was 91.3% across 27 requests. It read 6.5× Astra's input
+BANTAM FACTORY's prefix reuse was 91.3% across 27 requests. It read 6.5× Astra's input
 tokens to reach the same passing result, which is the cost of a small model
 re-reading its context rather than carrying more of the task in one pass.
 
@@ -38,7 +41,7 @@ inference client used the endpoint during the window.
 ## Conditions and provenance
 
 The two lanes were recorded separately, not simultaneously, on the same frozen
-kit, starter bytes and independent grader. BANTAM ran on frozen factory source
+kit, starter bytes and independent grader. BANTAM FACTORY ran on frozen factory source
 `7d6d304a419e99da3bfdf347f8fc47a67a147791`, which derives the history window
 from the served context and reserves a final action against the wall budget;
 its manifest records a 72,192-token served window, a 173,260-character history
@@ -57,3 +60,5 @@ allowlisted measurements and replay counters, not private source, prompts or
 machine paths. Raw evidence remains private. Package hashes check generated
 assets, excluding this README; they do not attest authorship or authorize
 execution.
+
+</details>

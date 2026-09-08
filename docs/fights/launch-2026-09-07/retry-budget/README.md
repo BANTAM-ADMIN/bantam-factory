@@ -10,25 +10,28 @@ work.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 141.7 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 141.7 s |
 | DeepSeek Harness · same 27B | PASS | 5/5 | 445.8 s |
 | Hermes · same 27B | PASS | 5/5 | 562.0 s |
 | Codex · native Astra | PASS | 5/5 | 137.3 s |
 | Codex · native Sol | PASS | 5/5 | 231.8 s |
 | Codex · native Terra | PASS | 5/5 | 143.2 s |
 
-BANTAM was the fastest local contender: 68.2% less wall time than DeepSeek
+BANTAM FACTORY was the fastest local contender: 68.2% less wall time than DeepSeek
 Harness and 74.8% less than Hermes on the same weights. Astra was fastest
-overall; BANTAM finished 4.4 seconds later, 1.5 seconds ahead of Terra and
+overall; BANTAM FACTORY finished 4.4 seconds later, 1.5 seconds ahead of Terra and
 well ahead of Sol. These are single observations, not statistically
 established rankings or evidence that the models have identical general
 capability.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 23 requests | 304,594 | 9,969 | 273,649 | 30,945 |
+| BANTAM FACTORY · all 23 requests | 304,594 | 9,969 | 273,649 | 30,945 |
 | DeepSeek Harness · all 15 requests | 397,922 | 27,046 | 384,287 | 13,635 |
 | Hermes · measured subset, 25/26 requests | 510,541 | 33,214 | 481,155 | 29,386 |
 | Hermes · separate idle-bounded server window | 533,700 | 33,214 | 503,800 | 29,900 |
@@ -36,15 +39,15 @@ capability.
 | Sol · native aggregate | 127,218 | 6,251 | 96,768 | 30,450 |
 | Terra · native aggregate | 163,987 | 5,762 | 137,728 | 26,259 |
 
-BANTAM used 23.5% fewer input tokens and 63.1% fewer output tokens than
+BANTAM FACTORY used 23.5% fewer input tokens and 63.1% fewer output tokens than
 DeepSeek Harness. Its prefix reuse was 89.8%. Native frontier systems used
-fewer input and output tokens than BANTAM on this attempt. Input already
+fewer input and output tokens than BANTAM FACTORY on this attempt. Input already
 includes cached input: do not add those columns together.
 
 Hermes has one request without a wire usage receipt, so its complete wire
 totals remain unknown; the measured subset and the independent server-window
 totals are retained separately. Server attribution assumes no other inference
-client used the endpoint during the window. BANTAM and DeepSeek also retain
+client used the endpoint during the window. BANTAM FACTORY and DeepSeek also retain
 their slightly different server counters in the replay. Overlapping meters
 must not be added or forced to agree. Native aggregates are not per-request
 wire recordings.
@@ -68,3 +71,5 @@ including the frontier contender that was faster. Raw transcripts, source and
 machine details remain private. Public packages contain allowlisted
 measurements and replay counters. Hash manifests exclude this README and do
 not establish authorship or authorize executing imported evidence.
+
+</details>

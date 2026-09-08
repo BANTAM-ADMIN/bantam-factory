@@ -4,12 +4,12 @@
 [Detailed replay](index.html) · [Portable measurements](share/fight-card.json)
 
 Extend a file-snapshot tool with validation, source binding and drift detection.
-All contenders received the same starter, task and independent grader. BANTAM
+All contenders received the same starter, task and independent grader. BANTAM FACTORY
 was the fastest local contender; native Terra was fastest overall.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 124.343 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 124.343 s |
 | DeepSeek Harness · same 27B | PASS | 5/5 | 465.784 s |
 | Hermes · same 27B | PASS | 5/5 | 496.987 s |
 | Codex · native Astra | PASS | 5/5 | 146.163 s |
@@ -21,11 +21,14 @@ test. That violates the work-order rules and is not an accepted completion.
 The changed-test finding is retained separately from the functional grade;
 neither is rewritten to make the result look better or worse.
 
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
+
 ## Token and cache accounting
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 29 requests | 409,391 | 8,124 | 377,438 | 31,953 |
+| BANTAM FACTORY · all 29 requests | 409,391 | 8,124 | 377,438 | 31,953 |
 | DeepSeek Harness · all 17 requests | 485,350 | 28,346 | 470,652 | 14,698 |
 | Hermes · measured wire subset | 211,676 | 31,045 | 196,714 | 14,962 |
 | Hermes · separate idle-bounded server window | 239,170 | 31,045 | 223,600 | 15,570 |
@@ -33,15 +36,15 @@ neither is rewritten to make the result look better or worse.
 | Sol · native aggregate, 7 responses | 116,959 | 5,663 | 87,296 | 29,663 |
 | Terra · native aggregate, 9 responses | 145,342 | 4,101 | 106,752 | 38,590 |
 
-BANTAM reused 92.2% of input tokens. It used fewer total input/output tokens
+BANTAM FACTORY reused 92.2% of input tokens. It used fewer total input/output tokens
 than DeepSeek but more fresh input tokens. All three frontier references used
-fewer total input/output tokens than BANTAM. Speed and token efficiency are
+fewer total input/output tokens than BANTAM FACTORY. Speed and token efficiency are
 separate measurements, not interchangeable claims.
 
 Hermes's complete wire totals remain unknown; the partial subset and settled
 server window are distinct meters. Server attribution assumes exclusive
 endpoint use during the serial local window. Small differences between wire
-and server meters for BANTAM and DeepSeek remain in the replay. Cached input
+and server meters for BANTAM FACTORY and DeepSeek remain in the replay. Cached input
 is included in input. Do not sum overlapping meters or substitute the Hermes
 subset for a complete receipt total.
 
@@ -61,3 +64,5 @@ were made. Every planned contender remains visible. Public exports contain
 allowlisted measurements, not private source/prompts/machine paths. Raw evidence
 remains private. Package hashes exclude this README and do not establish
 authorship or authorize executing imported evidence.
+
+</details>

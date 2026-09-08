@@ -7,7 +7,7 @@ is a separately recorded package beside the launch card of the same name. It is
 never merged into that card's roster and never feeds the gallery's featured
 same-model comparison.
 
-| Work order | Claude Sonnet | Claude Opus | Claude Fable | BANTAM local attempt |
+| Work order | Claude Sonnet | Claude Opus | Claude Fable | BANTAM FACTORY local attempt |
 |---|---:|---:|---:|---:|
 | [Context packet](context-packet/README.md) | 80.4 s · 5/5 | 108.4 s · 5/5 | 74.2 s · 5/5 | [**58.1 s · 5/5**](../context-packet/README.md) |
 | [Patch transaction](patch-transaction/README.md) | 81.5 s · 5/5 | 153.5 s · 5/5 | **41.2 s · 5/5** | [81.8 s · 5/5](../patch-transaction/README.md) |
@@ -17,10 +17,10 @@ same-model comparison.
 | [Job planner](job-planner/README.md) | **49.7 s · 5/5** | 64.2 s · 5/5 | 65.4 s · 5/5 | [193.2 s · 5/5](../job-planner/README.md) |
 
 All eighteen attempts passed 5/5 with complete native aggregate token and
-cache accounting. Bold marks the quickest attempt in each row. BANTAM's local
+cache accounting. Bold marks the quickest attempt in each row. BANTAM FACTORY's local
 27B attempt was quicker than all three Claude attempts on Context packet and
 within a second of Sonnet on Patch transaction; the Claude attempts were
-quicker on the other four work orders, including Stream framer, where BANTAM's
+quicker on the other four work orders, including Stream framer, where BANTAM FACTORY's
 attempt timed out. Different models, native policies and run windows matter:
 this table compares individual observations across cohorts, not simultaneous
 trials or a general ranking. The launch cards and all their contender outcomes

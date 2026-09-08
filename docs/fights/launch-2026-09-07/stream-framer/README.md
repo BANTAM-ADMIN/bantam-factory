@@ -9,26 +9,29 @@ system; no manual repairs to the submitted candidates.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 432.7 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 432.7 s |
 | OpenCode · same local 27B | TIMEOUT | 0/5 | 600.0 s |
 | Codex · native Astra | PASS | 5/5 | 160.7 s |
 
-BANTAM and Astra both completed accepted work and passed every acceptance
+BANTAM FACTORY and Astra both completed accepted work and passed every acceptance
 group. Astra was 2.7× quicker on this attempt. OpenCode, running the same
-local weights as BANTAM, reached its time limit with no group passing; a
+local weights as BANTAM FACTORY, reached its time limit with no group passing; a
 timeout is not a time to successful completion.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 40 requests | 945,746 | 29,812 | 887,131 | 58,615 |
-| BANTAM · separate idle-bounded server window | 945,710 | 29,812 | 887,100 | 58,610 |
+| BANTAM FACTORY · all 40 requests | 945,746 | 29,812 | 887,131 | 58,615 |
+| BANTAM FACTORY · separate idle-bounded server window | 945,710 | 29,812 | 887,100 | 58,610 |
 | OpenCode · measured subset, 6/7 requests | 74,091 | 36,392 | 25,307 | 48,784 |
 | OpenCode · separate idle-bounded server window | 85,643 | 36,396 | 35,860 | 49,783 |
 | Astra · native aggregate | 94,116 | 3,998 | 78,976 | 15,140 |
 
-BANTAM's prefix reuse was 93.8%, its highest on any published card, and it
+BANTAM FACTORY's prefix reuse was 93.8%, its highest on any published card, and it
 produced 18.1% fewer output tokens than OpenCode while OpenCode left the
 starter unimplemented. Input already includes cached input: do not add those
 columns together.
@@ -42,14 +45,14 @@ recordings.
 
 ## Conditions and provenance
 
-The BANTAM lane was recorded on frozen factory source
+The BANTAM FACTORY lane was recorded on frozen factory source
 `06dc7a2042b36030e7399d3101a5421dd2df0efa`, which derives the history window
 from the served context and reserves a final action against the wall budget.
 Its manifest records a 72,192-token served window and a 173,260-character
 history budget. The OpenCode and Astra lanes are the recorded attempts from
 frozen source `6bf118ba5f5fc0d06127fa1368ee85c5011d7590` on the same frozen
 kit, starter bytes and independent grader; they were not re-run, because
-neither change affects a non-BANTAM lane.
+neither change affects a non-BANTAM FACTORY lane.
 
 Local contenders used the existing Qwen 27B Q4_K_P control, 72K context and
 CPU vision projection, not the recommended DavidAU download. OpenCode had a
@@ -58,10 +61,12 @@ policies. Local inference was serial. No manual repairs, teacher requests or
 post-result changes to the candidates were made.
 
 This previously used development task is not a held-out reliability study.
-BANTAM's recorded attempts on this work order have ranged widely in turn count,
+BANTAM FACTORY's recorded attempts on this work order have ranged widely in turn count,
 so one attempt is an observation rather than an expected value. All three
 planned contenders are retained, including the timeout. Public exports contain
 allowlisted measurements and replay counters, not private source, prompts or
 machine paths. Raw evidence remains private. Package hashes check generated
 assets, excluding this README; they do not attest authorship or authorize
 execution.
+
+</details>

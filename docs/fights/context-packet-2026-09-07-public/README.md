@@ -9,11 +9,11 @@ serial local inference, untouched task/grader, no candidate repairs by the opera
 
 | System | Independent grade | Outcome | Recorded wall time |
 |---|---:|---|---:|
-| BANTAM | 5/5 | PASS, accepted completion | 124.592 s |
+| BANTAM FACTORY | 5/5 | PASS, accepted completion | 124.592 s |
 | Hermes | 5/5 | PASS, clean process finish | 588.951 s |
 | OpenCode | 0/5 | FAIL, starter left unimplemented | 157.776 s |
 
-BANTAM finished the accepted work about 4.73× faster than Hermes in this
+BANTAM FACTORY finished the accepted work about 4.73× faster than Hermes in this
 attempt. This is an exploratory, already-seen development task, not a held-out
 reliability study or universal ranking. Warm cache, native prompts, sampling,
 tool policy and output-budget behavior are part of these systems' configurations.
@@ -25,7 +25,7 @@ These were not identical strictly enforced per-request output budgets.
 
 | System | Requests measured | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|---:|
-| BANTAM | 20/20 | 232,039 | 8,228 | 199,896 | 32,143 |
+| BANTAM FACTORY | 20/20 | 232,039 | 8,228 | 199,896 | 32,143 |
 | Hermes | 28/29, measured subset only | 715,101 | 36,795 | 680,128 | 34,973 |
 | OpenCode | 4/4 | 27,014 | 8,767 | 16,727 | 10,287 |
 
@@ -37,13 +37,13 @@ Do not compare that subset as though it were the full run.
 
 | System | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM | 232,033 | 8,228 | 199,890 | 32,143 |
+| BANTAM FACTORY | 232,033 | 8,228 | 199,890 | 32,143 |
 | Hermes | 750,472 | 36,795 | 714,990 | 35,482 |
 | OpenCode | 27,017 | 8,767 | 16,730 | 10,287 |
 
 These are global endpoint counter deltas, attributable to the selected lane
 under this run's exclusive-server assumption—not reconstructed per-request
-receipts. BANTAM and OpenCode use their recorded idle-before/idle-after windows.
+receipts. BANTAM FACTORY and OpenCode use their recorded idle-before/idle-after windows.
 Hermes' initial end snapshot was still busy; its settled end boundary is the
 next lane's saved, idle, pre-inference snapshot. That includes the cancellation
 tail before OpenCode made any model request. The original snapshot and all wire

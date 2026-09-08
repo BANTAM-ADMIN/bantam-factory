@@ -15,9 +15,12 @@ to its roster.
 | Claude · native Opus | PASS | 5/5 | 74.8 s |
 | Claude · native Fable | PASS | 5/5 | 82.5 s |
 
-For context, BANTAM's earlier local 27B attempt on this work order passed 5/5
+For context, BANTAM FACTORY's earlier local 27B attempt on this work order passed 5/5
 in 124.3 s, and native Codex Terra in 106.2 s. Those came from a different run
-window and, for BANTAM, a different model. Individual observations, not a ranking.
+window and, for BANTAM FACTORY, a different model. Individual observations, not a ranking.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
@@ -49,3 +52,5 @@ contention remained possible. The local model was not used by Claude.
 Work-order and starter materials were frozen; candidates received the same
 independent graders. Public exports omit raw prompts, source, credentials and
 machine paths. Asset hashes cover generated files, not these notes.
+
+</details>

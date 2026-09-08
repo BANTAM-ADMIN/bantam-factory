@@ -115,7 +115,7 @@ test('solo cards have their own roster filter and make no claim against absent o
   card.rows=card.rows.filter(r=>r.arm==='bantam-local-27b');
   const before=structuredClone(data),html=renderFightGallery(data);
   assert.match(html,/data-mode="bantam"/);
-  assert.match(html,/BANTAM run/);
+  assert.match(html,/BANTAM FACTORY run/);
   assert.match(html,/Open run/);
   assert.doesNotMatch(html,/Selected highlight|shorter wall time|class="score-name">OpenCode/);
   assert.deepEqual(data,before);

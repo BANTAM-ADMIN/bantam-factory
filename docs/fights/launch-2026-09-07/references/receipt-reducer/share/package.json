@@ -11,8 +11,8 @@
   "files": [
     {
       "path": "index.html",
-      "bytes": 70362,
-      "sha256": "ab3ce2703708b92ebd09096f72dc88061589927ef2fc9ae428125651b28317f7"
+      "bytes": 70733,
+      "sha256": "3919882475d7e0e445ddf25f2c9db4f173c049e38a42e545b0c22639fa33b802"
     },
     {
       "path": "fight-card.json",
@@ -21,13 +21,13 @@
     },
     {
       "path": "share-card.svg",
-      "bytes": 8068,
-      "sha256": "eca04f68cdaa4f278c1a3a6699877dfe52c7a4238362f8268f676eca2095058e"
+      "bytes": 8092,
+      "sha256": "6502c8ac8da8a29e802ed6b5569686918dde657399afdbef457da98f8c8acd22"
     },
     {
       "path": "share-card.png",
-      "bytes": 63629,
-      "sha256": "5f46edd58af77f5fc2d19a27a368ecce33fbf3b5d418f9f3deeacd4050b43f71"
+      "bytes": 65804,
+      "sha256": "24db2cbc8ced65e6e4a2040673e3ef04122703da6b5135d58a4c4d0f44dcc971"
     }
   ]
 }

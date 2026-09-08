@@ -17,6 +17,6 @@ Cache-creation input was 13,081 and 20,358 respectively, already included in
 fresh/input totals. These are not per-request wire measurements.
 
 Read the [shared source, model and isolation conditions](../README.md).
-The [earlier BANTAM comparison](../../launch-2026-09-07/patch-transaction/README.md)
-is a separate cohort. Sonnet finished this task faster than that BANTAM attempt;
+The [earlier BANTAM FACTORY comparison](../../launch-2026-09-07/patch-transaction/README.md)
+is a separate cohort. Sonnet finished this task faster than that BANTAM FACTORY attempt;
 the original measurements and all other contenders remain available.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Offline presentation only. Never runs a model, contender, judge or imported code.
 import fs from 'node:fs';
-import {SHOWCASE_BOARD_CSS} from './fight-design.mjs';
+import {SHOWCASE_BOARD_CSS,factoryName} from './fight-design.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {gzipSync} from 'node:zlib';
@@ -204,13 +204,13 @@ export function buildShowcase({roots,mode='private',limits={},now=new Date().toI
 }
 
 function scoreTable(series){
-  return `<section class="static-series"><h2>${E(series.title)}</h2><p>${series.counts.pass}/${series.counts.observed} strict PASS · ${series.counts.accepted} accepted projects · ${series.counts.completed} clean completions</p>${series.cards.map(card=>`<h3>${E(card.title)} <small>repeat ${card.repeat}</small></h3><div class="table-wrap"><table><thead><tr><th>System</th><th>Outcome</th><th>Accepted</th><th>Completed</th><th>Time</th><th>Judge</th><th>Input</th><th>Output</th><th>Cached</th><th>Fresh</th></tr></thead><tbody>${card.rows.map(r=>`<tr><th>${E(r.label)}</th><td>${E(r.outcome)}</td><td>${r.accepted===null?'unknown':r.accepted?'yes':'no'}</td><td>${r.completed===null?'unknown':r.completed?'yes':'no'}</td><td>${r.wallMs===null?'unknown':(r.wallMs/1000).toFixed(3)+'s'}</td><td>${r.groupsPassed??'?'} / ${r.groupsTotal??'?'}</td>${FIELDS.map(f=>`<td>${r.accounting.full[f]===null?'unknown':r.accounting.full[f].toLocaleString('en-US')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')}</section>`;
+  return `<section class="static-series"><h2>${E(series.title)}</h2><p>${series.counts.pass}/${series.counts.observed} strict PASS · ${series.counts.accepted} accepted projects · ${series.counts.completed} clean completions</p>${series.cards.map(card=>`<h3>${E(card.title)} <small>repeat ${card.repeat}</small></h3><div class="table-wrap"><table><thead><tr><th>System</th><th>Outcome</th><th>Accepted</th><th>Completed</th><th>Time</th><th>Judge</th><th>Input</th><th>Output</th><th>Cached</th><th>Fresh</th></tr></thead><tbody>${card.rows.map(r=>`<tr><th>${E(factoryName(r.label))}</th><td>${E(r.outcome)}</td><td>${r.accepted===null?'unknown':r.accepted?'yes':'no'}</td><td>${r.completed===null?'unknown':r.completed?'yes':'no'}</td><td>${r.wallMs===null?'unknown':(r.wallMs/1000).toFixed(3)+'s'}</td><td>${r.groupsPassed??'?'} / ${r.groupsTotal??'?'}</td>${FIELDS.map(f=>`<td>${r.accounting.full[f]===null?'unknown':r.accounting.full[f].toLocaleString('en-US')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')}</section>`;
 }
 
 export function renderShowcase({data,payloads}){
   const brand=fs.readFileSync(path.join(ROOT,'docs/brand/bantam-mark.svg')).toString('base64');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>BANTAM Arena · Recorded factory trials</title><style>${CSS}${SHOWCASE_BOARD_CSS}</style></head><body>
-<div class="top-stripe"></div><header class="topbar"><a class="wordmark" href="#"><img src="data:image/svg+xml;base64,${brand}" alt="" width="44" height="44"><span>BANTAM <i>ARENA</i></span></a><div class="top-status"><span class="dot"></span> RECORDED EVIDENCE <span class="divider">/</span> ${data.mode==='public'?'PUBLIC SUMMARY':'PRIVATE EDITION'}</div><button id="download-summary" class="quiet">↓ Export data</button></header>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>BANTAM FACTORY Arena · Recorded factory trials</title><style>${CSS}${SHOWCASE_BOARD_CSS}</style></head><body>
+<div class="top-stripe"></div><header class="topbar"><a class="wordmark" href="#"><img src="data:image/svg+xml;base64,${brand}" alt="" width="44" height="44"><span>BANTAM FACTORY <i>ARENA</i></span></a><div class="top-status"><span class="dot"></span> RECORDED EVIDENCE <span class="divider">/</span> ${data.mode==='public'?'PUBLIC SUMMARY':'PRIVATE EDITION'}</div><button id="download-summary" class="quiet">↓ Export data</button></header>
 <div class="layout"><aside class="rail"><p class="eyebrow">THE RECORD</p><nav id="series-nav" aria-label="Recorded series"></nav><div class="rail-foot"><span class="small-square"></span><p>Every edition stands alone.<br>Every outcome stays on record.</p></div></aside><main id="main"><section class="hero"><div><p class="eyebrow" id="edition-label">FACTORY SYSTEM TRIALS</p><h1 id="headline">Intelligence.<br><em>Put to work.</em></h1><p id="series-subtitle" class="hero-sub">Real work. Recorded clocks. Independent acceptance.</p></div><div class="hero-score"><span class="eyebrow">STRICT PASS / RECORDED</span><strong id="hero-score">—<small>/ —</small></strong><p id="hero-score-note">Artifact acceptance and harness completion are separate measures.</p><div class="mini-stats"><div><b id="accepted-count">—</b><span>PROJECTS ACCEPTED</span></div><div><b id="completed-count">—</b><span>CLEAN COMPLETIONS</span></div></div></div></section>
 <div class="privacy ${data.mode}"><span>${data.mode==='public'?'PUBLIC SUMMARY':'PRIVATE · NOT REDACTED'}</span> ${data.mode==='public'?'Only allowlisted measurements and public task labels. Context, source, private paths and raw evidence are deliberately omitted.':'This portable file contains private context, source, transcripts and machine paths. Review before posting or recording. Nothing is uploaded.'}</div>
 <section class="edition-strip"><p id="series-note"></p><button id="method-button" class="quiet">Method & provenance ↗</button></section>
@@ -219,11 +219,11 @@ export function renderShowcase({data,payloads}){
 <p class="clock-note" id="clock-note">Clocks are relative to each lane's recorded start, not a claim that independent runs happened simultaneously.</p><div id="lane-grid" class="lane-grid"></div><div id="takeaway" class="takeaway"></div></section>
 <section class="principles"><div><span>01</span><h3>Acceptance ≠ completion.</h3><p>Passing the judge is necessary, not sufficient. The delivered project, protected files and clean harness finish all matter.</p></div><div><span>02</span><h3>Unknown is a measurement.</h3><p>Missing receipts are never zero. Known subsets, native counters and endpoint windows carry different scopes.</p></div><div><span>03</span><h3>Different editions. No rewrite.</h3><p>Adaptive repairs and new models remain separate. A later success does not erase an earlier incomplete run.</p></div></section>
 <details class="static"><summary>Complete static score sheets · printable, no JavaScript required</summary>${data.series.map(scoreTable).join('')}</details>
-<footer>BANTAM / THE FACTORY FLOOR <span>Unsigned observations. Hashes establish byte consistency, not correctness or authority.</span></footer>
+<footer>BANTAM FACTORY / THE FACTORY FLOOR <span>Unsigned observations. Hashes establish byte consistency, not correctness or authority.</span></footer>
 </main></div><dialog id="inspector"><header><div><p class="eyebrow" id="inspector-kicker">RECORDED EVIDENCE</p><h2 id="inspector-title">Inspect the work</h2></div><button id="close-inspector" aria-label="Close evidence inspector">✕</button></header><nav id="inspector-tabs" aria-label="Evidence sections"></nav><div id="inspector-body"></div></dialog>
 <noscript><div class="nojs">Interactive controls require JavaScript. Open “Complete static score sheets” above to inspect every recorded outcome. Private compressed evidence additionally requires browser DecompressionStream support.</div></noscript>
 <script id="showcase-data" type="application/json">${J(data)}</script>${payloads.map(p=>`<script id="evidence-${E(p.id)}" type="application/octet-stream">${p.data}</script>`).join('')}
-<script>const lineDiff=${replayLineDiff.toString()};const acceptanceAt=${showcaseAcceptanceAt.toString()};const sameModelObservation=${sameModelObservation.toString()};(${client.toString()})(${J(Object.fromEntries(data.series.flatMap(s=>s.cards.flatMap(c=>c.rows.map(r=>[r.id,performanceView(r.performance)])))))});</script></body></html>`;
+<script>const factoryName=${factoryName.toString()};const lineDiff=${replayLineDiff.toString()};const acceptanceAt=${showcaseAcceptanceAt.toString()};const sameModelObservation=${sameModelObservation.toString()};(${client.toString()})(${J(Object.fromEntries(data.series.flatMap(s=>s.cards.flatMap(c=>c.rows.map(r=>[r.id,performanceView(r.performance)])))))});</script></body></html>`;
 }
 
 export function writeShowcase({roots,output,mode='private',limits={},localHardware=null}){
@@ -285,7 +285,7 @@ function client(performanceViews){
     const solo=new Set(s.cards.flatMap(card=>card.rows.map(row=>row.arm))).size===1;
     const headline=$('headline');headline.replaceChildren(el('span',solo?'One system.':'The fight.'),el('br'),el('em',solo?'Real work.':'On record.'));
     const localSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='local').map(r=>r.arm))).size,frontierSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='astra').map(r=>r.arm))).size;
-    $('series-subtitle').textContent=solo?`${s.cards.length} work order${s.cards.length===1?'':'s'}. One recorded system. This edition stands on its own; competitor attempts are not included.`:s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same selected local model. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
+    $('series-subtitle').textContent=solo?`${s.cards.length} work order${s.cards.length===1?'':'s'}. One recorded system. This edition stands on its own; competitor attempts are not included.`:s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same selected local model. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM FACTORY. A separately recorded edition, not a replacement for the original comparison.`;
     $('hero-score').replaceChildren(document.createTextNode(String(s.counts.pass)),el('small',`/ ${s.counts.observed}`));
     $('hero-score-note').textContent=`${s.counts.groupsMeasured?`${s.counts.groupsPassed}/${s.counts.groupsTotal} independent groups passed across ${s.counts.groupsMeasured} measured attempts.`:'No independent group results recorded.'} ${s.counts.planned-s.counts.observed?`${s.counts.planned-s.counts.observed} planned attempts have no final record.`:'Every recorded outcome remains visible.'}`;
     $('accepted-count').textContent=`${s.counts.accepted}/${s.counts.observed}`;$('completed-count').textContent=`${s.counts.completed}/${s.counts.observed}`;
@@ -304,14 +304,14 @@ function client(performanceViews){
     let title=`${accepted.length}/${c.rows.filter(r=>r.recorded).length} accepted projects. ${strict.length} clean PASS.`,note='Functional acceptance and the completion protocol are shown separately. One attempt is not a reliability estimate.';
     if(s.kind==='comparison'){
       const observation=sameModelObservation(c.rows);
-      if(observation){title=`Same local model. Both accepted. BANTAM finished ${observation.ratio.toFixed(2)}× sooner than DeepSeek Harness.`;note='Observed on this card, not a universal ranking. Cache efficiency and cloud-system results can favor another lane.';}
+      if(observation){title=`Same local model. Both accepted. BANTAM FACTORY finished ${observation.ratio.toFixed(2)}× sooner than DeepSeek Harness.`;note='Observed on this card, not a universal ranking. Cache efficiency and cloud-system results can favor another lane.';}
     }else if(incomplete.length)note='Passing tests did not guarantee a clean finish. These incomplete deliveries stay visible beside successful runs.';
     append(body,el('strong',title),el('p',note));takeaway.replaceChildren(body);if(focus)takeaway.append(button('Show all lanes',()=>{focus=null;render();},'quiet'));
   }
   function renderLane(row){
     const lane=el('article',undefined,'lane'+(row.bantam?' bantam':'')+(row.family==='astra'?' native-astra':''));lane.dataset.lane=row.id;
     const stage=acceptanceAt(row,{results,t}),{ended}=stage,top=el('div',undefined,'lane-top'),name=el('div'),clock=el('div',undefined,'lane-clock');
-    append(name,el('div',row.model,'lane-family'),el('h3',row.label),badge(ended?row.outcome:'REPLAYING'));
+    append(name,el('div',row.model,'lane-family'),el('h3',factoryName(row.label)),badge(ended?row.outcome:'REPLAYING'));
     const perf=performanceViews[row.id];
     if(perf){
       if(perf.hardware)name.append(el('p',perf.hardware,'lane-hardware'));
@@ -349,7 +349,7 @@ function client(performanceViews){
   function dataTable(head,rows){const wrap=el('div',undefined,'table-wrap'),table=el('table'),thead=el('thead'),tr=el('tr'),body=el('tbody');for(const h of head)tr.append(el('th',h));thead.append(tr);for(const values of rows){const r=el('tr');values.forEach((v,i)=>r.append(el(i===0?'th':'td',v)));body.append(r);}return append(wrap,append(table,thead,body));}
   async function openInspector(row,tab='evidence',event=null){
     inspectorRow=row;inspectorTab=tab;picked=event;
-    $('inspector-title').textContent=row?row.label+' / '+card().title:series().title;
+    $('inspector-title').textContent=row?factoryName(row.label)+' / '+card().title:series().title;
     $('inspector-kicker').textContent=data.mode==='public'?'PUBLIC MEASUREMENTS / RAW EVIDENCE OMITTED':'PRIVATE EVIDENCE / READ-ONLY INSPECTION';
     if(!$('inspector').open)$('inspector').showModal();await renderInspector();
   }

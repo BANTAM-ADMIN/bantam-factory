@@ -10,7 +10,7 @@ outside it; the root itself is inside it.
 
 | System | Outcome | Independent groups | Wall time |
 |---|---|---:|---:|
-| BANTAM · local 27B | PASS | 5/5 | 75.1 s |
+| BANTAM FACTORY · local 27B | PASS | 5/5 | 75.1 s |
 | Codex · native Astra | PASS | 5/5 | 107.9 s |
 
 Both systems completed accepted work and passed every acceptance group. The
@@ -18,15 +18,18 @@ local 27B was 1.44× quicker than the frontier CLI on this attempt. At 75.1
 seconds it is the second quickest recorded pass in the gallery, behind context
 packet at 58.1 s.
 
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
+
 ## Tokens and prefix reuse
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · all 16 requests | 125,827 | 5,025 | 96,652 | 29,175 |
-| BANTAM · separate idle-bounded server window | 125,770 | 5,020 | 96,600 | 29,170 |
+| BANTAM FACTORY · all 16 requests | 125,827 | 5,025 | 96,652 | 29,175 |
+| BANTAM FACTORY · separate idle-bounded server window | 125,770 | 5,020 | 96,600 | 29,170 |
 | Astra · native aggregate | 103,844 | 2,423 | 90,240 | 13,604 |
 
-BANTAM's prefix reuse was 76.8% across 16 requests, the lowest ratio on any
+BANTAM FACTORY's prefix reuse was 76.8% across 16 requests, the lowest ratio on any
 published card and a direct consequence of the short run: fewer turns means
 the fixed prompt preamble is amortized over less reused context. Astra spent
 17.5% fewer input tokens and 51.8% fewer output tokens while taking longer in
@@ -40,7 +43,7 @@ inference client used the endpoint during the window.
 ## Conditions and provenance
 
 The two lanes were recorded separately, not simultaneously, on the same frozen
-kit, starter bytes and independent grader. BANTAM ran on frozen factory source
+kit, starter bytes and independent grader. BANTAM FACTORY ran on frozen factory source
 `7d6d304a419e99da3bfdf347f8fc47a67a147791`, which derives the history window
 from the served context and reserves a final action against the wall budget;
 its manifest records a 72,192-token served window, a 173,260-character history
@@ -59,3 +62,5 @@ allowlisted measurements and replay counters, not private source, prompts or
 machine paths. Raw evidence remains private. Package hashes check generated
 assets, excluding this README; they do not attest authorship or authorize
 execution.
+
+</details>

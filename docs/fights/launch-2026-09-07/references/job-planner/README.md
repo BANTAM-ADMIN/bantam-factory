@@ -15,10 +15,13 @@ to its roster.
 | Claude · native Opus | PASS | 5/5 | 64.2 s |
 | Claude · native Fable | PASS | 5/5 | 65.4 s |
 
-For context, BANTAM's local 27B attempt on this work order passed 5/5 in
+For context, BANTAM FACTORY's local 27B attempt on this work order passed 5/5 in
 193.2 s and native Codex Astra in 118.4 s, recorded in a separate comparison
 that was running on the same machine during these attempts. Different models
 and run windows: individual observations, not a ranking.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
@@ -51,3 +54,5 @@ was not used by Claude. Work-order and starter materials were frozen;
 candidates received the same independent graders. Public exports omit raw
 prompts, source, credentials and machine paths. Asset hashes cover generated
 files, not these notes.
+
+</details>

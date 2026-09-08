@@ -62,9 +62,9 @@ test('local factory headlines earn their finish without claiming a win over a fa
   const data=fourCornerFixture();
   for(const render of [renderLaunchPage,renderShareCard]) {
     const prose=visibleProse(render(data));
-    assert.match(prose,/5\/5\s+BANTAM · checks passed\. Work completed\./);
+    assert.match(prose,/5\/5\s+BANTAM FACTORY · checks passed\. Work completed\./);
     assert.match(prose,/2\.0s elapsed · 5\/5 acceptance groups/);
-    assert.doesNotMatch(prose,/BANTAM wins|BANTAM is fastest/);
+    assert.doesNotMatch(prose,/BANTAM FACTORY wins|BANTAM FACTORY is fastest/);
   }
   const row=data.series[0].cards[0].rows.find(row=>row.arm==='bantam-local-27b');
   for(const change of [{outcome:'OUTPUT_ONLY',completed:false},{outcome:'FAIL',hiddenExit:1},
@@ -73,8 +73,8 @@ test('local factory headlines earn their finish without claiming a win over a fa
     Object.assign(row,change);
     for(const render of [renderLaunchPage,renderShareCard]) {
       const prose=visibleProse(render(data));
-      assert.doesNotMatch(prose,/BANTAM · checks passed\. Work completed\./);
-      assert.match(prose,/BANTAM · recorded outcome/);
+      assert.doesNotMatch(prose,/BANTAM FACTORY · checks passed\. Work completed\./);
+      assert.match(prose,/BANTAM FACTORY · recorded outcome/);
     }
   }
 });
@@ -85,12 +85,12 @@ function embedded(html) {
   return JSON.parse(block[1]);
 }
 
-test('single-card share images put local BANTAM first without reordering evidence',()=>{
+test('single-card share images put local BANTAM FACTORY first without reordering evidence',()=>{
   const data=fixture();data.series[0].cards=data.series[0].cards.slice(0,1);
   data.series[0].cards[0].rows.reverse();const before=structuredClone(data);
   const svg=renderShareCard(data);
   const labels=[...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map(m=>m[1]);
-  assert.ok(labels.indexOf('BANTAM · local')<labels.indexOf('DeepSeek Harness'));
+  assert.ok(labels.indexOf('BANTAM FACTORY · local')<labels.indexOf('DeepSeek Harness'));
   assert.deepEqual(data,before);
 });
 
@@ -166,9 +166,9 @@ test('single workshop comparison scopes four actual corners without legacy task,
   assert.match(prose,/No held-out-task claim is made/);
   assert.match(share,/1 work order · 4 systems · 4\/4 attempts recorded/);
   assert.match(share,/3\/4 artifacts accepted/);
-  for(const label of ['BANTAM · local','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);
+  for(const label of ['BANTAM FACTORY · local','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);
   for(const text of [prose,share])assert.doesNotMatch(text,
-    /DeepSeek|BANTAM · Astra|wrapped CLI|receipt reducer|snapshot tool|dependency planner|three (?:tasks|work orders)|six[- ]system|two Astra|frontier work overlapped|CPU\/I\/O contention|\d+(?:\.\d+)?\s*%\s*less|less recorded time|BANTAM finished .*sooner/i);
+    /DeepSeek|BANTAM FACTORY · Astra|wrapped CLI|receipt reducer|snapshot tool|dependency planner|three (?:tasks|work orders)|six[- ]system|two Astra|frontier work overlapped|CPU\/I\/O contention|\d+(?:\.\d+)?\s*%\s*less|less recorded time|BANTAM FACTORY finished .*sooner/i);
   const hermes=embedded(html).series[0].cards[0].rows.find(row=>row.arm==='hermes');
   assert.deepEqual(hermes.accounting.full,metrics(null,null,null,null));
   assert.deepEqual(hermes.accounting.subset,metrics(100,8,70,30));
@@ -188,16 +188,16 @@ test('an unrecorded fourth corner keeps the planned denominator and unknown coun
   assert.match(visibleProse(svg),/OpenCode\s+Unknown\s+NOT RECORDED/);
 });
 
-test('a solo BANTAM card stands alone without inventing a competitor or comparative win',()=>{
+test('a solo BANTAM FACTORY card stands alone without inventing a competitor or comparative win',()=>{
   const data=fourCornerFixture();
   const card=data.series[0].cards[0];
   card.rows=card.rows.filter(row=>row.arm==='bantam-local-27b');
   const before=structuredClone(data),html=renderLaunchPage(data),svg=renderShareCard(data);
-  assert.match(visibleProse(html),/BANTAM \/ solo run/);
+  assert.match(visibleProse(html),/BANTAM FACTORY \/ solo run/);
   assert.match(visibleProse(html),/One recorded system/);
   assert.match(visibleProse(svg),/SOLO RUN \/ ON RECORD/);
   assert.match(visibleProse(svg),/1\/1 attempts recorded/);
-  assert.doesNotMatch(visibleProse(html)+visibleProse(svg),/OpenCode|DeepSeek|Hermes|Astra|BANTAM wins|faster than/);
+  assert.doesNotMatch(visibleProse(html)+visibleProse(svg),/OpenCode|DeepSeek|Hermes|Astra|BANTAM FACTORY wins|faster than/);
   assert.deepEqual(embedded(html),before);
   assert.deepEqual(data,before);
 });
@@ -384,7 +384,7 @@ test('actual Chromium keeps a one-work-order four-corner film and its exports sc
       expect('exactFourCornerDownload',JSON.stringify(JSON.parse(await downloads.at(-1).text()))===JSON.stringify(data));
       get('share-svg').click();await wait(()=>downloads.some(blob=>blob.type.includes('svg')));
       const svg=await downloads.find(blob=>blob.type.includes('svg')).text();
-      expect('scopedShare',svg.includes('4 systems')&&svg.includes('4/4 attempts recorded')&&!/DeepSeek|BANTAM · Astra/.test(svg));
+      expect('scopedShare',svg.includes('4 systems')&&svg.includes('4/4 attempts recorded')&&!/DeepSeek|BANTAM FACTORY · Astra/.test(svg));
       expect('layout',document.documentElement.scrollWidth<=innerWidth);
       report.width=innerWidth;report.height=innerHeight;
     }catch(error){report.error=error.stack||String(error);}

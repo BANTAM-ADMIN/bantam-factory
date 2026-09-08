@@ -9,24 +9,27 @@ one recorded attempt each. No manual candidate repairs.
 
 | System | Independent groups | Outcome | Wall time |
 |---|---:|---|---:|
-| BANTAM · local 27B | 5/5 | PASS, accepted completion | 58.072 s |
+| BANTAM FACTORY · local 27B | 5/5 | PASS, accepted completion | 58.072 s |
 | OpenCode · same local 27B | 5/5 | OUTPUT_ONLY, time limit | 600.004 s |
 | Codex · native Astra | 5/5 | PASS, clean completion | 110.560 s |
 
-BANTAM completed this attempt in 47.5% less elapsed time than native Astra.
+BANTAM FACTORY completed this attempt in 47.5% less elapsed time than native Astra.
 That is a different-model system comparison, not a same-model harness result.
 OpenCode's artifact passed, but its process did not finish within ten minutes;
 600 seconds is a timeout boundary, not its time to successful completion.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Token receipts
 
 | System / scope | Input | Output | Cached input | Fresh input |
 |---|---:|---:|---:|---:|
-| BANTAM · complete, 14/14 requests | 109,586 | 4,206 | 93,590 | 15,996 |
+| BANTAM FACTORY · complete, 14/14 requests | 109,586 | 4,206 | 93,590 | 15,996 |
 | OpenCode · measured subset, 27/28 requests | 623,297 | 38,632 | 532,798 | 90,499 |
 | Astra · native aggregate | 75,196 | 2,835 | 62,336 | 12,860 |
 
-BANTAM used more input and output tokens than Astra despite finishing sooner.
+BANTAM FACTORY used more input and output tokens than Astra despite finishing sooner.
 Input already includes cached input; these columns must not be added together.
 Astra reports aggregate usage, not full request-by-request coverage.
 
@@ -60,3 +63,5 @@ Only allowlisted public labels, measurements and replay counters are included.
 Raw prompts, source code, machine paths and execution transcripts are omitted.
 The package manifests hash the generated assets; they do not attest authorship
 or authorize execution. The explanatory README is outside those asset hashes.
+
+</details>

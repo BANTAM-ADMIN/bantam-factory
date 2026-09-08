@@ -15,10 +15,13 @@ to its roster.
 | Claude · native Opus | PASS | 5/5 | 108.4 s |
 | Claude · native Fable | PASS | 5/5 | 74.2 s |
 
-For context, BANTAM's earlier local 27B attempt on this work order passed 5/5
-in 58.1 s and native Codex Astra in 110.6 s. BANTAM's attempt was quicker than
+For context, BANTAM FACTORY's earlier local 27B attempt on this work order passed 5/5
+in 58.1 s and native Codex Astra in 110.6 s. BANTAM FACTORY's attempt was quicker than
 all three Claude attempts here. Those came from a different run window and,
-for BANTAM, a different model. Individual observations, not a ranking.
+for BANTAM FACTORY, a different model. Individual observations, not a ranking.
+
+<details>
+<summary>Token receipts, run conditions & provenance</summary>
 
 ## Tokens and prefix reuse
 
@@ -54,3 +57,5 @@ paths. Asset hashes cover generated files, not these notes.
 The earlier [September 7 reference set](../../../claude-references-2026-09-07/context-packet/README.md)
 recorded Sonnet in 62.2 s and Opus in 67.3 s on this work order from source
 `96b6d1a`; it is retained unchanged as a separate cohort.
+
+</details>

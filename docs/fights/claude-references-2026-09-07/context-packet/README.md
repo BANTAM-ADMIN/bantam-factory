@@ -16,5 +16,5 @@ input was 41,327 and 26,854 respectively, already included in fresh/input totals
 These are not per-request wire measurements.
 
 Read the [shared source, model and isolation conditions](../README.md).
-The [earlier BANTAM comparison](../../launch-2026-09-07/context-packet/README.md)
+The [earlier BANTAM FACTORY comparison](../../launch-2026-09-07/context-packet/README.md)
 is a separate cohort, not a rerun or a row silently inserted into this card.

@@ -136,6 +136,7 @@ import { auditReachability } from "../src/logic/orphan-audit.js";
 const REACHABILITY_EXEMPTIONS = [
   // Spawned by path (execFileSync/child_process), invisible to an import walk.
   { file: "src/logic/preview-runner.mjs", reason: "spawned by path from preview flow" },
+  { file: "src/logic/preview-viewport.mjs", reason: "imported by the spawned preview runner for exact phone viewports" },
   { file: "src/lock-recovery-child.js", reason: "spawned by path for lock recovery" },
   // The shelved self-improvement pile, grandfathered 2026-08-02 (D14 landing).
   // Wire it or delete it; do not add to it. Lower this list, never grow it.

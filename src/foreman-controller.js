@@ -37,7 +37,7 @@ export async function driveForeman({ task, initial, model, execute, inspect, ver
   signal, codexWorkers = [], maxJobs = 12, maxDecisions = 40, maxSupervisorTokens = 150000 }) {
   const queue = new ForemanQueue({ execute, emit, signal, codexWorkers, maxJobs });
   let prompt = `${FOREMAN_INSTRUCTIONS}\n\nOPERATOR TASK:\n${task}\n\nCONFIGURATION AND INITIAL MATERIAL:\n${JSON.stringify(initial)}\nEnabled workers: ${['local', ...codexWorkers].join(', ')}\nJob limit: ${maxJobs}; supervisor decision limit: ${maxDecisions}.\n`;
-  const calls = [], priorQueue = new Map(); let final = null, error = null, consumed = 0;
+  const calls = [], priorQueue = new Map(), started = Date.now(); let final = null, error = null, consumed = 0;
   try {
     for (let turn = 1; turn <= maxDecisions; turn++) {
       if (signal?.aborted) throw Error('foreman deadline or cancellation');
@@ -46,7 +46,10 @@ export async function driveForeman({ task, initial, model, execute, inspect, ver
         const serialized = JSON.stringify(row), changed = priorQueue.get(row.id) !== serialized;
         priorQueue.set(row.id, serialized); return changed;
       });
-      prompt += `\nQUEUE UPDATES (replace earlier state for these IDs; unlisted jobs unchanged) ${JSON.stringify(changes)}\nChoose your next action.\n`;
+      const budget = { now: Date.now(), decisionsRemaining: maxDecisions - turn + 1,
+        observedTokenAllowanceRemaining: maxSupervisorTokens - consumed,
+        wallMsRemaining: Number.isFinite(initial?.wallBudgetMs) ? Math.max(0, initial.wallBudgetMs - (Date.now() - started)) : null };
+      prompt += `\nQUEUE UPDATES (replace earlier state for these IDs; unlisted jobs unchanged) ${JSON.stringify(changes)}\nCONTROLLER BUDGET ${JSON.stringify(budget)}\nToken allowance includes cached input; reserve room for final review and finish. Choose your next action.\n`;
       emit('supervisor.request', { turn, prompt });
       const start = Date.now();
       let response;

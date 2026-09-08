@@ -317,7 +317,7 @@ const COMPUTE_EXEC_RE = new RegExp(
 // terminated at turn 20 of a 200-turn budget. Recognizing only `-c` gates the
 // long form of the very thing the short form is explicitly allowed to do.
 export function isComputeShellCommand(command) {
-  const c = String(command ?? "");
+  const c = String(command ?? "").replace(/\bnode\s+(?:(?:--input-type(?:=|\s+)(?:module|commonjs)|--test)\s+)+/g, "node ");
   if (!c.trim()) return false;
   return COMPUTE_EXEC_RE.test(c);
 }

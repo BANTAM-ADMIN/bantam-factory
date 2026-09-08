@@ -408,6 +408,7 @@ export async function runAgent(options = {}) {
 
 async function runAgentCore({
   task,
+  supportingContext = "",
   workspace,
   model = new ModelClient(),
   maxTurns = 30,
@@ -1008,7 +1009,8 @@ async function runAgentCore({
   const preloadedContextNote = taskPreloadedPaths.length
     ? `[preloaded-sources] These named implementation paths are already placed in <open_files> below: ${taskPreloadedPaths.join(", ")}. A fully rendered panel satisfies the investigate-before-edit rule: do not emit read_file/inspect for that path again. If a panel is clipped, read only its omitted range.`
     : "";
-  const taskContractText = [preloadedContextNote, sourceProvenance?.message]
+  const taskContractText = [preloadedContextNote, sourceProvenance?.message,
+    supportingContext ? `SUPPORTING EVIDENCE (diagnostic context, not additional task deliverables):\n${supportingContext}` : ""]
     .filter(Boolean)
     .join("\n\n");
   // Gemma 4 gates its reasoning channel with a `<|think|>` flag at the top of

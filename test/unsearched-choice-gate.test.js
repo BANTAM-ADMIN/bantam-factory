@@ -30,7 +30,15 @@ test("an ordinary build is NOT a search — the gate must stay out of the way", 
     "Write a compressor to /app/compress.py",
     "Fix the failing test in src/app.js",
     "Install nginx and configure it to log requests",
+    "Build a byte-budget packer, not a claim about optimal model context. Missing array slots are invalid.",
   ]) assert.equal(taskDemandsSearch(t), false, t);
+});
+
+test('Node module-mode assertions are computation, including the live worker spelling', () => {
+  assert.equal(isComputeShellCommand('node --input-type=module -e "console.log(1)"'),true);
+  assert.equal(isComputeShellCommand('node --test test/boundary.test.js'),true);
+  assert.equal(isComputeShellCommand('node --version'),false);
+  assert.equal(isComputeShellCommand('cat script.mjs'),false);
 });
 
 test("looking and writing are not searching", () => {

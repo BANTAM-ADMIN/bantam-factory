@@ -64,7 +64,7 @@ export async function foremanCommand(args, { cwd = process.cwd(), ask = null, lo
   return result.pass ? 0 : 1;
 }
 
-export async function cleanupForemanContainers(directory) {
+export async function cleanupForemanContainers(directory, { run = runProcess } = {}) {
   if (!fs.existsSync(directory)) return;
   for (const file of fs.readdirSync(directory)) {
     if (!/^(astra-codex|bantam-shell)-[a-z0-9-]+\.cid$/.test(file)) continue;
@@ -75,8 +75,19 @@ export async function cleanupForemanContainers(directory) {
     // A killed Docker client can leave a container in Created rather than
     // Running. `stop` succeeds without removing that state. Remove only this
     // exact receipt-owned container; candidate bytes live in retained binds.
-    const r = await runProcess('docker', ['rm','--force',id], { timeoutMs: 10000 });
-    if (r.code !== 0 && !/No such container/i.test(r.stderr)) throw Error('cannot confirm owned Codex container stopped');
+    const attempts = [];
+    let absent = false;
+    for (let n = 0; n < 3 && !absent; n++) {
+      const removed = await run('docker', ['rm','--force',id], { timeoutMs: 10000 });
+      const inspected = await run('docker', ['container','inspect',id], { timeoutMs: 10000 });
+      // The wrapper and Docker --rm may remove the same owned container at
+      // once. Removal-in-progress is not proof of a leak OR proof of absence.
+      absent = inspected.code !== 0 && !inspected.timedOut && !inspected.aborted
+        && new RegExp(`No such (?:container|object):?\\s*${id}`, 'i').test(inspected.stderr);
+      attempts.push({ removed, inspected });
+      write(receipt + '.cleanup.json', { id, absent, attempts });
+    }
+    if (!absent) throw Error(`cannot confirm owned container absent; evidence: ${receipt}.cleanup.json`);
   }
 }
 export function foremanUsage(result) {
@@ -116,7 +127,7 @@ export function readForemanEvidence(output, id, selector) {
   } finally { fs.closeSync(fd); }
 }
 
-export function foremanWorkerTask(task, job, dependencies) {
+export function foremanWorkerContext(job, dependencies) {
   // Do not flatten transport diagnostics into the product contract. In the
   // first live trial, `process.aborted:false` in a successful dependency's raw
   // receipt triggered an unrelated abort-lifecycle audit in a synchronous API.
@@ -125,7 +136,11 @@ export function foremanWorkerTask(task, job, dependencies) {
   const outcomes = dependencies.map(j => ({ id: j.id, status: j.status,
     verified: j.result?.verification?.pass === true, integrated: j.result?.integrated === true,
     changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null }));
-  return `OVERALL OPERATOR CONTRACT (binding):\n${task}\n\nYOUR BOUNDED JOB:\n${job.task}\n\nSUPERVISOR CONTEXT:\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features.`;
+  return `SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
+}
+export function foremanWorkerTask(task, job, dependencies = null) {
+  const contract = `OVERALL OPERATOR CONTRACT (binding):\n${task}\n\nYOUR BOUNDED JOB:\n${job.task}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features.`;
+  return dependencies === null ? contract : `${contract}\n\n${foremanWorkerContext(job, dependencies)}`;
 }
 
 export async function runForeman(plan, { log = () => {} } = {}) {
@@ -163,7 +178,10 @@ export async function runForeman(plan, { log = () => {} } = {}) {
         const current = await inspectLocalModel(plan.endpoint);
         if (current.id !== modelIdentity.id) throw Error('local model changed');
         recorder = await startModelRecorder({ upstream: plan.endpoint, output: path.join(dir, 'wire') });
-        command = freshCommand({ arm: 'bantam-local-27b', task, workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, timeoutMs: remaining() });
+        const contextFile = path.join(dir, 'supporting-context.txt');
+        fs.writeFileSync(contextFile, foremanWorkerContext(job, dependencies), { mode: 0o600 });
+        command = freshCommand({ arm: 'bantam-local-27b', task: foremanWorkerTask(plan.task, job), workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, timeoutMs: remaining() });
+        command.args.push('--supporting-context-file', contextFile);
         command.args[command.args.indexOf('--verify') + 1] = job.verify;
       } else {
         command = { exe: path.join(ROOT, 'scripts/astra-container-cli.mjs'), args: ['exec','--json','--ignore-user-config','--skip-git-repo-check',
@@ -225,12 +243,19 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     const r = await check(path.join(checkDir, 'ws'), action.text); write(path.join(checkDir, 'result.json'), r); return { snapshot: snap.commit, ...brief(r) };
   };
   let result;
+  let cleanup = { pass: false, status: 'pending' };
   try {
     result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor' }, model: supervisor, execute, inspect,
       verify: async () => { const r = await check(candidate, plan.verify); write(path.join(plan.output, 'final-verification.json'), r); return brief(r); }, emit, signal: ac.signal });
+    // Never let teardown erase completed work, usage or the supervisor finish.
+    write(path.join(plan.output, 'completion-checkpoint.json'), result);
   } finally {
     ac.abort(); clearTimeout(timer); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
-    supervisor.endRun(runToken); supervisor.close(); await cleanupForemanContainers(supervisorCids);
+    try {
+      supervisor.endRun(runToken); supervisor.close(); await cleanupForemanContainers(supervisorCids);
+      cleanup = { pass: true, status: 'confirmed-absent' };
+    } catch (error) { cleanup = { pass: false, status: 'unconfirmed', error: String(error.message ?? error) }; }
+    write(path.join(plan.output, 'cleanup.json'), cleanup);
   }
   const sourceUnchanged = store.treeForWorkspace(plan.workspace, { excludePaths: [plan.output] }).tree === baseline.tree;
   const wallMs = Date.now() - started;
@@ -238,7 +263,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     const jobs = result.jobs.filter(j => j.lane === lane && j.startedAt), occupiedMs = jobs.reduce((n,j) => n + (j.wallMs ?? 0), 0);
     return [lane, { jobs: jobs.length, occupiedMs, utilization: occupiedMs / wallMs, queueWaitMs: jobs.reduce((n,j) => n + j.startedAt - j.queuedAt, 0) }];
   }));
-  result = { ...result, pass: result.pass && sourceUnchanged, sourceUnchanged, schema: 'bantam.foreman-run.v1', startedAt, wallMs, baseline, candidate, usage: foremanUsage(result),
+  result = { ...result, acceptedBeforeCleanup: result.pass, cleanup, pass: result.pass && sourceUnchanged && cleanup.pass, sourceUnchanged, schema: 'bantam.foreman-run.v1', startedAt, wallMs, baseline, candidate, usage: foremanUsage(result),
     timing: { scope: 'end-to-end including setup, verification, integration and cleanup; lane occupation is not pure GPU generation time', lanes, supervisorCallMs: result.calls.reduce((n,c) => n + c.wallMs, 0) } };
   write(path.join(plan.output, 'result.json'), result); emit('foreman.finished', { pass: result.pass, wallMs: result.wallMs, usage: result.usage }); return result;
 }

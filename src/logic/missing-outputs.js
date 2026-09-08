@@ -33,7 +33,7 @@ import crypto from "node:crypto";
 // sentence, by something that makes it about a FILE.
 const OUTPUT_VERB = /\b(?:writ(?:e|ing|ten)|sav(?:e|ing|ed)|stor(?:e|ing|ed)|produc(?:e|ing|ed)|creat(?:e|ing|ed)|emit|generat(?:e|ing|ed)|dump|export)\b|\boutput\b(?=[^.]*\b(?:file|to|as|into|titled|named)\b)/i;
 // A path with a file extension: /app/alpha_est.csv, ./out/result.txt, answer.txt
-const PATH_RE = /(?:^|[\s'"`(=])((?:\/|\.\/)?(?:[\w.-]+\/)*[\w-]+\.[A-Za-z0-9]{1,8})(?=$|[\s'"`),.;:])/g;
+const PATH_RE = /(?:^|[\s'"`(=])((?:\/|\.\/)?(?:[\w.-]+\/)*[\w-]+(?:\.[\w-]+)*\.[A-Za-z0-9]{1,8})(?=$|[\s'"`),.;:])/g;
 const BULLET = /^\s*(?:[-*+•]|\d+[.)])\s/;
 // The author DESCRIBING what they handed you, not asking you for anything.
 // query-optimize (2026-08-21) says "I implemented a sql query but it is not

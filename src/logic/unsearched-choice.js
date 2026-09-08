@@ -32,7 +32,9 @@ const act = (turn) => (turn && (turn.action || turn.parsedAction)) || null;
  */
 export function taskDemandsSearch(task) {
   const text = String(task ?? "");
-  return SELECTION_RE.test(text) && SPACE_RE.test(text);
+  // An unrelated superlative in background prose and a later mention of an
+  // array slot/path do not together constitute a search request.
+  return text.split(/\n|(?<=[.!?])\s+/).some(clause => SELECTION_RE.test(clause) && SPACE_RE.test(clause));
 }
 
 /**

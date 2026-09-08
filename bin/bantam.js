@@ -2217,6 +2217,8 @@ if (cmd === undefined || cmd === "chat") {
     graderBefore = args.verify ? graderSnapshot(workspace, { verifyCommand: args.verify }) : null;
     res = await runAgent({
       task: args.task,
+      supportingContext: typeof args["supporting-context-file"] === "string"
+        ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
       workspace,
       shellNetwork: args["dangerously-allow-net"] ? true : undefined,
       model,

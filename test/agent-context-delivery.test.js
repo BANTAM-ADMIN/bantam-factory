@@ -34,6 +34,14 @@ function options(workspace, model) {
   };
 }
 
+test('supporting evidence reaches the model without becoming a task output contract', async t => {
+  const { workspace, model } = setup(t, [{ a: 'respond', text: 'Reviewed.' }]);
+  const supportingContext = "Reproduction evidence: Object.create(Array.prototype); process.argv[1]='/tmp/example-importer.js'; import(moduleURL).";
+  const result = await runAgent({ ...options(workspace, model), task: 'Explain the synchronous API.', supportingContext });
+  assert.ok(model.prompts[0].includes(supportingContext));
+  assert.ok(!result.turns.some(turn => /file the task names as output/.test(turn.observation ?? '')));
+});
+
 test("the actual model callback receives complete decision context despite an oversized annotated observation", async (t) => {
   const source = Array.from({ length: 30 }, (_, i) => `// harmless source line ${i}`).join("\n")
     + '\nexport const strict = true;\nexport const marker = "LATE_CURRENT_SOURCE";\n';

@@ -44,6 +44,18 @@ station contracts and reusable helpers, including regression cases that catch
 the observed failure. Shared-harness changes remain versioned proposals for a
 separate validation run: no mid-benchmark self-modification or relaxed graders.
 
+Local worker handoffs separate the binding operator/job contract from supporting
+diagnostic evidence. Both reach the model, but example paths and dependency
+metadata do not become extra deliverables merely by appearing in a reproduction.
+The headless `run` command accepts `--supporting-context-file FILE` for this
+purpose. Put actual requirements in the task, not in this evidence channel.
+
+Factory repair should follow the same discipline: reproduce a defect, propose
+and test a versioned harness patch, then validate in a fresh run. Autonomous
+promotion to the shared installation is not implemented. A local-model
+supervisor with a separate worker context is a planned experiment, not an
+available mode; sharing one inference slot would serialize its local turns.
+
 Every worker receives a separate snapshot. Nonconflicting verified changes
 integrate into a private candidate using existing BANTAM workspace transactions.
 Conflicting stale edits fail instead of overwriting an integrated change. Worker
@@ -64,6 +76,12 @@ canonical prompts and responses, each job's task, candidate snapshots, BANTAM
 run/factory records, local request receipts, native Codex session receipts,
 verification logs and final `result.json`. Do not publish that directory: it
 can contain private project material and cloud context.
+
+A completion checkpoint is written before supervisor teardown. Cleanup records
+retain exact owned-container removal and inspection evidence; uncertain cleanup
+keeps the overall outcome incomplete without erasing the successful work or
+usage receipts. A wrapper removal race is resolved by confirming container
+absence, not by assuming a failed removal command means a live container.
 
 The result separates supervisor, local-worker and cloud-worker input/output,
 cached/fresh input and combined totals. Missing receipts stay unknown, not zero.

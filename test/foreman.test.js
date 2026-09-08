@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, cleanupForemanContainers } from '../src/foreman.js';
+import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
 import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
 import { shellContainerReceiptArgs } from '../src/executor.js';
 const usage = { inputTokens: 100, outputTokens: 10, cachedInputTokens: 80 };
@@ -12,6 +13,32 @@ const action = (kind, fields = {}) => ({ action: kind, jobs: [], target: '', tex
 const job = (id, worker = 'local') => ({ id, worker, task: 'build the module', context: 'preserve the API contract', verify: 'npm test', dependsOn: [] });
 function model(actions) { const prompts = []; return { prompts, complete: async prompt => { prompts.push(prompt); return { content: JSON.stringify(actions.shift() ?? action('wait')), rawUsage: usage }; } }; }
 function fixture(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-foreman-test-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; }
+test('diagnostic reproduction paths do not become binding worker deliverables', () => {
+  const j = { ...job('repair'), task: 'Write test/boundary.test.js with regression assertions.',
+    context: "Review: Object.create(Array.prototype); process.argv[1]='/tmp/example-importer.js'; await import(realModuleURL) wrongly runs the CLI." };
+  const contract = foremanWorkerTask('Implement a synchronous API.', j);
+  const evidence = foremanWorkerContext(j, []);
+  assert.ok(requiredOutputPaths(contract + '\n' + evidence).includes('/tmp/example-importer.js'), 'reproduces flat-context false requirement');
+  assert.deepEqual(requiredOutputPaths(contract), ['test/boundary.test.js']);
+  assert.match(evidence, /example-importer.js/);
+});
+test('owned cleanup resolves wrapper removal races using exact-ID absence evidence', async t => {
+  const dir = fixture(t), id = 'a'.repeat(64), receipt = path.join(dir,'astra-codex-test.cid');
+  fs.writeFileSync(receipt,id);
+  let calls = 0;
+  await cleanupForemanContainers(dir, { run: async (exe,args) => {
+    assert.equal(exe,'docker'); assert.equal(args.at(-1),id);
+    calls++;
+    if (args[0] === 'rm') return {code:1,stderr:'removal already in progress',stdout:''};
+    return calls < 4 ? {code:0,stderr:'',stdout:'[]'} : {code:1,stderr:`Error: No such object: ${id}`,stdout:''};
+  } });
+  assert.equal(calls,4);
+  assert.equal(JSON.parse(fs.readFileSync(receipt + '.cleanup.json')).absent,true);
+});
+test('Docker unavailability cannot be mistaken for successful cleanup', async t => {
+  const dir = fixture(t); fs.writeFileSync(path.join(dir,'bantam-shell-test.cid'),'b'.repeat(64));
+  await assert.rejects(cleanupForemanContainers(dir,{run:async()=>({code:1,stderr:'Cannot connect to Docker daemon',stdout:''})}),/cannot confirm/);
+});
 test('the model sees the same job ID rule as the queue validates', () => {
   const pattern = new RegExp(FOREMAN_SCHEMA.properties.jobs.items.properties.id.pattern);
   assert.equal(pattern.test('edge_tests'), false); assert.equal(pattern.test('edge-tests'), true);
@@ -62,6 +89,15 @@ test('missing and failed model receipts remain unknown and stop cloud admission'
     let n = 0; const result = await driveForeman({ task: 'x', initial: {}, model: { complete: () => { n++; return complete(); } }, execute: () => {}, verify: () => {}, inspect: () => {} });
     assert.equal(result.pass, false); assert.equal(n, 1); assert.equal(result.calls.length, 1); assert.equal(foremanUsage(result).total.inputTokens, null);
   }
+});
+test('supervisor sees remaining decision, token and wall allowances before spending', async () => {
+  const m = model([action('list'),action('list')]);
+  await driveForeman({task:'build',initial:{wallBudgetMs:600000},model:m,maxDecisions:2,maxSupervisorTokens:1000,
+    execute:()=>({pass:true}),inspect:async()=>[],verify:async()=>({pass:false})});
+  assert.match(m.prompts[0],/"observedTokenAllowanceRemaining":1000/);
+  assert.match(m.prompts[1],/"observedTokenAllowanceRemaining":890/);
+  assert.match(m.prompts[1],/"decisionsRemaining":1/);
+  assert.match(m.prompts[1],/"wallMsRemaining":\d+/);
 });
 test('usage totals count every lane, preserve unknowns, and do not invent dollar prices', () => {
   const u = { inputTokens: 100, outputTokens: 10, cacheHitTokens: 80, freshInputTokens: 20 };

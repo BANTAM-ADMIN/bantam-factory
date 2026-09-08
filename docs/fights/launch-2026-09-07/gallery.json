@@ -274,8 +274,197 @@
       "kind": "REPAIR",
       "number": "03",
       "description": "Order dependent work deterministically. Propagate failure without losing the plan.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "0cb6548228ec48d4eadd1c0012854b752dc1113e89641b6f2d77ed126ec9a94b",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 193154,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 483467,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Hermes",
+          "arm": "hermes",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600006,
+          "groupsPassed": 2,
+          "groupsTotal": 5,
+          "accountingComplete": false
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 118397,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Sol",
+          "arm": "codex-sol",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 240866,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Terra",
+          "arm": "codex-terra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 119274,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     }
-  ]
+  ],
+  "references": {
+    "cards": [
+      {
+        "id": "receipt-reducer",
+        "title": "Receipt reducer",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
+        "recorded": true,
+        "sourceSha256": "06653d555c7b3e7abfbe6044ad7a18e48bebb8b15ace71766d964fee179490d3",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 36582,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 89438,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 58516,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "id": "snapshot-drift",
+        "title": "Snapshot drift",
+        "kind": "EXTEND",
+        "number": "02",
+        "description": "Bind a snapshot to real files. Detect what changed, and validate what did not.",
+        "recorded": true,
+        "sourceSha256": "55ad5d1f6b49415740e9018c8aadc3478f85bafafdbbb7647ede903d53b187a9",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 35692,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 74753,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 82525,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "id": "job-planner",
+        "title": "Job planner",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "Order dependent work deterministically. Propagate failure without losing the plan.",
+        "recorded": true,
+        "sourceSha256": "77b60e49b4b6609f95b03ba63cbe46433f730eb80691a851d89b754ed0a64030",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 49710,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 64183,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 65387,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      }
+    ]
+  }
 }

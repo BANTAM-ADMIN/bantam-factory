@@ -1,0 +1,271 @@
+{
+  "schema": "bantam.launch-fight-card.v1",
+  "generatedAt": "2026-09-08T04:20:56.041Z",
+  "source": {
+    "sha256": "06653d555c7b3e7abfbe6044ad7a18e48bebb8b15ace71766d964fee179490d3",
+    "schema": "bantam.factory-showcase.v1"
+  },
+  "comparison": null,
+  "spotlight": null,
+  "series": [
+    {
+      "id": "series-1",
+      "title": "Factory system comparison",
+      "kind": "comparison",
+      "complete": true,
+      "startedAt": "2026-09-08T04:17:47.284Z",
+      "finishedAt": "2026-09-08T04:20:55.974Z",
+      "counts": {
+        "observed": 3,
+        "planned": 3,
+        "accepted": 3,
+        "completed": 3,
+        "pass": 3,
+        "groupsMeasured": 3,
+        "groupsPassed": 15,
+        "groupsTotal": 15
+      },
+      "cards": [
+        {
+          "id": "s1-receipt-reducer-r1",
+          "card": "receipt-reducer",
+          "title": "Receipt reducer",
+          "kind": "BUILD",
+          "number": "01",
+          "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
+          "repeat": 1,
+          "rows": [
+            {
+              "id": "s1-receipt-reducer-r1-lane1",
+              "arm": "claude-sonnet",
+              "label": "Claude · Sonnet",
+              "model": "Claude Sonnet · native CLI alias",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 36582,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 203838,
+                  "outputTokens": 3293,
+                  "cacheHitTokens": 191496,
+                  "freshInputTokens": 12342
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 203838,
+                  "outputTokens": 3293,
+                  "cacheHitTokens": 191496,
+                  "freshInputTokens": 12342
+                },
+                "server": null,
+                "complete": true,
+                "requests": null,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [],
+              "events": [],
+              "timedEvents": 21,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-receipt-reducer-r1-lane2",
+              "arm": "claude-opus",
+              "label": "Claude · Opus",
+              "model": "Claude Opus · native CLI alias",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 89438,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 231845,
+                  "outputTokens": 8371,
+                  "cacheHitTokens": 217518,
+                  "freshInputTokens": 14327
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 231845,
+                  "outputTokens": 8371,
+                  "cacheHitTokens": 217518,
+                  "freshInputTokens": 14327
+                },
+                "server": null,
+                "complete": true,
+                "requests": null,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [],
+              "events": [],
+              "timedEvents": 35,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-receipt-reducer-r1-lane3",
+              "arm": "claude-fable",
+              "label": "Claude · Fable",
+              "model": "Claude Fable · native CLI alias",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 58516,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 70029,
+                  "outputTokens": 4980,
+                  "cacheHitTokens": 43399,
+                  "freshInputTokens": 26630
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 70029,
+                  "outputTokens": 4980,
+                  "cacheHitTokens": 43399,
+                  "freshInputTokens": 26630
+                },
+                "server": null,
+                "complete": true,
+                "requests": null,
+                "measuredRequests": null,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": null,
+                    "totalRequests": null,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [],
+              "events": [],
+              "timedEvents": 11,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

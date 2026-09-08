@@ -1,0 +1,33 @@
+{
+  "schema": "bantam.launch-package.v1",
+  "public": true,
+  "redacted": true,
+  "presentation": "comparison",
+  "rawEvidenceIncluded": false,
+  "source": {
+    "sha256": "77b60e49b4b6609f95b03ba63cbe46433f730eb80691a851d89b754ed0a64030",
+    "schema": "bantam.factory-showcase.v1"
+  },
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 62544,
+      "sha256": "9da93459bc5659a728b205ee813644a91c3fc6298b848132accb8e4291735344"
+    },
+    {
+      "path": "fight-card.json",
+      "bytes": 9095,
+      "sha256": "78c4af592eaa8dc5299ac95b7d692c5a574f82e06b16231fc4aeb5f8f57a2f30"
+    },
+    {
+      "path": "share-card.svg",
+      "bytes": 7181,
+      "sha256": "7e65a2d488824f62ed7e4e587427895045965e6fe71422e94356c605bc465cb8"
+    },
+    {
+      "path": "share-card.png",
+      "bytes": 66969,
+      "sha256": "3ded7bc2edcac0241c6d3b9d1897ac648fbc3d772ed722bcd4bed39c1a2bb382"
+    }
+  ]
+}

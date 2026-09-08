@@ -1,7 +1,8 @@
 /* Terminal replays for the BANTAM FACTORY showcase.
  *
  * Written from recorded fight-card runs (docs/fights/launch-2026-09-07/<card>/work/bantam-local-27b.json)
- * and from commands run on the maintainer's machine. Timing is compressed; the words are the run's own.
+ * and the recorded Tetris build in examples/tetris/build.json. Commands and
+ * tool activity are condensed for the tour; its clocks are not real-time replay.
  * Line markup: [g] gold [d] dim [k] bright [c] red [b] cyan [ok] green [bad] red [th] blue [bo] bold [/] close.
  */
 (function () {
@@ -12,65 +13,27 @@
   const hardware = JSON.parse(document.getElementById('hardware-preview')?.textContent || 'null');
   const fileSize = bytes => bytes >= 1e9 ? (bytes / 1e9).toFixed(2) + ' GB' : Math.round(bytes / 1e6) + ' MB';
 
-  // The first screen, as bin/bantam.js paints it: wordmark, then a key/value column.
-  const CARD = [
-    '[bo][g]BANTAM[/][/]  [d]v1.1.0[/]',
-    '[d]a scrappy little terminal agent[/]',
-    '',
-    '[d]model    [/][k]Qwen3.8-27B-BANTAM-Q4_K_P[/]  [d]localhost:8085[/]',
-    '[d]dir      [/][k]~/work/context-packet[/]',
-    '[d]verify   [/][b]npm test[/]   [d]context  [/][b]extension (cache-fast)[/]',
-    '[d]sandbox  [/][k]docker[/][d] · alpine:3 · offline[/]',
-    '',
-    '[d]type a request · :help · Ctrl-C stops · exit[/]',
-    '[d]:modes to see what else is switched on[/]',
-    '',
-  ];
-
   const PASS = '  [ok]⚑ verification: pass[/]  [d]npm test · 4 passed, 0 failed[/]';
 
   window.DEMOS = {
 
-    // ---------------------------------------------------------------- Context packet, 58.1 s
+    // ---------------------------------------------------------------- Recorded Tetris build, 148.2 s
     job: {
-      title: 'bantam · give it a job',
-      caption: 'Condensed from the recorded Context packet run: 14 actions, 58.1 seconds, all five independent check groups passed. <a href="' + GALLERY + 'context-packet/share/index.html">Open the card</a>.',
+      title: 'bantam · build me a game',
+      caption: 'One request. A playable game. <a href="assets/showcase/examples/tetris/index.html">Play what it built ↗</a>',
       end: 'pass',
       steps: [
-        { cmd: 'bantamfactory --verify "npm test"', wait: 500 },
-        { card: { anim: 'idle', lines: CARD }, wait: 1100 },
-        { prompt: 'Build the context packer described in WORK-ORDER.md. Sections have to fit a strict UTF-8 byte budget, required ones first.', wait: 300 },
-        { working: 'inspecting', ms: 1100 },
-        { out: ['  [d]inspect: list .  ·  read context-packet.js  ·  read package.json  ·  list test[/]'], wait: 700 },
-        { working: 'reading', ms: 700 },
-        { out: ['  [d]read test/public.test.js[/]'], wait: 600 },
-        { working: 'writing', ms: 1700 },
-        { out: ['  [g]write context-packet.js[/]'], wait: 600 },
-        { out: [PASS], wait: 1000 },
-        { working: 'thinking', ms: 1000 },
-        { out: [
-          '  [b]$ node -e "import(\'./context-packet.js\').then(m=>{try{m.packContext([],1.5);…"[/]',
-          '    [d]│ THREW (GOOD): maxBytes must be a nonnegative safe integer[/]',
-          '    [d]exit 0[/]',
-        ], every: 120, wait: 800 },
-        { working: 'writing', ms: 1200 },
-        { out: ['  [g]write check-contract.mjs[/]'], wait: 500 },
-        { out: [
-          '  [b]$ node check-contract.mjs[/]',
-          '    [d]│ all contract checks passed[/]',
-          '    [d]exit 0[/]',
-        ], every: 120, wait: 500 },
-        { out: [PASS, ''], wait: 700 },
-        { out: [
-          'Implemented packContext(sections, maxBytes) in context-packet.js with full',
-          'input validation, exact UTF-8 byte-budget packing (required sections first in',
-          'input order, optional by descending priority with input-order tiebreak,',
-          'skip-and-continue), and a CLI that reads a JSON file and prints the result.',
-          'All 4 public tests pass, and the focused contract check (20 assertions) passes.',
-          '',
-          '  [d]done · 7 turns · 58.1s · 4,206 tokens generated at 105 tok/s[/]',
-          '',
-        ], every: 30, wait: 300 },
+        { prompt: 'Make Tetris in one Static html file called BANTAMTETRIS.html it must be fully self contained in one file.', wait: 500 },
+        { working: 'building', ms: 2200 },
+        { out: ['  [g]write BANTAMTETRIS.html[/]', '  [d]board · seven pieces · keyboard controls · score · next · hold[/]'], every: 220, wait: 900 },
+        { working: 'polishing', ms: 1100 },
+        { out: ['  [g]fix the piece preview[/]'], wait: 700 },
+        { working: 'checking', ms: 1000 },
+        { out: ['  [d]run the game script in a test environment[/]', '  [bad]JS ERROR: Maximum call stack size exceeded[/]'], every: 200, wait: 1100 },
+        { working: 'repairing the check', ms: 1000 },
+        { out: ['  [ok]JS OK[/]', '  [d]read the finished game · check controls and file structure[/]'], every: 200, wait: 900 },
+        { out: ['  [ok]All seven pieces present[/]', '  [ok]Keyboard handlers present[/]', '  [ok]External references: 0[/]', ''], every: 220, wait: 700 },
+        { out: ['Built BANTAMTETRIS.html — a fully self-contained Tetris game', 'in a single static HTML file.', '', '  [g]12 recorded actions · 2m 28s · one file[/]', ''], every: 80, wait: 300 },
         { idle: true },
       ],
     },

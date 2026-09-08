@@ -12,6 +12,7 @@
 <p align="center">
   <a href="#quick-start"><strong>Get started</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/"><strong>Watch the fights</strong></a> ·
+  <a href="https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/tetris/index.html">Play what it built</a> ·
   <a href="docs/README.md">Docs</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>

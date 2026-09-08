@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import {renderFactoryShowcase,renderShowcaseResults,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
 
 const gallery=()=>({cards:[{id:'context-packet',recorded:true,rows:[
@@ -50,6 +51,22 @@ test('the product page stages a finite local asset set without its template or p
   const files=showcaseAssets();
   assert.equal(files.length,SHOWCASE_STATIC_FILES.length);
   assert.ok(files.every(([name,bytes])=>name.startsWith('assets/showcase/')&&bytes.length>0));
-  assert.ok(!files.some(([name])=>/README|index\.html|\.md$/.test(name)));
+  assert.ok(!files.some(([name])=>/README|\.md$/.test(name)||name==='assets/showcase/index.html'));
   assert.throws(()=>renderShowcaseResults({cards:[{id:'../private',recorded:true,rows:[]}]}),/Unrecognized/);
+});
+
+test('the playable game matches the recorded edits and the opening tour uses its real request',()=>{
+  const source=fs.readFileSync(new URL('../site/examples/tetris/BANTAMTETRIS.html',import.meta.url));
+  const build=JSON.parse(fs.readFileSync(new URL('../site/examples/tetris/build.json',import.meta.url)));
+  const hash=crypto.createHash('sha256').update(source).digest('hex');
+  assert.equal(hash,'08f6dc5b1857b6a3d3509f3bd19f0941cf9c5e5699b9e6cb730a055fed21f085');
+  assert.equal(build.file.sha256,hash);assert.equal(build.file.bytes,source.length);
+  let replay=build.actions[0].action.content;
+  for(const row of build.actions.slice(1))if(row.action.a==='replace')replay=replay.replace(row.action.old,row.action.new);
+  assert.equal(replay,source.toString());assert.equal(build.durationMs,148189);
+  assert.ok(build.actions.every(row=>!Object.hasOwn(row,'reasoning')));
+  const context={window:{},document:{getElementById:()=>null}};
+  vm.runInNewContext(fs.readFileSync(new URL('../site/demos.js',import.meta.url),'utf8'),context);
+  assert.equal(context.window.DEMOS.job.steps[0].prompt,build.request);
+  assert.doesNotMatch(JSON.stringify(context.window.DEMOS.job.steps),/npm test|context-packet|all checks passed/i);
 });

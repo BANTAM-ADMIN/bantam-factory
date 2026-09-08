@@ -70,6 +70,123 @@
           }
         ]
       }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 62141,
+      "sha256": "4cec9e55af02c0db8739ec086a9c954ac2c645b9e965f35bf60d001962a679bf",
+      "arm": "opencode",
+      "wallMs": 424136,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 16,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+      "explanation": {
+        "title": "Accepted work in 424 seconds.",
+        "paragraphs": [
+          {
+            "text": "OpenCode built the containment check and a separate test file. It corrected one added boundary expectation and reached 26 passing project tests.",
+            "actions": [
+              "action-8",
+              "action-9",
+              "action-11",
+              "action-12",
+              "action-13"
+            ]
+          },
+          {
+            "text": "The CLI checks and all five independent groups passed. The run finished in 424.1 seconds; BANTAM FACTORY finished the same work order in 75.1 seconds.",
+            "actions": [
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 61926,
+      "sha256": "9a69f7625d43aa7abd4a2367e98b98e4073e1f4a74639f6cb4f11f7dee2b6da7",
+      "arm": "deepseek-local-27b",
+      "wallMs": 313633,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 16,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+      "explanation": {
+        "title": "Correct boundaries, after test repairs.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek Harness implemented containment and added a regression file. It corrected expectations in its added tests, then reran all 19 tests successfully.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-11",
+              "action-14",
+              "action-15"
+            ]
+          },
+          {
+            "text": "The CLI checks and all five independent groups passed. It finished in 313.6 seconds; BANTAM FACTORY completed the same frozen task in 75.1 seconds.",
+            "actions": [
+              "action-8",
+              "action-16"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 61958,
+      "sha256": "c8e9dc8ec63b62fdda21813b52e8fd69e122257a4fcaa67c23551f8ca47a532a",
+      "arm": "hermes",
+      "wallMs": 275623,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+      "explanation": {
+        "title": "A working guard, with a longer route.",
+        "paragraphs": [
+          {
+            "text": "Hermes extended the path checker and added containment regressions. A failing assertion in its new test file led to a correction, followed by 21 passing project tests.",
+            "actions": [
+              "action-6",
+              "action-9",
+              "action-10",
+              "action-11",
+              "action-12",
+              "action-13"
+            ]
+          },
+          {
+            "text": "It also checked the CLI from another directory. All five independent groups passed, with a clean finish at 275.6 seconds. BANTAM FACTORY finished the same work in 75.1 seconds.",
+            "actions": [
+              "action-14"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

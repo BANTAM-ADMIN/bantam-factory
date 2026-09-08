@@ -15,6 +15,7 @@ const ROW_LABEL = {
   "bantam-local-27b": /^\|\s*BANTAM\b/i,
   opencode: /^\|\s*OpenCode\b/i,
   hermes: /^\|\s*Hermes\b/i,
+  pi: /^\|\s*Pi\b/i,
   "deepseek-local-27b": /^\|\s*DeepSeek\b/i,
   "codex-astra": /^\|.*\bAstra\b/i,
   "codex-sol": /^\|.*\bSol\b/i,
@@ -53,7 +54,7 @@ test("every README result row matches the measurement it reports", () => {
   const failures = [];
   for (const { name, readme, showcase } of cards) {
     const lines = readme.split("\n")
-      .filter((l) => l.startsWith("|") && /\d+\/\d+/.test(l) && /\d+(\.\d+)?\s*s\b/.test(l));
+      .filter((l) => l.startsWith("|") && /\d+(\.\d+)?\s*s\b/.test(l));
     for (const series of showcase.series ?? []) {
       for (const card of series.cards ?? []) {
         for (const row of card.rows ?? []) {
@@ -65,7 +66,7 @@ test("every README result row matches the measurement it reports", () => {
           if (!Number.isFinite(stated) || Math.abs(stated - actual) > 0.06) {
             failures.push(`${name}: ${row.arm} ran ${actual.toFixed(3)}s, README says ${stated}s`);
           }
-          const groups = `${row.groupsPassed}/${row.groupsTotal}`;
+          const groups = row.groupsTotal === null ? 'No group report' : `${row.groupsPassed}/${row.groupsTotal}`;
           if (!line.includes(groups)) failures.push(`${name}: ${row.arm} scored ${groups}, README row: ${line.trim()}`);
           if (!new RegExp(`\\b${row.outcome}\\b`, "i").test(line)) {
             failures.push(`${name}: ${row.arm} was ${row.outcome}, README row: ${line.trim()}`);

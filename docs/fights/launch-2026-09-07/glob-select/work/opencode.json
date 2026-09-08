@@ -1,0 +1,182 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "glob-select",
+  "arm": "opencode",
+  "wallMs": 600007,
+  "outcome": "TIMEOUT",
+  "accepted": false,
+  "completed": false,
+  "publicExit": 1,
+  "hiddenExit": 1,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T19:06:26.093Z",
+  "task": "# Build a glob path selector with decision receipts\n\nImplement `selectPaths(paths, patterns)` in `glob-select.js`, exported as an\nES module, and its CLI. This is a deterministic path filter. Patterns are glob\nsyntax, never regular expressions.\n\n`paths` must be a dense array of unique nonempty strings. Each path is relative\nand POSIX-style: `/` separates segments, and no path may start or end with `/`,\ncontain an empty segment, contain a `.` or `..` segment, or contain a NUL.\n`patterns` must be a dense array of nonempty strings. Validate everything before\nmatching, even when either array is empty.\n\nA pattern whose first character is `!` is a negation; the `!` is removed and the\nrest is the pattern body, which must be nonempty. Match each path against every\npattern in order. The LAST pattern that matches decides: a negation excludes the\npath, any other match includes it. A path no pattern matches is excluded.\n\nGlob syntax, applied per segment:\n\n- `?` matches exactly one character.\n- `*` matches zero or more characters within one segment. Consecutive `*` in a\n  segment that is not exactly `**` behave as a single `*`.\n- A segment that is exactly `**` matches zero or more whole segments, so\n  `a/**/b` matches `a/b`, `a/x/b` and `a/x/y/b`.\n- `[...]` matches exactly one character. A leading `!` or `^` after `[` negates\n  the class. A `]` in the first position is literal. `a-z` is a range. A `-`\n  first or last is literal. An unclosed `[` is an error.\n- `\\` escapes the next character so it is literal. Only `\\ * ? [ ] ! -` may be\n  escaped; any other escape, or a trailing lone `\\`, is an error. `/` is\n  structural and can never be escaped.\n\nReturn exactly `{selected, decisions}`. `decisions` has one entry per input\npath, in input order, exactly `{path, included, pattern}`, where `pattern` is\nthe zero-based index of the deciding pattern or `-1` when none matched.\n`selected` lists the included paths in input order. Do not mutate either input;\nfrozen inputs must work. Invalid inputs throw an Error.\n\nExample: paths `['a.js','b.js','x/c.js']`, patterns `['**/*.js','!b.js']`\nselects `['a.js','x/c.js']` with decisions\n`[{path:'a.js',included:true,pattern:0},{path:'b.js',included:false,pattern:1},\n{path:'x/c.js',included:true,pattern:0}]`.\n\nCLI: `node glob-select.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{paths,patterns}`; extra fields are\nignored. Success prints exactly the API result as one JSON value followed by\nnewline, exits 0, and writes no stderr. Invalid arguments/files/JSON/API input\nexit 2, with nonempty stderr and no stdout. Importing the module must not run\nthe CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+  "source": "opencode-native-database",
+  "actions": [
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && find /workspace -type f -not -path '*/node_modules/*' | head -50"
+      },
+      "output": "total 8\ndrwxrwxr-x 1 bantam bantam  60 Sep  8 19:06 .\ndrwxr-xr-x 1 root   root    54 Sep  8 19:06 ..\n-rw-rw-r-- 1 bantam bantam  92 Sep  8 19:06 glob-select.js\n-rw-rw-r-- 1 bantam bantam 113 Sep  8 19:06 package.json\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 19:06 test\n/workspace/glob-select.js\n/workspace/package.json\n/workspace/test/public.test.js\n",
+      "atMs": 12053.0,
+      "endedMs": 12061.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/glob-select.js"
+      },
+      "output": "<path>/workspace/glob-select.js</path>\n<type>file</type>\n<content>\n1: export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n\n(End of file - total 1 lines)\n</content>",
+      "atMs": 12797.0,
+      "endedMs": 12807.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/package.json"
+      },
+      "output": "<path>/workspace/package.json</path>\n<type>file</type>\n<content>\n1: {\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n(End of file - total 1 lines)\n</content>",
+      "atMs": 13025.0,
+      "endedMs": 13033.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/test/public.test.js"
+      },
+      "output": "<path>/workspace/test/public.test.js</path>\n<type>file</type>\n<content>\n1: import test from 'node:test';\n2: import assert from 'node:assert/strict';\n3: import {selectPaths} from '../glob-select.js';\n4: test('a star stays inside one segment and every path gets a decision',()=>{\n5:   assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n6:     {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n7: });\n8: test('the last matching pattern decides',()=>{\n9:   assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n10: });\n\n(End of file - total 10 lines)\n</content>",
+      "atMs": 13250.0,
+      "endedMs": 13259.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-4"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "glob-select.js",
+      "state": "unchanged",
+      "beforeSha256": "5086c72c2f1f20a1c896871714da141016e7199a779653ef264fa0bc7b35abc3",
+      "afterSha256": "5086c72c2f1f20a1c896871714da141016e7199a779653ef264fa0bc7b35abc3",
+      "before": "export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n",
+      "after": "export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n",
+      "displaySha256": "5086c72c2f1f20a1c896871714da141016e7199a779653ef264fa0bc7b35abc3",
+      "diff": ""
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "afterSha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "before": "{\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "diff": ""
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "afterSha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {selectPaths} from '../glob-select.js';\ntest('a star stays inside one segment and every path gets a decision',()=>{\n  assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n    {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n});\ntest('the last matching pattern decides',()=>{\n  assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {selectPaths} from '../glob-select.js';\ntest('a star stays inside one segment and every path gets a decision',()=>{\n  assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n    {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n});\ntest('the last matching pattern decides',()=>{\n  assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n});\n",
+      "displaySha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 1,
+      "stdout": "\n> factory-glob-select@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: a star stays inside one segment and every path gets a decision\nnot ok 1 - a star stays inside one segment and every path gets a decision\n  ---\n  duration_ms: 0.979998\n  location: '/workspace/test/public.test.js:4:1'\n  failureType: 'testCodeFailure'\n  error: 'Implement the selector and CLI'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    selectPaths (file:///workspace/glob-select.js:1:51)\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:5:20)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    node:internal/test_runner/harness:255:12\n    node:internal/process/task_queues:140:7\n    AsyncResource.runInAsyncScope (node:async_hooks:206:9)\n    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)\n  ...\n# Subtest: the last matching pattern decides\nnot ok 2 - the last matching pattern decides\n  ---\n  duration_ms: 0.10041\n  location: '/workspace/test/public.test.js:8:1'\n  failureType: 'testCodeFailure'\n  error: 'Implement the selector and CLI'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    selectPaths (file:///workspace/glob-select.js:1:51)\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:9:20)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 0\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.754549\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 1,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"glob-select\",\"pass\":false,\"groups\":[{\"name\":\"wildcards-and-segment-boundaries\",\"pass\":false,\"error\":\"Error: Implement the selector and CLI\\n    at selectPaths (file:///workspace/glob-select.js:1:51)\\n    at file:///work-order/glob-select/grader.mjs:8:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:7:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"globstar-and-zero-segments\",\"pass\":false,\"error\":\"Error: Implement the selector and CLI\\n    at selectPaths (file:///workspace/glob-select.js:1:51)\\n    at file:///work-order/glob-select/grader.mjs:19:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:17:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"character-classes-and-escapes\",\"pass\":false,\"error\":\"Error: Implement the selector and CLI\\n    at selectPaths (file:///workspace/glob-select.js:1:51)\\n    at file:///work-order/glob-select/grader.mjs:26:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:25:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"negation-order-and-decisions\",\"pass\":false,\"error\":\"Error: Implement the selector and CLI\\n    at selectPaths (file:///workspace/glob-select.js:1:51)\\n    at file:///work-order/glob-select/grader.mjs:37:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:36:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"validation-and-cli-contract\",\"pass\":false,\"error\":\"AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\\n+ actual - expected\\n\\n+ ''\\n- '{\\\"selected\\\":[\\\"a.js\\\"],\\\"decisions\\\":[{\\\"path\\\":\\\"a.js\\\",\\\"included\\\":true,\\\"pattern\\\":0},{\\\"path\\\":\\\"x/b.js\\\",\\\"included\\\":false,\\\"pattern\\\":1}]}\\\\n'\\n    at file:///work-order/glob-select/grader.mjs:57:14\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:48:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "48c5cc9bc006bcb7233cb281b7dcad90ae4455c0b6ebaa854ec1d8cde85b447f"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "40cf07c52bfaa52b334ef341456f970787f6dc701ffe18ad3c572cb5056dbd70"
+    },
+    {
+      "kind": "native-database-wal",
+      "sha256": "d3f6d1e91b539ff782a91f713161e82f7eaf8539574f3f731b5ce3ffc69efaca"
+    },
+    {
+      "kind": "native-database-shm",
+      "sha256": "59e32437bdab6562201354ae053262628d4c160d8921644b50c0e25fe4130496"
+    },
+    {
+      "kind": "native-cli-output",
+      "sha256": "9858c879574cc90df55379dfe003f5d9f5f981d2fc6a87edf61b5889bfc9dca0"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "f96444ac899828486b589ae1aa3e68a668d22b307e9dedc07f7394dff257065d"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "162814728d85c24beea8fcf09cda8ad805655d658bdaaad04711884e1629b8fd"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 4,
+    "withResults": 4,
+    "normalizedPathOccurrences": 35,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "The clock ran out before an edit landed.",
+    "paragraphs": [
+      {
+        "text": "OpenCode inspected the workspace and read the source and supplied tests. Its recorded work contains four tool calls and no changed files.",
+        "actions": [
+          "action-1",
+          "action-2",
+          "action-3",
+          "action-4"
+        ]
+      },
+      {
+        "text": "At the ten-minute boundary, the selector still threw its original \u201cImplement the selector and CLI\u201d error. All five independent groups failed. BANTAM FACTORY delivered an accepted selector in 264.1 seconds.",
+        "actions": []
+      }
+    ]
+  }
+}

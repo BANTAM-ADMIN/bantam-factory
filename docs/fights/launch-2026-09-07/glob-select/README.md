@@ -1,61 +1,26 @@
-# Glob select · selection series
+# Glob select · fight card
 
-[Watch the fight](share/index.html) · [Share image](share/share-card.png) ·
-[Detailed replay](index.html) · [Portable measurements](share/fight-card.json)
+[Open the fight](share/index.html) · [Measurements](share/fight-card.json)
 
-Match paths against an ordered list of glob patterns, with the last matching
-pattern deciding inclusion, and return a receipt naming the deciding pattern
-for every path. The assignment states its own preconditions: the pattern list
-must be a dense array of unique nonempty strings, and a single `*` never
-crosses a path separator.
+See each contender’s actions, delivered files, test output and short explanation inside the card.
 
-| System | Outcome | Independent groups | Wall time |
+| System | Outcome | Time | Independent groups |
 |---|---|---:|---:|
-| BANTAM FACTORY · local 27B | PASS | 5/5 | 264.1 s |
-| Codex · native Astra | PASS | 5/5 | 155.8 s |
-
-Both systems completed accepted work and passed every acceptance group,
-including the hidden group that exercises the uniqueness precondition the
-visible tests never touch. Astra was 1.70× quicker on this attempt.
-
-**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
+| BANTAM · local | PASS | 264.1 s | 5/5 |
+| Codex · Astra | PASS | 155.8 s | 5/5 |
+| DeepSeek Harness | FAIL | 551.4 s | 0/5 |
+| Hermes | TIMEOUT | 600.0 s | 0/5 |
+| OpenCode | TIMEOUT | 600.0 s | 0/5 |
 
 <details>
-<summary>Token receipts, run conditions & provenance</summary>
+<summary>Recorded conditions</summary>
 
-## Tokens and prefix reuse
+BANTAM FACTORY was qualified first. The follow-up contenders received the same frozen task, starter and independent grader, using the same local Qwen 27B model bytes on an RTX 4090 with 24 GB VRAM and a 72,192-token server context. The original published results are retained.
 
-| System / scope | Input | Output | Cached input | Fresh input |
-|---|---:|---:|---:|---:|
-| BANTAM FACTORY · all 27 requests | 503,914 | 19,280 | 459,965 | 43,949 |
-| BANTAM FACTORY · separate idle-bounded server window | 503,950 | 19,280 | 460,000 | 43,950 |
-| Astra · native aggregate | 77,389 | 4,409 | 63,104 | 14,285 |
+DeepSeek Harness 0.1.2-rc.1, Hermes 0.20.0 and OpenCode 1.18.23 ran serially on September 8, 2026, with a ten-minute limit and 32,768-token response allowance. Their clients declared a 65,536-token context. Native tools, prompts, sampling and compaction policies apply. The existing server remained warm; its cache was not reset between attempts.
 
-BANTAM FACTORY's prefix reuse was 91.3% across 27 requests. It read 6.5× Astra's input
-tokens to reach the same passing result, which is the cost of a small model
-re-reading its context rather than carrying more of the task in one pass.
+All planned follow-ups are included. PASS requires accepted work and a clean finish. Output only means the files passed but the run did not complete. Timeouts show the stopping boundary. Missing group reports remain unknown; the acceptance output records the underlying error.
 
-Input already includes cached input: do not add those columns together. A
-native aggregate is not a per-request wire recording, and the two systems'
-meters must not be forced to agree. Server attribution assumes no other
-inference client used the endpoint during the window.
-
-## Conditions and provenance
-
-The two lanes were recorded separately, not simultaneously, on the same frozen
-kit, starter bytes and independent grader. BANTAM FACTORY ran on frozen factory source
-`7d6d304a419e99da3bfdf347f8fc47a67a147791`, which derives the history window
-from the served context and reserves a final action against the wall budget;
-its manifest records a 72,192-token served window, a 173,260-character history
-budget, a 600-second wall deadline and a 48-second closure reserve. Astra ran
-its own native CLI, tools and policies on frozen source
-`f236c47ac813fd67e71ee45ec50e817e25143dbc`.
-
-The local contender used the existing Qwen 27B Q4_K_P control, 72K context and
-CPU vision projection, not the recommended DavidAU download. Local inference
-was serial. No manual repairs, teacher requests or post-result changes to the
-candidates were made.
-
-These are different models on the same development work order. The work views include recorded actions, checks and delivered files. Asset hashes cover the generated files; this explanatory note is separate.
+Model, task and recording hashes accompany the measurements. Tool results and files are selected from saved records; machine paths are normalized. Private reasoning and account data stay in the original recording.
 
 </details>

@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T15:08:58.380Z",
+  "generatedAt": "2026-09-08T20:02:30.122Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -15,15 +15,35 @@
       "complete": true,
       "startedAt": "2026-09-08T13:24:08.193Z",
       "finishedAt": "2026-09-08T13:28:44.158Z",
+      "followups": [
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "f2599528714ae11fd11cd580d552e9be95a3ed3f1c14fefd458125c1f77caa9d",
+          "baselineManifestSha256": "840952b07fce3bfae43caf074504907476e0bbbb7120339c9c5806dd646a824f",
+          "manifestSha256": "48c5cc9bc006bcb7233cb281b7dcad90ae4455c0b6ebaa854ec1d8cde85b447f",
+          "materialsSha256": "bad1b66fd99e0f92138ae7bcca4fa0cd828c48e48e9f1996cf37fc3d2b2e4cf6",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T18:47:00.297Z",
+          "finishedAt": "2026-09-08T20:02:30.122Z",
+          "arms": [
+            "deepseek-local-27b",
+            "hermes",
+            "opencode"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
+        }
+      ],
       "counts": {
-        "observed": 2,
-        "planned": 2,
+        "observed": 5,
+        "planned": 5,
         "accepted": 2,
         "completed": 2,
         "pass": 2,
-        "groupsMeasured": 2,
+        "groupsMeasured": 5,
         "groupsPassed": 10,
-        "groupsTotal": 10
+        "groupsTotal": 25
       },
       "cards": [
         {
@@ -109,6 +129,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 19280,
+                  "milliseconds": 227447.92100000003,
+                  "measuredRequests": 27,
+                  "totalRequests": 27
+                },
+                "prefill": {
+                  "tokens": 43949,
+                  "milliseconds": 26744.498999999996,
+                  "measuredRequests": 27,
+                  "totalRequests": 27
+                },
+                "evidenceSha256": "eeede64314eb7a97847d15096565b7a9bc07b0a6ca9a54d9ef2e58d667020c88",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -336,27 +376,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 19280,
-                  "milliseconds": 227447.92100000003,
-                  "measuredRequests": 27,
-                  "totalRequests": 27
-                },
-                "prefill": {
-                  "tokens": 43949,
-                  "milliseconds": 26744.498999999996,
-                  "measuredRequests": 27,
-                  "totalRequests": 27
-                },
-                "evidenceSha256": "eeede64314eb7a97847d15096565b7a9bc07b0a6ca9a54d9ef2e58d667020c88",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-glob-select-r1-lane2",
@@ -467,6 +487,576 @@
               ],
               "events": [],
               "timedEvents": 43,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-glob-select-r1-lane3",
+              "arm": "deepseek-local-27b",
+              "label": "DeepSeek Harness",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "FAIL",
+              "accepted": false,
+              "completed": false,
+              "wallMs": 551382,
+              "groupsPassed": 0,
+              "groupsTotal": 5,
+              "publicExit": 1,
+              "hiddenExit": 1,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 37704,
+                  "outputTokens": 33057,
+                  "cacheHitTokens": 27370,
+                  "freshInputTokens": 10334
+                },
+                "subset": {
+                  "inputTokens": 37704,
+                  "outputTokens": 33057,
+                  "cacheHitTokens": 27370,
+                  "freshInputTokens": 10334
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 37630,
+                  "outputTokens": 33060,
+                  "cacheHitTokens": 27300,
+                  "freshInputTokens": 10330
+                },
+                "complete": true,
+                "requests": 5,
+                "measuredRequests": 5,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 5,
+                    "totalRequests": 5,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 5,
+                    "totalRequests": 5,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 5,
+                    "totalRequests": 5,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 5,
+                    "totalRequests": 5,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 33057,
+                  "milliseconds": 539710.544,
+                  "measuredRequests": 5,
+                  "totalRequests": 5
+                },
+                "prefill": {
+                  "tokens": 10334,
+                  "milliseconds": 5548.633,
+                  "measuredRequests": 5,
+                  "totalRequests": 5
+                },
+                "evidenceSha256": "ad45d1ed4fd39595018ab7e6c6eb40a0bc37df97438d4da9740c908e6486d28a",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 6439,
+                  "inputTokens": 943,
+                  "outputTokens": 64,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 943,
+                  "partial": false
+                },
+                {
+                  "t": 11169,
+                  "inputTokens": 9730,
+                  "outputTokens": 128,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 9730,
+                  "partial": false
+                },
+                {
+                  "t": 12593,
+                  "inputTokens": 18732,
+                  "outputTokens": 242,
+                  "cacheHitTokens": 8852,
+                  "freshInputTokens": 9880,
+                  "partial": false
+                },
+                {
+                  "t": 13592,
+                  "inputTokens": 28085,
+                  "outputTokens": 289,
+                  "cacheHitTokens": 17969,
+                  "freshInputTokens": 10116,
+                  "partial": false
+                },
+                {
+                  "t": 550756,
+                  "inputTokens": 37704,
+                  "outputTokens": 33057,
+                  "cacheHitTokens": 27370,
+                  "freshInputTokens": 10334,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 11,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-glob-select-r1-lane4",
+              "arm": "hermes",
+              "label": "Hermes",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "TIMEOUT",
+              "accepted": false,
+              "completed": false,
+              "wallMs": 600006,
+              "groupsPassed": 0,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 1,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": null,
+                  "outputTokens": null,
+                  "cacheHitTokens": null,
+                  "freshInputTokens": null
+                },
+                "subset": {
+                  "inputTokens": 349061,
+                  "outputTokens": 35930,
+                  "cacheHitTokens": 326913,
+                  "freshInputTokens": 22148
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 371300,
+                  "outputTokens": 36090,
+                  "cacheHitTokens": 349000,
+                  "freshInputTokens": 22300
+                },
+                "complete": false,
+                "requests": 20,
+                "measuredRequests": 19,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 19,
+                    "totalRequests": 20,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      26
+                    ]
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 19,
+                    "totalRequests": 20,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      26
+                    ]
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 19,
+                    "totalRequests": 20,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      26
+                    ]
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 19,
+                    "totalRequests": 20,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      26
+                    ]
+                  }
+                },
+                "gaps": [
+                  {
+                    "index": 26,
+                    "missingFields": [
+                      "inputTokens",
+                      "outputTokens",
+                      "cacheHitTokens",
+                      "freshInputTokens"
+                    ],
+                    "finished": false,
+                    "responseBytes": 46200
+                  }
+                ]
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 35930,
+                  "milliseconds": 568209.8550000001,
+                  "measuredRequests": 19,
+                  "totalRequests": 20
+                },
+                "prefill": {
+                  "tokens": 22148,
+                  "milliseconds": 16101.922,
+                  "measuredRequests": 19,
+                  "totalRequests": 20
+                },
+                "evidenceSha256": "f5f1e0647aa36dd197f1d672eb9e4b2cd0cfecc6078b32996f5912a3fa9fdc20",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 11794,
+                  "inputTokens": 13169,
+                  "outputTokens": 111,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 13169,
+                  "partial": false
+                },
+                {
+                  "t": 13362,
+                  "inputTokens": 26599,
+                  "outputTokens": 217,
+                  "cacheHitTokens": 13165,
+                  "freshInputTokens": 13434,
+                  "partial": false
+                },
+                {
+                  "t": 454428,
+                  "inputTokens": 40471,
+                  "outputTokens": 27172,
+                  "cacheHitTokens": 26591,
+                  "freshInputTokens": 13880,
+                  "partial": false
+                },
+                {
+                  "t": 492939,
+                  "inputTokens": 54424,
+                  "outputTokens": 30038,
+                  "cacheHitTokens": 40459,
+                  "freshInputTokens": 13965,
+                  "partial": false
+                },
+                {
+                  "t": 503950,
+                  "inputTokens": 71306,
+                  "outputTokens": 30773,
+                  "cacheHitTokens": 54408,
+                  "freshInputTokens": 16898,
+                  "partial": false
+                },
+                {
+                  "t": 508344,
+                  "inputTokens": 89029,
+                  "outputTokens": 31060,
+                  "cacheHitTokens": 71286,
+                  "freshInputTokens": 17743,
+                  "partial": false
+                },
+                {
+                  "t": 509962,
+                  "inputTokens": 107207,
+                  "outputTokens": 31122,
+                  "cacheHitTokens": 89005,
+                  "freshInputTokens": 18202,
+                  "partial": false
+                },
+                {
+                  "t": 511926,
+                  "inputTokens": 125704,
+                  "outputTokens": 31199,
+                  "cacheHitTokens": 107179,
+                  "freshInputTokens": 18525,
+                  "partial": false
+                },
+                {
+                  "t": 527727,
+                  "inputTokens": 144603,
+                  "outputTokens": 32043,
+                  "cacheHitTokens": 125672,
+                  "freshInputTokens": 18931,
+                  "partial": false
+                },
+                {
+                  "t": 532132,
+                  "inputTokens": 163659,
+                  "outputTokens": 32298,
+                  "cacheHitTokens": 144567,
+                  "freshInputTokens": 19092,
+                  "partial": false
+                },
+                {
+                  "t": 535094,
+                  "inputTokens": 182965,
+                  "outputTokens": 32437,
+                  "cacheHitTokens": 163619,
+                  "freshInputTokens": 19346,
+                  "partial": false
+                },
+                {
+                  "t": 536723,
+                  "inputTokens": 202472,
+                  "outputTokens": 32502,
+                  "cacheHitTokens": 182921,
+                  "freshInputTokens": 19551,
+                  "partial": false
+                },
+                {
+                  "t": 547839,
+                  "inputTokens": 222525,
+                  "outputTokens": 33090,
+                  "cacheHitTokens": 202424,
+                  "freshInputTokens": 20101,
+                  "partial": false
+                },
+                {
+                  "t": 567415,
+                  "inputTokens": 242760,
+                  "outputTokens": 34283,
+                  "cacheHitTokens": 222473,
+                  "freshInputTokens": 20287,
+                  "partial": false
+                },
+                {
+                  "t": 571688,
+                  "inputTokens": 263346,
+                  "outputTokens": 34518,
+                  "cacheHitTokens": 242704,
+                  "freshInputTokens": 20642,
+                  "partial": false
+                },
+                {
+                  "t": 573338,
+                  "inputTokens": 284092,
+                  "outputTokens": 34581,
+                  "cacheHitTokens": 263286,
+                  "freshInputTokens": 20806,
+                  "partial": false
+                },
+                {
+                  "t": 588244,
+                  "inputTokens": 305370,
+                  "outputTokens": 35376,
+                  "cacheHitTokens": 284028,
+                  "freshInputTokens": 21342,
+                  "partial": false
+                },
+                {
+                  "t": 594186,
+                  "inputTokens": 326985,
+                  "outputTokens": 35797,
+                  "cacheHitTokens": 305302,
+                  "freshInputTokens": 21683,
+                  "partial": false
+                },
+                {
+                  "t": 597050,
+                  "inputTokens": 349061,
+                  "outputTokens": 35930,
+                  "cacheHitTokens": 326913,
+                  "freshInputTokens": 22148,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 52,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-glob-select-r1-lane5",
+              "arm": "opencode",
+              "label": "OpenCode",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "TIMEOUT",
+              "accepted": false,
+              "completed": false,
+              "wallMs": 600007,
+              "groupsPassed": 0,
+              "groupsTotal": 5,
+              "publicExit": 1,
+              "hiddenExit": 1,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": null,
+                  "outputTokens": null,
+                  "cacheHitTokens": null,
+                  "freshInputTokens": null
+                },
+                "subset": {
+                  "inputTokens": 27071,
+                  "outputTokens": 33152,
+                  "cacheHitTokens": 16924,
+                  "freshInputTokens": 10147
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 61810,
+                  "outputTokens": 34800,
+                  "cacheHitTokens": 17000,
+                  "freshInputTokens": 44810
+                },
+                "complete": false,
+                "requests": 5,
+                "measuredRequests": 4,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 4,
+                    "totalRequests": 5,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      5
+                    ]
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 4,
+                    "totalRequests": 5,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      5
+                    ]
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 4,
+                    "totalRequests": 5,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      5
+                    ]
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 4,
+                    "totalRequests": 5,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      5
+                    ]
+                  }
+                },
+                "gaps": [
+                  {
+                    "index": 5,
+                    "missingFields": [
+                      "inputTokens",
+                      "outputTokens",
+                      "cacheHitTokens",
+                      "freshInputTokens"
+                    ],
+                    "finished": false,
+                    "responseBytes": 537123
+                  }
+                ]
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 33152,
+                  "milliseconds": 545039.203,
+                  "measuredRequests": 4,
+                  "totalRequests": 5
+                },
+                "prefill": {
+                  "tokens": 10147,
+                  "milliseconds": 5282.393999999999,
+                  "measuredRequests": 4,
+                  "totalRequests": 5
+                },
+                "evidenceSha256": "a43ee3a2a6b01915d141fe4a5a67b347c4040b83eeef74f943e03f7eca2c0033",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 7462,
+                  "inputTokens": 1355,
+                  "outputTokens": 218,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 1355,
+                  "partial": false
+                },
+                {
+                  "t": 12046,
+                  "inputTokens": 9607,
+                  "outputTokens": 286,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 9607,
+                  "partial": false
+                },
+                {
+                  "t": 13300,
+                  "inputTokens": 18111,
+                  "outputTokens": 384,
+                  "cacheHitTokens": 8321,
+                  "freshInputTokens": 9790,
+                  "partial": false
+                },
+                {
+                  "t": 554501,
+                  "inputTokens": 27071,
+                  "outputTokens": 33152,
+                  "cacheHitTokens": 16924,
+                  "freshInputTokens": 10147,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 21,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

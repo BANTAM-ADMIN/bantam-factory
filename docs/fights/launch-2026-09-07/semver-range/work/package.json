@@ -72,6 +72,115 @@
           }
         ]
       }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 41374,
+      "sha256": "26be351a05cdf79449651f68a6fbbdde75cbd11fa2a337a64e1afea8cd7c451c",
+      "arm": "hermes",
+      "wallMs": 600007,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+      "explanation": {
+        "title": "The source passed. The run did not finish.",
+        "paragraphs": [
+          {
+            "text": "Hermes inspected the existing implementation and wrote a replacement. The saved tool history ends after that successful write.",
+            "actions": [
+              "action-3",
+              "action-6",
+              "action-7",
+              "action-8"
+            ]
+          },
+          {
+            "text": "The delivered source passed the project tests and all five independent groups after the run stopped. No clean completion arrived before ten minutes, so this is Output only. BANTAM FACTORY completed the same task in 399.9 seconds.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 68132,
+      "sha256": "00a984675abbc3a8d57591bbcefa5b3f39d9c1c379cad8824fd8900f3c0183c1",
+      "arm": "opencode",
+      "wallMs": 600008,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 13,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+      "explanation": {
+        "title": "A broken regular expression stopped the checks.",
+        "paragraphs": [
+          {
+            "text": "OpenCode wrote the implementation and new tests, then edited its version-matching expression. The recorded test command failed while loading the module.",
+            "actions": [
+              "action-8",
+              "action-9",
+              "action-10",
+              "action-13"
+            ]
+          },
+          {
+            "text": "The independent grader hit the same invalid regular expression and could not produce the expected group results. The run reached ten minutes without a repair or clean finish. BANTAM FACTORY completed the same work in 399.9 seconds.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 102188,
+      "sha256": "e5924b6a8b5b0f6a8f5b99d014550e411972e63567966b4b868c93714b5f5e59",
+      "arm": "deepseek-local-27b",
+      "wallMs": 536375,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 20,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+      "explanation": {
+        "title": "The repair passed after several test corrections.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek Harness replaced the version selector and added regressions. It corrected its new expectations for valid metadata, range unions and prereleases, then reran the suite.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-11",
+              "action-16",
+              "action-17"
+            ]
+          },
+          {
+            "text": "All 14 project tests and all five independent groups passed. It delivered in 536.4 seconds; BANTAM FACTORY completed the same work in 399.9 seconds.",
+            "actions": [
+              "action-20"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

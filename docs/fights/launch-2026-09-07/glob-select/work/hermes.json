@@ -1,0 +1,618 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "glob-select",
+  "arm": "hermes",
+  "wallMs": 600006,
+  "outcome": "TIMEOUT",
+  "accepted": false,
+  "completed": false,
+  "publicExit": 0,
+  "hiddenExit": 1,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T18:56:24.409Z",
+  "task": "# Build a glob path selector with decision receipts\n\nImplement `selectPaths(paths, patterns)` in `glob-select.js`, exported as an\nES module, and its CLI. This is a deterministic path filter. Patterns are glob\nsyntax, never regular expressions.\n\n`paths` must be a dense array of unique nonempty strings. Each path is relative\nand POSIX-style: `/` separates segments, and no path may start or end with `/`,\ncontain an empty segment, contain a `.` or `..` segment, or contain a NUL.\n`patterns` must be a dense array of nonempty strings. Validate everything before\nmatching, even when either array is empty.\n\nA pattern whose first character is `!` is a negation; the `!` is removed and the\nrest is the pattern body, which must be nonempty. Match each path against every\npattern in order. The LAST pattern that matches decides: a negation excludes the\npath, any other match includes it. A path no pattern matches is excluded.\n\nGlob syntax, applied per segment:\n\n- `?` matches exactly one character.\n- `*` matches zero or more characters within one segment. Consecutive `*` in a\n  segment that is not exactly `**` behave as a single `*`.\n- A segment that is exactly `**` matches zero or more whole segments, so\n  `a/**/b` matches `a/b`, `a/x/b` and `a/x/y/b`.\n- `[...]` matches exactly one character. A leading `!` or `^` after `[` negates\n  the class. A `]` in the first position is literal. `a-z` is a range. A `-`\n  first or last is literal. An unclosed `[` is an error.\n- `\\` escapes the next character so it is literal. Only `\\ * ? [ ] ! -` may be\n  escaped; any other escape, or a trailing lone `\\`, is an error. `/` is\n  structural and can never be escaped.\n\nReturn exactly `{selected, decisions}`. `decisions` has one entry per input\npath, in input order, exactly `{path, included, pattern}`, where `pattern` is\nthe zero-based index of the deciding pattern or `-1` when none matched.\n`selected` lists the included paths in input order. Do not mutate either input;\nfrozen inputs must work. Invalid inputs throw an Error.\n\nExample: paths `['a.js','b.js','x/c.js']`, patterns `['**/*.js','!b.js']`\nselects `['a.js','x/c.js']` with decisions\n`[{path:'a.js',included:true,pattern:0},{path:'b.js',included:false,pattern:1},\n{path:'x/c.js',included:true,pattern:0}]`.\n\nCLI: `node glob-select.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{paths,patterns}`; extra fields are\nignored. Success prints exactly the API result as one JSON value followed by\nnewline, exits 0, and writes no stderr. Invalid arguments/files/JSON/API input\nexit 2, with nonempty stderr and no stdout. Importing the module must not run\nthe CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+  "source": "hermes-native-database",
+  "actions": [
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && cat /workspace/package.json"
+      },
+      "output": {
+        "output": "total 8\ndrwxrwxr-x 1 bantam bantam  60 Sep  8 18:56 .\ndrwxr-xr-x 1 root   root    54 Sep  8 18:56 ..\n-rw-rw-r-- 1 bantam bantam  92 Sep  8 18:56 glob-select.js\n-rw-rw-r-- 1 bantam bantam 113 Sep  8 18:56 package.json\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 18:56 test\n{\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 11801.927,
+      "endedMs": 11888.025,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "content": "1|export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n2|",
+        "total_lines": 1,
+        "file_size": 92,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 13397.452,
+      "endedMs": 13481.033,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace/test && for f in /workspace/test/*; do echo \"=== $f ===\"; cat \"$f\"; done"
+      },
+      "output": {
+        "output": "total 4\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 18:56 .\ndrwxrwxr-x 1 bantam bantam  60 Sep  8 18:56 ..\n-rw-rw-r-- 1 bantam bantam 512 Sep  8 18:56 public.test.js\n=== /workspace/test/public.test.js ===\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {selectPaths} from '../glob-select.js';\ntest('a star stays inside one segment and every path gets a decision',()=>{\n  assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n    {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n});\ntest('the last matching pattern decides',()=>{\n  assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n});",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 13397.452,
+      "endedMs": 13522.476,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "node --version && npm --version"
+      },
+      "output": {
+        "output": "v20.19.4\n11.5.2",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 454622.209,
+      "endedMs": 454771.699,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "content": "#!/usr/bin/env node\n// glob-select.js \u2014 deterministic glob path selector with decision receipts.\n//\n// API:  selectPaths(paths, patterns) -> {selected, decisions}\n// CLI:  node glob-select.js INPUT_JSON_FILE\n\nconst ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isDenseArray(value) {\n  return Array.isArray(value) &&\n    Number.isInteger(value.length) &&\n    value.length > 0 &&\n    value.length === Object.keys(value).length;\n}\n\nfunction assertUnique(values, label) {\n  const seen = new Set();\n  for (const value of values) {\n    if (seen.has(value)) fail(`${label} must be unique`);\n    seen.add(value);\n  }\n}\n\nfunction validatePaths(paths) {\n  if (!isDenseArray(paths)) fail('paths must be a nonempty dense array');\n  const seen = new Set();\n  for (const path of paths) {\n    if (typeof path !== 'string' || path.length === 0) {\n      fail('paths must contain only nonempty strings');\n    }\n    if (path.includes('\\u0000')) fail('paths must not contain NUL');\n    if (path.startsWith('/') || path.endsWith('/')) {\n      fail('paths must not start or end with /');\n    }\n    const segments = path.split('/');\n    if (segments.some((s) => s === '' || s === '.' || s === '..')) {\n      fail('paths must not contain empty, . or .. segments');\n    }\n    if (seen.has(path)) fail('paths must be unique');\n    seen.add(path);\n  }\n}\n\nfunction validatePatterns(patterns) {\n  if (!isDenseArray(patterns)) fail('patterns must be a nonempty dense array');\n  for (const pattern of patterns) {\n    if (typeof pattern !== 'string' || pattern.length === 0) {\n      fail('patterns must contain only nonempty strings');\n    }\n  }\n}\n\n// Parse one character class. Returns {end, test} where end is the index\n// immediately after the closing ']'.\nfunction parseClass(segment, start) {\n  const chars = [];\n  let negated = false;\n  let i = start; // index just after '['\n  if (i < segment.length && (segment[i] === '!' || segment[i] === '^')) {\n    negated = true;\n    i += 1;\n  }\n  if (i < segment.length && segment[i] === ']') chars.push(']'); // literal ]\n  while (i < segment.length) {\n    const ch = segment[i];\n    if (ch === ']') return {end: i + 1, negated, chars};\n    if (ch === '\\\\') {\n      const next = segment[i + 1];\n      if (next === undefined || !ESCAPABLE.has(next)) {\n        fail('invalid escape inside character class');\n      }\n      chars.push(next);\n      i += 2;\n    } else if (ch === '-' && chars.length > 0 && i + 1 < segment.length) {\n      const next = segment[i + 1];\n      if (next === ']') {\n        chars.push('-');\n        i += 1;\n      } else if (next === '\\\\') {\n        const escaped = segment[i + 2];\n        if (escaped === undefined || !ESCAPABLE.has(escaped)) {\n          fail('invalid escape inside character class');\n        }\n        chars.push(chars.pop(), '-', escaped);\n        i += 3;\n      } else {\n        chars.push(chars.pop(), '-', next);\n        i += 2;\n      }\n    } else {\n      chars.push(ch);\n      i += 1;\n    }\n  }\n  fail('unclosed [ in pattern');\n}\n\nfunction isRange(triple) {\n  const a = triple[0];\n  const c = triple[2];\n  return a.length === 1 && c.length === 1 &&\n    a.codePointAt(0) <= c.codePointAt(0);\n}\n\n// Parse one segment (no '/' characters) into an array of atom matchers.\nfunction compileSegment(segment, index) {\n  const atoms = [];\n  let i = 0;\n  while (i < segment.length) {\n    const ch = segment[i];\n    if (ch === '\\\\') {\n      const next = segment[i + 1];\n      if (next === undefined) fail('trailing lone backslash in pattern');\n      if (next === '/' || !ESCAPABLE.has(next)) {\n        fail('only \\\\, *, ?, [, ], !, - may be escaped');\n      }\n      atoms.push({literal: next});\n      i += 2;\n    } else if (ch === '?') {\n      atoms.push({single: true});\n      i += 1;\n    } else if (ch === '*') {\n      const run = segment.slice(i).match(/^\\*+/)[0];\n      atoms.push({star: run.length === 1});\n      i += run.length;\n    } else if (ch === '[') {\n      const cls = parseClass(segment, i + 1);\n      const items = cls.chars.slice();\n      const test = (c) => {\n        let found = false;\n        for (let k = 0; k < items.length; k += 1) {\n          const it = items[k];\n          if (it === c) { found = true; break; }\n          if (isRange(it) &&\n              it[0] <= c && c <= it[2]) { found = true; break; }\n        }\n        return found;\n      };\n      atoms.push({class: {negated: cls.negated, test}});\n      i = cls.end;\n    } else {\n      atoms.push({literal: ch});\n      i += 1;\n    }\n  }\n  return atoms;\n}\n\nfunction atomMatches(atom, ch) {\n  if (atom.single) return true;\n  if (atom.literal !== undefined) return ch === atom.literal;\n  if (atom.class) return atom.class.negated ? !atom.class.test(ch) : atom.class.test(ch);\n  return false; // star\n}\n\nfunction starAtom(atom, segment, i) {\n  if (i === segment.length) return true;\n  for (let k = i; k < segment.length; k += 1) {\n    if (!atomMatches(atom, segment[k])) return false;\n  }\n  return true;\n}\n\nfunction matchAtoms(atoms, segment) {\n  const n = atoms.length;\n  const m = segment.length;\n  let i = 0;\n  let j = 0;\n  let fallback = -1; // most recent star atom position with consumed j\n  while (j < m) {\n    if (i < n && atomMatches(atoms[i], segment[j])) {\n      i += 1;\n      j += 1;\n    } else if (i < n && atoms[i].star) {\n      if (i > fallback) fallback = i;\n      i += 1; // star consumes nothing; re-consider atoms[i]\n    } else if (fallback !== -1) {\n      i = fallback; // back off to the star, which consumes one more char\n      j += 1;\n    } else {\n      return false;\n    }\n  }\n  // Only stars may match the empty remainder.\n  while (i < n) {\n    if (!atoms[i].star) return false;\n    i += 1;\n  }\n  return true;\n}\n\n// Compile a pattern into per-segment atom lists. Double star (**) segments\n// collapse to a single * segment; matching handles the zero-or-more-segment\n// semantics.\nfunction compilePattern(pattern) {\n  return pattern.split('/').map((segment) => compileSegment(segment));\n}\n\n// segments: array of atom lists. pathSegments: actual path segments.\n// Match segments 0..p-1, then require segments p..end to all be star lists\n// (the collapsed ** behavior).\nfunction matchFrom(segments, pathSegments, p) {\n  const n = segments.length;\n  for (; p < n; p += 1) {\n    if (p < pathSegments.length) {\n      if (!matchAtoms(segments[p], pathSegments[p])) return false;\n    } else if (!starAtom(segments[p], '', 0)) {\n      return false; // non-*** segment but no path segment left\n    }\n  }\n  return p === pathSegments.length;\n}\n\nfunction matchSegments(segments, pathSegments) {\n  const n = segments.length;\n  if (n === 0) return pathSegments.length === 0;\n  if (n === 1) return pathSegments.length === 1 && matchAtoms(segments[0], pathSegments[0]);\n  if (matchFrom(segments, pathSegments, 1)) return true;\n  // A ** segment (star-only list) may span zero or more whole path segments.\n  for (let p = 1; p < n - 1; p += 1) {\n    if (starAtom(segments[p], '', 0)) {\n      for (let k = 0; k <= pathSegments.length; k += 1) {\n        if (matchFrom(segments, pathSegments, p + k)) return true;\n      }\n    }\n  }\n  return false;\n}\n\nexport function selectPaths(paths, patterns) {\n  validatePaths(paths);\n  validatePatterns(patterns);\n  const compiled = patterns.map(compilePattern);\n  const decisions = [];\n  const selected = [];\n  for (const path of paths) {\n    const pathSegments = path.split('/');\n    let included = false;\n    let deciding = -1;\n    for (let pi = 0; pi < compiled.length; pi += 1) {\n      if (matchSegments(compiled[pi], pathSegments)) {\n        included = patterns[pi].startsWith('!');\n        deciding = pi;\n      }\n    }\n    decisions.push({path, included, pattern: deciding});\n    if (included) selected.push(path);\n  }\n  return {selected, decisions};\n}\n\nfunction isPlainObject(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nasync function main() {\n  const argv = process.argv.slice(2);\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node glob-select.js INPUT_JSON_FILE\\n');\n    process.exitCode = 2;\n    return;\n  }\n  let text;\n  try {\n    const {readFileSync} = await import('node:fs');\n    text = readFileSync(argv[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`error: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    process.stderr.write(`error: invalid JSON: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  if (!isPlainObject(data) ||\n      !Array.isArray(data.paths) ||\n      !Array.isArray(data.patterns)) {\n    process.stderr.write('error: expected a JSON object with \"paths\" and \"patterns\" arrays\\n');\n    process.exitCode = 2;\n    return;\n  }\n  let result;\n  try {\n    result = selectPaths(data.paths, data.patterns);\n  } catch (err) {\n    process.stderr.write(`error: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  process.stdout.write(JSON.stringify(result) + '\\n');\n}\n\nconst isDirectRun = (() => {\n  const entry = process.argv[1];\n  if (!entry) return false;\n  let current;\n  let parent;\n  try {\n    current = new URL('file://' + entry);\n    parent = import.meta.url;\n  } catch {\n    return false;\n  }\n  return current.href === parent;\n})();\n\nif (isDirectRun) main();\n",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "bytes_written": 9317,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ]
+      },
+      "atMs": 492965.559,
+      "endedMs": 493235.587,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "path": "/workspace/glob-select.js",
+        "old_string": "const isDirectRun = (() => {\n  const entry = process.argv[1];\n  if (!entry) return false;\n  let current;\n  let parent;\n  try {\n    current = new URL('file://' + entry);\n    parent = import.meta.url;\n  } catch {\n    return false;\n  }\n  return current.href === parent;\n})();\n\nif (isDirectRun) main();",
+        "new_string": "function isDirectRun() {\n  const entry = process.argv[1];\n  if (typeof entry !== 'string' || entry.length === 0) return false;\n  try {\n    const resolved = fileURLToPath(import.meta.url);\n    return realpathSync(entry) === resolved;\n  } catch {\n    return false;\n  }\n}\n\nif (isDirectRun) main();"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -299,18 +299,15 @@\n   process.stdout.write(JSON.stringify(result) + '\\n');\n }\n \n-const isDirectRun = (() => {\n+function isDirectRun() {\n   const entry = process.argv[1];\n-  if (!entry) return false;\n-  let current;\n-  let parent;\n+  if (typeof entry !== 'string' || entry.length === 0) return false;\n   try {\n-    current = new URL('file://' + entry);\n-    parent = import.meta.url;\n+    const resolved = fileURLToPath(import.meta.url);\n+    return realpathSync(entry) === resolved;\n   } catch {\n     return false;\n   }\n-  return current.href === parent;\n-})();\n+}\n \n if (isDirectRun) main();\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 503976.526,
+      "endedMs": 504200.747,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "path": "/workspace/glob-select.js",
+        "old_string": "  let text;\n  try {\n    const {readFileSync} = await import('node:fs');\n    text = readFileSync(argv[0], 'utf8');\n  } catch (err) {",
+        "new_string": "  let text;\n  try {\n    text = readFileSync(argv[0], 'utf8');\n  } catch (err) {"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -266,7 +266,6 @@\n   }\n   let text;\n   try {\n-    const {readFileSync} = await import('node:fs');\n     text = readFileSync(argv[0], 'utf8');\n   } catch (err) {\n     process.stderr.write(`error: ${err.message}\\n`);\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 503976.526,
+      "endedMs": 504416.044,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "#!/usr/bin/env node\n// glob-select.js \u2014 deterministic glob path selector with decision receipts.\n//\n// API:  selectPaths(paths, patterns) -> {selected, decisions}\n// CLI:  node glob-select.js INPUT_JSON_FILE\n\nimport {readFileSync} from 'node:fs';\nimport {realpathSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\n\nconst ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);",
+        "old_string": "#!/usr/bin/env node\n// glob-select.js \u2014 deterministic glob path selector with decision receipts.\n//\n// API:  selectPaths(paths, patterns) -> {selected, decisions}\n// CLI:  node glob-select.js INPUT_JSON_FILE\n\nconst ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -3,6 +3,10 @@\n //\n // API:  selectPaths(paths, patterns) -> {selected, decisions}\n // CLI:  node glob-select.js INPUT_JSON_FILE\n+\n+import {readFileSync} from 'node:fs';\n+import {realpathSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n \n const ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);\n \n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 508372.442,
+      "endedMs": 508597.787,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -20"
+      },
+      "output": {
+        "output": "actual:\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:9:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 0\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 42.461591",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 510014.97,
+      "endedMs": 510479.012,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | head -40"
+      },
+      "output": {
+        "output": "> factory-glob-select@1.0.0 test\n> node --test\n\nTAP version 13\n# usage: node glob-select.js INPUT_JSON_FILE\n# Subtest: a star stays inside one segment and every path gets a decision\nnot ok 1 - a star stays inside one segment and every path gets a decision\n  ---\n  duration_ms: 2.886713\n  location: '/workspace/test/public.test.js:4:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected ... Lines skipped\n    \n      {\n        decisions: [\n          {\n    +       included: false,\n    -       included: true,\n            path: 'a.js',\n            pattern: 0\n    ...\n          }\n        ],\n    +   selected: []\n    -   selected: [\n    -     'a.js'\n    -   ]\n      }\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    selected:\n      0: 'a.js'\n    decisions:\n      0:\n        path: 'a.js'\n        included: true",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 511953.519,
+      "endedMs": 512203.824,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node -e \"import('/workspace/glob-select.js').then(()=>console.log('imported ok'))\" ; echo \"---exit $?\"; node --test 2>&1 | grep -c usage; node -e \"console.log(process.argv)\""
+      },
+      "output": {
+        "output": "usage: node glob-select.js INPUT_JSON_FILE\nimported ok\n---exit 2\n1\n[ '/usr/bin/node' ]",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 527763.45,
+      "endedMs": 527954.564,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "if (isDirectRun()) main();",
+        "old_string": "if (isDirectRun) main();",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -313,4 +313,4 @@\n   }\n }\n \n-if (isDirectRun) main();\n+if (isDirectRun()) main();\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 532169.585,
+      "endedMs": 532396.079,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -12"
+      },
+      "output": {
+        "output": "Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 0\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.680419",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 535130.773,
+      "endedMs": 535380.949,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | sed -n '1,60p'"
+      },
+      "output": {
+        "output": "> factory-glob-select@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: a star stays inside one segment and every path gets a decision\nnot ok 1 - a star stays inside one segment and every path gets a decision\n  ---\n  duration_ms: 2.827882\n  location: '/workspace/test/public.test.js:4:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected ... Lines skipped\n    \n      {\n        decisions: [\n          {\n    +       included: false,\n    -       included: true,\n            path: 'a.js',\n            pattern: 0\n    ...\n          }\n        ],\n    +   selected: []\n    -   selected: [\n    -     'a.js'\n    -   ]\n      }\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    selected:\n      0: 'a.js'\n    decisions:\n      0:\n        path: 'a.js'\n        included: true\n        pattern: 0\n      1:\n        path: 'x/b.js'\n        included: false\n        pattern: -1\n  actual:\n    selected:\n    decisions:\n      0:\n        path: 'a.js'\n        included: false\n        pattern: 0\n      1:\n        path: 'x/b.js'\n        included: false\n        pattern: -1\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:5:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 536759.696,
+      "endedMs": 537001.678,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node -e \"\nconst m = await import('/workspace/glob-select.js');\nconsole.log(m.selectPaths(['a.js','x/b.js'],['*.js']));\n\" 2>&1"
+      },
+      "output": {
+        "output": "{\n  selected: [],\n  decisions: [\n    { path: 'a.js', included: false, pattern: 0 },\n    { path: 'x/b.js', included: false, pattern: -1 }\n  ]\n}",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 547876.179,
+      "endedMs": 547946.341,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "      if (matchSegments(compiled[pi], pathSegments)) {\n        included = !patterns[pi].startsWith('!');\n        deciding = pi;\n      }",
+        "old_string": "      if (matchSegments(compiled[pi], pathSegments)) {\n        included = patterns[pi].startsWith('!');\n        deciding = pi;\n      }",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -247,7 +247,7 @@\n     let deciding = -1;\n     for (let pi = 0; pi < compiled.length; pi += 1) {\n       if (matchSegments(compiled[pi], pathSegments)) {\n-        included = patterns[pi].startsWith('!');\n+        included = !patterns[pi].startsWith('!');\n         deciding = pi;\n       }\n     }\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 567450.633,
+      "endedMs": 567675.167,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -10"
+      },
+      "output": {
+        "output": "...\n1..2\n# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 42.931762",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 571723.047,
+      "endedMs": 571969.94,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | sed -n '1,45p'"
+      },
+      "output": {
+        "output": "> factory-glob-select@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: a star stays inside one segment and every path gets a decision\nok 1 - a star stays inside one segment and every path gets a decision\n  ---\n  duration_ms: 1.430071\n  ...\n# Subtest: the last matching pattern decides\nnot ok 2 - the last matching pattern decides\n  ---\n  duration_ms: 1.707594\n  location: '/workspace/test/public.test.js:8:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n    +   'a.js',\n        'b.js'\n      ]\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: 'b.js'\n  actual:\n    0: 'a.js'\n    1: 'b.js'\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:9:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 1",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 573379.175,
+      "endedMs": 573630.179,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  const compiled = patterns.map((pattern) =>\n    compilePattern(pattern.startsWith('!') ? pattern.slice(1) : pattern));",
+        "old_string": "  const compiled = patterns.map(compilePattern);",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -238,7 +238,8 @@\n export function selectPaths(paths, patterns) {\n   validatePaths(paths);\n   validatePatterns(patterns);\n-  const compiled = patterns.map(compilePattern);\n+  const compiled = patterns.map((pattern) =>\n+    compilePattern(pattern.startsWith('!') ? pattern.slice(1) : pattern));\n   const decisions = [];\n   const selected = [];\n   for (const path of paths) {\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 588280.21,
+      "endedMs": 588505.324,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-19"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "function validatePatterns(patterns) {\n  if (!isDenseArray(patterns)) fail('patterns must be a nonempty dense array');\n  for (const pattern of patterns) {\n    if (typeof pattern !== 'string' || pattern.length === 0) {\n      fail('patterns must contain only nonempty strings');\n    }\n    if (pattern.startsWith('!') && pattern.length === 1) {\n      fail('negation pattern body must be nonempty');\n    }\n  }\n}",
+        "old_string": "function validatePatterns(patterns) {\n  if (!isDenseArray(patterns)) fail('patterns must be a nonempty dense array');\n  for (const pattern of patterns) {\n    if (typeof pattern !== 'string' || pattern.length === 0) {\n      fail('patterns must contain only nonempty strings');\n    }\n  }\n}",
+        "path": "/workspace/glob-select.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/glob-select.js\n+++ b//workspace/glob-select.js\n@@ -54,6 +54,9 @@\n   for (const pattern of patterns) {\n     if (typeof pattern !== 'string' || pattern.length === 0) {\n       fail('patterns must contain only nonempty strings');\n+    }\n+    if (pattern.startsWith('!') && pattern.length === 1) {\n+      fail('negation pattern body must be nonempty');\n     }\n   }\n }\n",
+        "files_modified": [
+          "/workspace/glob-select.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/glob-select.js"
+      },
+      "atMs": 594222.247,
+      "endedMs": 594446.554,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-20"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -8"
+      },
+      "output": {
+        "output": "# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 42.148215",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 597086.175,
+      "endedMs": 597336.0,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-21"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "glob-select.js",
+      "state": "changed",
+      "beforeSha256": "5086c72c2f1f20a1c896871714da141016e7199a779653ef264fa0bc7b35abc3",
+      "afterSha256": "fcb40243a51fd994fe71baf10e3e9185143666c0a3cdd8c2737c55e8258cd102",
+      "before": "export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n",
+      "after": "#!/usr/bin/env node\n// glob-select.js \u2014 deterministic glob path selector with decision receipts.\n//\n// API:  selectPaths(paths, patterns) -> {selected, decisions}\n// CLI:  node glob-select.js INPUT_JSON_FILE\n\nimport {readFileSync} from 'node:fs';\nimport {realpathSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\n\nconst ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isDenseArray(value) {\n  return Array.isArray(value) &&\n    Number.isInteger(value.length) &&\n    value.length > 0 &&\n    value.length === Object.keys(value).length;\n}\n\nfunction assertUnique(values, label) {\n  const seen = new Set();\n  for (const value of values) {\n    if (seen.has(value)) fail(`${label} must be unique`);\n    seen.add(value);\n  }\n}\n\nfunction validatePaths(paths) {\n  if (!isDenseArray(paths)) fail('paths must be a nonempty dense array');\n  const seen = new Set();\n  for (const path of paths) {\n    if (typeof path !== 'string' || path.length === 0) {\n      fail('paths must contain only nonempty strings');\n    }\n    if (path.includes('\\u0000')) fail('paths must not contain NUL');\n    if (path.startsWith('/') || path.endsWith('/')) {\n      fail('paths must not start or end with /');\n    }\n    const segments = path.split('/');\n    if (segments.some((s) => s === '' || s === '.' || s === '..')) {\n      fail('paths must not contain empty, . or .. segments');\n    }\n    if (seen.has(path)) fail('paths must be unique');\n    seen.add(path);\n  }\n}\n\nfunction validatePatterns(patterns) {\n  if (!isDenseArray(patterns)) fail('patterns must be a nonempty dense array');\n  for (const pattern of patterns) {\n    if (typeof pattern !== 'string' || pattern.length === 0) {\n      fail('patterns must contain only nonempty strings');\n    }\n    if (pattern.startsWith('!') && pattern.length === 1) {\n      fail('negation pattern body must be nonempty');\n    }\n  }\n}\n\n// Parse one character class. Returns {end, test} where end is the index\n// immediately after the closing ']'.\nfunction parseClass(segment, start) {\n  const chars = [];\n  let negated = false;\n  let i = start; // index just after '['\n  if (i < segment.length && (segment[i] === '!' || segment[i] === '^')) {\n    negated = true;\n    i += 1;\n  }\n  if (i < segment.length && segment[i] === ']') chars.push(']'); // literal ]\n  while (i < segment.length) {\n    const ch = segment[i];\n    if (ch === ']') return {end: i + 1, negated, chars};\n    if (ch === '\\\\') {\n      const next = segment[i + 1];\n      if (next === undefined || !ESCAPABLE.has(next)) {\n        fail('invalid escape inside character class');\n      }\n      chars.push(next);\n      i += 2;\n    } else if (ch === '-' && chars.length > 0 && i + 1 < segment.length) {\n      const next = segment[i + 1];\n      if (next === ']') {\n        chars.push('-');\n        i += 1;\n      } else if (next === '\\\\') {\n        const escaped = segment[i + 2];\n        if (escaped === undefined || !ESCAPABLE.has(escaped)) {\n          fail('invalid escape inside character class');\n        }\n        chars.push(chars.pop(), '-', escaped);\n        i += 3;\n      } else {\n        chars.push(chars.pop(), '-', next);\n        i += 2;\n      }\n    } else {\n      chars.push(ch);\n      i += 1;\n    }\n  }\n  fail('unclosed [ in pattern');\n}\n\nfunction isRange(triple) {\n  const a = triple[0];\n  const c = triple[2];\n  return a.length === 1 && c.length === 1 &&\n    a.codePointAt(0) <= c.codePointAt(0);\n}\n\n// Parse one segment (no '/' characters) into an array of atom matchers.\nfunction compileSegment(segment, index) {\n  const atoms = [];\n  let i = 0;\n  while (i < segment.length) {\n    const ch = segment[i];\n    if (ch === '\\\\') {\n      const next = segment[i + 1];\n      if (next === undefined) fail('trailing lone backslash in pattern');\n      if (next === '/' || !ESCAPABLE.has(next)) {\n        fail('only \\\\, *, ?, [, ], !, - may be escaped');\n      }\n      atoms.push({literal: next});\n      i += 2;\n    } else if (ch === '?') {\n      atoms.push({single: true});\n      i += 1;\n    } else if (ch === '*') {\n      const run = segment.slice(i).match(/^\\*+/)[0];\n      atoms.push({star: run.length === 1});\n      i += run.length;\n    } else if (ch === '[') {\n      const cls = parseClass(segment, i + 1);\n      const items = cls.chars.slice();\n      const test = (c) => {\n        let found = false;\n        for (let k = 0; k < items.length; k += 1) {\n          const it = items[k];\n          if (it === c) { found = true; break; }\n          if (isRange(it) &&\n              it[0] <= c && c <= it[2]) { found = true; break; }\n        }\n        return found;\n      };\n      atoms.push({class: {negated: cls.negated, test}});\n      i = cls.end;\n    } else {\n      atoms.push({literal: ch});\n      i += 1;\n    }\n  }\n  return atoms;\n}\n\nfunction atomMatches(atom, ch) {\n  if (atom.single) return true;\n  if (atom.literal !== undefined) return ch === atom.literal;\n  if (atom.class) return atom.class.negated ? !atom.class.test(ch) : atom.class.test(ch);\n  return false; // star\n}\n\nfunction starAtom(atom, segment, i) {\n  if (i === segment.length) return true;\n  for (let k = i; k < segment.length; k += 1) {\n    if (!atomMatches(atom, segment[k])) return false;\n  }\n  return true;\n}\n\nfunction matchAtoms(atoms, segment) {\n  const n = atoms.length;\n  const m = segment.length;\n  let i = 0;\n  let j = 0;\n  let fallback = -1; // most recent star atom position with consumed j\n  while (j < m) {\n    if (i < n && atomMatches(atoms[i], segment[j])) {\n      i += 1;\n      j += 1;\n    } else if (i < n && atoms[i].star) {\n      if (i > fallback) fallback = i;\n      i += 1; // star consumes nothing; re-consider atoms[i]\n    } else if (fallback !== -1) {\n      i = fallback; // back off to the star, which consumes one more char\n      j += 1;\n    } else {\n      return false;\n    }\n  }\n  // Only stars may match the empty remainder.\n  while (i < n) {\n    if (!atoms[i].star) return false;\n    i += 1;\n  }\n  return true;\n}\n\n// Compile a pattern into per-segment atom lists. Double star (**) segments\n// collapse to a single * segment; matching handles the zero-or-more-segment\n// semantics.\nfunction compilePattern(pattern) {\n  return pattern.split('/').map((segment) => compileSegment(segment));\n}\n\n// segments: array of atom lists. pathSegments: actual path segments.\n// Match segments 0..p-1, then require segments p..end to all be star lists\n// (the collapsed ** behavior).\nfunction matchFrom(segments, pathSegments, p) {\n  const n = segments.length;\n  for (; p < n; p += 1) {\n    if (p < pathSegments.length) {\n      if (!matchAtoms(segments[p], pathSegments[p])) return false;\n    } else if (!starAtom(segments[p], '', 0)) {\n      return false; // non-*** segment but no path segment left\n    }\n  }\n  return p === pathSegments.length;\n}\n\nfunction matchSegments(segments, pathSegments) {\n  const n = segments.length;\n  if (n === 0) return pathSegments.length === 0;\n  if (n === 1) return pathSegments.length === 1 && matchAtoms(segments[0], pathSegments[0]);\n  if (matchFrom(segments, pathSegments, 1)) return true;\n  // A ** segment (star-only list) may span zero or more whole path segments.\n  for (let p = 1; p < n - 1; p += 1) {\n    if (starAtom(segments[p], '', 0)) {\n      for (let k = 0; k <= pathSegments.length; k += 1) {\n        if (matchFrom(segments, pathSegments, p + k)) return true;\n      }\n    }\n  }\n  return false;\n}\n\nexport function selectPaths(paths, patterns) {\n  validatePaths(paths);\n  validatePatterns(patterns);\n  const compiled = patterns.map((pattern) =>\n    compilePattern(pattern.startsWith('!') ? pattern.slice(1) : pattern));\n  const decisions = [];\n  const selected = [];\n  for (const path of paths) {\n    const pathSegments = path.split('/');\n    let included = false;\n    let deciding = -1;\n    for (let pi = 0; pi < compiled.length; pi += 1) {\n      if (matchSegments(compiled[pi], pathSegments)) {\n        included = !patterns[pi].startsWith('!');\n        deciding = pi;\n      }\n    }\n    decisions.push({path, included, pattern: deciding});\n    if (included) selected.push(path);\n  }\n  return {selected, decisions};\n}\n\nfunction isPlainObject(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nasync function main() {\n  const argv = process.argv.slice(2);\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node glob-select.js INPUT_JSON_FILE\\n');\n    process.exitCode = 2;\n    return;\n  }\n  let text;\n  try {\n    text = readFileSync(argv[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`error: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  let data;\n  try {\n    data = JSON.parse(text);\n  } catch (err) {\n    process.stderr.write(`error: invalid JSON: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  if (!isPlainObject(data) ||\n      !Array.isArray(data.paths) ||\n      !Array.isArray(data.patterns)) {\n    process.stderr.write('error: expected a JSON object with \"paths\" and \"patterns\" arrays\\n');\n    process.exitCode = 2;\n    return;\n  }\n  let result;\n  try {\n    result = selectPaths(data.paths, data.patterns);\n  } catch (err) {\n    process.stderr.write(`error: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  process.stdout.write(JSON.stringify(result) + '\\n');\n}\n\nfunction isDirectRun() {\n  const entry = process.argv[1];\n  if (typeof entry !== 'string' || entry.length === 0) return false;\n  try {\n    const resolved = fileURLToPath(import.meta.url);\n    return realpathSync(entry) === resolved;\n  } catch {\n    return false;\n  }\n}\n\nif (isDirectRun()) main();\n",
+      "displaySha256": "fcb40243a51fd994fe71baf10e3e9185143666c0a3cdd8c2737c55e8258cd102",
+      "diff": "--- starter/glob-select.js\n+++ delivered/glob-select.js\n@@ -1 +1,320 @@\n-export function selectPaths(paths,patterns){throw Error('Implement the selector and CLI');}\n+#!/usr/bin/env node\n+// glob-select.js \u2014 deterministic glob path selector with decision receipts.\n+//\n+// API:  selectPaths(paths, patterns) -> {selected, decisions}\n+// CLI:  node glob-select.js INPUT_JSON_FILE\n+\n+import {readFileSync} from 'node:fs';\n+import {realpathSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n+\n+const ESCAPABLE = new Set(['\\\\', '*', '?', '[', ']', '!', '-']);\n+\n+function fail(message) {\n+  throw new Error(message);\n+}\n+\n+function isDenseArray(value) {\n+  return Array.isArray(value) &&\n+    Number.isInteger(value.length) &&\n+    value.length > 0 &&\n+    value.length === Object.keys(value).length;\n+}\n+\n+function assertUnique(values, label) {\n+  const seen = new Set();\n+  for (const value of values) {\n+    if (seen.has(value)) fail(`${label} must be unique`);\n+    seen.add(value);\n+  }\n+}\n+\n+function validatePaths(paths) {\n+  if (!isDenseArray(paths)) fail('paths must be a nonempty dense array');\n+  const seen = new Set();\n+  for (const path of paths) {\n+    if (typeof path !== 'string' || path.length === 0) {\n+      fail('paths must contain only nonempty strings');\n+    }\n+    if (path.includes('\\u0000')) fail('paths must not contain NUL');\n+    if (path.startsWith('/') || path.endsWith('/')) {\n+      fail('paths must not start or end with /');\n+    }\n+    const segments = path.split('/');\n+    if (segments.some((s) => s === '' || s === '.' || s === '..')) {\n+      fail('paths must not contain empty, . or .. segments');\n+    }\n+    if (seen.has(path)) fail('paths must be unique');\n+    seen.add(path);\n+  }\n+}\n+\n+function validatePatterns(patterns) {\n+  if (!isDenseArray(patterns)) fail('patterns must be a nonempty dense array');\n+  for (const pattern of patterns) {\n+    if (typeof pattern !== 'string' || pattern.length === 0) {\n+      fail('patterns must contain only nonempty strings');\n+    }\n+    if (pattern.startsWith('!') && pattern.length === 1) {\n+      fail('negation pattern body must be nonempty');\n+    }\n+  }\n+}\n+\n+// Parse one character class. Returns {end, test} where end is the index\n+// immediately after the closing ']'.\n+function parseClass(segment, start) {\n+  const chars = [];\n+  let negated = false;\n+  let i = start; // index just after '['\n+  if (i < segment.length && (segment[i] === '!' || segment[i] === '^')) {\n+    negated = true;\n+    i += 1;\n+  }\n+  if (i < segment.length && segment[i] === ']') chars.push(']'); // literal ]\n+  while (i < segment.length) {\n+    const ch = segment[i];\n+    if (ch === ']') return {end: i + 1, negated, chars};\n+    if (ch === '\\\\') {\n+      const next = segment[i + 1];\n+      if (next === undefined || !ESCAPABLE.has(next)) {\n+        fail('invalid escape inside character class');\n+      }\n+      chars.push(next);\n+      i += 2;\n+    } else if (ch === '-' && chars.length > 0 && i + 1 < segment.length) {\n+      const next = segment[i + 1];\n+      if (next === ']') {\n+        chars.push('-');\n+        i += 1;\n+      } else if (next === '\\\\') {\n+        const escaped = segment[i + 2];\n+        if (escaped === undefined || !ESCAPABLE.has(escaped)) {\n+          fail('invalid escape inside character class');\n+        }\n+        chars.push(chars.pop(), '-', escaped);\n+        i += 3;\n+      } else {\n+        chars.push(chars.pop(), '-', next);\n+        i += 2;\n+      }\n+    } else {\n+      chars.push(ch);\n+      i += 1;\n+    }\n+  }\n+  fail('unclosed [ in pattern');\n+}\n+\n+function isRange(triple) {\n+  const a = triple[0];\n+  const c = triple[2];\n+  return a.length === 1 && c.length === 1 &&\n+    a.codePointAt(0) <= c.codePointAt(0);\n+}\n+\n+// Parse one segment (no '/' characters) into an array of atom matchers.\n+function compileSegment(segment, index) {\n+  const atoms = [];\n+  let i = 0;\n+  while (i < segment.length) {\n+    const ch = segment[i];\n+    if (ch === '\\\\') {\n+      const next = segment[i + 1];\n+      if (next === undefined) fail('trailing lone backslash in pattern');\n+      if (next === '/' || !ESCAPABLE.has(next)) {\n+        fail('only \\\\, *, ?, [, ], !, - may be escaped');\n+      }\n+      atoms.push({literal: next});\n+      i += 2;\n+    } else if (ch === '?') {\n+      atoms.push({single: true});\n+      i += 1;\n+    } else if (ch === '*') {\n+      const run = segment.slice(i).match(/^\\*+/)[0];\n+      atoms.push({star: run.length === 1});\n+      i += run.length;\n+    } else if (ch === '[') {\n+      const cls = parseClass(segment, i + 1);\n+      const items = cls.chars.slice();\n+      const test = (c) => {\n+        let found = false;\n+        for (let k = 0; k < items.length; k += 1) {\n+          const it = items[k];\n+          if (it === c) { found = true; break; }\n+          if (isRange(it) &&\n+              it[0] <= c && c <= it[2]) { found = true; break; }\n+        }\n+        return found;\n+      };\n+      atoms.push({class: {negated: cls.negated, test}});\n+      i = cls.end;\n+    } else {\n+      atoms.push({literal: ch});\n+      i += 1;\n+    }\n+  }\n+  return atoms;\n+}\n+\n+function atomMatches(atom, ch) {\n+  if (atom.single) return true;\n+  if (atom.literal !== undefined) return ch === atom.literal;\n+  if (atom.class) return atom.class.negated ? !atom.class.test(ch) : atom.class.test(ch);\n+  return false; // star\n+}\n+\n+function starAtom(atom, segment, i) {\n+  if (i === segment.length) return true;\n+  for (let k = i; k < segment.length; k += 1) {\n+    if (!atomMatches(atom, segment[k])) return false;\n+  }\n+  return true;\n+}\n+\n+function matchAtoms(atoms, segment) {\n+  const n = atoms.length;\n+  const m = segment.length;\n+  let i = 0;\n+  let j = 0;\n+  let fallback = -1; // most recent star atom position with consumed j\n+  while (j < m) {\n+    if (i < n && atomMatches(atoms[i], segment[j])) {\n+      i += 1;\n+      j += 1;\n+    } else if (i < n && atoms[i].star) {\n+      if (i > fallback) fallback = i;\n+      i += 1; // star consumes nothing; re-consider atoms[i]\n+    } else if (fallback !== -1) {\n+      i = fallback; // back off to the star, which consumes one more char\n+      j += 1;\n+    } else {\n+      return false;\n+    }\n+  }\n+  // Only stars may match the empty remainder.\n+  while (i < n) {\n+    if (!atoms[i].star) return false;\n+    i += 1;\n+  }\n+  return true;\n+}\n+\n+// Compile a pattern into per-segment atom lists. Double star (**) segments\n+// collapse to a single * segment; matching handles the zero-or-more-segment\n+// semantics.\n+function compilePattern(pattern) {\n+  return pattern.split('/').map((segment) => compileSegment(segment));\n+}\n+\n+// segments: array of atom lists. pathSegments: actual path segments.\n+// Match segments 0..p-1, then require segments p..end to all be star lists\n+// (the collapsed ** behavior).\n+function matchFrom(segments, pathSegments, p) {\n+  const n = segments.length;\n+  for (; p < n; p += 1) {\n+    if (p < pathSegments.length) {\n+      if (!matchAtoms(segments[p], pathSegments[p])) return false;\n+    } else if (!starAtom(segments[p], '', 0)) {\n+      return false; // non-*** segment but no path segment left\n+    }\n+  }\n+  return p === pathSegments.length;\n+}\n+\n+function matchSegments(segments, pathSegments) {\n+  const n = segments.length;\n+  if (n === 0) return pathSegments.length === 0;\n+  if (n === 1) return pathSegments.length === 1 && matchAtoms(segments[0], pathSegments[0]);\n+  if (matchFrom(segments, pathSegments, 1)) return true;\n+  // A ** segment (star-only list) may span zero or more whole path segments.\n+  for (let p = 1; p < n - 1; p += 1) {\n+    if (starAtom(segments[p], '', 0)) {\n+      for (let k = 0; k <= pathSegments.length; k += 1) {\n+        if (matchFrom(segments, pathSegments, p + k)) return true;\n+      }\n+    }\n+  }\n+  return false;\n+}\n+\n+export function selectPaths(paths, patterns) {\n+  validatePaths(paths);\n+  validatePatterns(patterns);\n+  const compiled = patterns.map((pattern) =>\n+    compilePattern(pattern.startsWith('!') ? pattern.slice(1) : pattern));\n+  const decisions = [];\n+  const selected = [];\n+  for (const path of paths) {\n+    const pathSegments = path.split('/');\n+    let included = false;\n+    let deciding = -1;\n+    for (let pi = 0; pi < compiled.length; pi += 1) {\n+      if (matchSegments(compiled[pi], pathSegments)) {\n+        included = !patterns[pi].startsWith('!');\n+        deciding = pi;\n+      }\n+    }\n+    decisions.push({path, included, pattern: deciding});\n+    if (included) selected.push(path);\n+  }\n+  return {selected, decisions};\n+}\n+\n+function isPlainObject(value) {\n+  return value !== null && typeof value === 'object' && !Array.isArray(value);\n+}\n+\n+async function main() {\n+  const argv = process.argv.slice(2);\n+  if (argv.length !== 1) {\n+    process.stderr.write('usage: node glob-select.js INPUT_JSON_FILE\\n');\n+    process.exitCode = 2;\n+    return;\n+  }\n+  let text;\n+  try {\n+    text = readFileSync(argv[0], 'utf8');\n+  } catch (err) {\n+    process.stderr.write(`error: ${err.message}\\n`);\n+    process.exitCode = 2;\n+    return;\n+  }\n+  let data;\n+  try {\n+    data = JSON.parse(text);\n+  } catch (err) {\n+    process.stderr.write(`error: invalid JSON: ${err.message}\\n`);\n+    process.exitCode = 2;\n+    return;\n+  }\n+  if (!isPlainObject(data) ||\n+      !Array.isArray(data.paths) ||\n+      !Array.isArray(data.patterns)) {\n+    process.stderr.write('error: expected a JSON object with \"paths\" and \"patterns\" arrays\\n');\n+    process.exitCode = 2;\n+    return;\n+  }\n+  let result;\n+  try {\n+    result = selectPaths(data.paths, data.patterns);\n+  } catch (err) {\n+    process.stderr.write(`error: ${err.message}\\n`);\n+    process.exitCode = 2;\n+    return;\n+  }\n+  process.stdout.write(JSON.stringify(result) + '\\n');\n+}\n+\n+function isDirectRun() {\n+  const entry = process.argv[1];\n+  if (typeof entry !== 'string' || entry.length === 0) return false;\n+  try {\n+    const resolved = fileURLToPath(import.meta.url);\n+    return realpathSync(entry) === resolved;\n+  } catch {\n+    return false;\n+  }\n+}\n+\n+if (isDirectRun()) main();\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "afterSha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "before": "{\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-glob-select\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "e182127d8c0441b50758a406b43c44f8feda4d50e33e1222bfae56352e63a341",
+      "diff": ""
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "afterSha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {selectPaths} from '../glob-select.js';\ntest('a star stays inside one segment and every path gets a decision',()=>{\n  assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n    {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n});\ntest('the last matching pattern decides',()=>{\n  assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {selectPaths} from '../glob-select.js';\ntest('a star stays inside one segment and every path gets a decision',()=>{\n  assert.deepEqual(selectPaths(['a.js','x/b.js'],['*.js']),\n    {selected:['a.js'],decisions:[{path:'a.js',included:true,pattern:0},{path:'x/b.js',included:false,pattern:-1}]});\n});\ntest('the last matching pattern decides',()=>{\n  assert.deepEqual(selectPaths(['a.js','b.js'],['*.js','!a.js']).selected,['b.js']);\n});\n",
+      "displaySha256": "3ebfaf0018fdfdca4659973f1895cce74fc049b46f8c96d36acd7cae3e77c10e",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-glob-select@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: a star stays inside one segment and every path gets a decision\nok 1 - a star stays inside one segment and every path gets a decision\n  ---\n  duration_ms: 1.417991\n  ...\n# Subtest: the last matching pattern decides\nok 2 - the last matching pattern decides\n  ---\n  duration_ms: 0.193662\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.195659\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 1,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"glob-select\",\"pass\":false,\"groups\":[{\"name\":\"wildcards-and-segment-boundaries\",\"pass\":false,\"error\":\"Error: patterns must be a nonempty dense array\\n    at fail (file:///workspace/glob-select.js:14:9)\\n    at validatePatterns (file:///workspace/glob-select.js:53:32)\\n    at selectPaths (file:///workspace/glob-select.js:243:3)\\n    at file:///work-order/glob-select/grader.mjs:14:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:7:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"globstar-and-zero-segments\",\"pass\":false,\"error\":\"AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\\n+ actual - expected\\n\\n  [\\n-   'a/b',\\n    'a/x/b',\\n    'a/x/y/b'\\n  ]\\n    at file:///work-order/glob-select/grader.mjs:19:12\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:17:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"character-classes-and-escapes\",\"pass\":false,\"error\":\"TypeError: Cannot read properties of undefined (reading 'length')\\n    at isRange (file:///workspace/glob-select.js:112:30)\\n    at Object.test (file:///workspace/glob-select.js:145:15)\\n    at atomMatches (file:///workspace/glob-select.js:163:81)\\n    at matchAtoms (file:///workspace/glob-select.js:182:18)\\n    at matchSegments (file:///workspace/glob-select.js:228:52)\\n    at selectPaths (file:///workspace/glob-select.js:253:11)\\n    at file:///work-order/glob-select/grader.mjs:26:22\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:25:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\"},{\"name\":\"negation-order-and-decisions\",\"pass\":false,\"error\":\"AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\\n+ actual - expected\\n\\n+ []\\n- [\\n-   'keep.js'\\n- ]\\n    at file:///work-order/glob-select/grader.mjs:45:12\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:36:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"},{\"name\":\"validation-and-cli-contract\",\"pass\":false,\"error\":\"AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\\n+ actual - expected\\n\\n+ '{\\\"selected\\\":[],\\\"decisions\\\":[{\\\"path\\\":\\\"a.js\\\",\\\"included\\\":false,\\\"pattern\\\":-1},{\\\"path\\\":\\\"x/b.js\\\",\\\"included\\\":false,\\\"pattern\\\":1}]}\\\\n'\\n- '{\\\"selected\\\":[\\\"a.js\\\"],\\\"decisions\\\":[{\\\"path\\\":\\\"a.js\\\",\\\"included\\\":true,\\\"pattern\\\":0},{\\\"path\\\":\\\"x/b.js\\\",\\\"included\\\":false,\\\"pattern\\\":1}]}\\\\n'\\n    at file:///work-order/glob-select/grader.mjs:57:14\\n    at check (file:///work-order/grader-support.mjs:21:15)\\n    at file:///work-order/glob-select/grader.mjs:48:9\\n    at async grade (file:///work-order/grader-support.mjs:24:7)\\n    at async file:///work-order/glob-select/grader.mjs:5:1\"}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "48c5cc9bc006bcb7233cb281b7dcad90ae4455c0b6ebaa854ec1d8cde85b447f"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "b6fd4d8b44ec57f4846c09d4e39fa851b89e89e6cd599c95a6d275b0febd7957"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "18677fef77c21219721ba26c8fa222d6bb1772bb1c3fec56c42c61c145e07012"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "1dd2337ca4a292d42a65042bb83fe00f1b9698c48b48da247067511894c56295"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 21,
+    "withResults": 21,
+    "normalizedPathOccurrences": 33,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Two green tests left five groups uncovered.",
+    "paragraphs": [
+      {
+        "text": "Hermes wrote a selector, then repaired its CLI entry check, include/exclude handling and pattern validation. Its final visible test run passed both supplied tests.",
+        "actions": [
+          "action-5",
+          "action-12",
+          "action-16",
+          "action-19",
+          "action-20",
+          "action-21"
+        ]
+      },
+      {
+        "text": "The independent checks still rejected all five groups, including empty-pattern handling, globstars, character classes and rule decisions. The attempt reached ten minutes without a clean finish; BANTAM FACTORY passed the full acceptance check in 264.1 seconds.",
+        "actions": []
+      }
+    ]
+  }
+}

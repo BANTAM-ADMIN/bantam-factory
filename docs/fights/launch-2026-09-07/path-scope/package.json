@@ -4,14 +4,14 @@
   "redacted": true,
   "files": [
     {
-      "path": "index.html",
-      "bytes": 69597,
-      "sha256": "fe62ed90d91bb025f40364cdaebe33120f80d1b6f6b9d98f57641d473c22680a"
+      "path": "showcase.json",
+      "bytes": 37901,
+      "sha256": "d4c4cef3e402c3017b9881faa47ea3fcbc295556e0b48977d3ffa74f8520b160"
     },
     {
-      "path": "showcase.json",
-      "bytes": 13809,
-      "sha256": "78ea1a3d6a4de71cd9440dfd4cb41fdfa8a6c77f94c464b0fbe8ea30998eaeef"
+      "path": "index.html",
+      "bytes": 82589,
+      "sha256": "5ac198fe974af2c32b158fe20d8e3e2c8008dd62bb1139d0d40fda3be39697cb"
     }
   ]
 }

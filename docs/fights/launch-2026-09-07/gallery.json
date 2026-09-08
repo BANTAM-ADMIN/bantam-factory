@@ -1297,7 +1297,7 @@
       "number": "01",
       "description": "Match paths against glob patterns, last pattern deciding, with a receipt per path.",
       "recorded": true,
-      "sourceSha256": "f2599528714ae11fd11cd580d552e9be95a3ed3f1c14fefd458125c1f77caa9d",
+      "sourceSha256": "3d2afef28724b6ea7896a7bd2ce5217505c3e4008afed8c95cf028a514ae05c5",
       "reviewedWork": true,
       "rows": [
         {
@@ -1341,6 +1341,99 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "FAIL",
+          "passed": false,
+          "wallMs": 551382,
+          "groupsPassed": 0,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 33057,
+              "milliseconds": 539710.544,
+              "measuredRequests": 5,
+              "totalRequests": 5
+            },
+            "prefill": {
+              "tokens": 10334,
+              "milliseconds": 5548.633,
+              "measuredRequests": 5,
+              "totalRequests": 5
+            },
+            "evidenceSha256": "ad45d1ed4fd39595018ab7e6c6eb40a0bc37df97438d4da9740c908e6486d28a",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600006,
+          "groupsPassed": 0,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 35930,
+              "milliseconds": 568209.8550000001,
+              "measuredRequests": 19,
+              "totalRequests": 20
+            },
+            "prefill": {
+              "tokens": 22148,
+              "milliseconds": 16101.922,
+              "measuredRequests": 19,
+              "totalRequests": 20
+            },
+            "evidenceSha256": "f5f1e0647aa36dd197f1d672eb9e4b2cd0cfecc6078b32996f5912a3fa9fdc20",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 0,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 33152,
+              "milliseconds": 545039.203,
+              "measuredRequests": 4,
+              "totalRequests": 5
+            },
+            "prefill": {
+              "tokens": 10147,
+              "milliseconds": 5282.393999999999,
+              "measuredRequests": 4,
+              "totalRequests": 5
+            },
+            "evidenceSha256": "a43ee3a2a6b01915d141fe4a5a67b347c4040b83eeef74f943e03f7eca2c0033",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -1351,7 +1444,7 @@
       "number": "02",
       "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
       "recorded": true,
-      "sourceSha256": "78ea1a3d6a4de71cd9440dfd4cb41fdfa8a6c77f94c464b0fbe8ea30998eaeef",
+      "sourceSha256": "d4c4cef3e402c3017b9881faa47ea3fcbc295556e0b48977d3ffa74f8520b160",
       "reviewedWork": true,
       "rows": [
         {
@@ -1395,6 +1488,99 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 424136,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 25649,
+              "milliseconds": 377175.06700000004,
+              "measuredRequests": 16,
+              "totalRequests": 16
+            },
+            "prefill": {
+              "tokens": 64510,
+              "milliseconds": 32988.062000000005,
+              "measuredRequests": 16,
+              "totalRequests": 16
+            },
+            "evidenceSha256": "d90f58ce8ddcb7837e13986c3000b6885e1418708ae63859f9b0852fc23264c9",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 313633,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 19084,
+              "milliseconds": 294588.5669999999,
+              "measuredRequests": 15,
+              "totalRequests": 15
+            },
+            "prefill": {
+              "tokens": 15088,
+              "milliseconds": 12026.571,
+              "measuredRequests": 15,
+              "totalRequests": 15
+            },
+            "evidenceSha256": "65b2c27dfb0539b59091f46fd1a5926b628c5f9e405d4143d6ae5bdfb446c7a8",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 275623,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 15848,
+              "milliseconds": 252344.59800000006,
+              "measuredRequests": 12,
+              "totalRequests": 13
+            },
+            "prefill": {
+              "tokens": 19462,
+              "milliseconds": 12025.689000000002,
+              "measuredRequests": 12,
+              "totalRequests": 13
+            },
+            "evidenceSha256": "3a7fb67c0e0a8ab42faa6ab07d7a2f2b3e9ff30ad72449a0f127e6bb452231d0",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -1405,7 +1591,7 @@
       "number": "03",
       "description": "Order versions by real precedence and admit prereleases into a range only when invited.",
       "recorded": true,
-      "sourceSha256": "8be9b292b46c61a52f6154dd2036643211d1b07bec353c28176677ee3a0dd28d",
+      "sourceSha256": "fd5c6770029d7e4e47b85d26b19b9aa26d94eaf1025f9491451638dd83ac827b",
       "reviewedWork": true,
       "rows": [
         {
@@ -1449,6 +1635,99 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "OUTPUT_ONLY",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 37841,
+              "milliseconds": 584351.532,
+              "measuredRequests": 5,
+              "totalRequests": 6
+            },
+            "prefill": {
+              "tokens": 3132,
+              "milliseconds": 3016.0759999999996,
+              "measuredRequests": 5,
+              "totalRequests": 6
+            },
+            "evidenceSha256": "bd95bb2b5326a6e40794d550932f1bf17a496c7e5ed360df3b6995fc24c579c2",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600008,
+          "groupsPassed": null,
+          "groupsTotal": null,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 30817,
+              "milliseconds": 466383.531,
+              "measuredRequests": 11,
+              "totalRequests": 12
+            },
+            "prefill": {
+              "tokens": 66507,
+              "milliseconds": 31589.09,
+              "measuredRequests": 11,
+              "totalRequests": 12
+            },
+            "evidenceSha256": "1c9093dd879af8c560ef88dbee66d175120ba12ecaaea13bbba0e5dc564b9d18",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 536375,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 33632,
+              "milliseconds": 503677.07199999987,
+              "measuredRequests": 19,
+              "totalRequests": 19
+            },
+            "prefill": {
+              "tokens": 36050,
+              "milliseconds": 23656.083000000002,
+              "measuredRequests": 19,
+              "totalRequests": 19
+            },
+            "evidenceSha256": "b59cd5c059856089d68a8da62842e49900725f12601e14abebf82de5c9772378",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     }

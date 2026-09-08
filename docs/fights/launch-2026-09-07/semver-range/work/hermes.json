@@ -1,0 +1,282 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "semver-range",
+  "arm": "hermes",
+  "wallMs": 600007,
+  "outcome": "OUTPUT_ONLY",
+  "accepted": true,
+  "completed": false,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T19:33:27.905Z",
+  "task": "# Repair a semantic-version precedence and range checker\n\nRepair the exported ES-module functions `compareVersions(a, b)` and\n`satisfies(version, range)` in `semver-range.js`, and implement its CLI. These\nare pure string comparisons: no clock, no network, no filesystem.\n\nA version is `MAJOR.MINOR.PATCH`, each a nonnegative integer with no leading\nzero, optionally followed by `-PRERELEASE` and/or `+BUILD`. Both PRERELEASE and\nBUILD are dot-separated nonempty identifiers of ASCII alphanumerics and `-`.\nA purely numeric prerelease identifier must not have a leading zero. Anything\nelse throws an Error.\n\n`compareVersions` returns `-1`, `0` or `1` by precedence:\n\n- Compare major, then minor, then patch numerically.\n- Build metadata is ignored entirely, so `1.0.0+a` and `1.0.0+b` are equal.\n- A version WITH a prerelease has LOWER precedence than the same version\n  without one, so `1.0.0-rc` is below `1.0.0`.\n- Otherwise compare prerelease identifiers left to right. Two numeric\n  identifiers compare numerically, so `9` is below `10`. Two non-numeric\n  identifiers compare by ASCII order. A numeric identifier is always below a\n  non-numeric one. If every shared identifier is equal, the shorter list has\n  LOWER precedence, so `1.0.0-a` is below `1.0.0-a.1`.\n\n`satisfies` returns a boolean. A range is one or more clauses separated by\n`||`; the range holds when any clause holds. A clause is one or more\nwhitespace-separated comparators that must ALL hold. A comparator is an\noptional operator `=`, `<`, `<=`, `>` or `>=` (default `=`) followed by a\nversion. Comparators use the same precedence rules.\n\nA version WITH a prerelease satisfies a clause only when the clause also\ncontains at least one comparator whose version has a prerelease and the same\nmajor, minor and patch. So `1.2.3-rc.1` does not satisfy `>=1.0.0 <2.0.0`, but\nit does satisfy `>=1.2.3-rc.0 <2.0.0`. Versions without a prerelease are\nunaffected by this rule.\n\nDo not mutate inputs; frozen inputs must work. Invalid versions or ranges throw\nan Error.\n\nCLI: `node semver-range.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{versions,range}` where `versions` is\na dense array of version strings and `range` is a range string; extra fields are\nignored. Print exactly `{sorted,satisfying}` as one JSON value followed by\nnewline, exit 0, and write no stderr. `sorted` lists every input version in\nascending precedence, keeping input order among equals; `satisfying` lists those\nthat satisfy the range, in the same order as `sorted`. Validate `range` on every\ninvocation, including when `versions` is empty and no version is ever tested\nagainst it. Invalid arguments/files/JSON/API input exit 2, with nonempty stderr\nand no stdout.\nImporting the module must not run the CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+  "source": "hermes-native-database",
+  "actions": [
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && git -C /workspace status 2>/dev/null | head -20"
+      },
+      "output": {
+        "output": "total 8\ndrwxrwxr-x 1 bantam bantam   62 Sep  8 19:33 .\ndrwxr-xr-x 1 root   root     54 Sep  8 19:33 ..\n-rw-rw-r-- 1 bantam bantam  114 Sep  8 19:33 package.json\n-rw-rw-r-- 1 bantam bantam 1462 Sep  8 19:33 semver-range.js\ndrwxrwxr-x 1 bantam bantam   28 Sep  8 19:33 test",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 5812.365,
+      "endedMs": 5874.983,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "search_files",
+      "category": "inspect",
+      "request": {
+        "pattern": "semver-range*",
+        "target": "files",
+        "path": "/workspace"
+      },
+      "output": {
+        "total_count": 1,
+        "files": [
+          "/workspace/semver-range.js"
+        ]
+      },
+      "atMs": 5812.365,
+      "endedMs": 5932.704,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/semver-range.js"
+      },
+      "output": {
+        "content": "1|// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n2|// above its release, prerelease identifiers never compare numerically, and any\n3|// prerelease is admitted into every range.\n4|const PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n5|\n6|function parse(v){\n7|  const m=PATTERN.exec(v);\n8|  if(!m)throw Error('invalid version');\n9|  return {major:+m[1],minor:+m[2],patch:+m[3],\n10|    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n11|}\n12|\n13|export function compareVersions(a,b){\n14|  const x=parse(a),y=parse(b);\n15|  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n16|  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n17|  for(let i=0;i<Math.max(left.length,right.length);i++){\n18|    if(left[i]===undefined)return -1;\n19|    if(right[i]===undefined)return 1;\n20|    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n21|  }\n22|  return 0;\n23|}\n24|\n25|export function satisfies(version,range){\n26|  for(const clause of String(range).split('||')){\n27|    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n28|    if(comparators.every(text=>{\n29|      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n30|      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n31|      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n32|    }))return true;\n33|  }\n34|  return false;\n35|}\n36|",
+        "total_lines": 35,
+        "file_size": 1462,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 7725.053,
+      "endedMs": 7804.381,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/package.json"
+      },
+      "output": {
+        "content": "1|{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2|",
+        "total_lines": 1,
+        "file_size": 114,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 7725.053,
+      "endedMs": 7830.055,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "search_files",
+      "category": "inspect",
+      "request": {
+        "pattern": "*",
+        "target": "files",
+        "path": "/workspace/test"
+      },
+      "output": {
+        "total_count": 1,
+        "files": [
+          "/workspace/test/public.test.js"
+        ]
+      },
+      "atMs": 7725.053,
+      "endedMs": 7856.265,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/public.test.js"
+      },
+      "output": {
+        "content": "1|import test from 'node:test';\n2|import assert from 'node:assert/strict';\n3|import {compareVersions, satisfies} from '../semver-range.js';\n4|test('build metadata is ignored and a prerelease ranks below its release',()=>{\n5|  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n6|  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n7|});\n8|test('a plain version satisfies a bounded range',()=>{\n9|  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n10|  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n11|});\n12|",
+        "total_lines": 11,
+        "file_size": 506,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 9483.28,
+      "endedMs": 9564.53,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --version && echo '--- argv[1] behavior ---' && node -e 'console.log(\"argv[1]:\", process.argv[1])' && node -e 'const {pathToFileURL}=require(\"url\");console.log(\"fileURL:\", process.argv[1] && pathToFileURL(process.argv[1]).href); console.log(\"import.meta.url:\", import.meta.url)' 2>&1 | head; echo '--- node -e relative ---'; node -e 'console.log(process.argv[1])'"
+      },
+      "output": {
+        "output": "v20.19.4\n--- argv[1] behavior ---\nargv[1]: undefined\nfile:///workspace/[eval1]:1\nconst {pathToFileURL}=require(\"url\");console.log(\"fileURL:\", process.argv[1] && pathToFileURL(process.argv[1]).href); console.log(\"import.meta.url:\", import.meta.url)\n                      ^\n\nReferenceError: require is not defined in ES module scope, you can use import instead\n    at file:///workspace/[eval1]:1:23\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.eval (node:internal/modules/esm/loader:217:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)\n\n--- node -e relative ---\nundefined",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 380772.818,
+      "endedMs": 380884.169,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "path": "/workspace/semver-range.js",
+        "content": "// Semantic-version precedence and range checking (pure string comparisons).\n//\n// A version is MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]. Each numeric component\n// is a nonnegative integer with no leading zero. PRERELEASE and BUILD are\n// dot-separated nonempty identifiers of ASCII alphanumerics and \"-\". A purely\n// numeric prerelease identifier must not have a leading zero.\n//\n// Precedence (SemVer-style):\n//   - major, then minor, then patch compared numerically\n//   - build metadata is ignored entirely\n//   - a version WITH a prerelease ranks BELOW the same version without one\n//   - prerelease identifiers compared left to right; numeric ids compare\n//     numerically, non-numeric ids compare by ASCII order, numeric < non-numeric,\n//     and (all else equal) the shorter list ranks lower\nimport path from 'node:path';\nimport { readFileSync } from 'node:fs';\nimport { pathToFileURL } from 'node:url';\n\nconst PATTERN =\n  /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\nconst IDENT = /^[0-9A-Za-z-]+$/;\nconst OPERATOR = /^(>=|<=|=|>|<)?(.+)$/;\n\n// Parse a version string into its structural parts. Throws on invalid input.\n// Build metadata is captured (for validation) but never used in precedence.\nfunction parse(v) {\n  if (typeof v !== 'string') throw new Error('invalid version');\n  const m = PATTERN.exec(v);\n  if (!m) throw new Error('invalid version');\n  let prerelease = [];\n  if (m[4] !== undefined) {\n    prerelease = m[4].split('.');\n    for (const id of prerelease) {\n      if (!IDENT.test(id)) throw new Error('invalid version');\n      // purely numeric identifiers must not have a leading zero (\"0\" is fine)\n      if (/^\\d+$/.test(id) && id.length > 1 && id[0] === '0') {\n        throw new Error('invalid version');\n      }\n    }\n  }\n  let build = [];\n  if (m[5] !== undefined) {\n    build = m[5].split('.');\n    for (const id of build) {\n      if (!IDENT.test(id)) throw new Error('invalid version');\n    }\n  }\n  return { major: +m[1], minor: +m[2], patch: +m[3], prerelease, build };\n}\n\n// Compare two prerelease identifier lists (each nonempty).\nfunction comparePrerelease(left, right) {\n  const n = Math.min(left.length, right.length);\n  for (let i = 0; i < n; i++) {\n    const d = compareIdentifier(left[i], right[i]);\n    if (d !== 0) return d;\n  }\n  if (left.length === right.length) return 0;\n  return left.length < right.length ? -1 : 1;\n}\n\nfunction compareIdentifier(a, b) {\n  const isNum = (s) => /^\\d+$/.test(s);\n  const aN = isNum(a);\n  const bN = isNum(b);\n  if (aN && bN) {\n    if (a === b) return 0;\n    return BigInt(a) < BigInt(b) ? -1 : 1;\n  }\n  if (aN) return -1; // numeric always below non-numeric\n  if (bN) return 1;\n  if (a === b) return 0;\n  return a < b ? -1 : 1; // ASCII order for non-numeric\n}\n\n// Compare two parsed versions by precedence.\nfunction compareParsed(x, y) {\n  for (const k of ['major', 'minor', 'patch']) {\n    if (x[k] !== y[k]) return x[k] < y[k] ? -1 : 1;\n  }\n  const hasL = x.prerelease.length > 0;\n  const hasR = y.prerelease.length > 0;\n  if (hasL !== hasR) return hasL ? -1 : 1; // prerelease < release\n  if (!hasL) return 0;\n  return comparePrerelease(x.prerelease, y.prerelease);\n}\n\nexport function compareVersions(a, b) {\n  return compareParsed(parse(a), parse(b));\n}\n\n// Parse a range into clauses of comparators. Throws on invalid ranges.\n// Each comparator is {op, parsed}; op is one of =,<,<=,>,>=.\nfunction parseRange(range) {\n  if (typeof range !== 'string' || range.length === 0) {\n    throw new Error('invalid range');\n  }\n  const clauses = [];\n  for (const raw of range.split('||')) {\n    const tokens = raw.trim().split(/\\s+/).filter(Boolean);\n    if (tokens.length === 0) throw new Error('invalid range: empty clause');\n    const comparators = [];\n    for (const tok of tokens) {\n      const m = OPERATOR.exec(tok);\n      if (!m) throw new Error('invalid range: bad comparator');\n      comparators.push({ op: m[1] ?? '=', parsed: parse(m[2]) });\n    }\n    clauses.push(comparators);\n  }\n  return clauses;\n}\n\nconst key = (v) => v.major + '.' + v.minor + '.' + v.patch;\n\n// Does `version` satisfy `range`? Throws on invalid version or range.\nexport function satisfies(version, range) {\n  const x = parse(version);\n  const clauses = parseRange(range);\n  const hasPre = x.prerelease.length > 0;\n  for (const comparators of clauses) {\n    let ok = true;\n    for (const { op, parsed: y } of comparators) {\n      const d = compareParsed(x, y);\n      const pass =\n        op === '=' ? d === 0 :\n        op === '>' ? d > 0 :\n        op === '>=' ? d >= 0 :\n        op === '<' ? d < 0 :\n        d <= 0;\n      if (!pass) { ok = false; break; }\n    }\n    if (!ok) continue;\n    // A prerelease version only satisfies a clause when some comparator in\n    // that clause also carries a prerelease with the same major.minor.patch.\n    if (hasPre) {\n      const k = key(x);\n      let matched = false;\n      for (const { parsed: y } of comparators) {\n        if (y.prerelease.length > 0 && key(y) === k) { matched = true; break; }\n      }\n      if (!matched) continue;\n    }\n    return true;\n  }\n  return false;\n}\n\n// ---------------------------------------------------------------------------\n// CLI: node semver-range.js INPUT_JSON_FILE\n// ---------------------------------------------------------------------------\n\nclass CliError extends Error {}\n\nfunction runCli(args) {\n  if (args.length !== 1) {\n    throw new CliError('usage: node semver-range.js INPUT_JSON_FILE');\n  }\n  const inputPath = args[0];\n  let data;\n  try {\n    data = JSON.parse(readFileSync(inputPath, 'utf8'));\n  } catch (err) {\n    throw new CliError('cannot read/parse input file: ' + err.message);\n  }\n  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n    throw new CliError('input must be a non-null, non-array object');\n  }\n  const versions = data.versions;\n  if (\n    !Array.isArray(versions) ||\n    versions.some((v) => typeof v !== 'string')\n  ) {\n    throw new CliError('versions must be a dense array of version strings');\n  }\n  // Validate the range on every invocation, even when there are no versions.\n  parseRange(data.range);\n  const parsed = versions.map((v) => [v, parse(v)]);\n  // Stable sort keeps input order among equal versions.\n  parsed.sort((a, b) => compareParsed(a[1], b[1]));\n  const sorted = parsed.map((p) => p[0]);\n  const satisfying = sorted.filter((v) => satisfies(v, data.range));\n  process.stdout.write(JSON.stringify({ sorted, satisfying }) + '\\n');\n}\n\n// Only run the CLI when this module is the program entry point, so importing\n// it never triggers CLI behaviour.\nlet isMain = false;\ntry {\n  const entry =\n    typeof process.argv[1] === 'string'\n      ? pathToFileURL(path.resolve(process.argv[1])).href\n      : '';\n  isMain = entry !== '' && entry === import.meta.url;\n} catch {\n  isMain = false;\n}\n\nif (isMain) {\n  try {\n    runCli(process.argv.slice(2));\n  } catch (err) {\n    process.exitCode = 2;\n    process.stderr.write(\n      (err && err.message ? err.message : 'error') + '\\n'\n    );\n  }\n}\n"
+      },
+      "output": {
+        "bytes_written": 7044,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/semver-range.js",
+        "files_modified": [
+          "/workspace/semver-range.js"
+        ]
+      },
+      "atMs": 593232.031,
+      "endedMs": 593509.405,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "afterSha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "before": "{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "diff": ""
+    },
+    {
+      "path": "semver-range.js",
+      "state": "changed",
+      "beforeSha256": "1c520e5f91e40f99acbcaf7491720772dfad7be54b6be32dc9b090aac76767de",
+      "afterSha256": "1ad9220ba653103fbae9ff0cac11910c4e9e0a8d27c3e8d5117e073ca2384e48",
+      "before": "// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n// above its release, prerelease identifiers never compare numerically, and any\n// prerelease is admitted into every range.\nconst PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n\nfunction parse(v){\n  const m=PATTERN.exec(v);\n  if(!m)throw Error('invalid version');\n  return {major:+m[1],minor:+m[2],patch:+m[3],\n    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n  for(let i=0;i<Math.max(left.length,right.length);i++){\n    if(left[i]===undefined)return -1;\n    if(right[i]===undefined)return 1;\n    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n  }\n  return 0;\n}\n\nexport function satisfies(version,range){\n  for(const clause of String(range).split('||')){\n    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n    if(comparators.every(text=>{\n      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n    }))return true;\n  }\n  return false;\n}\n",
+      "after": "// Semantic-version precedence and range checking (pure string comparisons).\n//\n// A version is MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]. Each numeric component\n// is a nonnegative integer with no leading zero. PRERELEASE and BUILD are\n// dot-separated nonempty identifiers of ASCII alphanumerics and \"-\". A purely\n// numeric prerelease identifier must not have a leading zero.\n//\n// Precedence (SemVer-style):\n//   - major, then minor, then patch compared numerically\n//   - build metadata is ignored entirely\n//   - a version WITH a prerelease ranks BELOW the same version without one\n//   - prerelease identifiers compared left to right; numeric ids compare\n//     numerically, non-numeric ids compare by ASCII order, numeric < non-numeric,\n//     and (all else equal) the shorter list ranks lower\nimport path from 'node:path';\nimport { readFileSync } from 'node:fs';\nimport { pathToFileURL } from 'node:url';\n\nconst PATTERN =\n  /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\nconst IDENT = /^[0-9A-Za-z-]+$/;\nconst OPERATOR = /^(>=|<=|=|>|<)?(.+)$/;\n\n// Parse a version string into its structural parts. Throws on invalid input.\n// Build metadata is captured (for validation) but never used in precedence.\nfunction parse(v) {\n  if (typeof v !== 'string') throw new Error('invalid version');\n  const m = PATTERN.exec(v);\n  if (!m) throw new Error('invalid version');\n  let prerelease = [];\n  if (m[4] !== undefined) {\n    prerelease = m[4].split('.');\n    for (const id of prerelease) {\n      if (!IDENT.test(id)) throw new Error('invalid version');\n      // purely numeric identifiers must not have a leading zero (\"0\" is fine)\n      if (/^\\d+$/.test(id) && id.length > 1 && id[0] === '0') {\n        throw new Error('invalid version');\n      }\n    }\n  }\n  let build = [];\n  if (m[5] !== undefined) {\n    build = m[5].split('.');\n    for (const id of build) {\n      if (!IDENT.test(id)) throw new Error('invalid version');\n    }\n  }\n  return { major: +m[1], minor: +m[2], patch: +m[3], prerelease, build };\n}\n\n// Compare two prerelease identifier lists (each nonempty).\nfunction comparePrerelease(left, right) {\n  const n = Math.min(left.length, right.length);\n  for (let i = 0; i < n; i++) {\n    const d = compareIdentifier(left[i], right[i]);\n    if (d !== 0) return d;\n  }\n  if (left.length === right.length) return 0;\n  return left.length < right.length ? -1 : 1;\n}\n\nfunction compareIdentifier(a, b) {\n  const isNum = (s) => /^\\d+$/.test(s);\n  const aN = isNum(a);\n  const bN = isNum(b);\n  if (aN && bN) {\n    if (a === b) return 0;\n    return BigInt(a) < BigInt(b) ? -1 : 1;\n  }\n  if (aN) return -1; // numeric always below non-numeric\n  if (bN) return 1;\n  if (a === b) return 0;\n  return a < b ? -1 : 1; // ASCII order for non-numeric\n}\n\n// Compare two parsed versions by precedence.\nfunction compareParsed(x, y) {\n  for (const k of ['major', 'minor', 'patch']) {\n    if (x[k] !== y[k]) return x[k] < y[k] ? -1 : 1;\n  }\n  const hasL = x.prerelease.length > 0;\n  const hasR = y.prerelease.length > 0;\n  if (hasL !== hasR) return hasL ? -1 : 1; // prerelease < release\n  if (!hasL) return 0;\n  return comparePrerelease(x.prerelease, y.prerelease);\n}\n\nexport function compareVersions(a, b) {\n  return compareParsed(parse(a), parse(b));\n}\n\n// Parse a range into clauses of comparators. Throws on invalid ranges.\n// Each comparator is {op, parsed}; op is one of =,<,<=,>,>=.\nfunction parseRange(range) {\n  if (typeof range !== 'string' || range.length === 0) {\n    throw new Error('invalid range');\n  }\n  const clauses = [];\n  for (const raw of range.split('||')) {\n    const tokens = raw.trim().split(/\\s+/).filter(Boolean);\n    if (tokens.length === 0) throw new Error('invalid range: empty clause');\n    const comparators = [];\n    for (const tok of tokens) {\n      const m = OPERATOR.exec(tok);\n      if (!m) throw new Error('invalid range: bad comparator');\n      comparators.push({ op: m[1] ?? '=', parsed: parse(m[2]) });\n    }\n    clauses.push(comparators);\n  }\n  return clauses;\n}\n\nconst key = (v) => v.major + '.' + v.minor + '.' + v.patch;\n\n// Does `version` satisfy `range`? Throws on invalid version or range.\nexport function satisfies(version, range) {\n  const x = parse(version);\n  const clauses = parseRange(range);\n  const hasPre = x.prerelease.length > 0;\n  for (const comparators of clauses) {\n    let ok = true;\n    for (const { op, parsed: y } of comparators) {\n      const d = compareParsed(x, y);\n      const pass =\n        op === '=' ? d === 0 :\n        op === '>' ? d > 0 :\n        op === '>=' ? d >= 0 :\n        op === '<' ? d < 0 :\n        d <= 0;\n      if (!pass) { ok = false; break; }\n    }\n    if (!ok) continue;\n    // A prerelease version only satisfies a clause when some comparator in\n    // that clause also carries a prerelease with the same major.minor.patch.\n    if (hasPre) {\n      const k = key(x);\n      let matched = false;\n      for (const { parsed: y } of comparators) {\n        if (y.prerelease.length > 0 && key(y) === k) { matched = true; break; }\n      }\n      if (!matched) continue;\n    }\n    return true;\n  }\n  return false;\n}\n\n// ---------------------------------------------------------------------------\n// CLI: node semver-range.js INPUT_JSON_FILE\n// ---------------------------------------------------------------------------\n\nclass CliError extends Error {}\n\nfunction runCli(args) {\n  if (args.length !== 1) {\n    throw new CliError('usage: node semver-range.js INPUT_JSON_FILE');\n  }\n  const inputPath = args[0];\n  let data;\n  try {\n    data = JSON.parse(readFileSync(inputPath, 'utf8'));\n  } catch (err) {\n    throw new CliError('cannot read/parse input file: ' + err.message);\n  }\n  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n    throw new CliError('input must be a non-null, non-array object');\n  }\n  const versions = data.versions;\n  if (\n    !Array.isArray(versions) ||\n    versions.some((v) => typeof v !== 'string')\n  ) {\n    throw new CliError('versions must be a dense array of version strings');\n  }\n  // Validate the range on every invocation, even when there are no versions.\n  parseRange(data.range);\n  const parsed = versions.map((v) => [v, parse(v)]);\n  // Stable sort keeps input order among equal versions.\n  parsed.sort((a, b) => compareParsed(a[1], b[1]));\n  const sorted = parsed.map((p) => p[0]);\n  const satisfying = sorted.filter((v) => satisfies(v, data.range));\n  process.stdout.write(JSON.stringify({ sorted, satisfying }) + '\\n');\n}\n\n// Only run the CLI when this module is the program entry point, so importing\n// it never triggers CLI behaviour.\nlet isMain = false;\ntry {\n  const entry =\n    typeof process.argv[1] === 'string'\n      ? pathToFileURL(path.resolve(process.argv[1])).href\n      : '';\n  isMain = entry !== '' && entry === import.meta.url;\n} catch {\n  isMain = false;\n}\n\nif (isMain) {\n  try {\n    runCli(process.argv.slice(2));\n  } catch (err) {\n    process.exitCode = 2;\n    process.stderr.write(\n      (err && err.message ? err.message : 'error') + '\\n'\n    );\n  }\n}\n",
+      "displaySha256": "1ad9220ba653103fbae9ff0cac11910c4e9e0a8d27c3e8d5117e073ca2384e48",
+      "diff": "--- starter/semver-range.js\n+++ delivered/semver-range.js\n@@ -1,35 +1,207 @@\n-// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n-// above its release, prerelease identifiers never compare numerically, and any\n-// prerelease is admitted into every range.\n-const PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n-\n-function parse(v){\n-  const m=PATTERN.exec(v);\n-  if(!m)throw Error('invalid version');\n-  return {major:+m[1],minor:+m[2],patch:+m[3],\n-    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n-}\n-\n-export function compareVersions(a,b){\n-  const x=parse(a),y=parse(b);\n-  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n-  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n-  for(let i=0;i<Math.max(left.length,right.length);i++){\n-    if(left[i]===undefined)return -1;\n-    if(right[i]===undefined)return 1;\n-    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n-  }\n-  return 0;\n-}\n-\n-export function satisfies(version,range){\n-  for(const clause of String(range).split('||')){\n-    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n-    if(comparators.every(text=>{\n-      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n-      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n-      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n-    }))return true;\n+// Semantic-version precedence and range checking (pure string comparisons).\n+//\n+// A version is MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]. Each numeric component\n+// is a nonnegative integer with no leading zero. PRERELEASE and BUILD are\n+// dot-separated nonempty identifiers of ASCII alphanumerics and \"-\". A purely\n+// numeric prerelease identifier must not have a leading zero.\n+//\n+// Precedence (SemVer-style):\n+//   - major, then minor, then patch compared numerically\n+//   - build metadata is ignored entirely\n+//   - a version WITH a prerelease ranks BELOW the same version without one\n+//   - prerelease identifiers compared left to right; numeric ids compare\n+//     numerically, non-numeric ids compare by ASCII order, numeric < non-numeric,\n+//     and (all else equal) the shorter list ranks lower\n+import path from 'node:path';\n+import { readFileSync } from 'node:fs';\n+import { pathToFileURL } from 'node:url';\n+\n+const PATTERN =\n+  /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n+const IDENT = /^[0-9A-Za-z-]+$/;\n+const OPERATOR = /^(>=|<=|=|>|<)?(.+)$/;\n+\n+// Parse a version string into its structural parts. Throws on invalid input.\n+// Build metadata is captured (for validation) but never used in precedence.\n+function parse(v) {\n+  if (typeof v !== 'string') throw new Error('invalid version');\n+  const m = PATTERN.exec(v);\n+  if (!m) throw new Error('invalid version');\n+  let prerelease = [];\n+  if (m[4] !== undefined) {\n+    prerelease = m[4].split('.');\n+    for (const id of prerelease) {\n+      if (!IDENT.test(id)) throw new Error('invalid version');\n+      // purely numeric identifiers must not have a leading zero (\"0\" is fine)\n+      if (/^\\d+$/.test(id) && id.length > 1 && id[0] === '0') {\n+        throw new Error('invalid version');\n+      }\n+    }\n+  }\n+  let build = [];\n+  if (m[5] !== undefined) {\n+    build = m[5].split('.');\n+    for (const id of build) {\n+      if (!IDENT.test(id)) throw new Error('invalid version');\n+    }\n+  }\n+  return { major: +m[1], minor: +m[2], patch: +m[3], prerelease, build };\n+}\n+\n+// Compare two prerelease identifier lists (each nonempty).\n+function comparePrerelease(left, right) {\n+  const n = Math.min(left.length, right.length);\n+  for (let i = 0; i < n; i++) {\n+    const d = compareIdentifier(left[i], right[i]);\n+    if (d !== 0) return d;\n+  }\n+  if (left.length === right.length) return 0;\n+  return left.length < right.length ? -1 : 1;\n+}\n+\n+function compareIdentifier(a, b) {\n+  const isNum = (s) => /^\\d+$/.test(s);\n+  const aN = isNum(a);\n+  const bN = isNum(b);\n+  if (aN && bN) {\n+    if (a === b) return 0;\n+    return BigInt(a) < BigInt(b) ? -1 : 1;\n+  }\n+  if (aN) return -1; // numeric always below non-numeric\n+  if (bN) return 1;\n+  if (a === b) return 0;\n+  return a < b ? -1 : 1; // ASCII order for non-numeric\n+}\n+\n+// Compare two parsed versions by precedence.\n+function compareParsed(x, y) {\n+  for (const k of ['major', 'minor', 'patch']) {\n+    if (x[k] !== y[k]) return x[k] < y[k] ? -1 : 1;\n+  }\n+  const hasL = x.prerelease.length > 0;\n+  const hasR = y.prerelease.length > 0;\n+  if (hasL !== hasR) return hasL ? -1 : 1; // prerelease < release\n+  if (!hasL) return 0;\n+  return comparePrerelease(x.prerelease, y.prerelease);\n+}\n+\n+export function compareVersions(a, b) {\n+  return compareParsed(parse(a), parse(b));\n+}\n+\n+// Parse a range into clauses of comparators. Throws on invalid ranges.\n+// Each comparator is {op, parsed}; op is one of =,<,<=,>,>=.\n+function parseRange(range) {\n+  if (typeof range !== 'string' || range.length === 0) {\n+    throw new Error('invalid range');\n+  }\n+  const clauses = [];\n+  for (const raw of range.split('||')) {\n+    const tokens = raw.trim().split(/\\s+/).filter(Boolean);\n+    if (tokens.length === 0) throw new Error('invalid range: empty clause');\n+    const comparators = [];\n+    for (const tok of tokens) {\n+      const m = OPERATOR.exec(tok);\n+      if (!m) throw new Error('invalid range: bad comparator');\n+      comparators.push({ op: m[1] ?? '=', parsed: parse(m[2]) });\n+    }\n+    clauses.push(comparators);\n+  }\n+  return clauses;\n+}\n+\n+const key = (v) => v.major + '.' + v.minor + '.' + v.patch;\n+\n+// Does `version` satisfy `range`? Throws on invalid version or range.\n+export function satisfies(version, range) {\n+  const x = parse(version);\n+  const clauses = parseRange(range);\n+  const hasPre = x.prerelease.length > 0;\n+  for (const comparators of clauses) {\n+    let ok = true;\n+    for (const { op, parsed: y } of comparators) {\n+      const d = compareParsed(x, y);\n+      const pass =\n+        op === '=' ? d === 0 :\n+        op === '>' ? d > 0 :\n+        op === '>=' ? d >= 0 :\n+        op === '<' ? d < 0 :\n+        d <= 0;\n+      if (!pass) { ok = false; break; }\n+    }\n+    if (!ok) continue;\n+    // A prerelease version only satisfies a clause when some comparator in\n+    // that clause also carries a prerelease with the same major.minor.patch.\n+    if (hasPre) {\n+      const k = key(x);\n+      let matched = false;\n+      for (const { parsed: y } of comparators) {\n+        if (y.prerelease.length > 0 && key(y) === k) { matched = true; break; }\n+      }\n+      if (!matched) continue;\n+    }\n+    return true;\n   }\n   return false;\n }\n+\n+// ---------------------------------------------------------------------------\n+// CLI: node semver-range.js INPUT_JSON_FILE\n+// ---------------------------------------------------------------------------\n+\n+class CliError extends Error {}\n+\n+function runCli(args) {\n+  if (args.length !== 1) {\n+    throw new CliError('usage: node semver-range.js INPUT_JSON_FILE');\n+  }\n+  const inputPath = args[0];\n+  let data;\n+  try {\n+    data = JSON.parse(readFileSync(inputPath, 'utf8'));\n+  } catch (err) {\n+    throw new CliError('cannot read/parse input file: ' + err.message);\n+  }\n+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n+    throw new CliError('input must be a non-null, non-array object');\n+  }\n+  const versions = data.versions;\n+  if (\n+    !Array.isArray(versions) ||\n+    versions.some((v) => typeof v !== 'string')\n+  ) {\n+    throw new CliError('versions must be a dense array of version strings');\n+  }\n+  // Validate the range on every invocation, even when there are no versions.\n+  parseRange(data.range);\n+  const parsed = versions.map((v) => [v, parse(v)]);\n+  // Stable sort keeps input order among equal versions.\n+  parsed.sort((a, b) => compareParsed(a[1], b[1]));\n+  const sorted = parsed.map((p) => p[0]);\n+  const satisfying = sorted.filter((v) => satisfies(v, data.range));\n+  process.stdout.write(JSON.stringify({ sorted, satisfying }) + '\\n');\n+}\n+\n+// Only run the CLI when this module is the program entry point, so importing\n+// it never triggers CLI behaviour.\n+let isMain = false;\n+try {\n+  const entry =\n+    typeof process.argv[1] === 'string'\n+      ? pathToFileURL(path.resolve(process.argv[1])).href\n+      : '';\n+  isMain = entry !== '' && entry === import.meta.url;\n+} catch {\n+  isMain = false;\n+}\n+\n+if (isMain) {\n+  try {\n+    runCli(process.argv.slice(2));\n+  } catch (err) {\n+    process.exitCode = 2;\n+    process.stderr.write(\n+      (err && err.message ? err.message : 'error') + '\\n'\n+    );\n+  }\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "afterSha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {compareVersions, satisfies} from '../semver-range.js';\ntest('build metadata is ignored and a prerelease ranks below its release',()=>{\n  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n});\ntest('a plain version satisfies a bounded range',()=>{\n  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {compareVersions, satisfies} from '../semver-range.js';\ntest('build metadata is ignored and a prerelease ranks below its release',()=>{\n  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n});\ntest('a plain version satisfies a bounded range',()=>{\n  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n});\n",
+      "displaySha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.09116\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.298003\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.52977\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"semver-range\",\"pass\":true,\"groups\":[{\"name\":\"core-precedence-and-build-metadata\",\"pass\":true},{\"name\":\"prerelease-ordering-rules\",\"pass\":true},{\"name\":\"comparator-sets-and-unions\",\"pass\":true},{\"name\":\"prerelease-range-admission\",\"pass\":true},{\"name\":\"validation-and-cli-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "48c5cc9bc006bcb7233cb281b7dcad90ae4455c0b6ebaa854ec1d8cde85b447f"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "7b54b00a4f72466a9755154980cca2b1dc487fb51b0499fbdefbc7840efab911"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "415ef7389f3f1222a4ca6296e7299fd6015f5813b54a2f6dc10373167f57568c"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "44cc8cc108b17b34a82a8f57c82f5318ae2ea376161f7332a85282319cfad1d9"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 8,
+    "withResults": 8,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "The source passed. The run did not finish.",
+    "paragraphs": [
+      {
+        "text": "Hermes inspected the existing implementation and wrote a replacement. The saved tool history ends after that successful write.",
+        "actions": [
+          "action-3",
+          "action-6",
+          "action-7",
+          "action-8"
+        ]
+      },
+      {
+        "text": "The delivered source passed the project tests and all five independent groups after the run stopped. No clean completion arrived before ten minutes, so this is Output only. BANTAM FACTORY completed the same task in 399.9 seconds.",
+        "actions": []
+      }
+    ]
+  }
+}

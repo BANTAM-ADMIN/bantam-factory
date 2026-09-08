@@ -1,0 +1,464 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "path-scope",
+  "arm": "hermes",
+  "wallMs": 275623,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T19:28:49.888Z",
+  "task": "# Extend a workspace containment guard\n\n`path-scope.js` already exports a working `normalizeSegments(input)`. Keep its\nexported behavior exactly as it is, and add `resolveWithin(root, candidate)`\nplus a CLI, both as ES module exports. This is a lexical decision over POSIX\npath strings only. It never touches the filesystem, resolves no symlinks, and\nis not a security boundary on its own.\n\n`root` and `candidate` must be nonempty strings containing no NUL, and `root`\nmust start with `/`. Validate both before resolving anything.\n\nResolve `candidate` against `root`: a candidate starting with `/` resolves from\nthe filesystem root, otherwise it resolves inside `root`. Normalize the result\nby dropping empty segments and `.` segments, and by removing the previous\nsegment for each `..`. A `..` with nothing left to remove is discarded, so a\npath can never climb above `/`. `\\` is an ordinary character, never a\nseparator, and segments such as `..foo`, `...` and `.hidden` are ordinary names.\n\n`candidate` is inside `root` when the normalized root segments are a complete\nleading run of the normalized candidate segments. Sharing a textual prefix is\nnot enough: with root `/a/b`, the candidate `/a/bc` is outside.\n\nReturn exactly `{inside, resolved, relative}`. `resolved` is the normalized\nabsolute path, always starting with `/` and never ending with `/` unless it is\nexactly `/`. `relative` is the path from `root` to the candidate when inside,\n`''` when they are the same location, and `null` when outside. Do not mutate\nyour inputs. Invalid inputs throw an Error.\n\nExample: root `/srv/ws`, candidate `../ws/sub/../file.txt` returns\n`{inside:true, resolved:'/srv/ws/file.txt', relative:'file.txt'}`, while\ncandidate `/srv/wsx` returns `{inside:false, resolved:'/srv/wsx', relative:null}`.\n\nCLI: `node path-scope.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{root,candidate}`; extra fields are\nignored. Success prints exactly the API result as one JSON value followed by\nnewline, exits 0, and writes no stderr. Invalid arguments/files/JSON/API input\nexit 2, with nonempty stderr and no stdout. Importing the module must not run\nthe CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+  "source": "hermes-native-database",
+  "actions": [
+    {
+      "name": "search_files",
+      "category": "inspect",
+      "request": {
+        "pattern": "path-scope.js",
+        "target": "files"
+      },
+      "output": {
+        "total_count": 1,
+        "files": [
+          "./path-scope.js"
+        ]
+      },
+      "atMs": 12222.451,
+      "endedMs": 12305.294,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "search_files",
+      "category": "inspect",
+      "request": {
+        "pattern": "*",
+        "target": "files",
+        "path": "/workspace",
+        "limit": 50
+      },
+      "output": {
+        "total_count": 3,
+        "files": [
+          "/workspace/test/public.test.js",
+          "/workspace/path-scope.js",
+          "/workspace/package.json"
+        ]
+      },
+      "atMs": 12222.451,
+      "endedMs": 12330.915,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/path-scope.js"
+      },
+      "output": {
+        "content": "1|// Existing, working helper. Preserve its exported behavior.\n2|export function normalizeSegments(input){\n3|  if(typeof input!=='string')throw Error('invalid path');\n4|  const segments=[];\n5|  for(const part of input.split('/')){\n6|    if(part===''||part==='.')continue;\n7|    if(part==='..'){segments.pop();continue;}\n8|    segments.push(part);\n9|  }\n10|  return segments;\n11|}\n12|\n13|export function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\n14|",
+        "total_lines": 13,
+        "file_size": 454,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 13728.336,
+      "endedMs": 13819.385,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/public.test.js"
+      },
+      "output": {
+        "content": "1|import test from 'node:test';\n2|import assert from 'node:assert/strict';\n3|import {normalizeSegments, resolveWithin} from '../path-scope.js';\n4|test('the existing helper keeps normalizing segments',()=>{\n5|  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n6|  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n7|});\n8|test('a candidate that stays inside reports its path from the root',()=>{\n9|  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\n10|    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n11|});\n12|",
+        "total_lines": 11,
+        "file_size": 535,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 13728.336,
+      "endedMs": 13845.34,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/package.json"
+      },
+      "output": {
+        "content": "1|{\"name\":\"factory-path-scope\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2|",
+        "total_lines": 1,
+        "file_size": 112,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 13728.336,
+      "endedMs": 13870.903,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "path": "/workspace/path-scope.js",
+        "content": "import{readFileSync,realpathSync}from'node:fs';\nimport{fileURLToPath}from'node:url';\n\n// Existing, working helper. Preserve its exported behavior.\nexport function normalizeSegments(input){\n  if(typeof input!=='string')throw Error('invalid path');\n  const segments=[];\n  for(const part of input.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){segments.pop();continue;}\n    segments.push(part);\n  }\n  return segments;\n}\n\nfunction assertPathString(value,name){\n  if(typeof value!=='string')throw Error(name+' must be a nonempty string');\n  if(value.length===0)throw Error(name+' must be a nonempty string');\n  if(value.indexOf('\\u0000')!==-1)throw Error(name+' must not contain NUL');\n}\n\nexport function resolveWithin(root,candidate){\n  assertPathString(root,'root');\n  assertPathString(candidate,'candidate');\n  if(!root.startsWith('/'))throw Error('root must start with /');\n  const rootSegments=normalizeSegments(root);\n  const resolvedSegments=candidate.startsWith('/')?[]:rootSegments.slice();\n  for(const part of candidate.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){if(resolvedSegments.length>0)resolvedSegments.pop();continue;}\n    resolvedSegments.push(part);\n  }\n  const inside=resolvedSegments.length>=rootSegments.length&&\n    rootSegments.every((segment,index)=>resolvedSegments[index]===segment);\n  const resolved=resolvedSegments.length===0?'/':'/'+resolvedSegments.join('/');\n  const relative=inside?resolvedSegments.slice(rootSegments.length).join('/'):null;\n  return {inside,resolved,relative};\n}\n\nfunction fail(message){\n  process.stderr.write(message+'\\n');\n  process.exitCode=2;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){fail('usage: node path-scope.js INPUT_JSON_FILE');return;}\n  let payload;\n  try{\n    payload=JSON.parse(readFileSync(args[0],'utf8'));\n  }catch(error){\n    fail('cannot read or parse input file: '+error.message);\n    return;\n  }\n  if(typeof payload!=='object'||payload===null||Array.isArray(payload)){\n    fail('input JSON must be a non-null, non-array object with {root,candidate}');\n    return;\n  }\n  let result;\n  try{\n    result=resolveWithin(payload.root,payload.candidate);\n  }catch(error){\n    fail('invalid path input: '+error.message);\n    return;\n  }\n  process.stdout.write(JSON.stringify(result)+'\\n');\n}\n\nfunction isDirectRun(){\n  const entry=process.argv[1];\n  if(typeof entry!=='string'||entry.length===0)return false;\n  try{\n    return realpathSync(entry)===realpathSync(fileURLToPath(import.meta.url));\n  }catch{return false;}\n}\n\nif(isDirectRun())runCli();\n"
+      },
+      "output": {
+        "bytes_written": 2602,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/path-scope.js",
+        "files_modified": [
+          "/workspace/path-scope.js"
+        ]
+      },
+      "atMs": 179673.482,
+      "endedMs": 179957.183,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "import{readFileSync}from'node:fs';\nimport{resolve as resolvePath}from'node:path';\nimport{fileURLToPath}from'node:url';",
+        "old_string": "import{readFileSync,realpathSync}from'node:fs';\nimport{fileURLToPath}from'node:url';",
+        "path": "/workspace/path-scope.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/path-scope.js\n+++ b//workspace/path-scope.js\n@@ -1,4 +1,5 @@\n-import{readFileSync,realpathSync}from'node:fs';\n+import{readFileSync}from'node:fs';\n+import{resolve as resolvePath}from'node:path';\n import{fileURLToPath}from'node:url';\n \n // Existing, working helper. Preserve its exported behavior.\n",
+        "files_modified": [
+          "/workspace/path-scope.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/path-scope.js"
+      },
+      "atMs": 194338.666,
+      "endedMs": 194564.469,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  try{\n    return resolvePath(entry)===resolvePath(fileURLToPath(import.meta.url));\n  }catch{return false;}",
+        "old_string": "  try{\n    return realpathSync(entry)===realpathSync(fileURLToPath(import.meta.url));\n  }catch{return false;}",
+        "path": "/workspace/path-scope.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/path-scope.js\n+++ b//workspace/path-scope.js\n@@ -71,7 +71,7 @@\n   const entry=process.argv[1];\n   if(typeof entry!=='string'||entry.length===0)return false;\n   try{\n-    return realpathSync(entry)===realpathSync(fileURLToPath(import.meta.url));\n+    return resolvePath(entry)===resolvePath(fileURLToPath(import.meta.url));\n   }catch{return false;}\n }\n \n",
+        "files_modified": [
+          "/workspace/path-scope.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/path-scope.js"
+      },
+      "atMs": 196348.513,
+      "endedMs": 196564.422,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {execFileSync}from'node:child_process';\nimport{mkdirSync,rmSync,writeFileSync,readFileSync,mkdtempSync,existsSync}from'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {fileURLToPath}from'node:url';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\n\nconst MODULE_PATH=fileURLToPath(new URL('../path-scope.js',import.meta.url));\nconst NODE=process.execPath;\n\nfunction cli(args){\n  try{\n    const stdout=execFileSync(NODE,[MODULE_PATH,...args],{encoding:'utf8',stdio:'pipe'});\n    return {code:0,stdout,stderr:''};\n  }catch(error){\n    return {code:error.status,stdout:(error.stdout??'')+'' ,stderr:(error.stderr??'')+''};\n  }\n}\n\ntest('the existing helper behavior is preserved',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','..hidden']);\n  assert.deepEqual(normalizeSegments(''),[]);\n  assert.throws(()=>normalizeSegments(42),Error);\n});\n\ntest('spec example: relative candidate climbs within root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','../ws/sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n\ntest('spec example: absolute sibling is outside',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','/srv/wsx'),\n    {inside:false,resolved:'/srv/wsx',relative:null});\n});\n\ntest('textual prefix is not containment',()=>{\n  assert.deepEqual(resolveWithin('/a/b','/a/bc'),\n    {inside:false,resolved:'/a/bc',relative:null});\n  assert.deepEqual(resolveWithin('/a/b','/a/b/c'),\n    {inside:true,resolved:'/a/b/c',relative:'c'});\n});\n\ntest('same location reports empty relative path',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','.'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../.'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n  assert.deepEqual(resolveWithin('/srv/ws/','/srv/ws'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n});\n\ntest('absolute candidate inside root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','/srv/ws/a/b'),\n    {inside:true,resolved:'/srv/ws/a/b',relative:'a/b'});\n});\n\ntest('.. clamps at the filesystem root and never climbs above it',()=>{\n  assert.deepEqual(resolveWithin('/a','../../x'),\n    {inside:false,resolved:'/x',relative:null});\n  assert.deepEqual(resolveWithin('/a/b','../../..'),\n    {inside:false,resolved:'/',relative:null});\n  assert.deepEqual(resolveWithin('/','../x'),\n    {inside:true,resolved:'/x',relative:'x'});\n});\n\ntest('root at filesystem root contains every absolute path',()=>{\n  assert.deepEqual(resolveWithin('/','a/b'),\n    {inside:true,resolved:'/a/b',relative:'a/b'});\n  assert.deepEqual(resolveWithin('/','/'),\n    {inside:true,resolved:'/',relative:''});\n});\n\ntest('backslash is an ordinary character, never a separator',()=>{\n  assert.deepEqual(resolveWithin('/a','a\\\\b'),\n    {inside:true,resolved:'/a/a\\\\b',relative:'a\\\\b'});\n  assert.deepEqual(normalizeSegments('x\\\\y'),['x\\\\y']);\n});\n\ntest('dot-adjacent names are ordinary segments',()=>{\n  assert.deepEqual(resolveWithin('/r','..foo/.../.hidden/.'),\n    {inside:true,resolved:'/r/..foo/.../.hidden',relative:'..foo/.../.hidden'});\n});\n\ntest('trailing and duplicate slashes are dropped in the result',()=>{\n  assert.deepEqual(resolveWithin('/srv//ws/','sub/'),\n    {inside:true,resolved:'/srv/ws/sub',relative:'sub'});\n  assert.deepEqual(resolveWithin('//a//','b//'),\n    {inside:true,resolved:'/a/b',relative:'b'});\n});\n\ntest('inputs are not mutated',()=>{\n  const root='/srv/ws';\n  const candidate='sub/../x/';\n  resolveWithin(root,candidate);\n  assert.equal(root,'/srv/ws');\n  assert.equal(candidate,'sub/../x/');\n});\n\ntest('invalid inputs throw an Error',()=>{\n  assert.throws(()=>resolveWithin('','x'),Error);\n  assert.throws(()=>resolveWithin('/a',''),Error);\n  assert.throws(()=>resolveWithin('a','x'),Error);\n  assert.throws(()=>resolveWithin('/a','b\\u0000'),Error);\n  assert.throws(()=>resolveWithin('/a\\u0000','b'),Error);\n  assert.throws(()=>resolveWithin(null,'x'),Error);\n  assert.throws(()=>resolveWithin('/a',null),Error);\n  assert.throws(()=>resolveWithin(1,'x'),Error);\n  assert.throws(()=>resolveWithin('/a',2),Error);\n  assert.throws(()=>resolveWithin(undefined,undefined),Error);\n});\n\ntest('CLI: valid input prints exactly the API result and exits 0',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const input=path.join(dir,'input.json');\n    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'../ws/sub/../file.txt',ignored:{}}));\n    const result=cli([input]);\n    assert.equal(result.code,0);\n    assert.equal(result.stderr,'');\n    assert.equal(result.stdout,'{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: outside candidate prints inside:false and relative:null',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const input=path.join(dir,'input.json');\n    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'/srv/wsx'}));\n    const result=cli([input]);\n    assert.equal(result.code,0);\n    assert.equal(result.stderr,'');\n    assert.equal(result.stdout,'{\"inside\":false,\"resolved\":\"/srv/wsx\",\"relative\":null}\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: invalid argument counts exit 2 with nonempty stderr and no stdout',()=>{\n  for(const args of[[],['one.json','two.json']]){\n    const result=cli(args);\n    assert.equal(result.code,2);\n    assert.ok(result.stderr.length>0);\n    assert.equal(result.stdout,'');\n  }\n});\n\ntest('CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const missing=path.join(dir,'nope.json');\n    const badJson=path.join(dir,'bad.json');\n    writeFileSync(badJson,'{not json');\n    const cases=[[missing],\n      [badJson],\n      ...['null','[]','\"x\"',JSON.stringify([]),JSON.stringify(null),JSON.stringify('s'),JSON.stringify(7)]\n        .map((content)=>{\n          const file=path.join(dir,'shape.json');\n          writeFileSync(file,content);\n          return [file];\n        })];\n    for(const args of cases){\n      const result=cli(args);\n      assert.equal(result.code,2,args[0]);\n      assert.ok(result.stderr.length>0,args[0]);\n      assert.equal(result.stdout,'');\n    }\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: object missing fields or with invalid path values exits 2',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const shapes=[\n      {},\n      {root:'/a'},\n      {candidate:'b'},\n      {root:'no-slash',candidate:'b'},\n      {root:'/a',candidate:null},\n      {root:'/a\\u0000b',candidate:'c'},\n    ];\n    for(const shape of shapes){\n      const file=path.join(dir,'shape.json');\n      writeFileSync(file,JSON.stringify(shape));\n      const result=cli([file]);\n      assert.equal(result.code,2,JSON.stringify(shape));\n      assert.ok(result.stderr.length>0,JSON.stringify(shape));\n      assert.equal(result.stdout,'');\n    }\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('importing the module does not run the CLI',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-import-'));\n  try{\n    const importer=path.join(dir,'importer.mjs');\n    writeFileSync(importer,\n      `import {resolveWithin} from ${JSON.stringify('file://'+MODULE_PATH)};\\n`+\n      `console.log(JSON.stringify(resolveWithin('/srv/ws','sub/file.txt')));\\n`);\n    const stdout=execFileSync(NODE,[importer,'extra','args','here'],{encoding:'utf8'});\n    assert.equal(stdout,JSON.stringify(\n      {inside:true,resolved:'/srv/ws/sub/file.txt',relative:'sub/file.txt'})+'\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n",
+        "path": "/workspace/test/containment.test.js"
+      },
+      "output": {
+        "bytes_written": 8000,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/containment.test.js",
+        "files_modified": [
+          "/workspace/test/containment.test.js"
+        ]
+      },
+      "atMs": 248902.776,
+      "endedMs": 249126.738,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -30"
+      },
+      "output": {
+        "output": "...\n# Subtest: importing the module does not run the CLI\nok 19 - importing the module does not run the CLI\n  ---\n  duration_ms: 22.475037\n  ...\n# Subtest: the existing helper keeps normalizing segments\nok 20 - the existing helper keeps normalizing segments\n  ---\n  duration_ms: 1.322215\n  ...\n# Subtest: a candidate that stays inside reports its path from the root\nok 21 - a candidate that stays inside reports its path from the root\n  ---\n  duration_ms: 0.194022\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 20\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 483.791638\nnpm notice\nnpm notice New minor version of npm available! 11.5.2 -> 11.19.1\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1\nnpm notice To update run: npm install -g npm@11.19.1\nnpm notice",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 253735.002,
+      "endedMs": 254593.709,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -B2 -A25 \"not ok\""
+      },
+      "output": {
+        "output": "TAP version 13\n# Subtest: the existing helper behavior is preserved\nnot ok 1 - the existing helper behavior is preserved\n  ---\n  duration_ms: 2.637771\n  location: '/workspace/test/containment.test.js:22:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n        '..foo',\n        '...',\n    +   '.hidden'\n    -   '..hidden'\n      ]\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: '..foo'\n    1: '...'\n    2: '..hidden'\n  actual:\n    0: '..foo'\n    1: '...'\n    2: '.hidden'\n  operator: 'deepStrictEqual'",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 255970.536,
+      "endedMs": 256826.539,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','.hidden']);",
+        "old_string": "  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','..hidden']);",
+        "path": "/workspace/test/containment.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/containment.test.js\n+++ b//workspace/test/containment.test.js\n@@ -22,7 +22,7 @@\n test('the existing helper behavior is preserved',()=>{\n   assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n   assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n-  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','..hidden']);\n+  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','.hidden']);\n   assert.deepEqual(normalizeSegments(''),[]);\n   assert.throws(()=>normalizeSegments(42),Error);\n });\n",
+        "files_modified": [
+          "/workspace/test/containment.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/containment.test.js"
+      },
+      "atMs": 259462.879,
+      "endedMs": 259687.007,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -E \"^(not ok|ok|# (tests|pass|fail))\" "
+      },
+      "output": {
+        "output": "ok 1 - the existing helper behavior is preserved\nok 2 - spec example: relative candidate climbs within root\nok 3 - spec example: absolute sibling is outside\nok 4 - textual prefix is not containment\nok 5 - same location reports empty relative path\nok 6 - absolute candidate inside root\nok 7 - .. clamps at the filesystem root and never climbs above it\nok 8 - root at filesystem root contains every absolute path\nok 9 - backslash is an ordinary character, never a separator\nok 10 - dot-adjacent names are ordinary segments\nok 11 - trailing and duplicate slashes are dropped in the result\nok 12 - inputs are not mutated\nok 13 - invalid inputs throw an Error\nok 14 - CLI: valid input prints exactly the API result and exits 0\nok 15 - CLI: outside candidate prints inside:false and relative:null\nok 16 - CLI: invalid argument counts exit 2 with nonempty stderr and no stdout\nok 17 - CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout\nok 18 - CLI: object missing fields or with invalid path values exits 2\nok 19 - importing the module does not run the CLI\nok 20 - the existing helper keeps normalizing segments\nok 21 - a candidate that stays inside reports its path from the root\n# tests 21\n# pass 21\n# fail 0",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 263403.949,
+      "endedMs": 264283.628,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /tmp && printf '{\"root\":\"/srv/ws\",\"candidate\":\"../ws/sub/../file.txt\"}' > ps.json && node /workspace/path-scope.js ps.json; echo \"exit=$?\"; printf '{\"root\":\"/srv/ws\",\"candidate\":\"/srv/wsx\"}' > ps2.json && node /workspace/path-scope.js ps2.json; echo \"exit=$?\"; node /workspace/path-scope.js 2>err.txt; echo \"noargs exit=$? stderr=$(cat err.txt)\"; node /workspace/path-scope.js /nonexistent.json 2>err2.txt; echo \"missing exit=$? stderr=$(cat err2.txt)\"; rm -f ps.json ps2.json err.txt err2.txt"
+      },
+      "output": {
+        "output": "{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\nexit=0\n{\"inside\":false,\"resolved\":\"/srv/wsx\",\"relative\":null}\nexit=0\nnoargs exit=2 stderr=usage: node path-scope.js INPUT_JSON_FILE\nmissing exit=2 stderr=cannot read or parse input file: ENOENT: no such file or directory, open '/nonexistent.json'",
+        "exit_code": 0,
+        "error": null,
+        "cwd": "/tmp"
+      },
+      "atMs": 267550.859,
+      "endedMs": 267687.153,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-14"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "Done. All 21 tests pass (2 existing + 19 new regression tests), and the CLI behaves per spec.\n\nChanges:\n\n/workspace/path-scope.js\n- `normalizeSegments` untouched, behavior preserved.\n- `resolveWithin(root, candidate)`: validates both are nonempty strings with no NUL and that `root` starts with `/` (throws `Error` otherwise, before any resolution). Candidate starting with `/` resolves from filesystem root; otherwise it's appended to a copy of root's normalized segments (inputs never mutated). Normalization drops empty/`.` segments and pops one segment per `..`, clamping at `/`. `inside` requires root's segments to be a complete leading run of candidate's segments (so `/a/bc` is outside `/a/b`). Returns exactly `{inside, resolved, relative}` \u2014 `resolved` is the normalized absolute path (no trailing slash unless `/`), `relative` is `''` at the same location and `null` when outside.\n- CLI: requires exactly one arg, reads the JSON file, accepts only a non-null non-array object (extra fields ignored), prints `JSON.stringify(result)+'\\n'` and exits 0 on success; any invalid arg/file/JSON/input exits 2 with a nonempty stderr message and no stdout.\n- The CLI only runs when the module is the entry point (argv[1] lexically resolved equals the module URL), so importing it \u2014 as the test suite does \u2014 has no side effects and no filesystem access at import.\n\n/workspace/test/containment.test.js \u2014 new regression tests covering both spec examples, textual-prefix exclusion, same-location `''`, `..` clamping at `/`, backslash as ordinary character, `..foo`/`...`/`.hidden` as ordinary names, non-mutation, all invalid-input throws, CLI stdout/stderr/exit codes for valid, outside, wrong-arg-count, missing file, malformed JSON, and non-object shapes, plus the import-doesn't-run-CLI check. CLI tests use temp files under os.tmpdir() and clean up in `finally` blocks.\n\n`package.json` and the existing test file are unmodified, no dependencies added.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "afterSha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "before": "{\"name\":\"factory-path-scope\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-path-scope\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "diff": ""
+    },
+    {
+      "path": "path-scope.js",
+      "state": "changed",
+      "beforeSha256": "b75f2a53b4a4189d3d653a17c72ab538e56507c980fd4aabef3d0d890eb810fd",
+      "afterSha256": "a20734ca3e210ab965df64bf967194db3c6b05b66115ebc7c33e69950b7f104e",
+      "before": "// Existing, working helper. Preserve its exported behavior.\nexport function normalizeSegments(input){\n  if(typeof input!=='string')throw Error('invalid path');\n  const segments=[];\n  for(const part of input.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){segments.pop();continue;}\n    segments.push(part);\n  }\n  return segments;\n}\n\nexport function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\n",
+      "after": "import{readFileSync}from'node:fs';\nimport{resolve as resolvePath}from'node:path';\nimport{fileURLToPath}from'node:url';\n\n// Existing, working helper. Preserve its exported behavior.\nexport function normalizeSegments(input){\n  if(typeof input!=='string')throw Error('invalid path');\n  const segments=[];\n  for(const part of input.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){segments.pop();continue;}\n    segments.push(part);\n  }\n  return segments;\n}\n\nfunction assertPathString(value,name){\n  if(typeof value!=='string')throw Error(name+' must be a nonempty string');\n  if(value.length===0)throw Error(name+' must be a nonempty string');\n  if(value.indexOf('\\u0000')!==-1)throw Error(name+' must not contain NUL');\n}\n\nexport function resolveWithin(root,candidate){\n  assertPathString(root,'root');\n  assertPathString(candidate,'candidate');\n  if(!root.startsWith('/'))throw Error('root must start with /');\n  const rootSegments=normalizeSegments(root);\n  const resolvedSegments=candidate.startsWith('/')?[]:rootSegments.slice();\n  for(const part of candidate.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){if(resolvedSegments.length>0)resolvedSegments.pop();continue;}\n    resolvedSegments.push(part);\n  }\n  const inside=resolvedSegments.length>=rootSegments.length&&\n    rootSegments.every((segment,index)=>resolvedSegments[index]===segment);\n  const resolved=resolvedSegments.length===0?'/':'/'+resolvedSegments.join('/');\n  const relative=inside?resolvedSegments.slice(rootSegments.length).join('/'):null;\n  return {inside,resolved,relative};\n}\n\nfunction fail(message){\n  process.stderr.write(message+'\\n');\n  process.exitCode=2;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){fail('usage: node path-scope.js INPUT_JSON_FILE');return;}\n  let payload;\n  try{\n    payload=JSON.parse(readFileSync(args[0],'utf8'));\n  }catch(error){\n    fail('cannot read or parse input file: '+error.message);\n    return;\n  }\n  if(typeof payload!=='object'||payload===null||Array.isArray(payload)){\n    fail('input JSON must be a non-null, non-array object with {root,candidate}');\n    return;\n  }\n  let result;\n  try{\n    result=resolveWithin(payload.root,payload.candidate);\n  }catch(error){\n    fail('invalid path input: '+error.message);\n    return;\n  }\n  process.stdout.write(JSON.stringify(result)+'\\n');\n}\n\nfunction isDirectRun(){\n  const entry=process.argv[1];\n  if(typeof entry!=='string'||entry.length===0)return false;\n  try{\n    return resolvePath(entry)===resolvePath(fileURLToPath(import.meta.url));\n  }catch{return false;}\n}\n\nif(isDirectRun())runCli();\n",
+      "displaySha256": "a20734ca3e210ab965df64bf967194db3c6b05b66115ebc7c33e69950b7f104e",
+      "diff": "--- starter/path-scope.js\n+++ delivered/path-scope.js\n@@ -1,3 +1,7 @@\n+import{readFileSync}from'node:fs';\n+import{resolve as resolvePath}from'node:path';\n+import{fileURLToPath}from'node:url';\n+\n // Existing, working helper. Preserve its exported behavior.\n export function normalizeSegments(input){\n   if(typeof input!=='string')throw Error('invalid path');\n@@ -10,4 +14,65 @@\n   return segments;\n }\n \n-export function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\n+function assertPathString(value,name){\n+  if(typeof value!=='string')throw Error(name+' must be a nonempty string');\n+  if(value.length===0)throw Error(name+' must be a nonempty string');\n+  if(value.indexOf('\\u0000')!==-1)throw Error(name+' must not contain NUL');\n+}\n+\n+export function resolveWithin(root,candidate){\n+  assertPathString(root,'root');\n+  assertPathString(candidate,'candidate');\n+  if(!root.startsWith('/'))throw Error('root must start with /');\n+  const rootSegments=normalizeSegments(root);\n+  const resolvedSegments=candidate.startsWith('/')?[]:rootSegments.slice();\n+  for(const part of candidate.split('/')){\n+    if(part===''||part==='.')continue;\n+    if(part==='..'){if(resolvedSegments.length>0)resolvedSegments.pop();continue;}\n+    resolvedSegments.push(part);\n+  }\n+  const inside=resolvedSegments.length>=rootSegments.length&&\n+    rootSegments.every((segment,index)=>resolvedSegments[index]===segment);\n+  const resolved=resolvedSegments.length===0?'/':'/'+resolvedSegments.join('/');\n+  const relative=inside?resolvedSegments.slice(rootSegments.length).join('/'):null;\n+  return {inside,resolved,relative};\n+}\n+\n+function fail(message){\n+  process.stderr.write(message+'\\n');\n+  process.exitCode=2;\n+}\n+\n+function runCli(){\n+  const args=process.argv.slice(2);\n+  if(args.length!==1){fail('usage: node path-scope.js INPUT_JSON_FILE');return;}\n+  let payload;\n+  try{\n+    payload=JSON.parse(readFileSync(args[0],'utf8'));\n+  }catch(error){\n+    fail('cannot read or parse input file: '+error.message);\n+    return;\n+  }\n+  if(typeof payload!=='object'||payload===null||Array.isArray(payload)){\n+    fail('input JSON must be a non-null, non-array object with {root,candidate}');\n+    return;\n+  }\n+  let result;\n+  try{\n+    result=resolveWithin(payload.root,payload.candidate);\n+  }catch(error){\n+    fail('invalid path input: '+error.message);\n+    return;\n+  }\n+  process.stdout.write(JSON.stringify(result)+'\\n');\n+}\n+\n+function isDirectRun(){\n+  const entry=process.argv[1];\n+  if(typeof entry!=='string'||entry.length===0)return false;\n+  try{\n+    return resolvePath(entry)===resolvePath(fileURLToPath(import.meta.url));\n+  }catch{return false;}\n+}\n+\n+if(isDirectRun())runCli();\n"
+    },
+    {
+      "path": "test/containment.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "958f8a490aface12ddd2a516c53b33e7e82270a26d9f3958de5dc9dcf4f3b8bc",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {execFileSync}from'node:child_process';\nimport{mkdirSync,rmSync,writeFileSync,readFileSync,mkdtempSync,existsSync}from'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {fileURLToPath}from'node:url';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\n\nconst MODULE_PATH=fileURLToPath(new URL('../path-scope.js',import.meta.url));\nconst NODE=process.execPath;\n\nfunction cli(args){\n  try{\n    const stdout=execFileSync(NODE,[MODULE_PATH,...args],{encoding:'utf8',stdio:'pipe'});\n    return {code:0,stdout,stderr:''};\n  }catch(error){\n    return {code:error.status,stdout:(error.stdout??'')+'' ,stderr:(error.stderr??'')+''};\n  }\n}\n\ntest('the existing helper behavior is preserved',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','.hidden']);\n  assert.deepEqual(normalizeSegments(''),[]);\n  assert.throws(()=>normalizeSegments(42),Error);\n});\n\ntest('spec example: relative candidate climbs within root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','../ws/sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n\ntest('spec example: absolute sibling is outside',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','/srv/wsx'),\n    {inside:false,resolved:'/srv/wsx',relative:null});\n});\n\ntest('textual prefix is not containment',()=>{\n  assert.deepEqual(resolveWithin('/a/b','/a/bc'),\n    {inside:false,resolved:'/a/bc',relative:null});\n  assert.deepEqual(resolveWithin('/a/b','/a/b/c'),\n    {inside:true,resolved:'/a/b/c',relative:'c'});\n});\n\ntest('same location reports empty relative path',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','.'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../.'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n  assert.deepEqual(resolveWithin('/srv/ws/','/srv/ws'),\n    {inside:true,resolved:'/srv/ws',relative:''});\n});\n\ntest('absolute candidate inside root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','/srv/ws/a/b'),\n    {inside:true,resolved:'/srv/ws/a/b',relative:'a/b'});\n});\n\ntest('.. clamps at the filesystem root and never climbs above it',()=>{\n  assert.deepEqual(resolveWithin('/a','../../x'),\n    {inside:false,resolved:'/x',relative:null});\n  assert.deepEqual(resolveWithin('/a/b','../../..'),\n    {inside:false,resolved:'/',relative:null});\n  assert.deepEqual(resolveWithin('/','../x'),\n    {inside:true,resolved:'/x',relative:'x'});\n});\n\ntest('root at filesystem root contains every absolute path',()=>{\n  assert.deepEqual(resolveWithin('/','a/b'),\n    {inside:true,resolved:'/a/b',relative:'a/b'});\n  assert.deepEqual(resolveWithin('/','/'),\n    {inside:true,resolved:'/',relative:''});\n});\n\ntest('backslash is an ordinary character, never a separator',()=>{\n  assert.deepEqual(resolveWithin('/a','a\\\\b'),\n    {inside:true,resolved:'/a/a\\\\b',relative:'a\\\\b'});\n  assert.deepEqual(normalizeSegments('x\\\\y'),['x\\\\y']);\n});\n\ntest('dot-adjacent names are ordinary segments',()=>{\n  assert.deepEqual(resolveWithin('/r','..foo/.../.hidden/.'),\n    {inside:true,resolved:'/r/..foo/.../.hidden',relative:'..foo/.../.hidden'});\n});\n\ntest('trailing and duplicate slashes are dropped in the result',()=>{\n  assert.deepEqual(resolveWithin('/srv//ws/','sub/'),\n    {inside:true,resolved:'/srv/ws/sub',relative:'sub'});\n  assert.deepEqual(resolveWithin('//a//','b//'),\n    {inside:true,resolved:'/a/b',relative:'b'});\n});\n\ntest('inputs are not mutated',()=>{\n  const root='/srv/ws';\n  const candidate='sub/../x/';\n  resolveWithin(root,candidate);\n  assert.equal(root,'/srv/ws');\n  assert.equal(candidate,'sub/../x/');\n});\n\ntest('invalid inputs throw an Error',()=>{\n  assert.throws(()=>resolveWithin('','x'),Error);\n  assert.throws(()=>resolveWithin('/a',''),Error);\n  assert.throws(()=>resolveWithin('a','x'),Error);\n  assert.throws(()=>resolveWithin('/a','b\\u0000'),Error);\n  assert.throws(()=>resolveWithin('/a\\u0000','b'),Error);\n  assert.throws(()=>resolveWithin(null,'x'),Error);\n  assert.throws(()=>resolveWithin('/a',null),Error);\n  assert.throws(()=>resolveWithin(1,'x'),Error);\n  assert.throws(()=>resolveWithin('/a',2),Error);\n  assert.throws(()=>resolveWithin(undefined,undefined),Error);\n});\n\ntest('CLI: valid input prints exactly the API result and exits 0',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const input=path.join(dir,'input.json');\n    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'../ws/sub/../file.txt',ignored:{}}));\n    const result=cli([input]);\n    assert.equal(result.code,0);\n    assert.equal(result.stderr,'');\n    assert.equal(result.stdout,'{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: outside candidate prints inside:false and relative:null',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const input=path.join(dir,'input.json');\n    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'/srv/wsx'}));\n    const result=cli([input]);\n    assert.equal(result.code,0);\n    assert.equal(result.stderr,'');\n    assert.equal(result.stdout,'{\"inside\":false,\"resolved\":\"/srv/wsx\",\"relative\":null}\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: invalid argument counts exit 2 with nonempty stderr and no stdout',()=>{\n  for(const args of[[],['one.json','two.json']]){\n    const result=cli(args);\n    assert.equal(result.code,2);\n    assert.ok(result.stderr.length>0);\n    assert.equal(result.stdout,'');\n  }\n});\n\ntest('CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const missing=path.join(dir,'nope.json');\n    const badJson=path.join(dir,'bad.json');\n    writeFileSync(badJson,'{not json');\n    const cases=[[missing],\n      [badJson],\n      ...['null','[]','\"x\"',JSON.stringify([]),JSON.stringify(null),JSON.stringify('s'),JSON.stringify(7)]\n        .map((content)=>{\n          const file=path.join(dir,'shape.json');\n          writeFileSync(file,content);\n          return [file];\n        })];\n    for(const args of cases){\n      const result=cli(args);\n      assert.equal(result.code,2,args[0]);\n      assert.ok(result.stderr.length>0,args[0]);\n      assert.equal(result.stdout,'');\n    }\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('CLI: object missing fields or with invalid path values exits 2',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n  try{\n    const shapes=[\n      {},\n      {root:'/a'},\n      {candidate:'b'},\n      {root:'no-slash',candidate:'b'},\n      {root:'/a',candidate:null},\n      {root:'/a\\u0000b',candidate:'c'},\n    ];\n    for(const shape of shapes){\n      const file=path.join(dir,'shape.json');\n      writeFileSync(file,JSON.stringify(shape));\n      const result=cli([file]);\n      assert.equal(result.code,2,JSON.stringify(shape));\n      assert.ok(result.stderr.length>0,JSON.stringify(shape));\n      assert.equal(result.stdout,'');\n    }\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n\ntest('importing the module does not run the CLI',()=>{\n  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-import-'));\n  try{\n    const importer=path.join(dir,'importer.mjs');\n    writeFileSync(importer,\n      `import {resolveWithin} from ${JSON.stringify('file://'+MODULE_PATH)};\\n`+\n      `console.log(JSON.stringify(resolveWithin('/srv/ws','sub/file.txt')));\\n`);\n    const stdout=execFileSync(NODE,[importer,'extra','args','here'],{encoding:'utf8'});\n    assert.equal(stdout,JSON.stringify(\n      {inside:true,resolved:'/srv/ws/sub/file.txt',relative:'sub/file.txt'})+'\\n');\n  }finally{rmSync(dir,{recursive:true,force:true});}\n});\n",
+      "displaySha256": "958f8a490aface12ddd2a516c53b33e7e82270a26d9f3958de5dc9dcf4f3b8bc",
+      "diff": "--- starter/test/containment.test.js\n+++ delivered/test/containment.test.js\n@@ -0,0 +1,205 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import {execFileSync}from'node:child_process';\n+import{mkdirSync,rmSync,writeFileSync,readFileSync,mkdtempSync,existsSync}from'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import {fileURLToPath}from'node:url';\n+import {normalizeSegments, resolveWithin} from '../path-scope.js';\n+\n+const MODULE_PATH=fileURLToPath(new URL('../path-scope.js',import.meta.url));\n+const NODE=process.execPath;\n+\n+function cli(args){\n+  try{\n+    const stdout=execFileSync(NODE,[MODULE_PATH,...args],{encoding:'utf8',stdio:'pipe'});\n+    return {code:0,stdout,stderr:''};\n+  }catch(error){\n+    return {code:error.status,stdout:(error.stdout??'')+'' ,stderr:(error.stderr??'')+''};\n+  }\n+}\n+\n+test('the existing helper behavior is preserved',()=>{\n+  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n+  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n+  assert.deepEqual(normalizeSegments('..foo/.../.hidden'),['..foo','...','.hidden']);\n+  assert.deepEqual(normalizeSegments(''),[]);\n+  assert.throws(()=>normalizeSegments(42),Error);\n+});\n+\n+test('spec example: relative candidate climbs within root',()=>{\n+  assert.deepEqual(resolveWithin('/srv/ws','../ws/sub/../file.txt'),\n+    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n+});\n+\n+test('spec example: absolute sibling is outside',()=>{\n+  assert.deepEqual(resolveWithin('/srv/ws','/srv/wsx'),\n+    {inside:false,resolved:'/srv/wsx',relative:null});\n+});\n+\n+test('textual prefix is not containment',()=>{\n+  assert.deepEqual(resolveWithin('/a/b','/a/bc'),\n+    {inside:false,resolved:'/a/bc',relative:null});\n+  assert.deepEqual(resolveWithin('/a/b','/a/b/c'),\n+    {inside:true,resolved:'/a/b/c',relative:'c'});\n+});\n+\n+test('same location reports empty relative path',()=>{\n+  assert.deepEqual(resolveWithin('/srv/ws','.'),\n+    {inside:true,resolved:'/srv/ws',relative:''});\n+  assert.deepEqual(resolveWithin('/srv/ws','sub/../.'),\n+    {inside:true,resolved:'/srv/ws',relative:''});\n+  assert.deepEqual(resolveWithin('/srv/ws/','/srv/ws'),\n+    {inside:true,resolved:'/srv/ws',relative:''});\n+});\n+\n+test('absolute candidate inside root',()=>{\n+  assert.deepEqual(resolveWithin('/srv/ws','/srv/ws/a/b'),\n+    {inside:true,resolved:'/srv/ws/a/b',relative:'a/b'});\n+});\n+\n+test('.. clamps at the filesystem root and never climbs above it',()=>{\n+  assert.deepEqual(resolveWithin('/a','../../x'),\n+    {inside:false,resolved:'/x',relative:null});\n+  assert.deepEqual(resolveWithin('/a/b','../../..'),\n+    {inside:false,resolved:'/',relative:null});\n+  assert.deepEqual(resolveWithin('/','../x'),\n+    {inside:true,resolved:'/x',relative:'x'});\n+});\n+\n+test('root at filesystem root contains every absolute path',()=>{\n+  assert.deepEqual(resolveWithin('/','a/b'),\n+    {inside:true,resolved:'/a/b',relative:'a/b'});\n+  assert.deepEqual(resolveWithin('/','/'),\n+    {inside:true,resolved:'/',relative:''});\n+});\n+\n+test('backslash is an ordinary character, never a separator',()=>{\n+  assert.deepEqual(resolveWithin('/a','a\\\\b'),\n+    {inside:true,resolved:'/a/a\\\\b',relative:'a\\\\b'});\n+  assert.deepEqual(normalizeSegments('x\\\\y'),['x\\\\y']);\n+});\n+\n+test('dot-adjacent names are ordinary segments',()=>{\n+  assert.deepEqual(resolveWithin('/r','..foo/.../.hidden/.'),\n+    {inside:true,resolved:'/r/..foo/.../.hidden',relative:'..foo/.../.hidden'});\n+});\n+\n+test('trailing and duplicate slashes are dropped in the result',()=>{\n+  assert.deepEqual(resolveWithin('/srv//ws/','sub/'),\n+    {inside:true,resolved:'/srv/ws/sub',relative:'sub'});\n+  assert.deepEqual(resolveWithin('//a//','b//'),\n+    {inside:true,resolved:'/a/b',relative:'b'});\n+});\n+\n+test('inputs are not mutated',()=>{\n+  const root='/srv/ws';\n+  const candidate='sub/../x/';\n+  resolveWithin(root,candidate);\n+  assert.equal(root,'/srv/ws');\n+  assert.equal(candidate,'sub/../x/');\n+});\n+\n+test('invalid inputs throw an Error',()=>{\n+  assert.throws(()=>resolveWithin('','x'),Error);\n+  assert.throws(()=>resolveWithin('/a',''),Error);\n+  assert.throws(()=>resolveWithin('a','x'),Error);\n+  assert.throws(()=>resolveWithin('/a','b\\u0000'),Error);\n+  assert.throws(()=>resolveWithin('/a\\u0000','b'),Error);\n+  assert.throws(()=>resolveWithin(null,'x'),Error);\n+  assert.throws(()=>resolveWithin('/a',null),Error);\n+  assert.throws(()=>resolveWithin(1,'x'),Error);\n+  assert.throws(()=>resolveWithin('/a',2),Error);\n+  assert.throws(()=>resolveWithin(undefined,undefined),Error);\n+});\n+\n+test('CLI: valid input prints exactly the API result and exits 0',()=>{\n+  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n+  try{\n+    const input=path.join(dir,'input.json');\n+    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'../ws/sub/../file.txt',ignored:{}}));\n+    const result=cli([input]);\n+    assert.equal(result.code,0);\n+    assert.equal(result.stderr,'');\n+    assert.equal(result.stdout,'{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\\n');\n+  }finally{rmSync(dir,{recursive:true,force:true});}\n+});\n+\n+test('CLI: outside candidate prints inside:false and relative:null',()=>{\n+  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n+  try{\n+    const input=path.join(dir,'input.json');\n+    writeFileSync(input,JSON.stringify({root:'/srv/ws',candidate:'/srv/wsx'}));\n+    const result=cli([input]);\n+    assert.equal(result.code,0);\n+    assert.equal(result.stderr,'');\n+    assert.equal(result.stdout,'{\"inside\":false,\"resolved\":\"/srv/wsx\",\"relative\":null}\\n');\n+  }finally{rmSync(dir,{recursive:true,force:true});}\n+});\n+\n+test('CLI: invalid argument counts exit 2 with nonempty stderr and no stdout',()=>{\n+  for(const args of[[],['one.json','two.json']]){\n+    const result=cli(args);\n+    assert.equal(result.code,2);\n+    assert.ok(result.stderr.length>0);\n+    assert.equal(result.stdout,'');\n+  }\n+});\n+\n+test('CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout',()=>{\n+  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n+  try{\n+    const missing=path.join(dir,'nope.json');\n+    const badJson=path.join(dir,'bad.json');\n+    writeFileSync(badJson,'{not json');\n+    const cases=[[missing],\n+      [badJson],\n+      ...['null','[]','\"x\"',JSON.stringify([]),JSON.stringify(null),JSON.stringify('s'),JSON.stringify(7)]\n+        .map((content)=>{\n+          const file=path.join(dir,'shape.json');\n+          writeFileSync(file,content);\n+          return [file];\n+        })];\n+    for(const args of cases){\n+      const result=cli(args);\n+      assert.equal(result.code,2,args[0]);\n+      assert.ok(result.stderr.length>0,args[0]);\n+      assert.equal(result.stdout,'');\n+    }\n+  }finally{rmSync(dir,{recursive:true,force:true});}\n+});\n+\n+test('CLI: object missing fields or with invalid path values exits 2',()=>{\n+  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-cli-'));\n+  try{\n+    const shapes=[\n+      {},\n+      {root:'/a'},\n+      {candidate:'b'},\n+      {root:'no-slash',candidate:'b'},\n+      {root:'/a',candidate:null},\n+      {root:'/a\\u0000b',candidate:'c'},\n+    ];\n+    for(const shape of shapes){\n+      const file=path.join(dir,'shape.json');\n+      writeFileSync(file,JSON.stringify(shape));\n+      const result=cli([file]);\n+      assert.equal(result.code,2,JSON.stringify(shape));\n+      assert.ok(result.stderr.length>0,JSON.stringify(shape));\n+      assert.equal(result.stdout,'');\n+    }\n+  }finally{rmSync(dir,{recursive:true,force:true});}\n+});\n+\n+test('importing the module does not run the CLI',()=>{\n+  const dir=mkdtempSync(path.join(os.tmpdir(),'path-scope-import-'));\n+  try{\n+    const importer=path.join(dir,'importer.mjs');\n+    writeFileSync(importer,\n+      `import {resolveWithin} from ${JSON.stringify('file://'+MODULE_PATH)};\\n`+\n+      `console.log(JSON.stringify(resolveWithin('/srv/ws','sub/file.txt')));\\n`);\n+    const stdout=execFileSync(NODE,[importer,'extra','args','here'],{encoding:'utf8'});\n+    assert.equal(stdout,JSON.stringify(\n+      {inside:true,resolved:'/srv/ws/sub/file.txt',relative:'sub/file.txt'})+'\\n');\n+  }finally{rmSync(dir,{recursive:true,force:true});}\n+});\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "afterSha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\ntest('the existing helper keeps normalizing segments',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n});\ntest('a candidate that stays inside reports its path from the root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\ntest('the existing helper keeps normalizing segments',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n});\ntest('a candidate that stays inside reports its path from the root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n",
+      "displaySha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-path-scope@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: the existing helper behavior is preserved\nok 1 - the existing helper behavior is preserved\n  ---\n  duration_ms: 1.393986\n  ...\n# Subtest: spec example: relative candidate climbs within root\nok 2 - spec example: relative candidate climbs within root\n  ---\n  duration_ms: 0.202602\n  ...\n# Subtest: spec example: absolute sibling is outside\nok 3 - spec example: absolute sibling is outside\n  ---\n  duration_ms: 0.163262\n  ...\n# Subtest: textual prefix is not containment\nok 4 - textual prefix is not containment\n  ---\n  duration_ms: 0.142812\n  ...\n# Subtest: same location reports empty relative path\nok 5 - same location reports empty relative path\n  ---\n  duration_ms: 0.147392\n  ...\n# Subtest: absolute candidate inside root\nok 6 - absolute candidate inside root\n  ---\n  duration_ms: 0.169452\n  ...\n# Subtest: .. clamps at the filesystem root and never climbs above it\nok 7 - .. clamps at the filesystem root and never climbs above it\n  ---\n  duration_ms: 0.188752\n  ...\n# Subtest: root at filesystem root contains every absolute path\nok 8 - root at filesystem root contains every absolute path\n  ---\n  duration_ms: 0.132301\n  ...\n# Subtest: backslash is an ordinary character, never a separator\nok 9 - backslash is an ordinary character, never a separator\n  ---\n  duration_ms: 0.217552\n  ...\n# Subtest: dot-adjacent names are ordinary segments\nok 10 - dot-adjacent names are ordinary segments\n  ---\n  duration_ms: 0.173822\n  ...\n# Subtest: trailing and duplicate slashes are dropped in the result\nok 11 - trailing and duplicate slashes are dropped in the result\n  ---\n  duration_ms: 0.642767\n  ...\n# Subtest: inputs are not mutated\nok 12 - inputs are not mutated\n  ---\n  duration_ms: 0.128561\n  ...\n# Subtest: invalid inputs throw an Error\nok 13 - invalid inputs throw an Error\n  ---\n  duration_ms: 0.189322\n  ...\n# Subtest: CLI: valid input prints exactly the API result and exits 0\nok 14 - CLI: valid input prints exactly the API result and exits 0\n  ---\n  duration_ms: 23.92817\n  ...\n# Subtest: CLI: outside candidate prints inside:false and relative:null\nok 15 - CLI: outside candidate prints inside:false and relative:null\n  ---\n  duration_ms: 21.992668\n  ...\n# Subtest: CLI: invalid argument counts exit 2 with nonempty stderr and no stdout\nok 16 - CLI: invalid argument counts exit 2 with nonempty stderr and no stdout\n  ---\n  duration_ms: 44.402703\n  ...\n# Subtest: CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout\nok 17 - CLI: missing file, bad JSON, and bad shapes exit 2 with nonempty stderr and no stdout\n  ---\n  duration_ms: 194.443519\n  ...\n# Subtest: CLI: object missing fields or with invalid path values exits 2\nok 18 - CLI: object missing fields or with invalid path values exits 2\n  ---\n  duration_ms: 130.92224\n  ...\n# Subtest: importing the module does not run the CLI\nok 19 - importing the module does not run the CLI\n  ---\n  duration_ms: 23.84173\n  ...\n# Subtest: the existing helper keeps normalizing segments\nok 20 - the existing helper keeps normalizing segments\n  ---\n  duration_ms: 1.203624\n  ...\n# Subtest: a candidate that stays inside reports its path from the root\nok 21 - a candidate that stays inside reports its path from the root\n  ---\n  duration_ms: 0.200592\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 21\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 494.272849\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"path-scope\",\"pass\":true,\"groups\":[{\"name\":\"preserved-helper-and-normalization\",\"pass\":true},{\"name\":\"traversal-and-root-clamping\",\"pass\":true},{\"name\":\"prefix-collisions-and-boundaries\",\"pass\":true},{\"name\":\"hostile-names-and-relative-receipts\",\"pass\":true},{\"name\":\"validation-and-cli-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "48c5cc9bc006bcb7233cb281b7dcad90ae4455c0b6ebaa854ec1d8cde85b447f"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "4045a037417d05b295e032e7e4410d47d1bb427096a3886491a5251e9e8ea457"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "cb47297ccdcec064725051c92f61937578190b8b018cce7dedc802c41ac4f7d6"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "0ba4a4adda28f59233b75791490b955d77655d842199eb4ac3a526809e223406"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 14,
+    "withResults": 14,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "A working guard, with a longer route.",
+    "paragraphs": [
+      {
+        "text": "Hermes extended the path checker and added containment regressions. A failing assertion in its new test file led to a correction, followed by 21 passing project tests.",
+        "actions": [
+          "action-6",
+          "action-9",
+          "action-10",
+          "action-11",
+          "action-12",
+          "action-13"
+        ]
+      },
+      {
+        "text": "It also checked the CLI from another directory. All five independent groups passed, with a clean finish at 275.6 seconds. BANTAM FACTORY finished the same work in 75.1 seconds.",
+        "actions": [
+          "action-14"
+        ]
+      }
+    ]
+  }
+}

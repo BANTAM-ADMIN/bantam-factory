@@ -70,6 +70,114 @@
           }
         ]
       }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 15695,
+      "sha256": "d5906c99921e9b596f318ec62d101e6c37fa5f2da75c3922294ae56ca21b89e3",
+      "arm": "deepseek-local-27b",
+      "wallMs": 551382,
+      "outcome": "FAIL",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 3,
+      "changedFiles": 0,
+      "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+      "explanation": {
+        "title": "Inspection never became an implementation.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek Harness listed the workspace and read the starter, package file and supplied tests. Its five recorded tool calls contain no edit.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          },
+          {
+            "text": "The delivered selector was still the original stub. All five independent groups failed; the attempt ended after 551.4 seconds. BANTAM FACTORY completed this work order in 264.1 seconds.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 65614,
+      "sha256": "ee410b1bb1a9524bf428ab16659fbb412f8512e27fd699318c10c1cbac7e205d",
+      "arm": "hermes",
+      "wallMs": 600006,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 21,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+      "explanation": {
+        "title": "Two green tests left five groups uncovered.",
+        "paragraphs": [
+          {
+            "text": "Hermes wrote a selector, then repaired its CLI entry check, include/exclude handling and pattern validation. Its final visible test run passed both supplied tests.",
+            "actions": [
+              "action-5",
+              "action-12",
+              "action-16",
+              "action-19",
+              "action-20",
+              "action-21"
+            ]
+          },
+          {
+            "text": "The independent checks still rejected all five groups, including empty-pattern handling, globstars, character classes and rule decisions. The attempt reached ten minutes without a clean finish; BANTAM FACTORY passed the full acceptance check in 264.1 seconds.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 15704,
+      "sha256": "f8311486fe7aeaa3af111644a3358a94fe3a57e6cd918c4b1c7696dcaeb8d010",
+      "arm": "opencode",
+      "wallMs": 600007,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 3,
+      "changedFiles": 0,
+      "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+      "explanation": {
+        "title": "The clock ran out before an edit landed.",
+        "paragraphs": [
+          {
+            "text": "OpenCode inspected the workspace and read the source and supplied tests. Its recorded work contains four tool calls and no changed files.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "At the ten-minute boundary, the selector still threw its original “Implement the selector and CLI” error. All five independent groups failed. BANTAM FACTORY delivered an accepted selector in 264.1 seconds.",
+            "actions": []
+          }
+        ]
+      }
     }
   ]
 }

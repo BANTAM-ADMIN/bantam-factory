@@ -480,6 +480,33 @@
           "accountingComplete": true
         }
       ]
+    },
+    {
+      "id": "glob-select",
+      "title": "Glob select",
+      "kind": "BUILD",
+      "number": "01",
+      "description": "Match paths against glob patterns, last pattern deciding, with a receipt per path.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "path-scope",
+      "title": "Path scope",
+      "kind": "EXTEND",
+      "number": "02",
+      "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "semver-range",
+      "title": "Semver range",
+      "kind": "REPAIR",
+      "number": "03",
+      "description": "Order versions by real precedence and admit prereleases into a range only when invited.",
+      "recorded": false,
+      "rows": []
     }
   ],
   "references": {

@@ -29,6 +29,10 @@ The factory formula: **turn big jobs into chicken problems**. Put the model at
 one station at a time—as worker, reviewer, or test builder. The factory runs
 the checks, feeds back the result, and directs the next repair or delivery.
 
+<p align="center">
+  <img src="docs/brand/chicken-problems.png" alt="A chicken struggles with a square peg, then builds a factory that sorts the pieces and sends the right one to the job." width="100%">
+</p>
+
 ## Same model. Bigger punch.
 
 Same task. Same local Qwen 27B. Both systems passed in each comparison below.
@@ -38,6 +42,7 @@ across the published cards: **82.6–105.2 tokens/second**.
 
 | BANTAM FACTORY vs. | BANTAM FACTORY finished | Watch the fight |
 | --- | --- | --- |
+| **Pi** | **6.0× faster** · 58.1s vs. 350.7s | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
 | **Hermes** | **8.8× faster** · 58.1s vs. 512.2s | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
 | **DeepSeek Harness** | **3.9× faster** · 112.5s vs. 442.7s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
 | **OpenCode** | **6.8× faster** · 81.8s vs. 559.0s | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
@@ -49,7 +54,7 @@ The little model can trade punches with frontier agents, too:
 [Context Packet](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html)
 took **58.1s locally vs. 110.6s in native Codex/Astra**, both 5/5.
 
-**[Enter the fight gallery →](https://bantam-admin.github.io/bantam-factory/)**
+**[Enter the fight gallery →](https://bantam-admin.github.io/bantam-factory/fights.html)**
 Pick a task. Put agents side by side. Read how it went. Inspect every recorded
 action and the files they delivered.
 

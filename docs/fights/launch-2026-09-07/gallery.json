@@ -959,7 +959,7 @@
       "number": "01",
       "description": "Remove selected literals deterministically, with an exact edit receipt and byte accounting.",
       "recorded": true,
-      "sourceSha256": "06d72a11ce426a936df574fbb17733b92d7abbda130725f8dea3e6656aae7dda",
+      "sourceSha256": "df5887004a8bba40b37ed8923c40a2cab385c6718c770e316d71654e656f1406",
       "reviewedWork": true,
       "rows": [
         {
@@ -1087,6 +1087,37 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 341638,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 22322,
+              "milliseconds": 323050.53,
+              "measuredRequests": 13,
+              "totalRequests": 13
+            },
+            "prefill": {
+              "tokens": 18955,
+              "milliseconds": 12372.633000000002,
+              "measuredRequests": 13,
+              "totalRequests": 13
+            },
+            "evidenceSha256": "886706479364672d22485b748a8ffe350db704c16b8def2a8edd549a1315726b",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -1097,7 +1128,7 @@
       "number": "02",
       "description": "Respect backoff, server retry hints and a hard remaining-time budget without overflow.",
       "recorded": true,
-      "sourceSha256": "4612f47f9e3b49ea2fd73cbc7ae6539ea20b27f2847353414a0338352d27d71d",
+      "sourceSha256": "09439f243e8b760e1bf86c7161eb8e53197e182652a4879b6760176be44b5d05",
       "reviewedWork": true,
       "rows": [
         {
@@ -1225,6 +1256,37 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 375419,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 22979,
+              "milliseconds": 337933.73300000007,
+              "measuredRequests": 21,
+              "totalRequests": 21
+            },
+            "prefill": {
+              "tokens": 49052,
+              "milliseconds": 27165.180000000004,
+              "measuredRequests": 21,
+              "totalRequests": 21
+            },
+            "evidenceSha256": "92d5d51aa49f338265aa0bd0b96640b583ad6becdbdb77d6c876d9fc1f65e6ae",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },

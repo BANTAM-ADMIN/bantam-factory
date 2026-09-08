@@ -1,8 +1,8 @@
 {
   "schema": "bantam.launch-fight-card.v1",
-  "generatedAt": "2026-09-08T12:11:51.214Z",
+  "generatedAt": "2026-09-08T18:46:54.921Z",
   "source": {
-    "sha256": "06d72a11ce426a936df574fbb17733b92d7abbda130725f8dea3e6656aae7dda",
+    "sha256": "df5887004a8bba40b37ed8923c40a2cab385c6718c770e316d71654e656f1406",
     "schema": "bantam.factory-showcase.v1"
   },
   "comparison": null,
@@ -15,15 +15,33 @@
       "complete": true,
       "startedAt": "2026-09-08T12:09:25.483Z",
       "finishedAt": "2026-09-08T12:11:50.786Z",
+      "followups": [
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "06d72a11ce426a936df574fbb17733b92d7abbda130725f8dea3e6656aae7dda",
+          "baselineManifestSha256": "365a3e95891d6c2308f3ac581eadc99e9f950241d857aaf817ecf71636389862",
+          "manifestSha256": "657b871cf8c0b77d77b4b6141895b173e3d732aac8298e8ac9b6f35e804a320c",
+          "materialsSha256": "43759dedeca66d9ca5264183f22fade47d0b4d5583a63c892675ae48e69e0c41",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T18:34:43.100Z",
+          "finishedAt": "2026-09-08T18:46:54.921Z",
+          "arms": [
+            "opencode"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
+        }
+      ],
       "counts": {
-        "observed": 6,
-        "planned": 6,
-        "accepted": 5,
-        "completed": 5,
-        "pass": 5,
-        "groupsMeasured": 6,
-        "groupsPassed": 30,
-        "groupsTotal": 30
+        "observed": 7,
+        "planned": 7,
+        "accepted": 6,
+        "completed": 6,
+        "pass": 6,
+        "groupsMeasured": 7,
+        "groupsPassed": 35,
+        "groupsTotal": 35
       },
       "cards": [
         {
@@ -1301,6 +1319,212 @@
               ],
               "events": [],
               "timedEvents": 77,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-redaction-plan-r1-lane7",
+              "arm": "opencode",
+              "label": "OpenCode",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 341638,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 267712,
+                  "outputTokens": 22322,
+                  "cacheHitTokens": 248757,
+                  "freshInputTokens": 18955
+                },
+                "subset": {
+                  "inputTokens": 267712,
+                  "outputTokens": 22322,
+                  "cacheHitTokens": 248757,
+                  "freshInputTokens": 18955
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 267750,
+                  "outputTokens": 22320,
+                  "cacheHitTokens": 248800,
+                  "freshInputTokens": 18950
+                },
+                "complete": true,
+                "requests": 13,
+                "measuredRequests": 13,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 13,
+                    "totalRequests": 13,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 13,
+                    "totalRequests": 13,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 13,
+                    "totalRequests": 13,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 13,
+                    "totalRequests": 13,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 22322,
+                  "milliseconds": 323050.53,
+                  "measuredRequests": 13,
+                  "totalRequests": 13
+                },
+                "prefill": {
+                  "tokens": 18955,
+                  "milliseconds": 12372.633000000002,
+                  "measuredRequests": 13,
+                  "totalRequests": 13
+                },
+                "evidenceSha256": "886706479364672d22485b748a8ffe350db704c16b8def2a8edd549a1315726b",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 7881,
+                  "inputTokens": 1178,
+                  "outputTokens": 280,
+                  "cacheHitTokens": 577,
+                  "freshInputTokens": 601,
+                  "partial": false
+                },
+                {
+                  "t": 9298,
+                  "inputTokens": 9253,
+                  "outputTokens": 325,
+                  "cacheHitTokens": 8051,
+                  "freshInputTokens": 1202,
+                  "partial": false
+                },
+                {
+                  "t": 10659,
+                  "inputTokens": 17542,
+                  "outputTokens": 431,
+                  "cacheHitTokens": 16171,
+                  "freshInputTokens": 1371,
+                  "partial": false
+                },
+                {
+                  "t": 11488,
+                  "inputTokens": 26186,
+                  "outputTokens": 478,
+                  "cacheHitTokens": 24566,
+                  "freshInputTokens": 1620,
+                  "partial": false
+                },
+                {
+                  "t": 236601,
+                  "inputTokens": 35129,
+                  "outputTokens": 15491,
+                  "cacheHitTokens": 33256,
+                  "freshInputTokens": 1873,
+                  "partial": false
+                },
+                {
+                  "t": 257671,
+                  "inputTokens": 59223,
+                  "outputTokens": 16754,
+                  "cacheHitTokens": 42195,
+                  "freshInputTokens": 17028,
+                  "partial": false
+                },
+                {
+                  "t": 293293,
+                  "inputTokens": 84600,
+                  "outputTokens": 19463,
+                  "cacheHitTokens": 67553,
+                  "freshInputTokens": 17047,
+                  "partial": false
+                },
+                {
+                  "t": 294341,
+                  "inputTokens": 112706,
+                  "outputTokens": 19518,
+                  "cacheHitTokens": 95640,
+                  "freshInputTokens": 17066,
+                  "partial": false
+                },
+                {
+                  "t": 306125,
+                  "inputTokens": 141973,
+                  "outputTokens": 20225,
+                  "cacheHitTokens": 123802,
+                  "freshInputTokens": 18171,
+                  "partial": false
+                },
+                {
+                  "t": 312553,
+                  "inputTokens": 172247,
+                  "outputTokens": 20762,
+                  "cacheHitTokens": 153777,
+                  "freshInputTokens": 18470,
+                  "partial": false
+                },
+                {
+                  "t": 330346,
+                  "inputTokens": 203254,
+                  "outputTokens": 21648,
+                  "cacheHitTokens": 184589,
+                  "freshInputTokens": 18665,
+                  "partial": false
+                },
+                {
+                  "t": 333747,
+                  "inputTokens": 235298,
+                  "outputTokens": 21880,
+                  "cacheHitTokens": 216481,
+                  "freshInputTokens": 18817,
+                  "partial": false
+                },
+                {
+                  "t": 341392,
+                  "inputTokens": 267712,
+                  "outputTokens": 22322,
+                  "cacheHitTokens": 248757,
+                  "freshInputTokens": 18955,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 66,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

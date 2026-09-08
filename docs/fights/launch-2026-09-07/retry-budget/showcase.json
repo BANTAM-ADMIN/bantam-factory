@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T05:11:19.307Z",
+  "generatedAt": "2026-09-08T18:46:54.921Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -15,15 +15,33 @@
       "complete": true,
       "startedAt": "2026-09-08T04:51:52.733Z",
       "finishedAt": "2026-09-08T05:11:18.208Z",
+      "followups": [
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "4612f47f9e3b49ea2fd73cbc7ae6539ea20b27f2847353414a0338352d27d71d",
+          "baselineManifestSha256": "2a2547782b0d5dc4b4cea7833fb3d92636c626980ea5564958f5d0888b40395f",
+          "manifestSha256": "657b871cf8c0b77d77b4b6141895b173e3d732aac8298e8ac9b6f35e804a320c",
+          "materialsSha256": "33ecad14fb23e569661d3c4178e3f236877a6f905290ecc2362b239c678cfdc5",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T18:34:43.100Z",
+          "finishedAt": "2026-09-08T18:46:54.921Z",
+          "arms": [
+            "opencode"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
+        }
+      ],
       "counts": {
-        "observed": 6,
-        "planned": 6,
-        "accepted": 6,
-        "completed": 6,
-        "pass": 6,
-        "groupsMeasured": 6,
-        "groupsPassed": 30,
-        "groupsTotal": 30
+        "observed": 7,
+        "planned": 7,
+        "accepted": 7,
+        "completed": 7,
+        "pass": 7,
+        "groupsMeasured": 7,
+        "groupsPassed": 35,
+        "groupsTotal": 35
       },
       "cards": [
         {
@@ -109,6 +127,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 9969,
+                  "milliseconds": 113948.30900000002,
+                  "measuredRequests": 23,
+                  "totalRequests": 23
+                },
+                "prefill": {
+                  "tokens": 30945,
+                  "milliseconds": 18741.175,
+                  "measuredRequests": 23,
+                  "totalRequests": 23
+                },
+                "evidenceSha256": "8ff5fbc427dd977a958202c74fa3bf5abe631d8ce6e11d5612e4746ae53dc442",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -304,27 +342,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 9969,
-                  "milliseconds": 113948.30900000002,
-                  "measuredRequests": 23,
-                  "totalRequests": 23
-                },
-                "prefill": {
-                  "tokens": 30945,
-                  "milliseconds": 18741.175,
-                  "measuredRequests": 23,
-                  "totalRequests": 23
-                },
-                "evidenceSha256": "8ff5fbc427dd977a958202c74fa3bf5abe631d8ce6e11d5612e4746ae53dc442",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-retry-budget-r1-lane2",
@@ -395,6 +413,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 27046,
+                  "milliseconds": 427646.369,
+                  "measuredRequests": 15,
+                  "totalRequests": 15
+                },
+                "prefill": {
+                  "tokens": 13635,
+                  "milliseconds": 10909.500000000002,
+                  "measuredRequests": 15,
+                  "totalRequests": 15
+                },
+                "evidenceSha256": "71097fe1c43a5db0a966ce4d4ce2162884c5f365cc8ad07ccf6f80426ddd5b72",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -526,27 +564,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 27046,
-                  "milliseconds": 427646.369,
-                  "measuredRequests": 15,
-                  "totalRequests": 15
-                },
-                "prefill": {
-                  "tokens": 13635,
-                  "milliseconds": 10909.500000000002,
-                  "measuredRequests": 15,
-                  "totalRequests": 15
-                },
-                "evidenceSha256": "71097fe1c43a5db0a966ce4d4ce2162884c5f365cc8ad07ccf6f80426ddd5b72",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-retry-budget-r1-lane3",
@@ -637,6 +655,26 @@
                     "responseBytes": 0
                   }
                 ]
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 33214,
+                  "milliseconds": 522284.8900000002,
+                  "measuredRequests": 25,
+                  "totalRequests": 26
+                },
+                "prefill": {
+                  "tokens": 29386,
+                  "milliseconds": 21118.409,
+                  "measuredRequests": 25,
+                  "totalRequests": 26
+                },
+                "evidenceSha256": "33eaf05fe4074ee2b3f649204f038fc790ae5bcd1c87c548f93beef1bf6e79f0",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -848,27 +886,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 33214,
-                  "milliseconds": 522284.8900000002,
-                  "measuredRequests": 25,
-                  "totalRequests": 26
-                },
-                "prefill": {
-                  "tokens": 29386,
-                  "milliseconds": 21118.409,
-                  "measuredRequests": 25,
-                  "totalRequests": 26
-                },
-                "evidenceSha256": "33eaf05fe4074ee2b3f649204f038fc790ae5bcd1c87c548f93beef1bf6e79f0",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-retry-budget-r1-lane4",
@@ -1285,6 +1303,276 @@
               ],
               "events": [],
               "timedEvents": 71,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-retry-budget-r1-lane7",
+              "arm": "opencode",
+              "label": "OpenCode",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 375419,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 433649,
+                  "outputTokens": 22979,
+                  "cacheHitTokens": 384597,
+                  "freshInputTokens": 49052
+                },
+                "subset": {
+                  "inputTokens": 433649,
+                  "outputTokens": 22979,
+                  "cacheHitTokens": 384597,
+                  "freshInputTokens": 49052
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 433660,
+                  "outputTokens": 22980,
+                  "cacheHitTokens": 384600,
+                  "freshInputTokens": 49060
+                },
+                "complete": true,
+                "requests": 21,
+                "measuredRequests": 21,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 21,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 21,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 21,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 21,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 22979,
+                  "milliseconds": 337933.73300000007,
+                  "measuredRequests": 21,
+                  "totalRequests": 21
+                },
+                "prefill": {
+                  "tokens": 49052,
+                  "milliseconds": 27165.180000000004,
+                  "measuredRequests": 21,
+                  "totalRequests": 21
+                },
+                "evidenceSha256": "92d5d51aa49f338265aa0bd0b96640b583ad6becdbdb77d6c876d9fc1f65e6ae",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 7699,
+                  "inputTokens": 1128,
+                  "outputTokens": 259,
+                  "cacheHitTokens": 577,
+                  "freshInputTokens": 551,
+                  "partial": false
+                },
+                {
+                  "t": 11873,
+                  "inputTokens": 9153,
+                  "outputTokens": 310,
+                  "cacheHitTokens": 577,
+                  "freshInputTokens": 8576,
+                  "partial": false
+                },
+                {
+                  "t": 13141,
+                  "inputTokens": 17397,
+                  "outputTokens": 409,
+                  "cacheHitTokens": 8652,
+                  "freshInputTokens": 8745,
+                  "partial": false
+                },
+                {
+                  "t": 13999,
+                  "inputTokens": 26084,
+                  "outputTokens": 449,
+                  "cacheHitTokens": 16995,
+                  "freshInputTokens": 9089,
+                  "partial": false
+                },
+                {
+                  "t": 168665,
+                  "inputTokens": 35023,
+                  "outputTokens": 10614,
+                  "cacheHitTokens": 25723,
+                  "freshInputTokens": 9300,
+                  "partial": false
+                },
+                {
+                  "t": 176030,
+                  "inputTokens": 54339,
+                  "outputTokens": 11285,
+                  "cacheHitTokens": 44826,
+                  "freshInputTokens": 9513,
+                  "partial": false
+                },
+                {
+                  "t": 202180,
+                  "inputTokens": 74346,
+                  "outputTokens": 13307,
+                  "cacheHitTokens": 64814,
+                  "freshInputTokens": 9532,
+                  "partial": false
+                },
+                {
+                  "t": 205294,
+                  "inputTokens": 96395,
+                  "outputTokens": 13512,
+                  "cacheHitTokens": 86844,
+                  "freshInputTokens": 9551,
+                  "partial": false
+                },
+                {
+                  "t": 210376,
+                  "inputTokens": 122000,
+                  "outputTokens": 13747,
+                  "cacheHitTokens": 109098,
+                  "freshInputTokens": 12902,
+                  "partial": false
+                },
+                {
+                  "t": 213402,
+                  "inputTokens": 147859,
+                  "outputTokens": 13930,
+                  "cacheHitTokens": 134939,
+                  "freshInputTokens": 12920,
+                  "partial": false
+                },
+                {
+                  "t": 214997,
+                  "inputTokens": 174203,
+                  "outputTokens": 14001,
+                  "cacheHitTokens": 160982,
+                  "freshInputTokens": 13221,
+                  "partial": false
+                },
+                {
+                  "t": 231991,
+                  "inputTokens": 200807,
+                  "outputTokens": 15134,
+                  "cacheHitTokens": 187398,
+                  "freshInputTokens": 13409,
+                  "partial": false
+                },
+                {
+                  "t": 235611,
+                  "inputTokens": 228563,
+                  "outputTokens": 15399,
+                  "cacheHitTokens": 215134,
+                  "freshInputTokens": 13429,
+                  "partial": false
+                },
+                {
+                  "t": 248973,
+                  "inputTokens": 256615,
+                  "outputTokens": 16211,
+                  "cacheHitTokens": 243154,
+                  "freshInputTokens": 13461,
+                  "partial": false
+                },
+                {
+                  "t": 259347,
+                  "inputTokens": 285688,
+                  "outputTokens": 16884,
+                  "cacheHitTokens": 272019,
+                  "freshInputTokens": 13669,
+                  "partial": false
+                },
+                {
+                  "t": 293027,
+                  "inputTokens": 315604,
+                  "outputTokens": 18798,
+                  "cacheHitTokens": 301765,
+                  "freshInputTokens": 13839,
+                  "partial": false
+                },
+                {
+                  "t": 296961,
+                  "inputTokens": 347648,
+                  "outputTokens": 19035,
+                  "cacheHitTokens": 333596,
+                  "freshInputTokens": 14052,
+                  "partial": false
+                },
+                {
+                  "t": 311118,
+                  "inputTokens": 380751,
+                  "outputTokens": 19824,
+                  "cacheHitTokens": 365876,
+                  "freshInputTokens": 14875,
+                  "partial": false
+                },
+                {
+                  "t": 350878,
+                  "inputTokens": 396644,
+                  "outputTokens": 21899,
+                  "cacheHitTokens": 365876,
+                  "freshInputTokens": 30768,
+                  "partial": false
+                },
+                {
+                  "t": 369332,
+                  "inputTokens": 414715,
+                  "outputTokens": 22550,
+                  "cacheHitTokens": 365876,
+                  "freshInputTokens": 48839,
+                  "partial": false
+                },
+                {
+                  "t": 375159,
+                  "inputTokens": 433649,
+                  "outputTokens": 22979,
+                  "cacheHitTokens": 384597,
+                  "freshInputTokens": 49052,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 116,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

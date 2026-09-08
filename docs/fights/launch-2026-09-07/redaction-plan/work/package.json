@@ -202,6 +202,42 @@
           }
         ]
       }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 67424,
+      "sha256": "df6de5adbb06114d3ad6c9040092495995b0e70096cf360300b0af0dd18198fb",
+      "arm": "opencode",
+      "wallMs": 341638,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 13,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Passed the suite, then exercised the CLI.",
+        "paragraphs": [
+          {
+            "text": "OpenCode implemented the redactor and added regression tests. All 22 tests passed on the first suite run. It then corrected an import path in a temporary CLI probe and used that probe to exercise errors, empty rules and Unicode.",
+            "actions": [
+              "action-7",
+              "action-8",
+              "action-9",
+              "action-10",
+              "action-11"
+            ]
+          },
+          {
+            "text": "The delivered project passed all five independent groups and finished in 341.6 seconds. BANTAM FACTORY delivered the same work order in 133.2 seconds.",
+            "actions": []
+          }
+        ]
+      }
     }
   ]
 }

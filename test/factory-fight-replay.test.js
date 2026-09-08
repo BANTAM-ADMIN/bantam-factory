@@ -77,6 +77,14 @@ test('wire replay uses actual request and response clocks and cumulative receipt
   assert.equal(lane.events[0].line,undefined,'exchange line index is not a line in the request body');
 });
 
+test('Pi exports as its own local replay lane with recorded wire clocks',t=>{
+  const root=fixture(t);wire(root);
+  const {lane}=buildReplayLane({directory:root,result:baseResult('pi'),arm:'pi',card:'receipt-reducer',repeat:1});
+  assert.equal(lane.arm,'pi');assert.equal(lane.label,'Pi');assert.equal(lane.family,'local');
+  assert.deepEqual(lane.events.map(event=>event.t),[1000,3000,4000,4500]);
+  assert.equal(lane.tokenUpdates.at(-1).outputTokens,20);
+});
+
 test('missing start clock never manufactures event timestamps or measured counters',t=>{
   const root=fixture(t);wire(root);const result=baseResult();delete result.startedAt;delete result.wallMs;delete result.usage;
   write(root,'run.json',{turns:[{i:0,tookMs:100,prompt:'exact saved prompt',parsedAction:{a:'read_file',p:'x'}}]});

@@ -10,7 +10,7 @@ import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
-const ARMS = [...LEGACY_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
+const ARMS = [...LEGACY_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
 const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','pi':'Pi','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus','claude-fable':'Claude · Fable'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
 const SHA = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -344,7 +344,7 @@ export function buildReplayLane({directory,result,arm,card,repeat,outer='',limit
   if(latestResponse?.reasons.includes('length'))stopReasons.push('latest wire response: length');
   const budgetLimited=stopReasons.includes('max-tokens')||latestResponse?.reasons.includes('length')===true;
   const lane={id:`r${repeat}-${card}-${arm}`,arm,label:LABELS[arm]??identity.label,card,repeat,
-    family:ARMS.includes(arm)?(ARMS.indexOf(arm)<4?'local':'astra'):identity.family,result:result??null,outcome:result?.outcome??(hasLaneArtifacts?'NO FINAL RESULT':'NOT RUN'),
+    family:ARMS.includes(arm)?(['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi'].includes(arm)?'local':'astra'):identity.family,result:result??null,outcome:result?.outcome??(hasLaneArtifacts?'NO FINAL RESULT':'NOT RUN'),
     duration,origin,stopReasons,budgetLimited,responseStops:wire.responseStops,
     usage:normalizeReplayUsage(result?.usage),usageComplete:result?.usage?.complete??null,
     usageSource:result?.usage?.source ?? result?.usage?.usageSource ?? null,

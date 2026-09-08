@@ -311,4 +311,29 @@
       ],
     },
   };
+  window.JOB_DEMOS = [
+    {label:'Build a game',demo:window.DEMOS.job,summary:'A falling-block game. One HTML file. Twelve recorded actions and 2 minutes 28 seconds from request to delivery.',link:'assets/showcase/examples/tetris/index.html',action:'Play what it built ↗'},
+    {label:'Make a tool',summary:'Project notes that fit an AI’s context budget. Keep complete sections, preserve required evidence, and see exactly what was included. Built and checked in 58.1 seconds.',link:'context-packet/share/index.html#try-it',action:'Try the tool it built ↗',demo:{
+      title:'bantam · make a useful little tool',caption:'Context packet · 58.1 seconds. <a href="context-packet/share/index.html#try-it">Try the recorded tool ↗</a>',end:'pass',steps:[
+        {prompt:'Build a tool that fits my project notes into an AI context budget without cutting sections in half.',wait:400},
+        {working:'building',ms:1500},
+        {out:['  [g]build context-packet.js[/]','  [d]keep required notes · rank optional sections · count UTF-8 bytes[/]'],every:160,wait:500},
+        {working:'checking',ms:1000},
+        {out:['  [ok]Project tests passed[/]','  [ok]CLI input and error paths checked[/]'],every:160,wait:500},
+        {working:'supervisor review',ms:900},
+        {out:['  [d]Check fractional limits and boundary cases.[/]','  [g]turn the questions into executable assertions[/]'],every:200,wait:500},
+        {out:['  [ok]20 contract assertions passed[/]','  [ok]5 / 5 independent acceptance groups[/]','','  [g]14 recorded actions · 58.1 seconds[/]'],every:140,wait:300},
+        {idle:true},
+      ]}},
+    {label:'Fix a bug',summary:'Retries should respect the clock. Repair backoff, honor the server’s retry delay, and stop when the job’s time budget is spent. Finished in 141.7 seconds.',link:'retry-budget/share/index.html',action:'See the repair and its checks ↗',demo:{
+      title:'bantam · fix the retry logic',caption:'Retry budget · 141.7 seconds. <a href="retry-budget/share/index.html">Open the recorded repair ↗</a>',end:'pass',steps:[
+        {prompt:'Fix the retry controller so backoff and server retry hints stay within the job’s remaining time budget.',wait:400},
+        {working:'inspecting',ms:1100},
+        {out:['  [d]read the controller and its tests[/]','  [g]repair retry-budget.js and its command-line interface[/]'],every:200,wait:500},
+        {working:'testing the edges',ms:1300},
+        {out:['  [d]zero delay · huge retry counts · exact deadline · invalid inputs[/]','  [g]add executable contract checks[/]'],every:160,wait:500},
+        {out:['  [ok]25 API assertions passed[/]','  [ok]8 CLI assertions passed[/]','  [ok]5 / 5 independent acceptance groups[/]','','  [g]18 recorded actions · 141.7 seconds[/]'],every:170,wait:400},
+        {idle:true},
+      ]}},
+  ];
 })();

@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T18:34:39.916Z",
+  "generatedAt": "2026-09-08T21:32:08.018Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -31,17 +31,33 @@
           "wallMs": 600000,
           "contextTokens": 72192,
           "peerOutputTokens": 32768
+        },
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "32bacac84ace03708d11b61101e3b8c6b318aecb8e313787e980d61b8d0ca963",
+          "baselineManifestSha256": "989cd7eedadbd80977a36cf5f3eb6a47426b3313d9bee64224512abbeb8dafad",
+          "manifestSha256": "e91a44ea072a7be0dbd45653c2f4748ee1959440d016ec1d181786b32b749ef6",
+          "materialsSha256": "8928677278eb6b314cfc465b20ce694824d8a254289c11e9aa0cebed4b3b1b54",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T21:08:39.350Z",
+          "finishedAt": "2026-09-08T21:32:08.018Z",
+          "arms": [
+            "pi"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
         }
       ],
       "counts": {
-        "observed": 7,
-        "planned": 7,
-        "accepted": 6,
+        "observed": 8,
+        "planned": 8,
+        "accepted": 7,
         "completed": 7,
         "pass": 6,
-        "groupsMeasured": 7,
-        "groupsPassed": 35,
-        "groupsTotal": 35
+        "groupsMeasured": 8,
+        "groupsPassed": 40,
+        "groupsTotal": 40
       },
       "cards": [
         {
@@ -1453,6 +1469,296 @@
               ],
               "events": [],
               "timedEvents": 76,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-snapshot-drift-r1-lane8",
+              "arm": "pi",
+              "label": "Pi",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "OUTPUT_ONLY",
+              "accepted": true,
+              "completed": false,
+              "wallMs": 600008,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": null,
+                  "outputTokens": null,
+                  "cacheHitTokens": null,
+                  "freshInputTokens": null
+                },
+                "subset": {
+                  "inputTokens": 642107,
+                  "outputTokens": 38643,
+                  "cacheHitTokens": 613734,
+                  "freshInputTokens": 28373
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 689470,
+                  "outputTokens": 39060,
+                  "cacheHitTokens": 659400,
+                  "freshInputTokens": 30070
+                },
+                "complete": false,
+                "requests": 22,
+                "measuredRequests": 21,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 22,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      22
+                    ]
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 22,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      22
+                    ]
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 22,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      22
+                    ]
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 21,
+                    "totalRequests": 22,
+                    "complete": false,
+                    "missingRequestIndices": [
+                      22
+                    ]
+                  }
+                },
+                "gaps": [
+                  {
+                    "index": 22,
+                    "missingFields": [
+                      "inputTokens",
+                      "outputTokens",
+                      "cacheHitTokens",
+                      "freshInputTokens"
+                    ],
+                    "finished": false,
+                    "responseBytes": 136540
+                  }
+                ]
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 38643,
+                  "milliseconds": 563104.965,
+                  "measuredRequests": 21,
+                  "totalRequests": 22
+                },
+                "prefill": {
+                  "tokens": 28373,
+                  "milliseconds": 21721.227999999996,
+                  "measuredRequests": 21,
+                  "totalRequests": 22
+                },
+                "evidenceSha256": "f663d5f712d8ffcbf3ffe2ea149356b518b8d6db6775affd8ddad71294fc9c55",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 4049,
+                  "inputTokens": 2412,
+                  "outputTokens": 70,
+                  "cacheHitTokens": 560,
+                  "freshInputTokens": 1852,
+                  "partial": false
+                },
+                {
+                  "t": 5246,
+                  "inputTokens": 5078,
+                  "outputTokens": 162,
+                  "cacheHitTokens": 3042,
+                  "freshInputTokens": 2036,
+                  "partial": false
+                },
+                {
+                  "t": 323063,
+                  "inputTokens": 8831,
+                  "outputTokens": 22060,
+                  "cacheHitTokens": 5801,
+                  "freshInputTokens": 3030,
+                  "partial": false
+                },
+                {
+                  "t": 337382,
+                  "inputTokens": 34712,
+                  "outputTokens": 22231,
+                  "cacheHitTokens": 9550,
+                  "freshInputTokens": 25162,
+                  "partial": false
+                },
+                {
+                  "t": 358558,
+                  "inputTokens": 60803,
+                  "outputTokens": 24028,
+                  "cacheHitTokens": 35601,
+                  "freshInputTokens": 25202,
+                  "partial": false
+                },
+                {
+                  "t": 409381,
+                  "inputTokens": 88714,
+                  "outputTokens": 28087,
+                  "cacheHitTokens": 63490,
+                  "freshInputTokens": 25224,
+                  "partial": false
+                },
+                {
+                  "t": 413640,
+                  "inputTokens": 120709,
+                  "outputTokens": 28389,
+                  "cacheHitTokens": 95461,
+                  "freshInputTokens": 25248,
+                  "partial": false
+                },
+                {
+                  "t": 415606,
+                  "inputTokens": 153037,
+                  "outputTokens": 28503,
+                  "cacheHitTokens": 127759,
+                  "freshInputTokens": 25278,
+                  "partial": false
+                },
+                {
+                  "t": 416922,
+                  "inputTokens": 185713,
+                  "outputTokens": 28571,
+                  "cacheHitTokens": 160200,
+                  "freshInputTokens": 25513,
+                  "partial": false
+                },
+                {
+                  "t": 420743,
+                  "inputTokens": 218798,
+                  "outputTokens": 28819,
+                  "cacheHitTokens": 192944,
+                  "freshInputTokens": 25854,
+                  "partial": false
+                },
+                {
+                  "t": 427010,
+                  "inputTokens": 252907,
+                  "outputTokens": 29256,
+                  "cacheHitTokens": 226277,
+                  "freshInputTokens": 26630,
+                  "partial": false
+                },
+                {
+                  "t": 428817,
+                  "inputTokens": 287482,
+                  "outputTokens": 29354,
+                  "cacheHitTokens": 260822,
+                  "freshInputTokens": 26660,
+                  "partial": false
+                },
+                {
+                  "t": 430042,
+                  "inputTokens": 322363,
+                  "outputTokens": 29407,
+                  "cacheHitTokens": 295496,
+                  "freshInputTokens": 26867,
+                  "partial": false
+                },
+                {
+                  "t": 442971,
+                  "inputTokens": 357418,
+                  "outputTokens": 30071,
+                  "cacheHitTokens": 330431,
+                  "freshInputTokens": 26987,
+                  "partial": false
+                },
+                {
+                  "t": 456744,
+                  "inputTokens": 393461,
+                  "outputTokens": 30843,
+                  "cacheHitTokens": 366151,
+                  "freshInputTokens": 27310,
+                  "partial": false
+                },
+                {
+                  "t": 474762,
+                  "inputTokens": 430513,
+                  "outputTokens": 31839,
+                  "cacheHitTokens": 402967,
+                  "freshInputTokens": 27546,
+                  "partial": false
+                },
+                {
+                  "t": 487622,
+                  "inputTokens": 468873,
+                  "outputTokens": 32599,
+                  "cacheHitTokens": 441015,
+                  "freshInputTokens": 27858,
+                  "partial": false
+                },
+                {
+                  "t": 557870,
+                  "inputTokens": 508038,
+                  "outputTokens": 36446,
+                  "cacheHitTokens": 480134,
+                  "freshInputTokens": 27904,
+                  "partial": false
+                },
+                {
+                  "t": 586170,
+                  "inputTokens": 551314,
+                  "outputTokens": 38369,
+                  "cacheHitTokens": 523145,
+                  "freshInputTokens": 28169,
+                  "partial": false
+                },
+                {
+                  "t": 589323,
+                  "inputTokens": 596537,
+                  "outputTokens": 38538,
+                  "cacheHitTokens": 568343,
+                  "freshInputTokens": 28194,
+                  "partial": false
+                },
+                {
+                  "t": 592006,
+                  "inputTokens": 642107,
+                  "outputTokens": 38643,
+                  "cacheHitTokens": 613734,
+                  "freshInputTokens": 28373,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 38255,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

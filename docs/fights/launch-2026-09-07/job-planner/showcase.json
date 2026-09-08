@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T18:34:39.916Z",
+  "generatedAt": "2026-09-08T21:32:08.018Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -31,17 +31,33 @@
           "wallMs": 600000,
           "contextTokens": 72192,
           "peerOutputTokens": 32768
+        },
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "8357c39f01c0f1d1a96982fc61ad0e7d24bcfa918475e0ec41feb2e108f22ac6",
+          "baselineManifestSha256": "c9a7147b247bb5d67dce0ac4a40581d339b120e8abad09b79e99219da54c666d",
+          "manifestSha256": "e91a44ea072a7be0dbd45653c2f4748ee1959440d016ec1d181786b32b749ef6",
+          "materialsSha256": "0af668d2102e4340761f514cbfe5ffcc2dc4226adf61c67f3e8ffb2ecec01245",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T21:08:39.350Z",
+          "finishedAt": "2026-09-08T21:32:08.018Z",
+          "arms": [
+            "pi"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
         }
       ],
       "counts": {
-        "observed": 7,
-        "planned": 7,
-        "accepted": 6,
-        "completed": 6,
-        "pass": 6,
-        "groupsMeasured": 7,
-        "groupsPassed": 32,
-        "groupsTotal": 35
+        "observed": 8,
+        "planned": 8,
+        "accepted": 7,
+        "completed": 7,
+        "pass": 7,
+        "groupsMeasured": 8,
+        "groupsPassed": 37,
+        "groupsTotal": 40
       },
       "cards": [
         {
@@ -1381,6 +1397,244 @@
               ],
               "events": [],
               "timedEvents": 88,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-job-planner-r1-lane8",
+              "arm": "pi",
+              "label": "Pi",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 483494,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 464650,
+                  "outputTokens": 32097,
+                  "cacheHitTokens": 459162,
+                  "freshInputTokens": 5488
+                },
+                "subset": {
+                  "inputTokens": 464650,
+                  "outputTokens": 32097,
+                  "cacheHitTokens": 459162,
+                  "freshInputTokens": 5488
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 464690,
+                  "outputTokens": 32100,
+                  "cacheHitTokens": 459200,
+                  "freshInputTokens": 5490
+                },
+                "complete": true,
+                "requests": 17,
+                "measuredRequests": 17,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 17,
+                    "totalRequests": 17,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 17,
+                    "totalRequests": 17,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 17,
+                    "totalRequests": 17,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 17,
+                    "totalRequests": 17,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 32097,
+                  "milliseconds": 468408.73,
+                  "measuredRequests": 17,
+                  "totalRequests": 17
+                },
+                "prefill": {
+                  "tokens": 5488,
+                  "milliseconds": 8732.301,
+                  "measuredRequests": 17,
+                  "totalRequests": 17
+                },
+                "evidenceSha256": "41e2005ca3a9587c005ac5b99bacecff708a109f097ef324df617ff32c503493",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 4650,
+                  "inputTokens": 2147,
+                  "outputTokens": 76,
+                  "cacheHitTokens": 560,
+                  "freshInputTokens": 1587,
+                  "partial": false
+                },
+                {
+                  "t": 5791,
+                  "inputTokens": 4554,
+                  "outputTokens": 170,
+                  "cacheHitTokens": 2784,
+                  "freshInputTokens": 1770,
+                  "partial": false
+                },
+                {
+                  "t": 344889,
+                  "inputTokens": 7661,
+                  "outputTokens": 22664,
+                  "cacheHitTokens": 5286,
+                  "freshInputTokens": 2375,
+                  "partial": false
+                },
+                {
+                  "t": 370257,
+                  "inputTokens": 33292,
+                  "outputTokens": 24751,
+                  "cacheHitTokens": 30888,
+                  "freshInputTokens": 2404,
+                  "partial": false
+                },
+                {
+                  "t": 398773,
+                  "inputTokens": 61033,
+                  "outputTokens": 26984,
+                  "cacheHitTokens": 58606,
+                  "freshInputTokens": 2427,
+                  "partial": false
+                },
+                {
+                  "t": 399930,
+                  "inputTokens": 91033,
+                  "outputTokens": 27049,
+                  "cacheHitTokens": 88580,
+                  "freshInputTokens": 2453,
+                  "partial": false
+                },
+                {
+                  "t": 401735,
+                  "inputTokens": 121476,
+                  "outputTokens": 27121,
+                  "cacheHitTokens": 118646,
+                  "freshInputTokens": 2830,
+                  "partial": false
+                },
+                {
+                  "t": 409114,
+                  "inputTokens": 152218,
+                  "outputTokens": 27615,
+                  "cacheHitTokens": 149160,
+                  "freshInputTokens": 3058,
+                  "partial": false
+                },
+                {
+                  "t": 411543,
+                  "inputTokens": 183486,
+                  "outputTokens": 27755,
+                  "cacheHitTokens": 180397,
+                  "freshInputTokens": 3089,
+                  "partial": false
+                },
+                {
+                  "t": 413473,
+                  "inputTokens": 215889,
+                  "outputTokens": 27841,
+                  "cacheHitTokens": 211806,
+                  "freshInputTokens": 4083,
+                  "partial": false
+                },
+                {
+                  "t": 430159,
+                  "inputTokens": 248629,
+                  "outputTokens": 28885,
+                  "cacheHitTokens": 244296,
+                  "freshInputTokens": 4333,
+                  "partial": false
+                },
+                {
+                  "t": 449298,
+                  "inputTokens": 282583,
+                  "outputTokens": 30119,
+                  "cacheHitTokens": 278081,
+                  "freshInputTokens": 4502,
+                  "partial": false
+                },
+                {
+                  "t": 454835,
+                  "inputTokens": 317797,
+                  "outputTokens": 30455,
+                  "cacheHitTokens": 313268,
+                  "freshInputTokens": 4529,
+                  "partial": false
+                },
+                {
+                  "t": 463674,
+                  "inputTokens": 353606,
+                  "outputTokens": 30982,
+                  "cacheHitTokens": 348819,
+                  "freshInputTokens": 4787,
+                  "partial": false
+                },
+                {
+                  "t": 469942,
+                  "inputTokens": 390108,
+                  "outputTokens": 31381,
+                  "cacheHitTokens": 385156,
+                  "freshInputTokens": 4952,
+                  "partial": false
+                },
+                {
+                  "t": 472683,
+                  "inputTokens": 427064,
+                  "outputTokens": 31528,
+                  "cacheHitTokens": 422058,
+                  "freshInputTokens": 5006,
+                  "partial": false
+                },
+                {
+                  "t": 483281,
+                  "inputTokens": 464650,
+                  "outputTokens": 32097,
+                  "cacheHitTokens": 459162,
+                  "freshInputTokens": 5488,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 31466,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

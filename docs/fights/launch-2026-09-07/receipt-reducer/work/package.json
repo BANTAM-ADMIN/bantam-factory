@@ -236,6 +236,45 @@
           }
         ]
       }
+    },
+    {
+      "path": "pi.json",
+      "bytes": 80314,
+      "sha256": "862f42d902a1004a8e68478bb0264a9570c0ee78e473387b791e8a27bcb8fbd5",
+      "arm": "pi",
+      "wallMs": 308128,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 15,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "A complete report tool, followed by extra checks.",
+        "paragraphs": [
+          {
+            "text": "Pi built the event reducer and CLI, then added thirteen tests. One added test failed; Pi repaired the test, checked command-line errors, and exercised duplicate IDs, malformed events, and ordering.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-8",
+              "action-10",
+              "action-14"
+            ]
+          },
+          {
+            "text": "The final workspace passed all 17 project tests and all five independent groups. Pi finished in 308.1 seconds; BANTAM FACTORY completed the same work order in 112.5 seconds.",
+            "actions": [
+              "action-11",
+              "action-15"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

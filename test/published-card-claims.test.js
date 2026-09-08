@@ -105,10 +105,10 @@ test("a card claiming the quickest or slowest pass actually holds it", () => {
 });
 
 test("a card claiming the highest request count actually holds it", () => {
-  const counts = cards.map(({ name, readme }) => ({
-    name, requests: Number((flow(readme).match(/all (\d+) requests/) ?? [])[1] ?? NaN),
-  })).filter((c) => Number.isFinite(c.requests));
-  assert.ok(counts.length >= 5, `expected request counts to parse, got ${counts.length}`);
+  const counts = recordedRows(cards)
+    .filter((row) => row.arm === "bantam-local-27b" && Number.isFinite(row.accounting?.requests))
+    .map((row) => ({ name: row.card, requests: row.accounting.requests }));
+  assert.ok(counts.length >= 11, `expected recorded BANTAM request counts, got ${counts.length}`);
   const top = counts.reduce((a, b) => (b.requests > a.requests ? b : a));
   const failures = cards
     .filter(({ name, readme }) => /highest request count on any published card/i.test(flow(readme)) && name !== top.name)

@@ -96,6 +96,7 @@
       this.demo = null;
       this.instant = REDUCED || !!opts.instant;
       this.onTitle = opts.onTitle || null;
+      this.onFinish = opts.onFinish || null;
       this.replayBtn.addEventListener('click', () => { if (this.demo) this.play(this.demo); });
     }
     cancel() { this.token++; }
@@ -249,6 +250,8 @@
         if (demo.end) this.status(demo.end);
         this.replayBtn.hidden = false;
         this.pauseBtn.hidden = true;
+        this.check(t);
+        if (this.onFinish) this.onFinish(demo);
       } catch (e) {
         if (e !== CANCEL) throw e;
       }
@@ -273,6 +276,35 @@
     const stage = stageMount ? new Term(stageMount, { onTitle: (d) => { if (stageCap) stageCap.innerHTML = d.caption || ''; } }) : null;
     let active = -1, stageSeen = false;
 
+    const jobs=window.JOB_DEMOS||[],jobStory=stories.find(s=>s.dataset.demo==='job');
+    let jobIndex=0,jobSeen=false,inlineJob=null,cycleTimer=null,rotate=!REDUCED;
+    const cycleButton=document.getElementById('job-autoplay');
+    const choiceButtons=[...document.querySelectorAll('[data-job-choice]')];
+    const demoFor=story=>story.dataset.demo==='job'&&jobs.length?jobs[jobIndex].demo:DEMOS[story.dataset.demo];
+    const stopCycle=()=>{clearTimeout(cycleTimer);cycleTimer=null;};
+    function cycleLabel(){if(cycleButton){cycleButton.textContent=rotate?'Pause rotation':'Resume rotation';cycleButton.setAttribute('aria-pressed',String(rotate));}}
+    function queueNext(demo){
+      stopCycle();
+      if(!rotate||!jobSeen||document.hidden||demo!==jobs[jobIndex]?.demo||(DESKTOP.matches&&active!==stories.indexOf(jobStory)))return;
+      cycleTimer=setTimeout(()=>{if(rotate&&jobSeen&&!document.hidden)selectJob((jobIndex+1)%jobs.length,false);},4500);
+    }
+    function selectJob(index,manual=true){
+      if(!jobs[index])return;
+      stopCycle();jobIndex=index;if(manual)rotate=false;cycleLabel();
+      choiceButtons.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));
+      const summary=document.getElementById('job-summary'),link=document.getElementById('job-open');
+      if(summary)summary.textContent=jobs[index].summary;
+      if(link){link.href=jobs[index].link;link.textContent=jobs[index].action;}
+      if(DESKTOP.matches&&active===stories.indexOf(jobStory)&&stageSeen)load(stage,jobs[index].demo);
+      if(!DESKTOP.matches&&inlineJob)load(inlineJob,jobs[index].demo);
+    }
+    if(stage)stage.onFinish=queueNext;
+    choiceButtons.forEach((button,i)=>button.onclick=()=>selectJob(i));
+    if(cycleButton)cycleButton.onclick=()=>{rotate=!rotate;cycleLabel();stopCycle();const term=DESKTOP.matches?stage:inlineJob;if(rotate&&term&&!term.replayBtn.hidden)queueNext(term.demo);};
+    if(jobStory)new IntersectionObserver(([e])=>{jobSeen=e.isIntersecting;if(!jobSeen)stopCycle();else{const term=DESKTOP.matches?stage:inlineJob;if(term&&!term.replayBtn.hidden)queueNext(term.demo);}},{threshold:.15}).observe(jobStory);
+    document.addEventListener('visibilitychange',()=>{stopCycle();if(!document.hidden){const term=DESKTOP.matches?stage:inlineJob;if(term&&!term.replayBtn.hidden)queueNext(term.demo);}});
+    cycleLabel();
+
     function load(term, demo) {
       if (!term || !demo) return;
       term.root.classList.add('is-swapping');
@@ -281,8 +313,9 @@
     function setActive(i) {
       if (i === active) return;
       active = i;
+      stopCycle();
       stories.forEach((s, k) => s.classList.toggle('is-active', k === i));
-      if (stageSeen && DESKTOP.matches) load(stage, DEMOS[stories[i].dataset.demo]);
+      if (stageSeen && DESKTOP.matches) load(stage, demoFor(stories[i]));
     }
     function pick() {
       if (!DESKTOP.matches || !stories.length) return;
@@ -302,7 +335,7 @@
       new IntersectionObserver(([e]) => {
         if (!e.isIntersecting || stageSeen) return;
         stageSeen = true;
-        if (active < 0) setActive(0); else load(stage, DEMOS[stories[active].dataset.demo]);
+        if (active < 0) setActive(0); else load(stage, demoFor(stories[active]));
       }, { threshold: 0.3 }).observe(stageMount);
     }
     pick();
@@ -311,16 +344,18 @@
     // Under 1024px every story carries its own terminal; it plays once when it comes into view.
     stories.forEach((s) => {
       const mount = s.querySelector('[data-inline]');
-      const demo = DEMOS[s.dataset.demo];
+      const demo = demoFor(s);
       if (!mount || !demo) return;
       const term = new Term(mount);
+      if(s===jobStory){inlineJob=term;term.onFinish=queueNext;}
       const cap = document.createElement('p');
       cap.className = 'term-cap term-cap--inline';
       cap.innerHTML = demo.caption || '';
+      term.onTitle=d=>{cap.innerHTML=d.caption||'';};
       mount.after(cap);
       let played = false;
       new IntersectionObserver(([e]) => {
-        if (e.isIntersecting && !played && !DESKTOP.matches) { played = true; term.play(demo); }
+        if (e.isIntersecting && !played && !DESKTOP.matches) { played = true; term.play(demoFor(s)); }
       }, { threshold: 0.25 }).observe(mount);
     });
 

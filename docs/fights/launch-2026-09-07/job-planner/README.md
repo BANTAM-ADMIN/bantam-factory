@@ -1,44 +1,31 @@
 # Job planner · fight card
 
-[Open the fight](share/index.html) · [Share image](share/share-card.png) · [Measurements](share/fight-card.json)
+[Open the fight](share/index.html) · [Measurements](share/fight-card.json)
 
-Repair a dependency planner so jobs run in the right order and failures reach the jobs that depend on them.
+Actions, delivered files, test output and the story of each attempt are inside the card.
 
-| System | Independent groups | Outcome | Elapsed time |
-|---|---:|---|---:|
-| BANTAM FACTORY · local 27B | 5/5 | PASS | 193.154 s |
-| DeepSeek Harness · same local 27B | 5/5 | PASS | 483.467 s |
-| Hermes · same local 27B | 2/5 | TIMEOUT | 600.006 s |
-| OpenCode · same local 27B | 5/5 | PASS | 324.088 s |
-| Codex · native Astra | 5/5 | PASS | 118.397 s |
-| Codex · native Sol | 5/5 | PASS | 240.866 s |
-| Codex · native Terra | 5/5 | PASS | 119.274 s |
+| System | Outcome | Time | Independent groups |
+|---|---|---:|---:|
+| BANTAM FACTORY · local | PASS | 193.2 s | 5/5 |
+| DeepSeek Harness | PASS | 483.5 s | 5/5 |
+| Hermes | TIMEOUT | 600.0 s | 2/5 |
+| Codex · Astra | PASS | 118.4 s | 5/5 |
+| Codex · Sol | PASS | 240.9 s | 5/5 |
+| Codex · Terra | PASS | 119.3 s | 5/5 |
+| OpenCode | PASS | 324.1 s | 5/5 |
+| Pi | PASS | 483.5 s | 5/5 |
 
-**Same local model:** BANTAM FACTORY, DeepSeek Harness, Hermes and OpenCode use the same Qwen 27B weights. Codex uses the frontier model named in its row.
-
-PASS means accepted work and a clean finish. OUTPUT_ONLY means accepted output without a clean finish. A timeout's elapsed time is its stopping boundary, not its time to successful completion.
-
-**The local rig:** NVIDIA RTX 4090 · 24 GB · Qwen 27B Q4_K_P · 72,192-token context. Open a lane for its measured generation speed and coverage.
-
-**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
+Pi 0.85.1 ran on September 8, 2026 with the same frozen task, starter, independent checks and local model weights. It used its native CLI, tools and prompts, a ten-minute limit, a 32,768-token response allowance and a 65,536-token declared context. The shared server served 72,192 tokens on the RTX 4090 and stayed warm between runs. Every planned Pi attempt is included.
 
 <details>
-<summary>Run conditions, token accounting & recording receipts</summary>
+<summary>Recording conditions</summary>
 
-This is a selected development work order. BANTAM FACTORY was qualified before the missing challenger lanes were run. The task was used during development before these recordings. The task was not changed for a challenger, and no candidate received manual repairs.
+BANTAM FACTORY was qualified first on this development work order. Follow-up contenders received the same frozen task, starting files, independent checks and local model bytes, without manual repairs. Codex uses the cloud model named in its row. Replay clocks align the starts of separately recorded runs.
 
-**Follow-up recordings:** OpenCode, starting 2026-09-08T18:14:16.442Z UTC (the `Z` suffix denotes UTC). All planned follow-up attempts for this card are included, including failures and timeouts. The original published lanes remain unchanged. The replay aligns each run's start to zero; these were separate recording windows.
+Native prompts, tools, sampling and compaction apply. BANTAM FACTORY uses separate requests allowing up to 4,096 reasoning tokens and 8,192 action tokens. Challenger clients use a 32,768-token response allowance. Local inference runs serially on the existing warm server.
 
-The follow-ups ran from frozen checkout `75012c4426841e45fc960390608e5c0482389b12`. The task, starter, independent grader and model file hashes matched the saved BANTAM FACTORY baseline before execution and during export. The portable measurements contain a follow-up receipt with hashes of the original public summary, both private manifests, the task materials and the model weights. Raw records remain private.
+PASS requires accepted work and a clean finish. OUTPUT_ONLY means the files passed but the attempt did not complete. Timeouts show the stopping boundary. Missing counters stay unknown; partial timing coverage is marked inside each lane.
 
-Recorded challenger versions: OpenCode 1.18.23.
-
-Each challenger had a ten-minute wall limit and a 32,768-token per-request output allowance. Peer clients declared a 65,536-token context; the server served 72,192 tokens. BANTAM FACTORY uses separate requests allowing up to 4,096 reasoning tokens and 8,192 action tokens. Native prompts, tools, sampling, input reservation and compaction policies differ.
-
-Local inference was serial on the existing warm server, with no restart or cache erase. Earlier runs may have left reusable prefixes. The host also performed lightweight reporting and browser checks during the follow-ups. Some original frontier runs overlapped original local runs; see the [original recording notes](https://github.com/BANTAM-ADMIN/bantam-factory/blob/75012c4426841e45fc960390608e5c0482389b12/docs/fights/launch-2026-09-07/job-planner/README.md) for their conditions.
-
-BANTAM FACTORY's token receipts cover all 20 requests. Other lanes identify full totals, measured subsets and native aggregates separately. Missing counters remain unknown. Input already includes cached input. Server windows and native reports overlap the request receipts and must not be added to them. Generation speed uses saved server timing receipts; it excludes tools and tests, and partial coverage is labeled.
-
-The work views include recorded actions, supervisor checks and delivered files. Machine paths are normalized in the displayed record. Asset hashes bind the published files to this export. This explanatory file is outside the asset hashes.
+[Earlier recording notes](https://github.com/BANTAM-ADMIN/bantam-factory/blob/87d9cc999ae0ffb585801764ae6d2b4fb42cb0ae/docs/fights/launch-2026-09-07/job-planner/README.md) · [Task, model and recording hashes](share/fight-card.json)
 
 </details>

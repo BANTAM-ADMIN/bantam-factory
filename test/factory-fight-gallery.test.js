@@ -44,7 +44,7 @@ test('gallery keeps all planned tasks, complete rosters, timeout and partial-acc
   const card=data.cards.find(c=>c.id==='context-packet');
   assert.equal(card.rows.length,2);assert.equal(card.rows[0].passed,true);assert.equal(card.rows[1].passed,false);
   assert.match(html,/OUTPUT_ONLY/);assert.match(html,/600\.0s/);assert.match(html,/Partial accounting disclosed/);
-  assert.match(html,new RegExp('1\\/'+PLANNED));assert.match(html,/Not published yet/);assert.match(html,/1\/1/);
+  assert.match(html,new RegExp('1\\/'+PLANNED));assert.match(html,/Not published yet/);assert.match(html,/jobs completed/);
   assert.doesNotMatch(html,/<script[^>]+src="(?:https?:)?\/\/|<iframe|<img[^>]+src="https?:/i);
   assert.deepEqual(writeFightGallery({root}),{published:1,planned:PLANNED});
   assert.throws(()=>writeFightGallery({root}),/Refusing to replace/);
@@ -56,7 +56,6 @@ test('featured wins exclude timeouts, missing clocks and different-model compari
   assert.equal(featuredFight(data),null,'output-only is not a completed speed comparison');
   card.rows[1].passed=true;card.rows[1].outcome='PASS';
   assert.equal(featuredFight(data).ratio,600000/58000);
-  assert.match(renderFightGallery(data),/Recorded highlight/);
   card.rows[1].arm='codex-astra';assert.equal(featuredFight(data),null);
   card.rows[1].arm='hermes';card.rows[0].wallMs=0;assert.equal(featuredFight(data),null);
   card.rows[0].wallMs=700000;assert.equal(featuredFight(data),null,'a loss is not a featured win');

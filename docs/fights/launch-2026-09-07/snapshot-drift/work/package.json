@@ -233,6 +233,46 @@
           }
         ]
       }
+    },
+    {
+      "path": "pi.json",
+      "bytes": 118808,
+      "sha256": "d48a097829548d0b3fa4791868e9642fceb8f2ccfdf64b36f26791a866a9007f",
+      "arm": "pi",
+      "wallMs": 600008,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 23,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "The files passed. The attempt kept running.",
+        "paragraphs": [
+          {
+            "text": "Pi extended the snapshot tool, added tests, and repaired its path inspection after a run reported eleven failures. It then checked file drift, symlink rejection, permission errors, and 300 randomized cases.",
+            "actions": [
+              "action-7",
+              "action-11",
+              "action-13",
+              "action-15",
+              "action-17",
+              "action-21"
+            ]
+          },
+          {
+            "text": "At the ten-minute boundary, all 16 project tests and all five independent groups passed, but Pi had not completed its response. The card records OUTPUT_ONLY. BANTAM FACTORY finished the same work order in 124.3 seconds.",
+            "actions": [
+              "action-22",
+              "action-23"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

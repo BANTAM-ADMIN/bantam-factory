@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
-const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra'};
+const LEGACY_ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
+const ARMS = [...LEGACY_ARMS,'codex-sol','codex-terra'];
+const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
 const SHA = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const NUM = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
@@ -462,7 +463,7 @@ export function writeFactoryReplay(outputRoot) {
     const card={id:`repeat-${item.repeat}-${item.card}`,card:item.card,repeat:item.repeat,title:metadata?.title??TITLES[item.card]??item.card,kind:metadata?.kind??'',description:metadata?.description??'',lanes:[]};
     const directory=path.join(root,`repeat-${item.repeat}`,item.card);
     let outer='';try{outer=fs.readFileSync(path.join(directory,'events.ndjson'),'utf8');}catch{}
-    for(const arm of ARMS.filter(a=>!manifest.presentation?.selectedParticipantsOnly||identities.some(i=>i.repeat===item.repeat&&i.card===item.card&&i.arm===a))){
+    for(const arm of ARMS.filter(a=>(!manifest.presentation?.selectedParticipantsOnly&&LEGACY_ARMS.includes(a))||identities.some(i=>i.repeat===item.repeat&&i.card===item.card&&i.arm===a))){
       const result=results.find(r=>r.repeat===item.repeat&&r.card===item.card&&r.arm===arm)??null;
       const built=buildReplayLane({directory:path.join(directory,arm),result,arm,card:item.card,repeat:item.repeat,outer,kitSeal:manifest.kitSeal??{},kitId:manifest.kitId??'factory-2026-09-06',
         identity:manifest.presentation?.selectedParticipantsOnly&&arm==='bantam-local-27b'?{family:'local',label:'BANTAM · selected model'}:null});

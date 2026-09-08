@@ -158,7 +158,7 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  if(args.check){
   if(typeof args.arms!=='string'||Object.keys(args).some(k=>!['_','check','arms','out','yes','dry-run'].includes(k)))throw Error('Use --check --arms hermes,opencode [--out NEW-DIRECTORY] [--yes|--dry-run].');
   const arms=args.arms.split(',').map(a=>a.trim());
-  if(!arms.length||arms.some(a=>!['hermes','opencode','deepseek-local-27b','codex-astra','bantam-codex-astra'].includes(a))||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/DeepSeek/Codex runtimes only.');
+  if(!arms.length||arms.some(a=>!FIGHT_ARMS.includes(a)||a==='bantam-local-27b')||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/DeepSeek/Codex runtimes only.');
   const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name==='deepseek'?'deepseek-local-27b':name)));
   const output=args.out?path.resolve(args.out):readinessLocation(path.resolve('.bantam/fight-cards/offline-check'));
   out(`Offline runtime checks: ${arms.join(', ')}\nEvidence: ${output}\nNo model inference, cloud login, downloads or publication. Installed program code will execute in network-disabled containers.\n`);

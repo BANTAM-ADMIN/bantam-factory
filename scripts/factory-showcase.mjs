@@ -24,6 +24,9 @@ const SYSTEMS={
   opencode:['OpenCode','local','Qwen 27B · same local weights'],
   hermes:['Hermes','local','Qwen 27B · same local weights'],
   'codex-astra':['Codex · Astra','astra','GPT-6 Astra · native CLI'],
+  // Historical family key 'astra' is the frontier display bucket, not a model ID.
+  'codex-sol':['Codex · Sol','astra','GPT-5.6 Sol · native CLI'],
+  'codex-terra':['Codex · Terra','astra','GPT-5.6 Terra · native CLI'],
   'bantam-codex-astra':['BANTAM · Astra','astra','GPT-6 Astra · wrapped CLI'],
 };
 const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);

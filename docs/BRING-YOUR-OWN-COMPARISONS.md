@@ -89,7 +89,8 @@ change grades or hide a failed attempt. If export validation fails, the command
 still attempts a readable replay and returns an error rather than claiming a
 successful portable export.
 
-Select cloud IDs explicitly (`codex-astra`, `bantam-codex-astra`); `--yes` also
+Select cloud IDs explicitly (`codex-astra`, `codex-sol`, `codex-terra`,
+`bantam-codex-astra`); `--yes` also
 requires explicit `--arms` and `--card`. Cloud-only execution no longer requires
 a local model. The isolated Codex benchmark runtime requires Linux x64 and a
 non-root numeric UID/GID. It discovers Node/Git/npm paths and supports the known
@@ -106,6 +107,14 @@ auth cache. They mount that cache read-only; no login, export, credential write
 or keyring migration is performed. Keyring-only/custom-home accounts still need
 another adapter. Expired credentials can still fail at actual inference.
 See [official credential-storage guidance](https://developers.openai.com/codex/auth#credential-storage).
+
+Native Astra/Sol/Terra cards pin their exact model IDs and medium reasoning,
+with the same isolated CLI recipe and native session-receipt accounting.
+The added models require explicit selection; the legacy runner's default roster
+has not silently grown. Public labels and downloadable records distinguish each
+model. The historical `astra` presentation-family key denotes the frontier bucket,
+not an assertion that Sol or Terra is Astra. Model availability still depends on
+the installed client and account; see [Codex model selection](https://developers.openai.com/codex/models).
 
 Local recorded cards currently need a credential-free loopback llama.cpp origin
 with `/health`, `/v1/models`, `/props` and `/slots`. A saved llama.cpp connection

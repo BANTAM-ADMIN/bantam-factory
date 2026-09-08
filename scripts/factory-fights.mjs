@@ -17,14 +17,16 @@ import {projectFightProgress,progressKey} from '../src/factory-card-progress.js'
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
-export const FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
+export const DEFAULT_FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
+export const NATIVE_CODEX_MODELS=Object.freeze({'codex-astra':'gpt-6-astra','codex-sol':'gpt-5.6-sol','codex-terra':'gpt-5.6-terra'});
+export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
 const LOCAL=new Set(FIGHT_ARMS.slice(0,4));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const write=(file,data)=>fs.writeFileSync(file,JSON.stringify(data,null,2)+'\n',{mode:0o600});
 const quote=text=>`'${String(text).replace(/'/g,"'\\''")}'`;
 
-export function fightPlan({arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1}={}) {
+export function fightPlan({arms=DEFAULT_FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1}={}) {
   const kit=factoryKit(kitId);if(cards===undefined)cards=kit.cards;
   if(!Array.isArray(arms)||!arms.length||arms.some(a=>!FIGHT_ARMS.includes(a))||new Set(arms).size!==arms.length)throw Error('invalid or duplicate arms');
   if(!Array.isArray(cards)||!cards.length||cards.some(c=>!kit.cards.includes(c))||new Set(cards).size!==cards.length)throw Error('invalid or duplicate cards');
@@ -57,9 +59,13 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
       '--max-output-tokens',String(peerOutputTokens),
       ...(peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm]?['--executable',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].executable,'--executable-sha256',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].sha256]:[])],env:{}};
   }
-  const command=cardCommand(arm,task,workspace,dir);
+  const nativeModel=NATIVE_CODEX_MODELS[arm];
+  const command=cardCommand(nativeModel?'codex-astra':arm,task,workspace,dir);
   command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions')};
-  if(arm==='codex-astra')command.args=command.args.filter(a=>a!=='--ephemeral');
+  if(nativeModel){
+    command.args=command.args.filter(a=>a!=='--ephemeral');
+    command.args[command.args.indexOf('--model')+1]=nativeModel;
+  }
   else {
     command.args.push('--context-mode','extension','--factory','--factory-home',path.join(dir,'factory'));
     command.env={...command.env,BANTAM_SAVE_PROMPTS:'1',BANTAM_PROBE:probeEnabled?'1':'0',BANTAM_STREAM:'1',
@@ -151,7 +157,7 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null,deepseekReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters,onProgress=()=>{}}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=DEFAULT_FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null,deepseekReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters,onProgress=()=>{}}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
@@ -175,7 +181,9 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
-    configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,codexModel:'gpt-6-astra',codexEffort:'medium',
+    configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,
+      codexModel:arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
+      codexModels:Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??'gpt-6-astra'])),
       verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,codexReadiness,deepseekReadiness,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',
       sampling:'native configured values, retained in local wire requests',
@@ -238,7 +246,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const clean=r=>r.code===0&&!r.timedOut&&!r.aborted&&!r.bufferExceeded;
     const candidatePass=!tampered.length&&clean(grading.publicResult)&&clean(grading.hidden)&&grading.record?.pass===true;
     const processCompleted=clean(result)&&acceptedCompletion!==false;
-    const nativeResponseUsage=arm==='codex-astra'?codexSessionUsage(path.join(dir,'native-sessions')):null;
+    const nativeResponseUsage=NATIVE_CODEX_MODELS[arm]?codexSessionUsage(path.join(dir,'native-sessions')):null;
     const cliUsage=cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
     const usage=wireUsage??nativeResponseUsage??cliUsage;
     if(usage&&usage.freshInputTokens==null&&usage.inputTokens!=null&&usage.cacheHitTokens!=null)usage.freshInputTokens=usage.inputTokens-usage.cacheHitTokens;

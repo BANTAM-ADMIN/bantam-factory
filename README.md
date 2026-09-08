@@ -45,11 +45,16 @@ Fight cards put BANTAM and other coding systems on the same work order, with
 the same starting files and independent acceptance checks. See the result,
 the elapsed time, and the accounting behind it. Then run a comparison yourself.
 
-[![BANTAM: Patch Transaction, 5/5 in 81.8 seconds](docs/fights/launch-2026-09-07/patch-transaction/share/share-card.png)](docs/fights/launch-2026-09-07/patch-transaction/share/index.html)
+[![BANTAM: Receipt Reducer, 5/5 in 112.5 seconds against five other systems](docs/fights/launch-2026-09-07/receipt-reducer/share/share-card.png)](docs/fights/launch-2026-09-07/receipt-reducer/share/index.html)
 
-**Same local 27B. Patch Transaction: BANTAM 81.8 seconds, OpenCode 559.0 seconds.
-Both passed 5/5 and finished cleanly.** BANTAM also used fewer input and output
-tokens. Native Astra completed the same task in 90.3 seconds.
+**Same local 27B. Receipt Reducer: BANTAM 112.5 seconds, DeepSeek Harness
+442.7 seconds, Hermes 577.6 seconds. All passed 5/5 and finished cleanly.**
+BANTAM used 47.4% fewer input tokens and 69.4% fewer output tokens than DeepSeek.
+Native Terra finished in 107.2s, Astra in 114.1s and Sol in 166.7s—all 5/5.
+The local factory was close to the fastest frontier result on this work order.
+[Inspect every counter and condition](docs/fights/launch-2026-09-07/receipt-reducer/README.md).
+
+More completed work orders, including the misses:
 
 | Work order | BANTAM · local 27B | OpenCode · same 27B | Native Astra |
 |---|---:|---:|---:|

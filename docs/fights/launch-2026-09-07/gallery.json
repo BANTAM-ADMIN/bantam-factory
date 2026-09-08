@@ -132,8 +132,70 @@
       "kind": "BUILD",
       "number": "01",
       "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "4782e60d69712bb50d789ef8fdfdee1f34bab89d6237dc23d340e59df577ee41",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 112487,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "arm": "deepseek-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 442738,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Hermes",
+          "arm": "hermes",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 577573,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 114133,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Sol",
+          "arm": "codex-sol",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 166661,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "Codex · Terra",
+          "arm": "codex-terra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 107185,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     },
     {
       "id": "snapshot-drift",

@@ -6,6 +6,12 @@ Real work orders. Independent checks. Recorded clocks and token receipts.
 
 [Browse the launch gallery](launch-2026-09-07/index.html).
 
+[Receipt reducer · six-system comparison](launch-2026-09-07/receipt-reducer/README.md):
+**BANTAM 112.5s, DeepSeek Harness 442.7s, Hermes 577.6s**, using the same local
+27B. Native Terra 107.2s, Astra 114.1s and Sol 166.7s. All six passed 5/5 and
+completed the work. Full counters, Hermes's partial wire accounting and its
+separate server totals are documented alongside the replay.
+
 [Patch transaction · launch series](launch-2026-09-07/patch-transaction/README.md):
 **BANTAM 81.8s, OpenCode 559.0s, native Astra 90.3s.** All passed 5/5 and
 finished cleanly; complete recorded totals are available for every lane.
@@ -18,7 +24,7 @@ the share image, and inspect the accounting.
 [Stream framer · launch series](launch-2026-09-07/stream-framer/README.md):
 native Astra passed **5/5 in 160.7s**. BANTAM timed out at 4/5 and OpenCode at
 0/5. Both local attempts retain their partial accounting; this is a disclosed
-loss, not an omitted run. Three of the six launch work orders are now published;
+loss, not an omitted run. Four of the six launch work orders are now published;
 the remaining comparisons are running and are not yet published results.
 
 ## Earlier reviewed comparison

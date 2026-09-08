@@ -87,6 +87,7 @@ function embedded(html) {
 
 test('launch exports only the supplied public record, preserving incomplete meters and completion distinctions', () => {
   const data=fixture(),before=structuredClone(data),html=renderLaunchPage(data),serialized=JSON.stringify(embedded(html));
+  assert.ok(!html.includes('Work completed..'));
   assert.deepEqual(data,before,'rendering must not mutate the evidence projection');
   for(const forbidden of ['PRIVATE_PROMPT_MUST_NOT_SHIP','PRIVATE_EVENT_MUST_NOT_SHIP','PRIVATE_CREDENTIAL_MUST_NOT_SHIP','/home/private/']) {
     assert.ok(!html.includes(forbidden),forbidden);

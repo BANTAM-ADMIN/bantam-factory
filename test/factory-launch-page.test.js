@@ -285,6 +285,8 @@ test('actual Chromium verifies mobile/desktop replay, exports, accessibility and
       expect('counterBinding',[...document.querySelectorAll('.lane')].every(n=>Number(n.querySelector('.token-inputTokens').textContent.replaceAll(',',''))===expectedInputs[n.dataset.arm]));
       expect('accessibleButtons',[...document.querySelectorAll('button')].every(b=>(b.getAttribute('aria-label')||b.textContent).trim()));
       const visibleLanes=()=>[...document.querySelectorAll('.lane')].filter(n=>!n.hidden);
+      expect('comparisonDefault',state().layout==='compare'&&visibleLanes().length===2);
+      expect('plainVerdict',!get('matchup-verdict').hidden&&/Same local 27B/.test(get('matchup-verdict').textContent));
       get('view-compare').click();
       expect('twoContenders',visibleLanes().length===2);
       expect('sideBySide',Math.abs(visibleLanes()[0].getBoundingClientRect().top-visibleLanes()[1].getBoundingClientRect().top)<2);
@@ -292,9 +294,15 @@ test('actual Chromium verifies mobile/desktop replay, exports, accessibility and
       expect('chooseFrontier',visibleLanes().some(n=>n.dataset.arm==='codex-astra'));
       get('compare-left').value='codex-astra';get('compare-left').dispatchEvent(new Event('change'));
       expect('distinctPair',get('compare-left').value!==get('compare-right').value&&visibleLanes().length===2);
+      const comparisonLink=location.hash;
+      expect('pairInLink',new URLSearchParams(comparisonLink.slice(1)).get('left')==='codex-astra');
       expect('compareNoOverflow',document.documentElement.scrollWidth<=innerWidth);
       get('view-all').click();
       expect('restoreRoster',visibleLanes().length===Object.keys(expectedInputs).length);
+      location.hash=comparisonLink;
+      await wait(()=>state().layout==='compare');
+      expect('restoreComparisonLink',state().pair[0]==='codex-astra'&&visibleLanes().length===2);
+      get('view-all').click();
 
       expect('accessibleTimeline',Boolean(get('timeline').getAttribute('aria-label')||get('timeline').labels?.length));
       get('download-data').click();await wait(()=>downloads.length>0);

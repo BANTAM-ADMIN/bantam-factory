@@ -15,6 +15,27 @@ const outcomeClass=v=>v==='PASS'?'pass':v==='FAIL'||v==='SETUP_ERROR'?'fail':'ot
 const groupText=r=>valid(r?.groupsPassed)&&valid(r?.groupsTotal)?`${r.groupsPassed}/${r.groupsTotal}`:'Unknown';
 const flag=v=>v===true?'Yes':v===false?'No':'Unknown';
 
+export function matchupVerdict(rows,ended=true){
+  if(rows.length!==2)return null;
+  const title=rows.every(row=>/^Qwen 27B · same local (?:model|weights)$/.test(row.model))
+    ?'Same local 27B. Different harnesses.':'Same work order. Compare the recorded systems.';
+  if(!ended)return {title,detail:'Recorded clocks are running. Final outcomes appear at each endpoint.'};
+  const passed=row=>row.recorded===true&&row.outcome==='PASS'&&row.accepted===true&&row.completed===true
+    &&row.publicExit===0&&row.hiddenExit===0&&row.protectedChanges===0&&row.groupsTotal>0
+    &&row.groupsPassed===row.groupsTotal&&Number.isFinite(row.wallMs)&&row.wallMs>0;
+  const label=row=>factoryName(row.label);
+  const time=row=>`${(row.wallMs/1000).toFixed(1)}s`;
+  if(rows.every(passed)){
+    const [first,second]=[...rows].sort((a,b)=>a.wallMs-b.wallMs);
+    return {title,detail:first.wallMs===second.wallMs?'Both passed and finished in the same recorded time.'
+      :`${label(first)} finished in ${time(first)}; ${label(second)} in ${time(second)}. Both passed. ${((1-first.wallMs/second.wallMs)*100).toFixed(1)}% less elapsed time for this task.`};
+  }
+  return {title,detail:rows.map(row=>passed(row)?`${label(row)} passed and finished in ${time(row)}.`
+    :row.recorded!==true?`${label(row)} has no recorded attempt.`
+    :row.outcome==='OUTPUT_ONLY'?`${label(row)} produced accepted output, but did not finish cleanly (${time(row)} elapsed).`
+    :`${label(row)}: ${row.outcome}${Number.isFinite(row.wallMs)?` at ${time(row)}`:''}.`).join(' ')};
+}
+
 function assertData(data){
   if(data?.schema!=='bantam.launch-fight-card.v1'||!Array.isArray(data.series))throw Error('Expected a public launch fight-card document');
   return data;
@@ -197,6 +218,8 @@ export function renderLaunchPage(input,{previewImage='share-card.svg',presentati
   const pageTitle=main?.cards.length===1?main.cards[0].title:qualification?'BANTAM FACTORY qualification':'The fight cards';
   const hero=localFactoryHeadline(summary);
   const recordedPlate=`<aside class="result-plate" aria-label="Recorded system comparison"><div class="plate-top"><span class="eyebrow">${soloBantam?'Recorded / BANTAM FACTORY run':solo?'Recorded / single-system run':'Recorded / system comparison'}</span><span class="plate-number">${summary.cards.length} WORK ORDER${summary.cards.length===1?'':'S'}</span></div><div class="hero-number"${hero.score.length>5?' style="font-size:clamp(1.5rem,4vw,3rem)"':''}>${E(hero.score)}</div><h2>${E(hero.label)}</h2><p>${E(hero.detail)}</p><p>${summary.cards.map(card=>E(card.title)).join('<br>')||'No recorded work orders.'}</p><div class="mini-comparison"><div><span>Systems included</span><strong>${summary.systems}</strong></div><div><span>Attempts recorded</span><strong>${summary.recorded}/${summary.total}</strong></div></div><p class="plate-note">${summary.passed}/${summary.total} attempts passed and completed.<br>Artifacts accepted: ${summary.accepted}/${summary.total}.</p></aside>`;
+  const followups=main?.followups??[];
+  const followupNote=followups.length?`<p class="followup-note"><strong>Matchup completed with follow-up runs.</strong> ${followups.map(f=>`${f.arms.map(arm=>({'deepseek-local-27b':'DeepSeek Harness',hermes:'Hermes',opencode:'OpenCode'}[arm])).join(', ')} · ${E(f.startedAt.slice(0,10))}`).join('; ')}. Original BANTAM FACTORY result retained. Task, starter, grader and local model hashes match. <a href="#method">Run conditions ↓</a></p>`:'';
   const recordedMethod=`<section><h3>The recorded comparison</h3><p>${summary.cards.length} included work order${summary.cards.length===1?'':'s'}: ${summary.cards.map(card=>`${E(card.kind)} — ${E(card.title)} (repeat ${card.repeat})`).join('; ')||'none'}. ${summary.systems} systems and ${summary.recorded}/${summary.total} recorded attempts. Every arm receives the supplied materials for its work order; independent acceptance checks remain separate from worker tests.</p><p>Local configurations and frontier references are distinguished in each lane. A frontier result is not a same-model comparison. All included outcomes remain visible; missing results are not zero-cost runs and do not count as passes. No winner or aggregate speed claim is inferred.</p><p>Configuration, native tool policies, sampling, cache state, run order and hardware can affect these observations. The public projection does not establish their equality or the execution schedule. This is not a controlled context-only ablation or a reliability estimate. No held-out-task claim is made; prior development exposure is not excluded.</p></section>`;
   const qualificationPlate=`<aside class="result-plate" aria-label="Recorded local qualification"><div class="plate-top"><span class="eyebrow">BANTAM FACTORY / local qualification</span><span class="plate-number">${q.total} WORK ORDERS</span></div><div class="hero-number">${q.total?`${q.passed}/${q.total}`:'—'}</div><h2>tasks passed and completed.</h2><p>${E(q.model)}<br>Build. Extend. Repair.</p><div class="mini-comparison"><div><span>Summed run time</span><strong>${duration(q.wallMs)}</strong></div><div><span>Attempts recorded</span><strong>${q.recorded}/${q.total}</strong></div></div><p class="plate-note">Artifacts accepted: ${q.acceptedCards}/${q.total}. Independent checks passed; factory completion is separate.<br>All included tasks count, including failures and unrecorded work.<br>One qualification cohort, not a model comparison or reliability estimate.</p></aside>`;
   const qualificationMethod=`<section><h3>The qualification</h3><p>${q.total} included work orders: ${q.cards.map(card=>`${E(card.kind)} — ${E(card.title)}`).join('; ')||'no recorded qualification cohort'}. This is BANTAM-only local-worker qualification, not a comparison against other harnesses or models. Independent acceptance checks are separate from the worker's own tests.</p><p>The score requires both an accepted project and clean completion, with passing public and independent checks and no protected-file changes. Every included task remains in the denominator. Missing results are not failures, but do not count as passes. Summed run time is unknown if any included attempt lacks a measured duration.</p><p>One cohort does not establish a reliability rate or general capability. Recorded configuration, sampling and cache state can affect results. This does not measure every later harness revision. Public measurements omit private execution context and source.</p></section>`;
@@ -207,14 +230,14 @@ export function renderLaunchPage(input,{previewImage='share-card.svg',presentati
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="theme-color" content="#101916"><meta name="description" content="${E(description)}"><meta property="og:type" content="website"><meta property="og:title" content="${E(pageTitle)} · BANTAM FACTORY fight cards"><meta property="og:description" content="${E(socialDescription)}"><meta property="og:image" content="${E(socialImage)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${E(socialImage)}"><title>${E(pageTitle)} · BANTAM FACTORY fight cards</title>${publishedPath?`<link rel="canonical" href="${galleryURL+publishedPath}">`:''}<link rel="icon" href="data:image/svg+xml;base64,${Buffer.from(BRAND).toString('base64')}"><style>${CSS}</style></head><body>
   <a class="skip" href="#arena">Skip to recorded results</a>
   <header class="site-header wrap"><a class="brand" href="${home}" aria-label="BANTAM FACTORY fight gallery">${BRAND}<span>BANTAM FACTORY<small>THE MODEL IS NOT THE FACTORY.</small></span></a><nav aria-label="Main"><a href="${home}">All fights ↗</a><a href="#method">Method</a><button id="download-data" class="button small" type="button">Download data <span aria-hidden="true">↓</span></button></nav></header>
-  <main id="top"><section class="hero wrap"><div class="hero-copy"><p class="eyebrow">${qualification?'BANTAM FACTORY / qualification':soloBantam?'BANTAM FACTORY / solo run':solo?'Single-system run':'BANTAM FACTORY / fight card'}</p><h1>${E(pageTitle)}<span style="color:var(--gold)">.</span></h1><p class="hero-description">${main?.cards.length===1?E(main.cards[0].description):'Build it. Extend it. Fix it. Explore the recorded work, one task at a time.'}</p>${solo?'<p class="solo-note">One recorded system. This card stands on its own; competitor results are not yet part of this record.</p>':''}<div class="hero-actions"><a class="button primary" href="#arena">Watch the work <span aria-hidden="true">↘</span></a><button class="button" id="download-image" type="button">Download result image <span aria-hidden="true">↓</span></button></div></div>
+  <main id="top"><section class="hero wrap"><div class="hero-copy"><p class="eyebrow">${qualification?'BANTAM FACTORY / qualification':soloBantam?'BANTAM FACTORY / solo run':solo?'Single-system run':'BANTAM FACTORY / fight card'}</p><h1>${E(pageTitle)}<span style="color:var(--gold)">.</span></h1><p class="hero-description">${main?.cards.length===1?E(main.cards[0].description):'Build it. Extend it. Fix it. Explore the recorded work, one task at a time.'}</p>${followupNote}${solo?'<p class="solo-note">One recorded system. This card stands on its own; competitor results are not yet part of this record.</p>':''}<div class="hero-actions"><a class="button primary" href="#arena">Watch the work <span aria-hidden="true">↘</span></a><button class="button" id="download-image" type="button">Download result image <span aria-hidden="true">↓</span></button></div></div>
     ${qualification?qualificationPlate:generic?recordedPlate:`<aside class="result-plate" aria-label="Observed same-model comparison"><div class="plate-top"><span class="eyebrow">Same model / different harness</span><span class="plate-number">01—03</span></div><div class="hero-number">${E(pct)}${has?'<span>%</span>':''}</div><h2>${has?'less recorded time.':'Recorded, not promised.'}</h2><p>${has?'BANTAM FACTORY vs DeepSeek Harness.<br>The same local 27B weights.':'Inspect the recorded systems below.'}</p><div class="mini-comparison"><div><span>BANTAM FACTORY</span><strong>${has?duration(c.bantamWallMs):'Unknown'}</strong><i class="bantam-mini" style="--w:${has?(100*c.bantamWallMs/c.deepseekWallMs).toFixed(2):0}%"></i></div><div><span>DeepSeek Harness</span><strong>${has?duration(c.deepseekWallMs):'Unknown'}</strong><i style="--w:${has?100:0}%"></i></div></div><p class="plate-note">${has?`${E(c.cards)} tasks · ${E(c.repeatCount)} recorded repeat · both passed all ${E(c.cards)}.<br>Aggregate elapsed time. Not a universal speed claim.`:'No comparable aggregate is available.'}</p></aside>`}
   </section>
 
 ${rigPanel(main)}
   <section class="arena-section" id="arena" aria-labelledby="arena-title"><div class="wrap"><div class="section-head"><div><p class="eyebrow">The recorded factory floor</p><h2 id="arena-title">${qualification?'The qualification board':solo?'The run, at a glance.':'Meet the contenders.'}</h2></div><p>${qualification?`${q.total} work orders inside BANTAM FACTORY.<br>${E(q.model)}.<br><span>${comparisonCount} recorded attempts shown. Missing work stays visible.</span>`:generic?`${summary.local} local configuration${summary.local===1?'':'s'}.${summary.frontier?`<br>${summary.frontier} frontier reference${summary.frontier===1?'':'s'}, shown separately.`:''}<br><span>All ${summary.recorded}/${summary.total} recorded attempts shown. No tokens invented.</span>`:`Four harnesses, the same local 27B.<br>Two Astra configurations, shown separately.<br><span>All ${comparisonCount} comparison attempts shown. No tokens invented.</span>`}</p></div>
   <div class="interactive" id="interactive" hidden><div id="work-tabs" class="work-tabs" role="tablist" aria-label="Work order"></div><div class="work-heading"><div><p class="eyebrow" id="work-kind"></p><h3 id="work-title"></h3><p id="work-description"></p></div><button id="focus" class="button dark" type="button" aria-pressed="false">Focus view <span aria-hidden="true">⛶</span></button></div>
-  <div class="board-tools" id="board-tools"><div class="view-switch" role="group" aria-label="Comparison layout"><button id="view-all" aria-pressed="true">All contenders</button><button id="view-compare" aria-pressed="false">Compare two</button></div><span id="board-count" class="board-count"></span><div id="compare-pickers" class="compare-pickers" hidden><label>Left corner<select id="compare-left" aria-label="Left contender"></select></label><label>Right corner<select id="compare-right" aria-label="Right contender"></select></label></div></div><div class="playback"><button id="play" class="play-button" type="button" aria-label="Play recorded timeline">▶ <span>Replay</span></button><output id="clock" aria-label="Recorded elapsed time">FINAL</output><label class="sr-only" for="timeline">Recorded elapsed time</label><input id="timeline" type="range" min="0" max="1" step="1" value="1"><label class="speed-label" for="speed">Speed <select id="speed"><option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="30">30×</option><option value="60">60×</option></select></label><button id="results" class="button dark" type="button">Final results</button></div>
+  <div class="board-tools" id="board-tools"><div class="view-switch" role="group" aria-label="Comparison layout"><button id="view-all" aria-pressed="true">All contenders</button><button id="view-compare" aria-pressed="false">Compare two</button></div><span id="board-count" class="board-count"></span><div id="compare-pickers" class="compare-pickers" hidden><label>Left corner<select id="compare-left" aria-label="Left contender"></select></label><label>Right corner<select id="compare-right" aria-label="Right contender"></select></label></div></div><div id="matchup-verdict" class="matchup-verdict" role="status" hidden><strong></strong><p></p></div><div class="playback"><button id="play" class="play-button" type="button" aria-label="Play recorded timeline">▶ <span>Replay</span></button><output id="clock" aria-label="Recorded elapsed time">FINAL</output><label class="sr-only" for="timeline">Recorded elapsed time</label><input id="timeline" type="range" min="0" max="1" step="1" value="1"><label class="speed-label" for="speed">Speed <select id="speed"><option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="30">30×</option><option value="60">60×</option></select></label><button id="results" class="button dark" type="button">Final results</button></div>
   <div class="replay-caption"><span id="replay-note">Final recorded measurements.</span><span>Space: play / pause · ← →: seek</span></div><div id="finish-points" class="finish-points" aria-label="Jump to recorded finishes"></div><div id="lane-list" aria-live="off"></div><p class="arena-footnote">Bars show elapsed time against the longest recorded run, not percentage of work completed. Token counters advance only when a saved response supplies them.</p></div>
   <div id="static-results" class="static-results">${staticTable(main?[main]:[])}</div>
   </div></section>
@@ -224,7 +247,7 @@ ${spot}
   </section>
   <section class="closing wrap"><p class="eyebrow">Put your model to work.</p><h2>Your model.<br>A better factory.</h2><div><a class="button primary" href="https://github.com/BANTAM-ADMIN/bantam-factory#quick-start">Get BANTAM FACTORY ↗</a><button id="share-svg" class="button" type="button">Download share card · SVG <span aria-hidden="true">↓</span></button><button id="print-page" class="button" type="button">Print results</button><p id="export-status" role="status">Public measurements only. Review before sharing.</p></div></section>
   </main><footer class="site-footer wrap"><span>BANTAM FACTORY / RECORDED RESULTS</span><span>Built to be inspected.</span><a href="#top">Back to top ↑</a></footer>
-  <script id="launch-data" type="application/json">${J(data)}</script><script id="share-card-data" type="application/json">${J(share)}</script><script>const factoryName=${factoryName.toString()};${browser.toString()};browser(${J(presentation)},${J(Object.fromEntries(data.series.flatMap(s=>s.cards.flatMap(c=>c.rows.map(r=>[r.id,performanceView(r.performance)])))))});</script></body></html>`;
+  <script id="launch-data" type="application/json">${J(data)}</script><script id="share-card-data" type="application/json">${J(share)}</script><script>const factoryName=${factoryName.toString()};const matchupVerdict=${matchupVerdict.toString()};${browser.toString()};browser(${J(presentation)},${J(Object.fromEntries(data.series.flatMap(s=>s.cards.flatMap(c=>c.rows.map(r=>[r.id,performanceView(r.performance)])))))});</script></body></html>`;
 }
 
 const CSS=PUBLIC_BOARD_CSS;
@@ -242,11 +265,11 @@ function browser(presentation,performanceViews){
   const main=presentation==='qualification'?data.series.find(s=>s.kind==='variant'):(data.series.find(s=>s.id===data.comparison?.seriesId)??data.series.find(s=>s.kind==='comparison'));
   const cards=main?.cards??[];
   let ci=0,t=0,mode='results',playing=false,last=0,frame=0;
-  let layout='all',pair=[];
+  let layout='compare',pair=[];
   const current=()=>cards[ci];
   const duration=()=>Math.max(0,...(current()?.rows??[]).flatMap(r=>[valid(r.wallMs)?r.wallMs:0,...(r.tokenUpdates??[]).filter(u=>valid(u.t)).map(u=>u.t)]));
-  function hash(){const q=new URLSearchParams({card:current()?.card??'',view:mode,t:String(Math.round(t))});history.replaceState(null,'','#'+q);}
-  function readHash(){const q=new URLSearchParams(location.hash.slice(1)),index=cards.findIndex(c=>c.card===q.get('card'));if(index>=0)ci=index;mode=q.get('view')==='replay'?'replay':'results';const v=Number(q.get('t'));t=mode==='results'?duration():Math.max(0,Math.min(duration(),Number.isFinite(v)?v:0));}
+  function hash(){const q=new URLSearchParams({card:current()?.card??'',view:mode,t:String(Math.round(t)),layout,left:pair[0]??'',right:pair[1]??''});history.replaceState(null,'','#'+q);}
+  function readHash(){const q=new URLSearchParams(location.hash.slice(1)),index=cards.findIndex(c=>c.card===q.get('card'));if(index>=0)ci=index;mode=q.get('view')==='replay'?'replay':'results';layout=q.get('layout')==='all'?'all':'compare';pair=[q.get('left'),q.get('right')].filter((arm,i,all)=>arm&&all.indexOf(arm)===i);const v=Number(q.get('t'));t=mode==='results'?duration():Math.max(0,Math.min(duration(),Number.isFinite(v)?v:0));}
   function stop(){playing=false;cancelAnimationFrame(frame);frame=0;}
   function accounting(r){
     const perf=performanceViews[r.id];
@@ -280,7 +303,7 @@ function browser(presentation,performanceViews){
     let group='';$('lane-list').innerHTML=displayed.map(({r,i})=>{
       const local=current().rows.filter(row=>row.family==='local');
       const localCount=new Set(local.map(row=>row.arm)).size;
-      const localLabel=local.every(row=>row.model==='Qwen 27B · same local weights')?'Same local 27B weights':'Local worker configurations';
+      const localLabel=local.every(row=>/^Qwen 27B · same local (?:model|weights)$/.test(row.model))?'Same local 27B weights':'Local worker configurations';
       const g=current().rows.length===1?`Recorded system · ${r.model}`:presentation==='qualification'?`BANTAM FACTORY local qualification · ${r.model}`:(r.family==='astra'?'Frontier references · different models from the local worker':`${localLabel} · ${localCount===4?'four':localCount} different harness${localCount===1?'':'es'}`);
       const perf=performanceViews[r.id];
       const heading=g!==group?`<h4 class="lane-group">${e(g)}</h4>`:'';group=g;
@@ -334,18 +357,24 @@ function browser(presentation,performanceViews){
       // Final receipts remain available in results mode, not leaked into replay before the endpoint.
       const detail=node.querySelector('details');detail.hidden=!ended;if(!ended)detail.open=false;
     });
-    window.__launchState=()=>({card:current().card,t,mode,playing});
+    const selected=pair.map(arm=>current().rows.find(row=>row.arm===arm)).filter(Boolean);
+    const verdict=matchupVerdict(selected,mode==='results'||selected.every(row=>valid(row.wallMs)&&t>=row.wallMs));
+    const note=$('matchup-verdict');note.hidden=layout!=='compare'||!verdict;
+    if(verdict){for(const [selector,text]of [['strong',verdict.title],['p',verdict.detail]]){
+      const child=note.querySelector(selector);if(child.textContent!==text)child.textContent=text;
+    }}
+    window.__launchState=()=>({card:current().card,t,mode,playing,layout,pair:[...pair]});
   }
   function select(index){stop();ci=index;t=duration();mode='results';build();hash();$('work-tabs').querySelector('[aria-selected=true]')?.focus({preventScroll:true});}
   function animate(now){if(!playing)return;if(last)t=Math.min(duration(),t+(now-last)*Number($('speed').value));last=now;update();if(t>=duration()){stop();hash();update();return;}frame=requestAnimationFrame(animate);}
   function play(){if(!current())return;if(playing){stop();hash();update();return;}if(mode==='results'||t>=duration())t=0;mode='replay';playing=true;last=0;hash();update();frame=requestAnimationFrame(animate);}
-  $('view-all').onclick=()=>{layout='all';applyLayout();};
-  $('view-compare').onclick=()=>{layout='compare';applyLayout();};
+  $('view-all').onclick=()=>{layout='all';applyLayout();update();hash();};
+  $('view-compare').onclick=()=>{layout='compare';applyLayout();update();hash();};
   for(const [id,index]of [['compare-left',0],['compare-right',1]])$(id).onchange=()=>{
     const previous=pair[index],next=$(id).value;
     if(pair[1-index]===next)pair[1-index]=previous;
     pair[index]=next;
-    $('compare-left').value=pair[0];$('compare-right').value=pair[1];applyLayout();
+    $('compare-left').value=pair[0];$('compare-right').value=pair[1];applyLayout();update();hash();
   };
   $('finish-points').onclick=ev=>{const button=ev.target.closest('[data-finish]');if(!button)return;
     stop();mode='replay';t=current().rows[Number(button.dataset.finish)].wallMs;update();hash();};

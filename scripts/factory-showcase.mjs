@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {buildReplayLane,normalizeReplayUsage,replayLineDiff} from './factory-fight-replay.mjs';
 import {deriveSavedWireUsage} from './fight-usage-report.mjs';
 import {derivePerformance,publicPerformance,performanceView,validateHardware} from './fight-performance.mjs';
+import {followupFields} from './fight-followups.mjs';
 import {factoryKit, PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -34,7 +35,7 @@ const SYSTEMS={
   'claude-fable':['Claude · Fable','astra','Claude Fable · native CLI alias'],
   'bantam-codex-astra':['BANTAM · Astra','astra','GPT-6 Astra · wrapped CLI'],
 };
-const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);
+const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local weights','Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);
 function localDescription(modelId){
   const name=path.basename(String(modelId??''));
   if(/^Qwen[^/]*27B[^/]*\.gguf$/i.test(name))return 'Qwen 27B · same local model';
@@ -127,7 +128,7 @@ export function publicShowcaseData(privateData){
   return {schema:'bantam.factory-showcase.v1',mode:'public',generatedAt:knownDate(privateData.generatedAt),
     privacy:{redacted:true,rawEvidenceIncluded:false,policy:'Explicit numeric/public-task allowlist; private logs, paths, source, prompts, group names and configuration omitted.'},
     series:privateData.series.map((s,si)=>({id:`series-${si+1}`,title:s.kind==='comparison'?'Factory system comparison':`Local worker · edition ${si+1}`,
-      kind:s.kind==='comparison'?'comparison':'variant',complete:s.complete===true,startedAt:knownDate(s.startedAt),finishedAt:knownDate(s.finishedAt),
+      kind:s.kind==='comparison'?'comparison':'variant',complete:s.complete===true,startedAt:knownDate(s.startedAt),finishedAt:knownDate(s.finishedAt),...followupFields(s),
       counts:counts(s.cards.flatMap(c=>c.rows).map(r=>({...r,groupsPassed:N(r.groupsPassed),groupsTotal:N(r.groupsTotal)}))),cards:s.cards.map(c=>{
         if(!Object.hasOwn(CARDS,c.card)||!Number.isSafeInteger(c.repeat)||c.repeat<1)throw Error('invalid public card identity');
         return {id:`s${si+1}-${c.card}-r${c.repeat}`,card:c.card,...CARDS[c.card],repeat:c.repeat,

@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {publicShowcaseData} from './factory-showcase.mjs';
 import {PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
+import {publicFollowups} from './fight-followups.mjs';
 
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -40,6 +41,13 @@ function validateShape(raw) {
     if (!record(series) || !['comparison', 'variant'].includes(series.kind)
         || !Array.isArray(series.cards) || !series.cards.length || series.cards.length > 200)
       throw Error('invalid public series');
+    if (Object.hasOwn(series, 'followups')) {
+      const followups = publicFollowups(series.followups);
+      if (!followups.length || JSON.stringify(followups) !== JSON.stringify(series.followups)
+          || series.cards.length !== 1 || followups.some(receipt => receipt.arms.some(arm =>
+            !series.cards[0].rows?.some(row => row.arm === arm && row.recorded === true))))
+        throw Error('invalid or unbound follow-up receipt');
+    }
     const identities = new Set();
     for (const card of series.cards) {
       if (!record(card) || !Object.hasOwn(PUBLIC_FACTORY_CARDS,card.card) || !Number.isSafeInteger(card.repeat)

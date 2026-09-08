@@ -51,7 +51,7 @@ test('legacy default retains exact eighteen card/arm identities and ordering',()
   const cards=['receipt-reducer','snapshot-drift','job-planner'];
   const expected=cards.flatMap((card,index)=>[...arms.slice(index*2),...arms.slice(0,index*2)].map(arm=>({card,arm,repeat:1})));
   assert.deepEqual(DEFAULT_FIGHT_ARMS,arms);assert.deepEqual(FIGHT_CARDS,cards);
-  assert.deepEqual(FIGHT_ARMS,[...arms,'codex-sol','codex-terra','claude-sonnet','claude-opus']);
+  assert.deepEqual(FIGHT_ARMS,[...arms,'codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable']);
   assert.deepEqual(fightPlan(),expected);
   assert.deepEqual(fightPlan({kitId:'factory-2026-09-06'}),expected);
 });

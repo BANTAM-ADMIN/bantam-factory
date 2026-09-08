@@ -10,6 +10,7 @@ import {buildShowcase} from '../scripts/factory-showcase.mjs';
 import {buildLaunchData} from '../scripts/factory-launch.mjs';
 import {writeFightCardExport} from '../scripts/factory-fight-export.mjs';
 import {writeFactoryReplay} from '../scripts/factory-fight-replay.mjs';
+import {projectFightProgress} from '../src/factory-card-progress.js';
 
 const receipt={type:'result',subtype:'success',num_turns:3,usage:{input_tokens:100,output_tokens:20,cache_read_input_tokens:70,cache_creation_input_tokens:30},modelUsage:{'fixture-model':{}},total_cost_usd:0.01};
 test('Claude aggregate is exact and absent or incomplete counters remain unknown',()=>{
@@ -28,14 +29,14 @@ test('Claude boundary mounts only one read-only credential, disables customizati
   assert.ok(args.includes('--strict-mcp-config'));assert.ok(args.includes('--disable-slash-commands'));assert.ok(!args.includes('--bare'));
   assert.equal(args[args.indexOf('--setting-sources')+1],'');assert.equal(args[args.indexOf('--effort')+1],'medium');
   assert.ok(!args.includes('--network'));const probe=claudeDockerArgs({...options,probe:true});assert.equal(probe[probe.indexOf('--network')+1],'none');
-  assert.throws(()=>claudeDockerArgs({...options,workspace:'/'}));assert.throws(()=>claudeDockerArgs({...options,model:'other'}));
+  assert.throws(()=>claudeDockerArgs({...options,workspace:'/'}));assert.throws(()=>claudeDockerArgs({...options,model:'other'}));assert.doesNotThrow(()=>claudeDockerArgs({...options,model:'fable'}));
   assert.throws(()=>claudeDockerArgs({...options,control:options.workspace}));
 });
 test('explicit Claude lanes preserve native accounting and identities through frozen runner and public export',async t=>{
   assert.ok(DEFAULT_FIGHT_ARMS.every(a=>!a.startsWith('claude-')),'no implicit subscription use');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-claude-lanes-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const output=path.join(root,'run');
-  const manifest=await runFactoryFights({output,arms:['claude-sonnet','claude-opus'],cards:['context-packet'],kitId:'factory-2026-09-07'}, {
+  const manifest=await runFactoryFights({output,arms:['claude-sonnet','claude-opus','claude-fable'],cards:['context-packet'],kitId:'factory-2026-09-07'}, {
     inspect:async()=>{throw Error('cloud-only must not inspect local GPU');},
     contender:async command=>{assert.ok(command.args.some(a=>a.endsWith('/claude-fight-cli.mjs')));return {code:0,stdout:JSON.stringify(receipt),stderr:'',wallMs:10,startedAt:new Date().toISOString(),timedOut:false,aborted:false,bufferExceeded:false};},
     grade:async()=>({publicResult:{code:0,stdout:'',stderr:'',timedOut:false},hidden:{code:0,stdout:'',stderr:'',timedOut:false},
@@ -43,8 +44,13 @@ test('explicit Claude lanes preserve native accounting and identities through fr
   });
   assert.equal(manifest.complete,true);assert.equal(manifest.configuration.codexModel,null);
   for(const row of manifest.results){assert.equal(row.usage.inputTokens,200);assert.equal(row.outcome,'PASS');}
-  writeFightCardExport(output);assert.equal(writeFactoryReplay(output).lanes,2);
+  writeFightCardExport(output);assert.equal(writeFactoryReplay(output).lanes,3);
   const data=buildShowcase({roots:[output],mode:'public'}).data,launch=buildLaunchData(JSON.stringify(data));
-  assert.deepEqual(launch.series[0].cards[0].rows.map(r=>r.model),['Claude Sonnet · native CLI alias','Claude Opus · native CLI alias']);
+  assert.deepEqual(launch.series[0].cards[0].rows.map(r=>r.model),['Claude Sonnet · native CLI alias','Claude Opus · native CLI alias','Claude Fable · native CLI alias']);
   for(const row of launch.series[0].cards[0].rows){assert.equal(row.accounting.full.inputTokens,200);assert.equal(row.accounting.complete,true);}
+});
+test('live progress labels an explicit Claude Fable lane instead of rejecting it',()=>{
+  const manifest={plan:[{arm:'claude-fable',card:'context-packet',repeat:1}],results:[],finishedAt:null,configuration:{}};
+  const lanes=projectFightProgress(manifest,new Map(),0).lanes;
+  assert.equal(lanes.length,1);assert.equal(lanes[0].label,'Claude · Fable');assert.equal(lanes[0].phase,'queued');
 });

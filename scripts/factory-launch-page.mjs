@@ -44,7 +44,7 @@ function comparisonSummary(series){
 
 // Presentation order only: do not reorder the portable evidence or imply rank.
 function shareDisplayRows(rows){
-  const order=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus'];
+  const order=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus','claude-fable'];
   const rank=row=>{const i=order.indexOf(row.arm);return i<0?order.length:i;};
   return rows.map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(x=>x.row);
 }

@@ -29,6 +29,7 @@ const SYSTEMS={
   'codex-terra':['Codex · Terra','astra','GPT-5.6 Terra · native CLI'],
   'claude-sonnet':['Claude · Sonnet','astra','Claude Sonnet · native CLI alias'],
   'claude-opus':['Claude · Opus','astra','Claude Opus · native CLI alias'],
+  'claude-fable':['Claude · Fable','astra','Claude Fable · native CLI alias'],
   'bantam-codex-astra':['BANTAM · Astra','astra','GPT-6 Astra · wrapped CLI'],
 };
 const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);

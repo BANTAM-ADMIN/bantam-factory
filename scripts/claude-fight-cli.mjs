@@ -17,7 +17,7 @@ const absolute=value=>{
 export function claudeDockerArgs({runtime,workspace,control,model='sonnet',task='',timeoutSeconds=600,probe=false,name}){
   workspace=absolute(workspace);control=absolute(control);
   if(['/',os.homedir(),ROOT].includes(workspace)||control===workspace||control.startsWith(workspace+path.sep)||workspace.startsWith(control+path.sep))throw Error('Use separate disposable workspace and control directory');
-  if(!['sonnet','opus'].includes(model)||!/^bantam-claude-[a-z0-9-]+$/.test(name))throw Error('Invalid Claude contender');
+  if(!['sonnet','opus','fable'].includes(model)||!/^bantam-claude-[a-z0-9-]+$/.test(name))throw Error('Invalid Claude contender');
   if(!Number.isInteger(timeoutSeconds)||timeoutSeconds<1||timeoutSeconds>1800)throw Error('Invalid deadline');
   const {uid,gid}=nonRootIdentity(runtime.identity);
   const mount=(source,target,readonly=true)=>['--mount',`type=bind,src=${absolute(source)},dst=${absolute(target)}${readonly?',readonly':''}`];

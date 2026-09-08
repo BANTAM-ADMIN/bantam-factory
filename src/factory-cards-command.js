@@ -43,7 +43,7 @@ listing or planning. Execution requires Docker and the selected runtimes.
 Local lanes currently require a loopback llama.cpp server with /props and /slots.
 Cloud-only cards do not require a local server. Select cloud participants
 explicitly: task context goes to the provider and consumes account access/quota.
-Claude Code is never selected automatically. Select claude-sonnet or claude-opus
+Claude Code is never selected automatically. Select claude-sonnet, claude-opus or claude-fable
 explicitly for an isolated native CLI comparison (Linux x64 standalone install,
 file-backed authentication). Generic agent APIs are not model APIs.
 `;

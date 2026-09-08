@@ -19,7 +19,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
 export const DEFAULT_FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 export const NATIVE_CODEX_MODELS=Object.freeze({'codex-astra':'gpt-6-astra','codex-sol':'gpt-5.6-sol','codex-terra':'gpt-5.6-terra'});
-export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus'];
+export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
 const LOCAL=new Set(FIGHT_ARMS.slice(0,4));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');

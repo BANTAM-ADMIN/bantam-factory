@@ -2,7 +2,7 @@ import {PUBLIC_FACTORY_CARDS} from '../scripts/factory-card-catalog.mjs';
 import {aggregateExchanges} from '../scripts/fight-model-proxy.mjs';
 
 const LABELS={'bantam-local-27b':'BANTAM · local','deepseek-local-27b':'DeepSeek Harness',hermes:'Hermes',opencode:'OpenCode',
- 'codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra'};
+ 'codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus'};
 const count=v=>Number.isSafeInteger(v)&&v>=0?v:null;
 const fields=['inputTokens','outputTokens','cacheHitTokens','freshInputTokens'];
 export const progressKey=r=>`${r.repeat}/${r.card}/${r.arm}`;

@@ -196,7 +196,7 @@ export function validateFightCard(card) {
     'endpoint', 'limits', 'configuration', 'sourceSeal', 'kitSeal', 'sourceMismatches', 'kitMismatches', 'operatorEvidence'], 'run');
   if (!object(card.run) || typeof card.run.complete !== 'boolean' || !hex(card.run.manifestSha256)) fail('invalid run metadata');
   if (card.run.modelFileSha256 !== null && !hex(card.run.modelFileSha256)) fail('invalid model digest');
-  const cloudOnly = Array.isArray(card.plan) && card.plan.length>0 && card.plan.every(row=>['codex-astra','codex-sol','codex-terra','bantam-codex-astra'].includes(row?.arm));
+  const cloudOnly = Array.isArray(card.plan) && card.plan.length>0 && card.plan.every(row=>['codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus'].includes(row?.arm));
   const noLocalIdentity = cloudOnly && card.run.modelId===null && card.run.endpoint===null && card.run.modelFileSha256===null;
   if ((!noLocalIdentity && typeof card.run.modelId !== 'string') || typeof card.run.design !== 'string' || !object(card.run.configuration)) fail('invalid model/configuration metadata');
   if (!timestamp(card.run.startedAt) || (card.run.finishedAt !== null && !timestamp(card.run.finishedAt))

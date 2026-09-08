@@ -10,7 +10,7 @@ import {cornerUsage} from '../src/fight.js';
 import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 import {startModelRecorder} from './fight-model-proxy.mjs';
-import {codexSessionUsage,serverCounters,counterDelta,settleServerCounters} from './fight-usage.mjs';
+import {codexSessionUsage,claudeStreamUsage,serverCounters,counterDelta,settleServerCounters} from './fight-usage.mjs';
 import {factoryKit} from './factory-card-catalog.mjs';
 import {verifyCompetitorRegistration} from '../src/competitor-registry.js';
 import {projectFightProgress,progressKey} from '../src/factory-card-progress.js';
@@ -19,7 +19,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
 export const DEFAULT_FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 export const NATIVE_CODEX_MODELS=Object.freeze({'codex-astra':'gpt-6-astra','codex-sol':'gpt-5.6-sol','codex-terra':'gpt-5.6-terra'});
-export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra'];
+export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
 const LOCAL=new Set(FIGHT_ARMS.slice(0,4));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -52,6 +52,9 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
   if(!FIGHT_ARMS.includes(arm))throw Error('unknown arm');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
   if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
+  if(arm.startsWith('claude-'))return {exe:process.execPath,args:[path.join(ROOT,'scripts/claude-fight-cli.mjs'),
+    '--workspace',workspace,'--output',path.join(dir,'native'),'--task-file',path.join(dir,'task.md'),
+    '--model',arm.slice('claude-'.length),'--timeout-seconds',String(Math.ceil(timeoutMs/1000))],env:{}};
   if(['deepseek-local-27b','opencode','hermes'].includes(arm)) {
     return {exe:process.execPath,args:[path.join(ROOT,'scripts',arm==='deepseek-local-27b'?'deepseek-fight-cli.mjs':'peer-fight-cli.mjs'),
       ...(arm==='deepseek-local-27b'?[]:['--arm',arm]),'--workspace',workspace,'--task-file',path.join(dir,'task.md'),
@@ -129,7 +132,7 @@ export async function executeContender(command,options) {
   }
 }
 
-const EXECUTION_SCRIPTS=['factory-fights.mjs','factory-card-catalog.mjs','fight-model-proxy.mjs','fight-usage.mjs','repobrief-astra-fights.mjs','astra-container-cli.mjs','deepseek-fight-cli.mjs','peer-fight-cli.mjs'];
+const EXECUTION_SCRIPTS=['factory-fights.mjs','factory-card-catalog.mjs','fight-model-proxy.mjs','fight-usage.mjs','repobrief-astra-fights.mjs','astra-container-cli.mjs','deepseek-fight-cli.mjs','peer-fight-cli.mjs','claude-fight-cli.mjs'];
 function sourceSeal() {return Object.fromEntries([
   ...['src','bin'].flatMap(part=>Object.entries(treeHashes(path.join(ROOT,part))).map(([p,h])=>[`${part}/${p}`,h])),
   ...EXECUTION_SCRIPTS.map(file=>[`scripts/${file}`,sha(fs.readFileSync(path.join(ROOT,'scripts',file)))]),
@@ -182,8 +185,9 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,
-      codexModel:arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
+      codexModel:!arms.some(a=>a.includes('codex'))||arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
       codexModels:Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??'gpt-6-astra'])),
+      claudeModels:Object.fromEntries(arms.filter(a=>a.startsWith('claude-')).map(a=>[a,{alias:a.slice('claude-'.length),effort:'medium'}])),
       verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,codexReadiness,deepseekReadiness,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',
       sampling:'native configured values, retained in local wire requests',
@@ -247,7 +251,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const candidatePass=!tampered.length&&clean(grading.publicResult)&&clean(grading.hidden)&&grading.record?.pass===true;
     const processCompleted=clean(result)&&acceptedCompletion!==false;
     const nativeResponseUsage=NATIVE_CODEX_MODELS[arm]?codexSessionUsage(path.join(dir,'native-sessions')):null;
-    const cliUsage=cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
+    const cliUsage=arm.startsWith('claude-')?claudeStreamUsage(result.stdout):cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
     const usage=wireUsage??nativeResponseUsage??cliUsage;
     if(usage&&usage.freshInputTokens==null&&usage.inputTokens!=null&&usage.cacheHitTokens!=null)usage.freshInputTokens=usage.inputTokens-usage.cacheHitTokens;
     const noModelRequest=LOCAL.has(arm)&&wireUsage.requests===0;

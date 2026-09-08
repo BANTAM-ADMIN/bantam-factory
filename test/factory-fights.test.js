@@ -17,6 +17,7 @@ test('all arms get exact task or task file and same explicit local endpoint/Astr
     const command=freshCommand({arm,task:'EXACT_TASK',workspace:'/tmp/fresh/ws',dir:'/tmp/fresh',endpoint:'http://127.0.0.1:9999',model:'exact27b'});
     assert.ok(command.args.includes('EXACT_TASK')||command.args.includes('/tmp/fresh/task.md'));
     if(arm.includes('codex'))assert.ok(command.args.includes(NATIVE_CODEX_MODELS[arm]??'gpt-6-astra'));
+    else if(arm.startsWith('claude-'))assert.ok(command.args.includes(arm.slice('claude-'.length)));
     else assert.ok(command.args.includes('http://127.0.0.1:9999'));
     if(arm.startsWith('bantam')){assert.equal(command.env.BANTAM_TEACHER,'0');assert.equal(command.env.BANTAM_PROBE,'1');assert.ok(command.args.includes('--factory'));}
     if(NATIVE_CODEX_MODELS[arm])assert.ok(!command.args.includes('--ephemeral'));
@@ -50,7 +51,7 @@ test('legacy default retains exact eighteen card/arm identities and ordering',()
   const cards=['receipt-reducer','snapshot-drift','job-planner'];
   const expected=cards.flatMap((card,index)=>[...arms.slice(index*2),...arms.slice(0,index*2)].map(arm=>({card,arm,repeat:1})));
   assert.deepEqual(DEFAULT_FIGHT_ARMS,arms);assert.deepEqual(FIGHT_CARDS,cards);
-  assert.deepEqual(FIGHT_ARMS,[...arms,'codex-sol','codex-terra']);
+  assert.deepEqual(FIGHT_ARMS,[...arms,'codex-sol','codex-terra','claude-sonnet','claude-opus']);
   assert.deepEqual(fightPlan(),expected);
   assert.deepEqual(fightPlan({kitId:'factory-2026-09-06'}),expected);
 });

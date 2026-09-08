@@ -21,6 +21,8 @@ const PUBLIC_MODELS = {
   'codex-astra': 'GPT-6 Astra · native CLI',
   'codex-sol': 'GPT-5.6 Sol · native CLI',
   'codex-terra': 'GPT-5.6 Terra · native CLI',
+  'claude-sonnet': 'Claude Sonnet · native CLI alias',
+  'claude-opus': 'Claude Opus · native CLI alias',
   'bantam-codex-astra': 'GPT-6 Astra · wrapped CLI',
 };
 const LOCAL_ARMS = new Set(['bantam-local-27b', 'deepseek-local-27b', 'opencode', 'hermes']);

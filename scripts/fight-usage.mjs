@@ -36,6 +36,23 @@ export function codexSessionUsage(directory){
     calls:[...calls.values()]};
 }
 
+// Final native aggregate only. Missing fields or absent terminal receipts are
+// unknown, never zeros synthesized from partial assistant events.
+export function claudeStreamUsage(text){
+  const records=String(text).split('\n').flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
+  const results=records.filter(r=>r?.type==='result');
+  if(results.length!==1)return null;
+  const result=results[0],u=result.usage;
+  if(!u||!['input_tokens','output_tokens','cache_read_input_tokens','cache_creation_input_tokens'].every(k=>count(u[k])))return null;
+  const input=u.input_tokens+u.cache_read_input_tokens+u.cache_creation_input_tokens;
+  if(!count(input))return null;
+  return {source:'claude-native-final-aggregate',complete:true,inputTokens:input,outputTokens:u.output_tokens,
+    cacheHitTokens:u.cache_read_input_tokens,freshInputTokens:u.input_tokens+u.cache_creation_input_tokens,
+    cacheCreationInputTokens:u.cache_creation_input_tokens,prefixReuse:input?u.cache_read_input_tokens/input:null,
+    turns:count(result.num_turns)?result.num_turns:null,models:Object.keys(result.modelUsage??{}),
+    costUsd:typeof result.total_cost_usd==='number'&&Number.isFinite(result.total_cost_usd)&&result.total_cost_usd>=0?result.total_cost_usd:null};
+}
+
 export function parseServerCounters(text){
   const names=['prompt_tokens_total','prompt_tokens_cached_total','tokens_predicted_total','prompt_seconds_total','tokens_predicted_seconds_total','requests_processing','requests_deferred'];
   const counters={};

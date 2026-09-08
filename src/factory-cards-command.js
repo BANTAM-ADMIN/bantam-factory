@@ -10,6 +10,7 @@ import {loadConnection,discoverModelServers} from './first-run.js';
 import {readCompetitorRegistry,registerCompetitor,executablePath,executableDigest,verifyCompetitorRegistration} from './competitor-registry.js';
 import {checkPeerReadiness,readinessLocation} from './peer-readiness.js';
 import {checkCodexReadiness} from './codex-readiness.js';
+import {checkClaudeReadiness} from './claude-readiness.js';
 import {nonRootIdentity} from './linux-peer-runtime.js';
 import {checkDeepseekReadiness} from './deepseek-readiness.js';
 import {startLiveFight,renderLiveFight} from './factory-card-live.js';
@@ -42,10 +43,9 @@ listing or planning. Execution requires Docker and the selected runtimes.
 Local lanes currently require a loopback llama.cpp server with /props and /slots.
 Cloud-only cards do not require a local server. Select cloud participants
 explicitly: task context goes to the provider and consumes account access/quota.
-Claude Code is never selected automatically. For an explicit direct Claude Code
-agent comparison, the existing command is: bantam fight --arms bantam,claude-sonnet --task "..."
-That legacy command has a different isolation/grading protocol; it is not this
-frozen-card runner. Generic agent APIs are not interchangeable with model APIs.
+Claude Code is never selected automatically. Select claude-sonnet or claude-opus
+explicitly for an isolated native CLI comparison (Linux x64 standalone install,
+file-backed authentication). Generic agent APIs are not model APIs.
 `;
 
 export function findCardExecutable(name,{env=process.env}={}){
@@ -75,7 +75,7 @@ export function discoverCardParticipants({find=findCardExecutable,registrations=
      inspectImages?`Prepared adapter image unavailable or Docker inaccessible: ${image}; nothing installed`:
       `Prepared adapter image prerequisite checked before execution: ${image}`};
   }
-  const command=id==='hermes'?'hermes':id==='opencode'?'opencode':id.includes('codex')?'codex':null;
+  const command=id==='hermes'?'hermes':id==='opencode'?'opencode':id.includes('codex')?'codex':id.startsWith('claude-')?'claude':null;
   const registration=registrations[id];let executable=command?find(command):null,problem=null;
   if(registration){
    try{executablePath(registration.executable);executable=registration.executable;}
@@ -158,7 +158,7 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  if(args.check){
   if(typeof args.arms!=='string'||Object.keys(args).some(k=>!['_','check','arms','out','yes','dry-run'].includes(k)))throw Error('Use --check --arms hermes,opencode [--out NEW-DIRECTORY] [--yes|--dry-run].');
   const arms=args.arms.split(',').map(a=>a.trim());
-  if(!arms.length||arms.some(a=>!FIGHT_ARMS.includes(a)||a==='bantam-local-27b')||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/DeepSeek/Codex runtimes only.');
+  if(!arms.length||arms.some(a=>!FIGHT_ARMS.includes(a)||a==='bantam-local-27b')||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/DeepSeek/Codex/Claude runtimes only.');
   const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name==='deepseek'?'deepseek-local-27b':name)));
   const output=args.out?path.resolve(args.out):readinessLocation(path.resolve('.bantam/fight-cards/offline-check'));
   out(`Offline runtime checks: ${arms.join(', ')}\nEvidence: ${output}\nNo model inference, cloud login, downloads or publication. Installed program code will execute in network-disabled containers.\n`);
@@ -171,9 +171,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   if(fs.existsSync(output))throw Error('Choose a fresh readiness evidence directory.');
   preflight({arms,peerExecutables},{participants});
   const peers=arms.filter(a=>['hermes','opencode'].includes(a)),codex=arms.some(a=>a.includes('codex'));
-  const deepseek=arms.includes('deepseek-local-27b'),mixed=Number(peers.length>0)+Number(codex)+Number(deepseek)>1;
+  const deepseek=arms.includes('deepseek-local-27b'),claude=arms.some(a=>a.startsWith('claude-')),mixed=Number(peers.length>0)+Number(codex)+Number(deepseek)+Number(claude)>1;
   if(peers.length)await checkPeers({arms:peers,peerExecutables,output:mixed?path.join(output,'peers'):output});
   if(codex)await checkCodex({output:mixed?path.join(output,'codex'):output});
+  if(claude)await checkClaudeReadiness({output:mixed?path.join(output,'claude'):output});
   if(deepseek)await checkDeepseek({output:mixed?path.join(output,'deepseek'):output,registration:peerExecutables.deepseek});
   out('Offline readiness passed. This is not a coding score or token-accounting qualification.\n');return 0;
  }
@@ -193,7 +194,8 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  if(args['dry-run'])return 0;
  if(args.public)out('A sanitized public summary will also be generated locally. Raw evidence stays private; no publication is authorized.\n');
  out('Fresh isolated workspaces; no changes to your current project. All failures remain recorded.\nRaw task/source/model transcripts remain private locally; inspect before sharing. No automatic uploads.\n');
- if(plan.arms.some(a=>!LOCAL.has(a)))out('Cloud participants send task/context to OpenAI using your signed-in Codex account and consume its quota/access.\n');
+ if(plan.arms.some(a=>a.includes('codex')))out('Codex participants send task/context to OpenAI using your signed-in Codex account and consume its quota/access.\n');
+ if(plan.arms.some(a=>a.startsWith('claude-')))out('Claude participants send task/context to Anthropic using your existing file-backed Claude account and consume its quota/access. No login, download or host configuration change is performed.\n');
  if(args.yes){
   if(typeof args.arms!=='string'||typeof args.card!=='string')throw Error('--yes requires explicit --arms and --card; no implicit paid participants.');
  }else if(!interactive)throw Error('Noninteractive execution requires --card, --arms and --yes. Use --dry-run to inspect without running.');
@@ -203,6 +205,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   const output=readinessLocation(plan.output)+'.deepseek';
   out(`Checking DeepSeek offline before scored work. Evidence: ${output}\n`);
   plan.deepseekReadiness=await checkDeepseek({output,registration:plan.peerExecutables?.deepseek});
+ }
+ if(plan.arms.some(a=>a.startsWith('claude-'))){
+  const output=readinessLocation(plan.output)+'.claude';out(`Checking Claude offline before scored work. Evidence: ${output}\n`);
+  await checkClaudeReadiness({output,requireAuthentication:true});
  }
  if(plan.arms.some(a=>a.includes('codex'))){
   const output=readinessLocation(plan.output)+'.codex';out(`Checking Codex offline before scored work. Evidence: ${output}\n`);

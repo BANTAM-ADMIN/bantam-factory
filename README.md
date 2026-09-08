@@ -78,7 +78,9 @@ creates a sanitized local package; it does **not** upload your project or publis
 anything automatically.
 
 Installed-harness comparisons support OpenCode, Hermes, DeepSeek Harness and
-Codex through their implemented adapters. Point BANTAM at supported installations;
+Codex through their implemented adapters. Explicit Claude Sonnet/Opus comparisons
+also support an existing Linux x64 standalone CLI with file-backed authentication.
+Point BANTAM at supported installations;
 you do not need to install every rival. A model's OpenAI-compatible API is not
 automatically an agent-harness interface—see the
 [adapter and accounting guide](docs/BRING-YOUR-OWN-COMPARISONS.md) for supported

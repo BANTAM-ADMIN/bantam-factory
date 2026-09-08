@@ -9,8 +9,8 @@ import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
-const ARMS = [...LEGACY_ARMS,'codex-sol','codex-terra'];
-const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra'};
+const ARMS = [...LEGACY_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus'];
+const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
 const SHA = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const NUM = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;

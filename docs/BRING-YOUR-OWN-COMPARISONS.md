@@ -10,7 +10,8 @@ Model setup does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Co
 Listing checks PATH/registered executable metadata and the prepared DeepSeek
 image using read-only `docker image inspect`; it never starts or pulls an image.
 Claude Code presence is listed without invoking it. Detection is not runtime
-qualification, and Claude remains outside the frozen-card runner for now.
+qualification. Explicit Claude lanes use the isolated frozen-card adapter
+described below; they are never part of the default roster.
 
 ## Start a card
 
@@ -260,3 +261,33 @@ stay local; the legacy local BANTAM lane no longer enables a cloud teacher.
 The legacy command `bantam fight --arms bantam,claude-sonnet --task "..."` is
 available for a deliberate direct comparison. Its execution/isolation/grading
 protocol differs from the frozen `cards` runner; do not label them equivalent.
+## Explicit Claude Code comparisons
+
+With an existing standalone Linux x64 Claude Code installation and readable
+file-backed authentication, select `claude-sonnet` or `claude-opus` explicitly:
+
+```bash
+bantamfactory cards --check --arms claude-sonnet,claude-opus --yes
+bantamfactory cards --card context-packet --arms bantam-local-27b,claude-sonnet --live --public
+```
+
+Claude is never added to the default fight roster or used as an implicit teacher.
+The scored run sends the work order to Anthropic and consumes the selected
+account's access/quota, only after execution consent. Nothing installs Claude,
+logs you in, exports credentials or changes your host configuration.
+
+The adapter uses a non-root, read-only-root Docker boundary with a disposable
+writable candidate, temporary home, one read-only credential file, no user
+settings, and no external MCP servers or skills. Offline checks use dummy
+credentials with networking disabled. Scored requests retain the CLI's built-in
+tools and native prompt, using the `sonnet`/`opus` alias at medium effort. Alias
+resolution can change: private native usage retains reported model IDs, and
+public card notes should identify the observed model when reviewed.
+
+Input totals include uncached input, cache creation and cache reads. Cached
+input is part of input, not an additional column to sum. A valid final native
+aggregate supplies the counters; absent or incomplete receipts remain unknown.
+Native aggregate coverage is not equivalent to per-request HTTP receipts.
+Claude's declared cost is not a claim about subscription billing. Keyring-only
+authentication, custom credential locations, npm-packaged Claude and non-Linux
+platforms are not qualified by this adapter.

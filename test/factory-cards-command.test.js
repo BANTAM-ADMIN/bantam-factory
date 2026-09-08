@@ -13,7 +13,7 @@ const tmp=t=>{const p=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-cards-'));t.a
 test('card discovery checks executables, never invokes Claude or installs rivals',()=>{
  const calls=[];const p=discoverCardParticipants({find:n=>{calls.push(n);return n==='hermes'?'/tools/hermes':null;}});
  assert.equal(p.find(p=>p.id==='hermes').installed,true);assert.equal(p.find(p=>p.id==='opencode').installed,false);
- assert.equal(calls.includes('claude'),false);assert.equal(p.some(p=>p.id.includes('claude')),false);
+ assert.equal(calls.includes('claude'),true);assert.equal(p.find(p=>p.id==='claude-sonnet').installed,false);
 });
 test('explicit listing recognizes prepared DeepSeek image using metadata only; planning does not inspect Docker',async()=>{
  const digest='sha256:'+'a'.repeat(64),calls=[];

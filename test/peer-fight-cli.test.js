@@ -12,7 +12,7 @@ const base = { arm: 'opencode', workspace: '/tmp/peer-test/candidate', taskFile:
 const runtime = { arm: 'opencode', entry: ['/opt/opencode'], version: 'test-native', executableDigest: 'a'.repeat(64), mounts: [{ source: '/opt/installed/opencode', target: '/opt/opencode' }], tools: ['/usr/bin/node', '/usr/bin/git'], libraries: [], npm: '/usr/lib/node_modules/npm' };
 const argumentsFor = (options = base) => ['--arm', options.arm, '--workspace', options.workspace, '--task-file', options.taskFile, '--output', options.output, '--endpoint', options.endpoint, '--model', options.model];
 const values = (args, flag) => args.flatMap((value, index) => value === flag ? [args[index + 1]] : []);
-const docker = (options = base) => buildDockerArgs({ options, runtime: { ...runtime, arm: options.arm }, control: '/tmp/peer-test/output/control', state: '/tmp/peer-test/output/native', cidfile: '/tmp/peer-test/output/container.cid', name: 'bantam-peer-opencode-test' });
+const docker = (options = base) => buildDockerArgs({ options, runtime: { ...runtime, identity: { uid: 2345, gid: 2346 }, arm: options.arm }, control: '/tmp/peer-test/output/control', state: '/tmp/peer-test/output/native', cidfile: '/tmp/peer-test/output/container.cid', name: 'bantam-peer-opencode-test' });
 
 test('loopback endpoints preserve arbitrary proxy port and base path', () => {
   assert.equal(normalizeEndpoint('http://127.0.0.1:39123/recorded/'), base.endpoint);
@@ -75,7 +75,7 @@ test('only candidate and fresh native state are writable bind mounts; credential
   assert.ok(args.includes('--read-only'));
   assert.deepEqual(values(args, '--cap-drop'), ['ALL']);
   assert.deepEqual(values(args, '--security-opt'), ['no-new-privileges']);
-  assert.deepEqual(values(args, '--user'), ['1000:1000']);
+  assert.deepEqual(values(args, '--user'), ['2345:2346']);
   assert.deepEqual(values(args, '--mount').filter(value => !value.endsWith(',readonly')), [
     'type=bind,src=/tmp/peer-test/candidate,dst=/workspace',
     'type=bind,src=/tmp/peer-test/output/native,dst=/state',

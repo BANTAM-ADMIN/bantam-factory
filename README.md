@@ -2,6 +2,10 @@
 
 **A local-model coding agent harness. Bring your own LLM — the factory does the rest.**
 
+Public-beta release candidate. Start with an existing model server on Linux;
+managed GPU profiles and the optional Astra foreman have documented experimental
+limits. See [Getting started](docs/GETTING-STARTED.md).
+
 BANTAM is a coding agent that wraps your model in a controlled action loop.
 It requests grammar-constrained generation from llama.cpp or structured output
 from supported API adapters, validates actions locally, runs model-chosen shell
@@ -115,6 +119,10 @@ node bin/bantam.js doctor                          # check local server and sand
 node bin/bantam.js doctor --api-url http://HOST:PORT/v1
 node bin/bantam.js                                 # interactive REPL
 ```
+
+Optionally run `npm link` from this checkout to expose `bantamfactory` and
+`bantam` on your PATH. This changes those command links; omit it if an existing
+installation should remain untouched. No npm registry publication is required.
 
 **First use:** setup offers an existing server first (bounded localhost scan
 or manual IP/port), an installed Codex CLI, or an optional DavidAU 27B easy-mode

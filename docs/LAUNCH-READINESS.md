@@ -3,11 +3,14 @@
 Updated September 7, 2026. The launch objective remains open. A passing test
 suite is necessary, not proof of a smooth installation on an unfamiliar PC.
 
-Privacy release blocker: old generated fight-card outputs have been moved to
-a verified private local archive outside the working tree. They remain in Git
-history. Keep this repository private pending the full secret/personal-data
-audit and an explicitly approved history-cleanup or clean-public-repository
-process. New public cards require review; see the [archive policy](fights/README.md).
+Release scope: a public beta centered on existing model servers on Linux.
+Managed hardware profiles and the optional Astra foreman retain their stated
+experimental limits; new supervisor experiments are deferred, not launch gates.
+
+Privacy gate: archived raw cards are outside the working tree. The approved
+history cleanup and final remote audit are in progress. Keep the repository
+private until the publication gate is explicitly cleared. New public cards
+require review; see the [archive policy](fights/README.md).
 The [privacy audit record](PRIVACY-RELEASE-AUDIT.md) records checks and remaining gates.
 
 | Requirement | Current evidence | Remaining qualification/work |

@@ -1,6 +1,7 @@
 # Privacy release audit — September 7, 2026
 
-Status: **not cleared for public release**. The repository remains private.
+Status: **release-candidate audit in progress; repository remains private**.
+The checks below distinguish completed evidence from the final publication gate.
 
 ## Completed checks and cleanup
 
@@ -32,9 +33,9 @@ not include matched values, workstation paths or raw evidence.
 
 ## Required before public launch
 
-1. Choose and explicitly approve either a clean public repository with reviewed
-   source only, or a coordinated history rewrite. Do not make the existing repo
-   public merely because its newest tree no longer contains the old cards.
+1. Complete the approved coordinated history cleanup: remove archived raw-card
+   paths and sanitize historical workstation identifiers. Preserve a verified
+   private bundle and the commit map. Check a fresh remote clone afterward.
 2. Finish review of remaining dated documents, image assets and fixture records
    for unrelated personal work and provenance. Scan the exact release tree,
    including newly added files, and inspect final public packages and their
@@ -44,5 +45,27 @@ not include matched values, workstation paths or raw evidence.
    separate from sanitized derivatives, with truthful accounting and outcomes.
 4. Obtain explicit publication approval and recheck repository visibility.
 
-No history rewrite, credential rotation, public upload or visibility change was
-performed by this audit. Source kits and graders remain intact.
+The earlier launch-plan-only rewrite did not remove the raw cards. Current
+release preparation extends that cleanup. Credential rotation and repository
+visibility changes are separate actions; neither is implied by a clean scan.
+Source kits and graders remain intact. GitHub-internal unreachable objects and
+old independent clones cannot be certified erased by a local history rewrite.
+
+## Final preparation findings
+
+- The tracked release-candidate tree passed another redacted Gitleaks scan.
+- GitHub reported no forks, pull requests, releases, release artifacts or Pages
+  deployment at audit time. Earlier Actions runs require separate review or
+  removal before publication because a Git rewrite does not sanitize their logs.
+- Eight tracked PNG assets were inventoried. The distinct fixture artwork and
+  sanitized comparison image were visually reviewed; fixture text is synthetic,
+  including an intentional prompt-injection test label, not a real credential.
+- Hosted CI exposed a host-UID assumption in a container test and diagnostic
+  stderr backpressure in a stream jig. Release fixes preserve non-root identity
+  checks and mandatory completion evidence; diagnostic EAGAIN no longer becomes
+  a false protocol failure. Focused regression tests passed.
+- Package command metadata now includes `bantamfactory` alongside `bantam` and
+  the lockfile matches the package name/version. No global command was relinked.
+
+The final remote revision, history scan, clean-install smoke test and CI outcome
+must be recorded before marking this candidate cleared for publication.

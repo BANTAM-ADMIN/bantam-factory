@@ -65,6 +65,12 @@ is a separate option. See [First-run setup](FIRST-RUN-SETUP.md).
 
 ## Path B — you have a GPU and nothing else
 
+Optional command installation: `npm link` inside the cloned repository registers
+both `bantamfactory` and `bantam`. It changes those PATH links. Alternatively,
+use the checkout's explicit `bin/bantamfactory` path without replacing an
+existing installation. GitHub source installation is the supported release
+route; there is no promised npm registry package.
+
 ```bash
 npm ci                # if you haven't already
 node bin/bantam.js setup

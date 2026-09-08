@@ -24,7 +24,8 @@
     "llm-tools"
   ],
   "bin": {
-    "bantam": "bin/bantam.js"
+    "bantam": "bin/bantam.js",
+    "bantamfactory": "bin/bantamfactory"
   },
   "scripts": {
     "start": "node bin/bantam.js",

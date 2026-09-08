@@ -1,5 +1,5 @@
 // EAVT run-history — record an agent run as append-only datoms [entity, attribute, value, time],
-// and query it "as of" any turn. This is the temporal event model applied to an agent run:
+// and query it "as of" any turn. This is a temporal event model applied to an agent run:
 // immutable facts, time as a first-class key, so you can ask "what was true at turn T?" without
 // snapshots. It's the substrate for time-travel ("recreate turn T with its context"), provenance
 // ("which turn asserted this?"), and — the point of this file — turning the agent's hand-written

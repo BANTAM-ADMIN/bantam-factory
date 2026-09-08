@@ -90,7 +90,10 @@ import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} fro
 import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';
 const write=fs.writeSync.bind(fs),stringify=JSON.stringify.bind(JSON);
 const {spec:s,obligation:id,bom,lineFraming}=JSON.parse(process.env.BANTAM_STREAM_CASE);
-let calls=0,phase='infrastructure',caseContext='module import',cli=null;const mark=x=>write(2,x+'\n');
+let calls=0,traceDropped=0,phase='infrastructure',caseContext='module import',cli=null;
+// Diagnostic pipe saturation is not a failure of the candidate protocol.
+// Keep the fd3 completion receipt mandatory; only best-effort markers may drop.
+const mark=x=>{try{write(2,x+'\n');}catch(e){if(e.code!=='EAGAIN')throw e;traceDropped++;}};
 try{
  const m=await import(pathToFileURL(path.join(process.cwd(),'subject',s.module)));
  if(typeof m[s.export]!=='function')throw Error('export is not callable');
@@ -146,8 +149,8 @@ try{
   chunks[0]=chunks[0][0]+alphabet[alphabet.indexOf(chunks[0][1])+1]+'=='; // Nonzero pad bits; same decoded byte.
   r=run(chunks,'CLI noncanonical pad bits',{status:2,stdout:'',stderr:'nonempty'});assert.equal(r.error,undefined);assert.equal(r.signal,null);assert.equal(r.status,2);assert.equal(r.stdout,'');assert.ok(r.stderr.length>0);
  }else throw Error('unknown obligation');
- write(3,stringify({status:'passed',calls})+'\n');
-}catch(e){write(3,stringify({status:phase==='checking'?'failed':'unavailable',caseContext:caseContext.slice(0,900),...(cli?{cli}:{}),message:String(e?.message??e).slice(0,1000),calls})+'\n');}
+ write(3,stringify({status:'passed',calls,traceDropped})+'\n');
+}catch(e){write(3,stringify({status:phase==='checking'?'failed':'unavailable',caseContext:caseContext.slice(0,900),...(cli?{cli}:{}),message:String(e?.message??e).slice(0,1000),calls,traceDropped})+'\n');}
 `;
 const quote=s=>`'${s.replace(/'/g,`'"'"'`)}'`;
 export function buildStreamProbe(spec,obligation,inputs,{bom=false,lineFraming=null}={}) {

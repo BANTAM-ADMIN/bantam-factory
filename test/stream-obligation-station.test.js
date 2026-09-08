@@ -19,6 +19,17 @@ const LINE_TASK=task+' Repair `api.mjs`. Export `createDecoder()`. Lines end at 
 function fixture(t,code=source){const root=fs.mkdtempSync(path.join(os.tmpdir(),'stream-jig-'));fs.mkdirSync(path.join(root,'subject'));fs.writeFileSync(path.join(root,'subject/api.mjs'),code);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}
 function execute(root,id){const action=buildStreamProbe(spec,id,[{p:'api.mjs'}],{bom:true});return spawnSync('/bin/sh',['-c',action.check],{cwd:root,encoding:'utf8',timeout:7000});}
 test('five actual jigs accept a correct independent toy protocol',t=>{const root=fixture(t);for(const id of streamObligations(task)){const r=execute(root,id);assert.equal(r.status,0,`${id}: ${r.stdout} ${r.stderr}`);}});
+test('diagnostic EAGAIN cannot turn a correct protocol into a failure or hide a real failure',t=>{
+ const replacement='((fd,...args)=>{if(fd===2){const e=Error();e.code=String.fromCharCode(69,65,71,65,73,78);throw e;}return fs.writeSync(fd,...args);})';
+ for(const [code,expected]of [[source,0],[source.replace('{fatal:true}','{fatal:false}'),1]]){
+  const root=fixture(t,code),action=buildStreamProbe(spec,'strict-utf8',[{p:'api.mjs'}],{bom:true});
+  const check=action.check.replace('fs.writeSync.bind(fs)',replacement);
+  assert.notEqual(check,action.check);
+  const r=spawnSync('/bin/sh',['-c',check],{cwd:root,encoding:'utf8',timeout:7000});
+  assert.equal(r.status,expected,r.stdout+r.stderr);
+  assert.ok(JSON.parse(r.stdout).traceDropped>0);
+ }
+});
 test('mutation checks discriminate strict decoding, termination, poison, BOM, and canonical bits',t=>{
  const variants=[['strict-utf8',source.replace('{fatal:true}','{fatal:false}')],
  ['terminal-state',source.replace("if(ended&&line)throw Error('after end');",'')],

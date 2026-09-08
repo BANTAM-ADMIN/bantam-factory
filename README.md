@@ -1,12 +1,12 @@
 <p align="center">
   <a href="https://bantam-admin.github.io/bantam-factory/">
-    <img src="docs/brand/bantam-banner.svg" alt="BANTAM — Small model. Heavy hitter. Your model. Your hardware. A better coding factory." width="100%">
+    <img src="docs/brand/bantam-banner.svg" alt="BANTAM FACTORY — Small model. Heavy hitter. Your model. Your hardware. A better coding factory." width="100%">
   </a>
 </p>
 
 <p align="center">
-  <strong>Your model is the worker. BANTAM is the factory.</strong><br>
-  An open source coding agent that puts your model to work.
+  <strong>Your model is the worker. Give it a factory.</strong><br>
+  An open source coding factory that can improve its own machinery.
 </p>
 
 <p align="center">
@@ -18,22 +18,23 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-f2b544?style=flat-square&labelColor=19251f" alt="License: Apache 2.0"></a>
-  <a href="docs/LAUNCH-READINESS.md"><img src="https://img.shields.io/badge/status-public_beta-f2b544?style=flat-square&labelColor=19251f" alt="Public beta"></a>
+  <a href="docs/GETTING-STARTED.md"><img src="https://img.shields.io/badge/status-public_beta-f2b544?style=flat-square&labelColor=19251f" alt="Public beta"></a>
 </p>
 
-Give BANTAM a coding job. It brings your model the project context, tools, tests,
-and feedback to build it. When a check fails, the failure feeds the next repair.
+Give BANTAM FACTORY a job: build an app, fix a stubborn bug, automate the boring part.
+It brings your model the tools, context, and checks to get the work done.
 
-**You bring the intelligence. BANTAM brings the production line.**
+The factory formula: **turn big jobs into chicken problems**—clear inputs,
+useful tools, and results you can check. Build. Test. Repair. Repeat.
 
 ## Same model. Bigger punch.
 
 Same task. Same local Qwen 27B. Both systems passed in each comparison below.
 
-The local rig: **one RTX 4090 · 24 GB**. BANTAM's recorded generation speed
+The local rig: **one RTX 4090 · 24 GB**. BANTAM FACTORY's recorded generation speed
 across the published cards: **82.6–105.2 tokens/second**.
 
-| BANTAM vs. | BANTAM finished | Watch the fight |
+| BANTAM FACTORY vs. | BANTAM FACTORY finished | Watch the fight |
 | --- | --- | --- |
 | **Hermes** | **5.1× faster** · 112.5s vs. 577.6s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
 | **DeepSeek Harness** | **3.9× faster** · 112.5s vs. 442.7s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
@@ -42,15 +43,19 @@ across the published cards: **82.6–105.2 tokens/second**.
 These are highlights from recorded development tasks. Open a card for every
 contender, the checks, and the run conditions.
 
+The little model can trade punches with frontier agents, too:
+[Context Packet](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html)
+took **58.1s locally vs. 110.6s in native Codex/Astra**, both 5/5.
+
 **[Enter the fight gallery →](https://bantam-admin.github.io/bantam-factory/)**
 Pick a task. Put agents side by side. Replay the clock. See who delivered.
 
 ## What can it do?
 
-- **Build the thing.** Add features, fix bugs, and write tests in your project.
-- **Check its work.** Run your tests and use the failures to guide repairs.
-- **Work on your hardware.** Connect your local model server, with Codex available when you want it.
-- **Show the result.** Follow the work as it happens, then inspect the changes and checks.
+- **Build what you need.** Features, tools, scripts, fixes, and tests.
+- **Check and repair.** Use real test results to guide the next attempt.
+- **Make the next job easier.** Build reusable tools for the work you keep doing.
+- **Put your hardware to work.** Run a local model, or bring your Codex account.
 
 <a id="start-with-what-you-already-have"></a>
 
@@ -84,22 +89,21 @@ Tell it what you want:
 > Add dark mode. Remember my choice. Make sure the tests pass.
 
 Use your project's test command in place of `npm test`.
-[Installation help](docs/GETTING-STARTED.md) · [Models & hardware](docs/FIRST-RUN-SETUP.md) · [Platform support](docs/LAUNCH-READINESS.md)
+[Installation help](docs/GETTING-STARTED.md) · [Models & hardware](docs/FIRST-RUN-SETUP.md)
 
 ## Use the factory to improve the factory.
 
-BANTAM can study recorded failures and build changes to its own machinery.
-Its experimental self-improvement workflow tests candidates before promotion,
-with a way to roll back. You choose when to run it.
+BANTAM FACTORY records recurring friction. Its experimental self-improvement workflow
+can study those signals, build a change to BANTAM FACTORY, and test its own work before
+adopting an eligible improvement. You choose when to run that cycle.
 
-The goal: **a factory that gets better at your work by doing your work.**
-[Self-improvement](docs/SELF-IMPROVEMENT.md) · [Next fights: the factory builds its toolbox →](docs/NEXT-FIGHTS.md)
+**Better tools. Fewer repeated mistakes. A better-equipped factory.**
+[Try self-improvement →](docs/SELF-IMPROVEMENT.md)
 
 ## Put it in the ring.
 
-Start with BANTAM on its own. Inspect the work. Bring competitors to the same
-tasks when you're ready. A solo card stands on its own; comparisons show the
-contenders actually recorded.
+Give it a task worth solving. Watch the work. Bring competitors to the same
+task and see what the harness changes.
 
 [Run your own cards →](docs/BRING-YOUR-OWN-COMPARISONS.md)
 

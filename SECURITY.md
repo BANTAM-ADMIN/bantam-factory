@@ -11,9 +11,9 @@ That opens a private advisory only the maintainers can read.
 Please include the version or commit, what an attacker gains, and the smallest
 reproduction you have. You'll get an acknowledgement within a week.
 
-## Scope — what BANTAM's threat model actually is
+## Scope — what BANTAM FACTORY's threat model actually is
 
-BANTAM runs model-authored actions against your files and your shell. The
+BANTAM FACTORY runs model-authored actions against your files and your shell. The
 security posture is built on that, so the interesting reports are the ones
 where a boundary that is *supposed* to hold does not:
 
@@ -36,7 +36,7 @@ where a boundary that is *supposed* to hold does not:
   the harness working. Constrain the workspace, or file it as a station bug.
 - **`--autonomous` skipping prompts.** That is what the flag is for.
 - **Weaknesses in models, weights, or llama.cpp.** Report those upstream.
-  BANTAM vendors no weights and no inference server.
+  BANTAM FACTORY vendors no weights and no inference server.
 
 ## Supported versions
 

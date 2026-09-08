@@ -14,6 +14,22 @@ __pycache__/
 BANTAM-LAUNCH-PLAN.md
 /docs/ROADMAP.md
 
+# Keep internal research and launch notes private. Public guides are deliberate.
+/docs/*.md
+!/docs/README.md
+!/docs/GETTING-STARTED.md
+!/docs/FIRST-RUN-SETUP.md
+!/docs/FACTORY-GETTING-STARTED.md
+!/docs/FACTORY-MODEL.md
+!/docs/SELF-IMPROVEMENT.md
+!/docs/BRING-YOUR-OWN-COMPARISONS.md
+/docs/evidence/
+/arena/README.md
+/creative-suite/README.md
+/creative-suite/report.md
+/docs/brand/README.md
+/tools/prefix-cache-bench/README.md
+
 # Browser automation output from the Playwright plugin.
 .playwright-mcp/
 

@@ -1,293 +1,92 @@
-# Compare with the tools you already use
+# Put it in the ring
 
-Status: September 7, 2026. `bantamfactory cards` now provides a guided front door
-to the frozen factory cards, participant selection, prerequisite checks, explicit
-execution consent and automatic local replay/export generation. Hermes/OpenCode
-support persistent installation-folder registration and offline readiness checks.
-Other installation adapters and generic agent APIs still need work.
-Model setup does not install Hermes, OpenCode, pi, DeepSeek Harness or Claude Code.
+A fight card is a job with a fixed starting point, independent checks, and a
+recorded result. Watch the agents work, compare them side by side, and inspect
+what actually passed.
 
-Listing checks PATH/registered executable metadata and the prepared DeepSeek
-image using read-only `docker image inspect`; it never starts or pulls an image.
-Claude Code presence is listed without invoking it. Detection is not runtime
-qualification. Explicit Claude lanes use the isolated frozen-card adapter
-described below; they are never part of the default roster.
+**[Watch the public fights →](https://bantam-admin.github.io/bantam-factory/)**
 
-## Start a card
+## Start with BANTAM FACTORY
 
 ```bash
 bantamfactory cards --list
-bantamfactory cards
-# Inspect a plan without inference, Docker execution or output-directory creation:
-bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
-# Explicit unattended authorization for these participants and this task:
-bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
-# Also generate a sanitized local page, without uploading anything:
-bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --public --yes
-# Watch the complete frozen build/extend/repair set:
-bantamfactory cards --card all --arms bantam-local-27b,hermes --live --public --yes
+bantamfactory cards --card context-packet --arms bantam-local-27b --live --public
 ```
 
-The default kit is `factory-2026-09-07`: context-packet, patch-transaction and
-stream-framer. Select a card, participants and an endpoint; inspect the plan;
-then approve it. Enter at the final confirmation cancels. Listing and dry runs
-do not execute participants or contact a model. Interactive server discovery is
-bounded loopback model metadata only. Discovery is not a readiness certificate.
+Review the plan and confirm to start. The terminal prints a local browser URL.
+A solo card works on its own; no competitor installations are required.
 
-Results go into a fresh `.bantam/fight-cards/<timestamp>/` directory (override
-with `--out`). Each contender gets a fresh starter workspace, not your project.
-The command preserves failed attempts and produces `fight-cards.html`,
-`fight-card.json` and raw evidence locally. The HTML embeds recorded source and
-transcripts: **inspect before sharing**. Nothing is uploaded automatically.
-Exit 0 means the requested series completed and every participant passed;
-failed/incomplete outcomes return 1, setup/command errors return 2.
+The default kit contains Context Packet, Patch Transaction, and Stream Framer:
+build a tool, extend it, and repair it. Use `--card all` for that set, or the
+interactive `bantamfactory cards` chooser. `--dry-run` shows a plan without
+running a model.
 
-With `--public`, a separate `public/` subdirectory contains an allowlisted
-summary page, JSON and package hashes. It excludes raw prompts, source, private
-paths and transcripts; preserves failed outcomes, measured timings and accounting
-gaps; and does not upload anything. Review only that directory for sharing.
-The surrounding evidence and default `fight-cards.html` are still private.
+Local recorded cards currently require a credential-free loopback llama.cpp
+server, Linux x64, Docker, and a non-root user. General model setup supports
+more connections than the recorded comparison runner.
 
-`--live` prints a token-protected loopback URL after consent and readiness checks.
-The read-only browser receives numeric receipt updates and running/settling/grading
-phases; reconnecting or closing the page never launches or stops a contender.
-It does not expose prompts, source, private paths or account details. A completed
-run leaves `live-public.html`, a standalone public snapshot, beside the private
-evidence. The live server closes when the command finishes; keep the standalone
-page or the `--public` replay for later viewing. Only those identified derivatives
-are sanitized—not their surrounding evidence directory.
+## Bring a challenger
 
-Live counters update when usage receipts arrive, not token-by-token. In-flight
-totals are explicitly “so far”; missing request receipts and unavailable frontier
-usage remain unknown. The final result still comes from independent grading,
-with artifact acceptance distinct from process completion. Browser disconnects
-do not erase recorded progress; `progress.json` retains the latest public snapshot.
-One local inference queue is serial even when a frontier queue runs alongside it.
+Use an installed contender with the same task:
 
-`--peer-output-tokens` exposes the existing native-peer allowance (1,024–32,768;
-default 8,192) in the reviewed plan. A 32,768 allowance avoids forcing the earlier
-OpenCode 8,192-token cutoff, but may change native context reservation/compaction.
-It applies to all selected native local peers, not BANTAM or Codex. Record the
-choice; differing reasoning/action budgets are not a pure context ablation.
+```bash
+bantamfactory cards --card context-packet \
+  --arms bantam-local-27b,hermes --live --public
+```
 
-Local counter windows now retain post-cleanup observations in each contender's
-`server-usage.json`. The runner waits up to ten seconds for two unchanged idle
-samples, 250 ms apart, so canceled requests can finish before the next local
-contender starts. This drain interval is recorded separately from contender
-wall time. Known-busy work that does not settle stops the local queue. Missing
-metrics are explicitly unavailable; ordinary server identity/idle checks still
-apply before the next contender. Endpoint counters remain supplementary and
-assume exclusive server use; they never replace missing request-level receipts.
+Available contender IDs include:
 
-Rebuild presentation from existing evidence without any model calls:
+| System | Card ID |
+| --- | --- |
+| BANTAM FACTORY with your local model | `bantam-local-27b` |
+| Hermes / OpenCode | `hermes` / `opencode` |
+| DeepSeek Harness with the local model | `deepseek-local-27b` |
+| Native Codex | `codex-astra`, `codex-sol`, `codex-terra` |
+| Codex inside BANTAM FACTORY | `bantam-codex-astra` |
+| Native Claude Code | `claude-sonnet`, `claude-opus` |
+
+Cloud contenders need an installed, authenticated client and explicit selection;
+the scored work uses that account. Supported credential and installation layouts
+vary. The chooser and checks report missing prerequisites.
+
+To register a local contender that isn't found automatically:
+
+```bash
+bantamfactory cards --register hermes --path /path/to/hermes-install
+bantamfactory cards --check --arms hermes --yes
+```
+
+Registration also supports `opencode` and `deepseek`. It records an existing
+installation; it doesn't install competitors. The offline check starts disposable
+containers without making model calls.
+
+## Make the comparison count
+
+Freeze the work order, starter, and judge before comparing systems. For a
+same-model fight, use the same weights and server settings. Each contender gets
+a fresh workspace; keep the recorded budgets and failed attempts visible.
+
+You can develop a task with BANTAM FACTORY first, then freeze it and run challengers.
+Keep those development attempts and identify their role. Same-model comparisons
+show the harness's contribution; native frontier runs compare whole systems.
+A selected development win isn't a held-out reliability score.
+
+## Keep and share the result
+
+Each run gets a fresh directory under `.bantam/fight-cards/`. It keeps the original
+evidence and generates a replay. Rebuild a saved replay without another model run:
 
 ```bash
 bantamfactory cards --replay /absolute/path/to/recorded-run
 ```
 
-This regenerates the derived export and HTML; it does not rerun candidates,
-change grades or hide a failed attempt. If export validation fails, the command
-still attempts a readable replay and returns an error rather than claiming a
-successful portable export.
+Raw evidence and the default `fight-cards.html` can contain source and prompts.
+`--public` creates a separate `public/` folder with a summary, JSON, and hashes.
+Review that folder before sharing. Nothing is uploaded automatically.
 
-Select cloud IDs explicitly (`codex-astra`, `codex-sol`, `codex-terra`,
-`bantam-codex-astra`); `--yes` also
-requires explicit `--arms` and `--card`. Cloud-only execution no longer requires
-a local model. The isolated Codex benchmark runtime requires Linux x64 and a
-non-root numeric UID/GID. It discovers Node/Git/npm paths and supports the known
-npm Codex layout or a standalone Linux x64 Codex executable on PATH. Ordinary
-BANTAM Codex setup is separate from this container adapter.
+Published cards show recorded outcomes, job time, and available token receipts.
+Local generation speeds use tokens divided by server generation time across
+measured requests; partial coverage is labeled. Hardware identifies the reviewed
+run's machine, not a forecast for yours.
 
-Selected Codex cards first run an offline probe with dummy credentials; a
-broken runtime stops the comparison before any scored participant. The probe
-checks executable startup, tools, writable candidate space, isolated home and
-container cleanup, not account validity or task quality. Run it separately with
-`bantamfactory cards --check --arms codex-astra --yes` (no cloud/model request).
-Scored comparisons additionally require a readable default file-backed Codex
-auth cache. They mount that cache read-only; no login, export, credential write
-or keyring migration is performed. Keyring-only/custom-home accounts still need
-another adapter. Expired credentials can still fail at actual inference.
-See [official credential-storage guidance](https://developers.openai.com/codex/auth#credential-storage).
-
-Native Astra/Sol/Terra cards pin their exact model IDs and medium reasoning,
-with the same isolated CLI recipe and native session-receipt accounting.
-The added models require explicit selection; the legacy runner's default roster
-has not silently grown. Public labels and downloadable records distinguish each
-model. The historical `astra` presentation-family key denotes the frontier bucket,
-not an assertion that Sol or Terra is Astra. Model availability still depends on
-the installed client and account; see [Codex model selection](https://developers.openai.com/codex/models).
-
-Local recorded cards currently need a credential-free loopback llama.cpp origin
-with `/health`, `/v1/models`, `/props` and `/slots`. A saved llama.cpp connection
-is offered; a server on another loopback port can be selected directly. Remote
-servers and generic OpenAI-compatible APIs work through BANTAM setup but still
-need additional adaptation for this recorded comparison flow. The historical
-lane ID `bantam-local-27b` is retained for evidence compatibility, not a check
-that the user's selected model has 27B parameters.
-
-Preflight checks selected executables and Docker/image availability, then runs
-selected Hermes/OpenCode/DeepSeek/Codex offline startup checks before any scored contender.
-It does not pull images or prove compatibility of every harness version. Missing runtime
-prerequisites fail before contender execution. All local inference contenders
-run serially. Frontier work may overlap; use `--serial` to serialize everything.
-
-## What works today
-
-- `scripts/peer-fight-cli.mjs` runs installed Hermes/OpenCode in disposable
-  outer containers. Runtime discovery uses the registered executable or PATH; for Hermes
-  it also resolves that environment's installed Python package. It does not
-  copy the operator's whole home or reuse personal harness memory/configuration.
-- `scripts/deepseek-fight-cli.mjs` can use an existing npm-installed `dsh`
-  (registered path first, then PATH) with read-only package/dependency mounts.
-  If none is selected/detected, the separately prepared, identified DeepSeek
-  image remains supported. Neither path silently installs software.
-- `src/fight.js` contains the existing Claude Code CLI corners. They are not
-  automatically included in the newer six-arm factory runner, and installing
-  BANTAM does not grant permission to use a Claude subscription.
-- The factory runner and replay/export tools already provide frozen materials,
-  independent grading, raw evidence and static-card presentation. See
-  [fresh factory protocol](FRESH-FACTORY-FIGHTS-2026-09-06.md) and
-  [exchange format](FIGHT-CARD-EXCHANGE.md).
-
-Run `node scripts/peer-fight-cli.mjs --help` to inspect its actual interface.
-Supply a disposable workspace, task file, new output directory, exact model ID
-and local recording endpoint. These are advanced runner interfaces beneath the
-guided `cards` command.
-
-## Point at an existing installation
-
-```bash
-bantamfactory cards --register hermes --path /path/to/hermes-install
-bantamfactory cards --register opencode --path /path/to/opencode-executable
-bantamfactory cards --register deepseek --path /path/to/npm-installation-or-dsh
-bantamfactory cards --check --arms hermes,opencode --yes
-bantamfactory cards --check --arms deepseek-local-27b --yes
-```
-
-Registration resolves a bounded set of known executable locations and saves
-the exact executable path and SHA-256. It does not run the tool, authorize an
-account or install anything. A changed registered executable requires explicit
-re-registration; a missing one does not silently fall back to a different PATH
-installation. Registration supports Hermes, OpenCode and DeepSeek Harness.
-
-DeepSeek currently supports the npm `@deepseek-ai/dsh/lib/bin.js` layout,
-including a global/npm-prefix installation. Linked/external dependency layouts
-(for example some pnpm/source-tree arrangements) need another adapter; they are
-not silently copied or installed. Only the dependency closure is mounted, not
-the installation's parent project or operator home. Package root dotfiles are
-excluded; writable settings and sessions are new for each contender.
-
-The installed adapter prefers Node in the selected npm prefix, then Node on
-PATH—not necessarily the older Node running BANTAM. Its offline check verifies
-the runtime APIs needed by the tested DeepSeek headless profile as well as
-startup, candidate writes and container cleanup. An incompatible Node fails
-before scored work. No Node download or version-manager change is automatic.
-Installed execution supports non-root Linux x64 UID/GID values; the legacy
-prepared-image path still requires UID/GID 1000.
-
-Qualification used the already-installed 0.1.2-rc.1 image's npm packages and
-bundled Node in a temporary prefix, mounted into Ubuntu—not a fresh download.
-Scripted HTTP checks exercised native tool execution, exact model/output routing,
-session usage with cached tokens, deadline handling and cleanup on both paths.
-These are transport/runtime tests, not a new model benchmark or proof that every
-DeepSeek version/package layout works.
-
-The offline check requires explicit consent, uses network-disabled disposable
-containers, and verifies version/help startup, writable candidate space, an
-isolated home and cleanup. It makes no model requests and does not certify task
-quality or metering. Its report is retained separately from scored evidence.
-The peer adapter supports Linux x64 with a non-root numeric UID/GID; it discovers
-Node/Git/npm and Hermes Python locations instead of assuming this workstation's
-paths. Unknown packaging layouts can still need an adapter change.
-
-## Remaining product flow
-
-The guided entry point is implemented. Complete its portability, remaining installed-folder
-adapters and agent-API support while keeping comparison setup separate from
-the initial model chooser:
-
-1. Offer “Compare with my tools” after BANTAM's own readiness check. Detect
-   executable availability without launching tasks or reading account secrets.
-   Let the user supply a specific executable or installation directory.
-2. Resolve a known adapter and show executable/version, model, backend, network
-   destination, task-data exposure and potential account usage. An unknown
-   installation is unsupported until adapted, not guessed into a shell command.
-3. Require explicit permission for each participant. Do not install missing
-   harnesses, log into accounts, copy credentials or enable subscriptions merely
-   because an executable is present. Report unavailable participants as not run.
-4. Run capability and metering checks, then a selected frozen card in fresh
-   workspaces. Serialize contenders sharing one local server. Frontier runs may
-   overlap, with host contention disclosed. Never silently run a rival in the
-   user's active project directory.
-5. Preview the static replay and machine-readable evidence locally. Sharing
-   requires a separate explicit export/publication action and privacy review.
-
-A model's OpenAI-compatible endpoint is **not** an agent/harness endpoint.
-An agent API adapter must define task submission, workspace ownership,
-completion, cancellation, event streaming and usage reconciliation. Connecting
-two harnesses to the same model is different from invoking a remote agent.
-pi and generic remote-agent adapters remain future work.
-
-## Honest comparison and reusable learning
-
-Use two unmistakable labels:
-
-- **Same-model harness comparison:** exact weights/quantization, server settings,
-  task/starter/judge hashes and resource budgets recorded. Different tools,
-  sampling and context policies are part of the treatment, not proof that only
-  context caused a difference.
-- **Whole-system comparison:** each tool uses its selected model/subscription.
-  This compares the systems users can choose, not model intelligence in isolation.
-
-Record input, output, reused-prefix and fresh tokens, timing, auxiliary calls,
-retries, model/runtime identity and evidence completeness. Unknown accounting
-must block a token-efficiency claim; it is neither zero nor a reason to hide a
-participant. Keep accepted completion separate from independent correctness.
-Retests and repairs get new identities; they do not replace original failures.
-
-An exchanged card can carry evidence and a proposed process improvement, not
-authority to execute downloaded code or weaken acceptance. Imported jigs need
-schema/hash validation, inspection, isolated tests, local holdouts and explicit
-promotion. Never automatically import another machine's prompts, credentials,
-project files or executable hooks. Community learning is a governed qualification
-process, not an automatic skill-install side effect of viewing a fight card.
-
-## Claude Code boundary
-
-Claude Code is only a direct CLI agent contender, explicitly requested by name
-or number. It is not used as BANTAM's model backend, teacher, planner or judge.
-The REPL's implicit `:fight` and the legacy picker's Enter/“all” selection now
-stay local; the legacy local BANTAM lane no longer enables a cloud teacher.
-The legacy command `bantam fight --arms bantam,claude-sonnet --task "..."` is
-available for a deliberate direct comparison. Its execution/isolation/grading
-protocol differs from the frozen `cards` runner; do not label them equivalent.
-## Explicit Claude Code comparisons
-
-With an existing standalone Linux x64 Claude Code installation and readable
-file-backed authentication, select `claude-sonnet` or `claude-opus` explicitly:
-
-```bash
-bantamfactory cards --check --arms claude-sonnet,claude-opus --yes
-bantamfactory cards --card context-packet --arms bantam-local-27b,claude-sonnet --live --public
-```
-
-Claude is never added to the default fight roster or used as an implicit teacher.
-The scored run sends the work order to Anthropic and consumes the selected
-account's access/quota, only after execution consent. Nothing installs Claude,
-logs you in, exports credentials or changes your host configuration.
-
-The adapter uses a non-root, read-only-root Docker boundary with a disposable
-writable candidate, temporary home, one read-only credential file, no user
-settings, and no external MCP servers or skills. Offline checks use dummy
-credentials with networking disabled. Scored requests retain the CLI's built-in
-tools and native prompt, using the `sonnet`/`opus` alias at medium effort. Alias
-resolution can change: private native usage retains reported model IDs, and
-public card notes should identify the observed model when reviewed.
-
-Input totals include uncached input, cache creation and cache reads. Cached
-input is part of input, not an additional column to sum. A valid final native
-aggregate supplies the counters; absent or incomplete receipts remain unknown.
-Native aggregate coverage is not equivalent to per-request HTTP receipts.
-Claude's declared cost is not a claim about subscription billing. Keyring-only
-authentication, custom credential locations, npm-packaged Claude and non-Linux
-platforms are not qualified by this adapter.
+**[Published card notes](fights/README.md) · [Models & hardware](FIRST-RUN-SETUP.md) · [Docs](README.md)**

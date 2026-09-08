@@ -1,4 +1,4 @@
-# Contributing to BANTAM
+# Contributing to BANTAM FACTORY
 
 Thanks for considering it. Two rules keep this project healthy:
 
@@ -16,7 +16,7 @@ which adds `Signed-off-by: Your Name <you@example.com>`. The DCO text is at
 
 ## 2. Measurements over opinions
 
-BANTAM's stations, gates, and launch-profile flags exist because a
+BANTAM FACTORY's stations, gates, and launch-profile flags exist because a
 measurement put them there, and each carries its rationale in a comment.
 Changes follow the same rule:
 

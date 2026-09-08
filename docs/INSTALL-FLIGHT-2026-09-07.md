@@ -31,11 +31,15 @@ invoking it. Regression coverage distinguishes discovery from execution consent.
 
 ## What this does not prove
 
-This was setup plus offline installed-peer qualification, not a scored fight.
+This particular flight was setup plus offline installed-peer qualification, not a scored fight.
 No Claude or Codex agent request ran, and no claim of task quality or token
-efficiency follows. Native DeepSeek folder registration, portable Codex packaging
-and the explicitly opted-in frozen Claude contender remain unfinished. The
-existing prepared DeepSeek image is not the same as a generic native adapter.
+efficiency follows. At the time of this flight, native DeepSeek folder registration
+and portable Codex packaging were unfinished. Subsequent updates added installed
+npm DeepSeek registration and qualified tool/usage/deadline checks, plus more
+portable Codex runtime discovery and offline checks. See the current
+[comparison guide](BRING-YOUR-OWN-COMPARISONS.md) for their tested scope and limits.
+The explicitly opted-in frozen Claude contender remains unfinished. The
+prepared DeepSeek image is not the same as a generic native adapter.
 General remote-agent APIs and remote recorded-model comparisons also remain work.
 
 This installation flight does not clear the repository for public release;

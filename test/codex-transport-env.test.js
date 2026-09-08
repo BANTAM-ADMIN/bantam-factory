@@ -34,3 +34,14 @@ test("the app-server child keeps its auth but never inherits harness or test-run
   assert.deepEqual(seen.bantamKeys, [], "BANTAM_* harness switches must not leak into the app-server");
   assert.equal(seen.nodeTestContext, null, "the node test-runner IPC marker must not reach the child");
 });
+test('an explicit runtime environment does not mutate or inherit the controller environment', async (t) => {
+  const codex = new CodexAppServer({ command: process.execPath, commandArgs: [fixture], timeoutMs: 2000,
+    env: { PATH: process.env.PATH, OPENAI_API_KEY: 'explicit-fixture-auth', BANTAM_ENV_PROBE: 'must-be-scrubbed' } });
+  t.after(() => codex.close());
+  const before = process.env.OPENAI_API_KEY;
+  const result = await codex.complete('report env');
+  const seen = JSON.parse(result.content);
+  assert.equal(seen.openaiApiKey, 'explicit-fixture-auth'); assert.deepEqual(seen.bantamKeys, []);
+  assert.equal(process.env.OPENAI_API_KEY, before);
+  assert.equal(result.rawUsage, null, 'the env-only fixture sends no usage receipt; do not fabricate one');
+});

@@ -60,6 +60,8 @@ export class CodexAppServer {
   constructor({
     command = DEFAULT_COMMAND,
     commandArgs = [],
+    env = null,
+    threadConfig = null,
     cwd = process.cwd(),
     model = "gpt-5.6-sol",
     effort = "high",
@@ -79,6 +81,8 @@ export class CodexAppServer {
   } = {}) {
     this.command = command;
     this.commandArgs = commandArgs;
+    this.environment = env;
+    this.threadConfig = threadConfig;
     this.cwd = cwd;
     this.model = model;
     this.effort = effort;
@@ -177,7 +181,7 @@ export class CodexAppServer {
     // test-runner IPC marker stops reflecting real exit codes) and the BANTAM_*
     // namespace (harness switches that would alter codex-spawned subprocesses).
     const env = {};
-    for (const [key, value] of Object.entries(process.env)) {
+    for (const [key, value] of Object.entries(this.environment ?? process.env)) {
       if (key === "NODE_TEST_CONTEXT" || key.startsWith("BANTAM_")) continue;
       env[key] = value;
     }
@@ -529,6 +533,7 @@ export class CodexAppServer {
       approvalPolicy: "never",
       sandbox: "read-only",
       environments: [],
+      ...(this.threadConfig ? { config: this.threadConfig } : {}),
       baseInstructions,
       developerInstructions: baseInstructions,
     });
@@ -623,6 +628,7 @@ export class CodexAppServer {
       stoppedLimit: false,
       timings: {},
       usage: codexUsage(state.usage, modelFromThread(turn, this.model)),
+      rawUsage: state.usage,
       images: state.images,
     });
   }

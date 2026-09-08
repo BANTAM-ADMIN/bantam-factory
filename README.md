@@ -19,11 +19,27 @@ generation: use the matching adapter and inspect the startup constraint check.
 
 ## Current factory fight cards
 
-Old generated cards and their private evidence have been archived outside the
-repository. We will publish fresh, privacy-reviewed cards rather than ship
-workstation transcripts. See the [archive and publication policy](docs/fights/README.md)
-and [comparison guide](docs/BRING-YOUR-OWN-COMPARISONS.md). Historical measurements
-below describe earlier configurations, not a currently shipped showcase.
+[Open the fresh context-packet fight card](docs/fights/context-packet-2026-09-07-public/share/index.html)
+or [read its results and accounting caveats](docs/fights/context-packet-2026-09-07-public/README.md).
+One same-model attempt per system: BANTAM passed 5/5 in 124.6 seconds,
+Hermes passed 5/5 in 589.0 seconds, and OpenCode scored 0/5 after reaching its
+output limit. This is an exploratory comparison, not a reliability ranking.
+
+![Recorded context-packet comparison](docs/fights/context-packet-2026-09-07-public/share/share-card.png)
+
+Try the frozen **build / extend / repair** set with your installed tools:
+
+```bash
+bantamfactory cards --card all --arms bantam-local-27b,opencode --live --public
+```
+
+The command reviews the plan and asks for consent before execution. The live
+viewer is read-only and loopback-only; the public derivative excludes private
+transcripts. See the [comparison guide](docs/BRING-YOUR-OWN-COMPARISONS.md) for
+setup, output-budget choices, metering limits and supported installations.
+Older raw cards remain in a private archive outside the current tree; see the
+[publication policy](docs/fights/README.md). Historical measurements below
+describe earlier configurations, not this new card or a stock-install promise.
 
 ## A faster local-worker path: 35B-A3B
 
@@ -51,7 +67,7 @@ packaged historical Arena.
 The following board describes earlier builds and configurations, not the
 current factory series above.
 
-The privately archived fight-night page recorded of **35 cards, 297 corners**, where a local
+The privately archived fight-night page recorded **35 cards, 297 corners**, where a local
 27B in this harness fights the same tasks as codex CLI, Claude Code CLI
 (sonnet/opus), and the same 27B weights in rival harnesses (hermes, opencode).
 Every card carries the full seven-corner roster. Twenty-five are bouts against
@@ -78,12 +94,10 @@ stock-weights, default-mode re-fight is an open launch item — until it lands,
 read these cards as a record of that configuration, not of what you get out of
 the box.
 
-Everything needed to *read* that record ships here — walls, verdicts, sealed
-truths, provenance, and every corner's own recorded output, replayable offline
-with no model and no GPU. Re-*deriving* the verdicts (`node
-bin/fight-concord.mjs`) additionally needs each corner's archived workspace,
-which is hundreds of MB of run artifacts and is deliberately not in the repo;
-the command says so plainly rather than pretending.
+The old replay, recorded outputs and workspaces are now privately archived;
+they are not distributed in the current repository tree. Re-deriving those
+verdicts (`node bin/fight-concord.mjs`) requires the archived workspaces.
+Use the fresh sanitized card above for the currently distributed presentation.
 
 New here? Start with **[Getting started](docs/GETTING-STARTED.md)**.
 

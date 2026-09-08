@@ -4,7 +4,7 @@
 > Their links now lead to the archive policy, not the old evidence.
 
 This index distinguishes operating guidance from proposals and dated evidence.
-Launch navigation was reconciled with the implemented CLI on 2026-09-05.
+Navigation was reconciled with the implemented CLI on 2026-09-07.
 Recorded measurements retain the date and configuration of their own artifacts.
 
 ## Start here
@@ -17,9 +17,10 @@ Recorded measurements retain the date and configuration of their own artifacts.
 | Understand the whole harness | [BANTAM System Handbook](BANTAM-SYSTEM-HANDBOOK.md) | Current behavior guide; numerical proof sections are dated |
 | Install and operate it | [Guide](GUIDE.md) | Current operator guide |
 | Watch it work, and grant/deny network | [The interactive experience](INTERACTIVE-EXPERIENCE.md) | Current: feed vs films, station-note visibility, network consent |
-| See the benchmark, or share it | [Fight Night](fights/README.md) | The static replayable bench: rules, protocols, regeneration |
-| Open the completed current Arena | [Packaged factory replay](fights/README.md) | All 18 results with embedded evidence; private and non-redacted |
-| Compare the current factory across six runtimes | [Fresh factory fight cards](FRESH-FACTORY-FIGHTS-2026-09-06.md) | New independent work orders, same-weights local comparisons, sealed evidence and replay |
+| Compare your installed tools live | [Bring-your-own comparisons](BRING-YOUR-OWN-COMPARISONS.md) | Consent-first `cards --live`; `--card all` selects build/extend/repair; public derivatives stay separate from raw evidence |
+| Try Astra supervising local BANTAM | [Experimental foreman mode](FOREMAN.md) | Optional local worker plus one shared Codex worker slot; private candidate, explicit consent, combined accounting; performance not yet established |
+| Open or share the fresh card | [Context-packet presentation](fights/context-packet-2026-09-07-public/README.md) | Three recorded same-model attempts; sanitized replay and images with accounting/budget caveats |
+| Inspect the historical six-runtime protocol | [September 6 factory fight cards](FRESH-FACTORY-FIGHTS-2026-09-06.md) | Frozen work orders, same-weights local comparisons and sealed evidence; raw packages privately archived |
 | Read the completed six-runtime comparison | [Fresh factory results](FRESH-FACTORY-RESULTS-2026-09-06.md) | All 18 V2 attempts; artifact correctness, completion, costs and limits kept separate |
 | Inspect the separate native Sol/Terra follow-up | [Frontier evidence package](fights/README.md) | Six additional runs, not merged into the main series; private evidence and verification instructions |
 | Exchange machine-readable fight evidence | [Portable fight-card observations](FIGHT-CARD-EXCHANGE.md) | Passive bounded validation, evidence hashes, and local qualification before trust |

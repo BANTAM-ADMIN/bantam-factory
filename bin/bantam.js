@@ -190,6 +190,12 @@ if (savedApi?.presets) {
   cliModelOptions.__presets = savedApi.presets;
 }
 const cmd = args._[0];
+if (cmd === 'foreman') {
+  try {
+    const { foremanCommand } = await import('../src/foreman.js');
+    process.exit(await foremanCommand(args, { ask: askSetup }));
+  } catch (error) { console.error(`Foreman: ${error.message}`); process.exit(2); }
+}
 if (cmd === 'cards') {
   try {
     const {factoryCardsCommand}=await import('../src/factory-cards-command.js');

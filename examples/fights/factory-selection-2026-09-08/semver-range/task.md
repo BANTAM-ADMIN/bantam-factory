@@ -43,8 +43,10 @@ a dense array of version strings and `range` is a range string; extra fields are
 ignored. Print exactly `{sorted,satisfying}` as one JSON value followed by
 newline, exit 0, and write no stderr. `sorted` lists every input version in
 ascending precedence, keeping input order among equals; `satisfying` lists those
-that satisfy the range, in the same order as `sorted`. Invalid
-arguments/files/JSON/API input exit 2, with nonempty stderr and no stdout.
+that satisfy the range, in the same order as `sorted`. Validate `range` on every
+invocation, including when `versions` is empty and no version is ever tested
+against it. Invalid arguments/files/JSON/API input exit 2, with nonempty stderr
+and no stdout.
 Importing the module must not run the CLI.
 
 Do not add dependencies or edit package.json or existing tests. You may add

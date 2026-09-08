@@ -101,8 +101,13 @@ and scanned. The package remains marked private to prevent accidental npm
 publication; that does not prevent a public GitHub source release.
 
 Local qualification: 4,159 tests passed, zero failed, 76 skipped, plus the new
-installed-command test passed separately. Hosted CI must pass on the release
-revision before publication. The repository visibility has not been changed.
+installed-command test passed separately. Hosted CI passed on `f67925e`. The
+repository was made public on September 7, 2026 at that revision with explicit
+owner approval, after a credential and operator-identifier sweep of the tracked
+tree found nothing beyond documented placeholders and synthetic fixtures. A
+public repository is not clearance for raw transcripts or archived evidence,
+which remain private and ignored. Later cards were added to the public
+repository only as reviewed sanitized packages.
 
 ## Final historical example correction
 

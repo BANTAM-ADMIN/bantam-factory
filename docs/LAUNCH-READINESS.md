@@ -8,18 +8,20 @@ Managed hardware profiles and the optional Astra foreman retain their stated
 experimental limits; new supervisor experiments are deferred, not launch gates.
 
 Privacy gate: archived raw cards and known historical identifiers have been
-removed from the cleaned history. A fresh private repository now holds that
-history at the original URL; the previous repository remains private. Keep the
-release repository private until hosted CI passes and publication is explicitly
-approved. New public cards
-require review; see the [archive policy](fights/README.md).
+removed from the cleaned history. A fresh repository holds that history at
+the original URL; the previous repositories remain private archives. The
+release repository was made public on September 7, 2026 at `f67925e` with
+explicit owner approval, after hosted CI passed on that revision and a
+credential and operator-identifier sweep of the tracked tree found nothing.
+New public cards still require review; see the [archive policy](fights/README.md).
 The [privacy audit record](PRIVACY-RELEASE-AUDIT.md) records checks and remaining gates.
 
-Before publication: confirm green CI on the exact release revision, approve
-the visibility change, then create a beta tag/release describing the supported
-Linux bring-your-own-server path and experimental options. Hosting the reviewed
-static fight card and announcements are separate opt-in publication steps.
-No additional model or supervisor experiments are required for this beta gate.
+Publication so far: green CI on the release revision, the approved visibility
+change, and the reviewed six-card gallery published through the explicit
+GitHub Pages workflow. Remaining: create a beta tag/release describing the
+supported Linux bring-your-own-server path and experimental options.
+Announcements are a separate opt-in step. No additional model or supervisor
+experiments are required for this beta gate.
 
 | Requirement | Current evidence | Remaining qualification/work |
 |---|---|---|
@@ -33,17 +35,22 @@ No additional model or supervisor experiments are required for this beta gate.
 | Live progress and polished replay | `cards --live` token-protected loopback view, receipt-driven running/settling/grading phases, public final snapshot; `--card all` frozen build/extend/repair set; static replay/export | Further clean-machine/browser exercises and long-run reconnect qualification; live public counters are not a full private-context viewer |
 | Fair, auditable accounting | Local HTTP recorder, native receipts, independent grades, completion separately recorded | Require complete accounting for efficiency claims across every supported adapter; preserve unavailable metrics rather than inventing totals |
 | Community sharing/learning | Portable evidence validation; `cards --public` creates an allowlisted local summary; no implicit execution/promotion/upload | Richer privacy preview and governed import/qualification workflow |
-| Private repository | Verified private at the last push; evidence remains local | Recheck before subsequent pushes; publication requires explicit authorization |
+| Public repository | Made public at `f67925e` with explicit approval after a clean credential and identifier sweep; raw evidence remains local and ignored | Recheck the tracked tree before each push; a public repository is not clearance for raw transcripts or archived evidence |
 
 ## Fresh evidence
 
-The [launch gallery](fights/launch-2026-09-07/index.html) now contains three
-complete task cards and nine recorded system attempts. BANTAM passed Context
-Packet in 58.1s and Patch Transaction in 81.8s; its Stream Framer attempt timed
-out at 4/5. All competitor results, accounting limitations and conditions are
-retained. Three further work orders are being compared across BANTAM, DeepSeek
-Harness, Hermes and native Codex Astra/Sol/Terra. Pending runs are not results.
-The static gallery is reviewed locally, not yet deployed to a public website.
+The [launch gallery](fights/launch-2026-09-07/index.html) now contains all six
+launch cards and 27 recorded system attempts. BANTAM passed Context Packet in
+58.1s, Patch Transaction in 81.8s, Receipt Reducer in 112.5s, Snapshot Drift in
+124.3s and Job Planner in 193.2s; its Stream Framer attempt timed out at 4/5.
+On the same local 27B, DeepSeek Harness took 442.7s, 465.8s and 483.5s on the
+three six-system cards and Hermes 577.6s, 497.0s and a 2/5 timeout. All
+competitor results, including the native Codex lanes that were faster than
+BANTAM, accounting limitations and conditions are retained. Native Claude Code
+Sonnet, Opus and Fable references are published beside the cards as separately
+recorded packages. Two further work orders from the controls kit are recording;
+pending runs are not results. The gallery is deployed through the explicit
+GitHub Pages workflow.
 
 Native Sol and Terra are explicit optional contenders, not additions to the
 default quota-consuming roster. Their isolated runner and portable accounting

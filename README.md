@@ -62,9 +62,22 @@ More completed work orders, including the misses:
 | [Extend a transactional edit engine](docs/fights/launch-2026-09-07/patch-transaction/README.md) | **81.8s · PASS 5/5** | 559.0s · PASS 5/5 | 90.3s · PASS 5/5 |
 | [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 600s limit · TIMEOUT 4/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
 
+Same weights, six systems. The 27B against itself in other harnesses, beside
+native Codex Astra, Sol and Terra:
+
+| Work order | BANTAM · local 27B | DeepSeek Harness · same 27B | Hermes · same 27B | Fastest native Codex |
+|---|---:|---:|---:|---:|
+| [Build a receipt reducer](docs/fights/launch-2026-09-07/receipt-reducer/README.md) | **112.5s · PASS 5/5** | 442.7s · PASS 5/5 | 577.6s · PASS 5/5 | Terra 107.2s · PASS 5/5 |
+| [Extend a snapshot-drift detector](docs/fights/launch-2026-09-07/snapshot-drift/README.md) | **124.3s · PASS 5/5** | 465.8s · PASS 5/5 | 497.0s · PASS 5/5 | Terra 106.2s · PASS 5/5 |
+| [Repair a job planner](docs/fights/launch-2026-09-07/job-planner/README.md) | **193.2s · PASS 5/5** | 483.5s · PASS 5/5 | 600s limit · TIMEOUT 2/5 | Astra 118.4s · PASS 5/5 |
+
+Native Claude Code Sonnet, Opus and Fable ran the same work orders as
+[separately recorded references](docs/fights/launch-2026-09-07/references/README.md),
+shown on the gallery page beside BANTAM's own attempts.
+
 [Browse the fight gallery](docs/fights/launch-2026-09-07/index.html) ·
 [Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md) ·
-[See the native Claude references](docs/fights/claude-references-2026-09-07/README.md)
+[See the native Claude references](docs/fights/launch-2026-09-07/references/README.md)
 
 The first two tasks show measured wins; the stream parser shows a real miss.
 These are individual attempts, not a universal ranking. The cards retain

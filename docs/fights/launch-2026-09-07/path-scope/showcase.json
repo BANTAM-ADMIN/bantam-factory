@@ -1,0 +1,258 @@
+{
+  "schema": "bantam.factory-showcase.v1",
+  "mode": "public",
+  "generatedAt": "2026-09-08T13:30:12.791Z",
+  "privacy": {
+    "redacted": true,
+    "rawEvidenceIncluded": false,
+    "policy": "Explicit numeric/public-task allowlist; private logs, paths, source, prompts, group names and configuration omitted."
+  },
+  "series": [
+    {
+      "id": "series-1",
+      "title": "Factory system comparison",
+      "kind": "comparison",
+      "complete": true,
+      "startedAt": "2026-09-08T13:28:45.234Z",
+      "finishedAt": "2026-09-08T13:30:12.535Z",
+      "counts": {
+        "observed": 1,
+        "planned": 1,
+        "accepted": 1,
+        "completed": 1,
+        "pass": 1,
+        "groupsMeasured": 1,
+        "groupsPassed": 5,
+        "groupsTotal": 5
+      },
+      "cards": [
+        {
+          "id": "s1-path-scope-r1",
+          "card": "path-scope",
+          "title": "Path scope",
+          "kind": "EXTEND",
+          "number": "02",
+          "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
+          "repeat": 1,
+          "rows": [
+            {
+              "id": "s1-path-scope-r1-lane1",
+              "arm": "bantam-local-27b",
+              "label": "BANTAM · local",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": true,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 75104,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 125827,
+                  "outputTokens": 5025,
+                  "cacheHitTokens": 96652,
+                  "freshInputTokens": 29175
+                },
+                "subset": {
+                  "inputTokens": 125827,
+                  "outputTokens": 5025,
+                  "cacheHitTokens": 96652,
+                  "freshInputTokens": 29175
+                },
+                "native": {
+                  "inputTokens": 125827,
+                  "outputTokens": 5025,
+                  "cacheHitTokens": 96652,
+                  "freshInputTokens": 29175
+                },
+                "server": {
+                  "inputTokens": 125770,
+                  "outputTokens": 5020,
+                  "cacheHitTokens": 96600,
+                  "freshInputTokens": 29170
+                },
+                "complete": true,
+                "requests": 16,
+                "measuredRequests": 16,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [
+                {
+                  "t": 3342,
+                  "inputTokens": 3424,
+                  "outputTokens": 11,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 3424,
+                  "partial": false
+                },
+                {
+                  "t": 3976,
+                  "inputTokens": 6860,
+                  "outputTokens": 51,
+                  "cacheHitTokens": 3420,
+                  "freshInputTokens": 3440,
+                  "partial": false
+                },
+                {
+                  "t": 4569,
+                  "inputTokens": 10731,
+                  "outputTokens": 65,
+                  "cacheHitTokens": 6840,
+                  "freshInputTokens": 3891,
+                  "partial": false
+                },
+                {
+                  "t": 10885,
+                  "inputTokens": 14833,
+                  "outputTokens": 728,
+                  "cacheHitTokens": 10726,
+                  "freshInputTokens": 4107,
+                  "partial": false
+                },
+                {
+                  "t": 17153,
+                  "inputTokens": 20558,
+                  "outputTokens": 1389,
+                  "cacheHitTokens": 14824,
+                  "freshInputTokens": 5734,
+                  "partial": false
+                },
+                {
+                  "t": 17704,
+                  "inputTokens": 27044,
+                  "outputTokens": 1404,
+                  "cacheHitTokens": 21211,
+                  "freshInputTokens": 5833,
+                  "partial": false
+                },
+                {
+                  "t": 21926,
+                  "inputTokens": 35013,
+                  "outputTokens": 1615,
+                  "cacheHitTokens": 27713,
+                  "freshInputTokens": 7300,
+                  "partial": false
+                },
+                {
+                  "t": 22678,
+                  "inputTokens": 43194,
+                  "outputTokens": 1675,
+                  "cacheHitTokens": 35892,
+                  "freshInputTokens": 7302,
+                  "partial": false
+                },
+                {
+                  "t": 26123,
+                  "inputTokens": 52146,
+                  "outputTokens": 1741,
+                  "cacheHitTokens": 38288,
+                  "freshInputTokens": 13858,
+                  "partial": false
+                },
+                {
+                  "t": 26648,
+                  "inputTokens": 61192,
+                  "outputTokens": 1756,
+                  "cacheHitTokens": 47307,
+                  "freshInputTokens": 13885,
+                  "partial": false
+                },
+                {
+                  "t": 33104,
+                  "inputTokens": 63439,
+                  "outputTokens": 2172,
+                  "cacheHitTokens": 47307,
+                  "freshInputTokens": 16132,
+                  "partial": false
+                },
+                {
+                  "t": 35259,
+                  "inputTokens": 73529,
+                  "outputTokens": 2274,
+                  "cacheHitTokens": 56369,
+                  "freshInputTokens": 17160,
+                  "partial": false
+                },
+                {
+                  "t": 62812,
+                  "inputTokens": 83722,
+                  "outputTokens": 4602,
+                  "cacheHitTokens": 66560,
+                  "freshInputTokens": 17162,
+                  "partial": false
+                },
+                {
+                  "t": 67622,
+                  "inputTokens": 96816,
+                  "outputTokens": 4623,
+                  "cacheHitTokens": 68956,
+                  "freshInputTokens": 27860,
+                  "partial": false
+                },
+                {
+                  "t": 71663,
+                  "inputTokens": 111244,
+                  "outputTokens": 4777,
+                  "cacheHitTokens": 82070,
+                  "freshInputTokens": 29174,
+                  "partial": false
+                },
+                {
+                  "t": 74835,
+                  "inputTokens": 125827,
+                  "outputTokens": 5025,
+                  "cacheHitTokens": 96652,
+                  "freshInputTokens": 29175,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 75,
+              "untimedEvents": 11,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

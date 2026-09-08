@@ -487,8 +487,20 @@
       "kind": "BUILD",
       "number": "01",
       "description": "Match paths against glob patterns, last pattern deciding, with a receipt per path.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "c51293be1d41a5c894e7329382a6ef596ef538b4ba2e461c2fd67c2536340529",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 264143,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     },
     {
       "id": "path-scope",
@@ -496,8 +508,20 @@
       "kind": "EXTEND",
       "number": "02",
       "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "768e7744fa8a583f8d1650b22c3ecd159b58a7ab5ccd81e09db187e4fb7eefb4",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 75104,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     },
     {
       "id": "semver-range",
@@ -505,8 +529,20 @@
       "kind": "REPAIR",
       "number": "03",
       "description": "Order versions by real precedence and admit prereleases into a range only when invited.",
-      "recorded": false,
-      "rows": []
+      "recorded": true,
+      "sourceSha256": "0f55ec00f725a769beab429b755acb87e274a33ceaf184250c897e7e499b6d98",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 399879,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
     }
   ],
   "references": {

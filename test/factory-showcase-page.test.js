@@ -26,12 +26,14 @@ test('the scrolling race shares the table records and never includes private fie
   const data=gallery();data.cards[0].rows[0].privatePrompt='PRIVATE_DO_NOT_PUBLISH';
   const html=renderFactoryShowcase(data),json=html.match(/<script id="fight-preview" type="application\/json">(.*?)<\/script>/s)[1];
   const preview=JSON.parse(json);
-  const context={window:{},document:{getElementById:()=>({textContent:json})}};
+  const context={window:{},document:{getElementById:id=>({textContent:id==='hardware-preview'?fs.readFileSync(new URL('../site/hardware.json',import.meta.url),'utf8'):json})}};
   vm.runInNewContext(fs.readFileSync(new URL('../site/demos.js',import.meta.url),'utf8'),context);
   const race=context.window.DEMOS.ring.steps.find(s=>s.race).race;
   assert.equal(race.rows.length,2);assert.equal(race.rows[0].finish,58.123);
   assert.equal(race.rows[1].finish,512.194);assert.equal(preview.rows[0].wallMs,58123);
   assert.doesNotMatch(html,/PRIVATE_DO_NOT_PUBLISH|reference runs with Claude|References · same work/);
+  assert.equal(context.window.DEMOS.hardware.steps.flatMap(s=>s.out||[]).some(s=>s.includes('17.92 GB')),true);
+  assert.doesNotMatch(context.window.DEMOS.hardware.steps.flatMap(s=>s.out||[]).join('\n'),/19.0 GB|0.6 GB|3.2 GB/);
   assert.match(html,/headerRooster/);assert.match(html,/data-demo="sandbox"/);
   assert.ok(html.indexOf('class="hero-factory"')<html.indexOf('id="stage"'));
 });

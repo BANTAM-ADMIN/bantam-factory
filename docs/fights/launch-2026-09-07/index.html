@@ -105,7 +105,7 @@ bantamfactory setup</pre>
     <article class="story" data-demo="hardware">
       <figure class="term term--inline" data-inline></figure>
       <h2>Your hardware. Or your Codex account.</h2>
-      <p>Run a local model through llama.cpp, or point the factory at a signed-in Codex CLI. Setup checks Node, Docker, and the model server, and offers a guided model download for supported NVIDIA GPUs. Vision and faster decoding are add-ons you choose; nothing optional is bundled.</p>
+      <p>Run a local model through llama.cpp, or point the factory at a signed-in Codex CLI. Setup checks Node, Docker, and the model server, and offers a guided model download for supported NVIDIA GPUs. Vision and MTP acceleration depend on your model and server. Compatible companions are optional; nothing is bundled.</p>
       <p class="fine">Shell commands from the model run in a Docker sandbox with the network off. An interactive session asks before it turns the network on.</p>
     </article>
 
@@ -158,7 +158,7 @@ bantamfactory setup</pre>
   </nav>
 </footer>
 
-<script id="fight-preview" type="application/json">{"title":"Context packet","rows":[{"arm":"bantam-local-27b","label":"BANTAM FACTORY","wallMs":58072,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5},{"arm":"hermes","label":"Hermes","wallMs":512194,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5},{"arm":"opencode","label":"OpenCode","wallMs":600004,"passed":false,"outcome":"OUTPUT_ONLY","groupsPassed":5,"groupsTotal":5},{"arm":"deepseek-local-27b","label":"DeepSeek Harness","wallMs":600007,"passed":false,"outcome":"OUTPUT_ONLY","groupsPassed":5,"groupsTotal":5},{"arm":"codex-astra","label":"Codex","wallMs":110560,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5}]}</script>
+<script id="fight-preview" type="application/json">{"title":"Context packet","rows":[{"arm":"bantam-local-27b","label":"BANTAM FACTORY","wallMs":58072,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5},{"arm":"hermes","label":"Hermes","wallMs":512194,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5},{"arm":"opencode","label":"OpenCode","wallMs":600004,"passed":false,"outcome":"OUTPUT_ONLY","groupsPassed":5,"groupsTotal":5},{"arm":"deepseek-local-27b","label":"DeepSeek Harness","wallMs":600007,"passed":false,"outcome":"OUTPUT_ONLY","groupsPassed":5,"groupsTotal":5},{"arm":"codex-astra","label":"Codex","wallMs":110560,"passed":true,"outcome":"PASS","groupsPassed":5,"groupsTotal":5}]}</script><script id="hardware-preview" type="application/json">{"schema":"bantam.showcase-hardware.v1","observedAt":"2026-09-08","sizeBasis":"filesystem-stat","sizeUnits":"decimal bytes; file sizes are not VRAM requirements","files":[{"role":"model","name":"Qwen3.8-27B-BANTAM-Q4_K_P.gguf","bytes":17923393664,"loadedAsSeparateFile":true},{"role":"vision","name":"mmproj-Qwen3.8-27B-BANTAM-BF16.gguf","bytes":931146624,"loadedAsSeparateFile":true},{"role":"mtp","name":"Qwen3.8-27B-BANTAM-FastMTP-32K.gguf","bytes":903453952,"loadedAsSeparateFile":false}],"server":{"speculation":"draft-mtp","separateDraftFile":false,"visionProjectorOffload":false}}</script>
 <script src="assets/showcase/rooster.js"></script>
 <script src="assets/showcase/demos.js"></script>
 <script src="assets/showcase/site.js"></script>

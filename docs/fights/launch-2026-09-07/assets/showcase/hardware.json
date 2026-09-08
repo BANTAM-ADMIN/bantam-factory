@@ -1,0 +1,31 @@
+{
+  "schema": "bantam.showcase-hardware.v1",
+  "observedAt": "2026-09-08",
+  "sizeBasis": "filesystem-stat",
+  "sizeUnits": "decimal bytes; file sizes are not VRAM requirements",
+  "files": [
+    {
+      "role": "model",
+      "name": "Qwen3.8-27B-BANTAM-Q4_K_P.gguf",
+      "bytes": 17923393664,
+      "loadedAsSeparateFile": true
+    },
+    {
+      "role": "vision",
+      "name": "mmproj-Qwen3.8-27B-BANTAM-BF16.gguf",
+      "bytes": 931146624,
+      "loadedAsSeparateFile": true
+    },
+    {
+      "role": "mtp",
+      "name": "Qwen3.8-27B-BANTAM-FastMTP-32K.gguf",
+      "bytes": 903453952,
+      "loadedAsSeparateFile": false
+    }
+  ],
+  "server": {
+    "speculation": "draft-mtp",
+    "separateDraftFile": false,
+    "visionProjectorOffload": false
+  }
+}

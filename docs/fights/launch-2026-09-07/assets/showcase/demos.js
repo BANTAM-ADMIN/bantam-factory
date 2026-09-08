@@ -9,6 +9,8 @@
 
   const GALLERY = '';
   const recordedFight = JSON.parse(document.getElementById('fight-preview')?.textContent || 'null');
+  const hardware = JSON.parse(document.getElementById('hardware-preview')?.textContent || 'null');
+  const fileSize = bytes => bytes >= 1e9 ? (bytes / 1e9).toFixed(2) + ' GB' : Math.round(bytes / 1e6) + ' MB';
 
   // The first screen, as bin/bantam.js paints it: wordmark, then a key/value column.
   const CARD = [
@@ -273,7 +275,7 @@
     // ---------------------------------------------------------------- doctor and add-ons
     hardware: {
       title: 'bantam doctor',
-      caption: 'Output of bantam doctor and bantam addons on the maintainer\'s machine on 2026-09-08. Add-ons download into your home directory, never into the repo.',
+      caption: 'Doctor output followed by measured files and server settings on the benchmark machine, September 8, 2026. Paths are shortened. Sizes are disk space, in decimal GB/MB. Vision and MTP support depend on the model and server. <a href="assets/showcase/hardware.json">File inventory</a>.',
       end: 'pass',
       steps: [
         { cmd: 'bantam doctor', wait: 600 },
@@ -286,24 +288,17 @@
           '[g]→[/] Next: You\'re set — run `bantam` in your project directory.',
           '',
         ], every: 260, wait: 900 },
-        { cmd: 'bantam addons', wait: 500 },
         { out: [
-          'Add-ons live in ~/.bantam/addons and ~/models — never in the repo.',
+          '[g]Files on the benchmark machine[/]', '',
+          ...(hardware?.files || []).flatMap(file => [
+            '[k]' + file.name + '[/]',
+            '  [b]' + fileSize(file.bytes) + '[/]  [d]' + (file.role === 'model' ? 'loaded model · Q4_K_P' : file.role === 'vision' ? 'loaded vision projector · BF16 · CPU' : 'optional FastMTP file · not loaded separately') + '[/]', '',
+          ]),
+          '[d]This server uses draft-mtp; no separate draft file is loaded.[/]',
+          '[d]MTP is model-dependent. Some models have no MTP support.[/]',
+          '[d]Vision needs a compatible model and matching projector.[/]',
           '',
-          '  [d]○[/] [k]llama-cpp[/]    llama.cpp server (prebuilt)',
-          '      [d]local inference server — Vulkan/Metal prebuilt, ~50 MB[/]',
-          '      [d]install: bantam doctor --install-llama[/]',
-          '  [d]○[/] [k]local-model[/]  local model (ggml-org/Qwen3.8-27B-GGUF)',
-          '      [d]stock Apache-2.0 weights, 19.0 GB (Q4_K_M)[/]',
-          '      [d]install: bantam doctor --provision[/]',
-          '  [d]○[/] [k]vision[/]       vision companion (mmproj)',
-          '      [d]screenshot/image input for the local model, 0.6 GB[/]',
-          '      [d]install: bantam doctor --provision-extra vision[/]',
-          '  [d]○[/] [k]mtp[/]          speculative-decoding sidecar (MTP)',
-          '      [d]faster generation for the local model, 3.2 GB[/]',
-          '      [d]install: bantam doctor --provision-extra mtp[/]',
-          '',
-        ], every: 70, wait: 700 },
+        ], every:180, wait:700 },
         { cmd: 'bantam health', wait: 500 },
         { out: [
           'model: ~/models/Qwen3.8-27B-BANTAM-Q4_K_P.gguf @ http://127.0.0.1:8085/v1 (openai)',

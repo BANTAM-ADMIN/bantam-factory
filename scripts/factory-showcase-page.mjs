@@ -6,7 +6,7 @@ import {performanceView} from './fight-performance.mjs';
 const E=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROOT=new URL('../site/',import.meta.url);
 export const SHOWCASE_STATIC_FILES=Object.freeze([
-  'style.css','site.js','demos.js','rooster.js','img/bantam-mark.svg',
+  'style.css','site.js','demos.js','rooster.js','hardware.json','img/bantam-mark.svg',
   'fonts/barlow-condensed-800.woff2','fonts/manrope-400.woff2','fonts/manrope-700.woff2',
   'fonts/source-code-pro-400.woff2','fonts/source-code-pro-600.woff2',
   'fonts/barlow-OFL.txt','fonts/manrope-OFL.txt','fonts/source-code-pro-OFL.txt',
@@ -73,7 +73,8 @@ export function renderFactoryShowcase(data,{intro=false}={}){
   };
   insert('FIGHT_RESULTS',renderShowcaseResults(data));
   insert('FIGHT_SPEEDS',renderShowcaseSpeeds(data));
-  insert('FIGHT_PREVIEW',`<script id="fight-preview" type="application/json">${JSON.stringify(preview).replace(/</g,'\\u003c')}</script>`);
+  const hardware=JSON.parse(read('hardware.json'));
+  insert('FIGHT_PREVIEW',`<script id="fight-preview" type="application/json">${JSON.stringify(preview).replace(/</g,'\\u003c')}</script><script id="hardware-preview" type="application/json">${JSON.stringify(hardware).replace(/</g,'\\u003c')}</script>`);
   insert('INTRO_LINK',intro?'<a class="intro-link" href="assets/motion/player.html">Meet your factory · 18-second film ↗</a>':'');
   return html;
 }

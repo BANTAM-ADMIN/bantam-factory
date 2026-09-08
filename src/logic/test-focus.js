@@ -708,7 +708,7 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2, tes
     const want = cap(f.diff.filter((d) => d.startsWith("-")).map((d) => d.replace(/^-\s*/, "")).join(", "));
     const diffLine = got || want
       ? `your code produced { ${got || "?"} }, but the test requires { ${want || "?"} }`
-      : (f.expected != null && f.actual != null ? `expected ${f.expected}, got ${f.actual}` : "see the assertion in the test output");
+      : testFailureDetail(f);
     parts.push(`\nFAILING: "${f.name}"${f.file ? ` (${path.basename(f.file)}:${f.line})` : ""}\n  ${diffLine}`);
     parts.push(`  ${testProvenanceGuidance(provenance)}`);
     if (block) parts.push(`  failing test source:\n${block.split("\n").map((l) => "    " + l).join("\n")}`);
@@ -724,6 +724,15 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2, tes
   return parts.join("\n");
 }
 
+export function testFailureDetail(failure) {
+  const message = String(failure?.message ?? '').trim();
+  const diff = Array.isArray(failure?.diff) ? failure.diff.join('  ') : '';
+  const values = failure?.expected != null && failure?.actual != null
+    ? `expected ${failure.expected}, got ${failure.actual}` : '';
+  return [message, diff || values].filter(Boolean).join('\n').slice(0, 2400)
+    || 'No concrete failure detail was captured; inspect the raw test output before diagnosing.';
+}
+
 /**
  * Focused diagnostic reasoning call: when the model is STUCK on one test (repeated focused feedback
  * hasn't moved it), decompose — hand it ONLY that failing test + its current implementation + the
@@ -731,7 +740,7 @@ export function formatFailingTestFocus(output, readTestFile, { maxTests = 2, tes
  * Returns the model's diagnosis text, or null. This is the "call the llm for a hard sub-step" lever.
  */
 export async function diagnoseFailingTest({ model, buildRawPrompt, testName, testSource, implSource, diff, task = "", testProvenance = "unknown", nPredict = 640, signal = null }) {
-  const instruction = `ONE test remains failing. Give the evidence-supported fix FIRST so a truncated answer still contains the actionable change. A failing test alone does not establish whether the implementation or the test is wrong.
+  const instruction = `Diagnose this observed failing test; other tests may also be failing. Give the evidence-supported fix FIRST so a truncated answer still contains the actionable change. A failing test alone does not establish whether the implementation or the test is wrong.
 
 STRICT OUTPUT — exactly these THREE short lines, in this order, with nothing before FIX:
 FIX: <responsible path + symbol/line + exact change, or the missing evidence needed; max 35 words>

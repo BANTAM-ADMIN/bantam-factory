@@ -54,7 +54,7 @@ import { symbolsIn } from "./collateral.js";
 import { impactFooter, familyFooter, familyFindings, familyBlocks, constantTableFooter, crossScopeUsageFooter, peerFunctionFooter, trimSiteList } from "./edit-context.js";
 import { detectSiblings } from "./logic/completeness-critic.js";
 import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-anchors.js";
-import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
+import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, testFailureDetail, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
 import { buildPrompt, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
 import { createContextUpdate, createActionContractUpdate } from "./context-updates.js";
@@ -5283,7 +5283,7 @@ async function runAgentCore({
       }
       if (diagnoseStuckTests) {
         const readTest = workspaceTestReader(workspace);
-        let implementation = null;
+        let implementation = null, diagnosisAttempted = false;
         for (const f of fails) {
           const n = (failStreak.get(f.name) ?? 0) + 1;
           failStreak.set(f.name, n);
@@ -5300,7 +5300,7 @@ async function runAgentCore({
             let pinSource = null;
             try { const pinRaw = readTest(f.file); if (pinRaw) pinSource = extractTestDiagnosticContext(pinRaw, f.line); } catch { /* skip */ }
             if (pinSource) {
-              const pinDiff = f.diff.length ? f.diff.join("  ") : `${f.actual ?? "?"} vs expected ${f.expected ?? "?"}`;
+              const pinDiff = testFailureDetail(f);
               result.observation += `\n\n[fix-tests] evidence pinned for "${f.name}" (red x${n}) — the test and its failure, verbatim:\n${String(pinSource).slice(0, 1400)}\nFAILURE: ${String(pinDiff).slice(0, 300)}`;
               metrics.evidencePins = (metrics.evidencePins ?? 0) + 1;
             }
@@ -5309,17 +5309,20 @@ async function runAgentCore({
           // reasoning pass if it stays stuck) was A/B'd on async and was null-to-negative — the model
           // got up to 4 focused reasoning passes on the same test and still couldn't crack it, so the
           // residual is model reasoning, not a lack of attempts. Single-fire is the validated behavior.
-          if (n >= diagnoseAfter && !diagnosed.has(f.name) && f.file && f.line) {
+          if (!diagnosisAttempted && n >= diagnoseAfter && !diagnosed.has(f.name) && f.file && f.line) {
             // The failing behavior can cross a tiny implementation seam (CLI -> store, route -> service).
             // Lazily hand the auxiliary call the current edited code set, not one recency-guessed file.
             // Source wins over docs and both file count and bytes are hard-bounded.
             implementation ??= buildDiagnosticImplementationContext(openList, (p) => exec.resolveExisting(p));
             if (!implementation.source) continue;
-            diagnosed.set(f.name, n);
             let testSource = null;
             try { const s = readTest(f.file); if (s) testSource = extractTestDiagnosticContext(s, f.line); } catch { /* skip */ }
-            const diff = f.diff.length ? f.diff.join("  ") : `${f.actual ?? "?"} vs expected ${f.expected ?? "?"}`;
+            const diff = testFailureDetail(f);
             if (testSource) {
+              // One diagnostic then return control to the worker. A shared fixture
+              // failure must not fan out into one model call per downstream test.
+              diagnosisAttempted = true;
+              diagnosed.set(f.name, n);
               onEvent({ type: "activity", label: "diagnosing" });
               const diag = await diagnoseFailingTest({
                 model, buildRawPrompt: (i) => buildAuxPrompt(i, model.assistantPrefill, model.template),
@@ -5356,7 +5359,7 @@ async function runAgentCore({
             if (implementation.source) {
               let testSource = null;
               try { const s = readTest(f.file); if (s) testSource = extractTestDiagnosticContext(s, f.line); } catch { /* skip */ }
-              const diff = f.diff.length ? f.diff.join("  ") : `${f.actual ?? "?"} vs expected ${f.expected ?? "?"}`;
+              const diff = testFailureDetail(f);
               onEvent({ type: "activity", label: "consulting teacher" });
               // The same-weights persona teacher: fresh context, explicit
               // distrust of the author's assumptions. Primary when the

@@ -167,6 +167,8 @@ test("cornerUsage reads a BANTAM run artifact: turns, tokens, prefix reuse, pass
   // No verifier on the arm: unverified, which is not a failure.
   fs.writeFileSync(path.join(armDir, "run.json"), JSON.stringify({ metrics: { turns: 3, modelRequests: 3, usage: {} }, result: { pass: null, status: "unverified" } }));
   assert.equal(cornerUsage("bantam", { armDir, rawLines: [] }).pass, null);
+  fs.writeFileSync(path.join(armDir, "run.json"), JSON.stringify({ modelCalls: [{}] }));
+  assert.equal(cornerUsage("bantam", { armDir, rawLines: [] }), null, "unfinished checkpoints are not zero-token runs");
 });
 
 test("cornerUsage reads the codex CLI's 'tokens used' tail and Claude's stream-json result", () => {

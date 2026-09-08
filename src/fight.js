@@ -756,7 +756,9 @@ export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
     if (!armDir) return null;
     let r;
     try { r = JSON.parse(fs.readFileSync(path.join(armDir, "run.json"), "utf8")); } catch { return null; }
-    const u = r?.metrics?.usage ?? {};
+    // Checkpoints written before final metrics are not zero-token runs.
+    if (!r?.metrics?.usage) return null;
+    const u = r.metrics.usage;
     const input = num(u.inputTokens) ?? 0;
     const hit = Math.min(input, num(u.cacheHitTokens) ?? 0);
     return {

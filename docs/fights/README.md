@@ -13,8 +13,13 @@ finished cleanly; complete recorded totals are available for every lane.
 [Context packet · launch series](launch-2026-09-07/context-packet/README.md):
 BANTAM 5/5 in **58.1s**, native Astra 5/5 in **110.6s**, OpenCode 5/5 artifact
 but no clean completion at its **600s** time limit. Watch the replay, download
-the share image, and inspect the accounting. The remaining launch-series cards
-are running; they are not yet published results.
+the share image, and inspect the accounting.
+
+[Stream framer · launch series](launch-2026-09-07/stream-framer/README.md):
+native Astra passed **5/5 in 160.7s**. BANTAM timed out at 4/5 and OpenCode at
+0/5. Both local attempts retain their partial accounting; this is a disclosed
+loss, not an omitted run. Three of the six launch work orders are now published;
+the remaining comparisons are running and are not yet published results.
 
 ## Earlier reviewed comparison
 

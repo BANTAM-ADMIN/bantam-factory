@@ -186,6 +186,18 @@ test('saved wire subsets expose four counters and coverage without filling unkno
   assert.deepEqual(JSON.parse(p.artifacts.find(a=>a.path==='result.json').content),f.r,'original incomplete usage is not rewritten');
 });
 
+test('legacy timeout checkpoint zeros are not published as native measurements',t=>{
+  const f=fixture(t,{wire:true,partial:true});
+  f.r.timedOut=true;
+  f.r.nativeUsage={source:'run.json',inputTokens:0,outputTokens:0,cacheHitTokens:0};
+  write(f.dir,'result.json',f.r);
+  write(f.root,'manifest.json',f.m);
+  const {data}=buildShowcase({roots:[f.root]});
+  const row=data.series[0].cards[0].rows[0];
+  assert.equal(row.accounting.native,null);
+  assert.equal(row.accounting.subset.inputTokens,100);
+});
+
 test('replay clocks come from actual evidence and untimed turns stay untimed',t=>{
   const f=fixture(t,{wire:true,variant:true}),{data}=buildShowcase({roots:[f.root]}),r=data.series[0].cards[0].rows[0];
   assert.deepEqual(r.events.map(e=>e.t),[500,1000,3000,null]);

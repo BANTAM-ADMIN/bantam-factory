@@ -72,7 +72,12 @@ function coverageOf(usage,report){
 function usageProjection(result,report){
   const usage=report?.usage??result?.usage??null;
   const full=metrics(usage),subset=report?.usage?.measuredSubset;
-  return {full,subset:subset?metrics(subset):null,native:result?.nativeUsage?metrics(result.nativeUsage):null,
+  // Legacy checkpoint fallback emitted zero counters without turn/request
+  // metrics after a timeout. Preserve the raw record privately, not as a meter.
+  const native=result?.nativeUsage;
+  const checkpointFallback=result?.timedOut===true&&native?.source==='run.json'
+    &&native.turns==null&&native.requests==null&&native.inputTokens===0&&native.outputTokens===0&&native.cacheHitTokens===0;
+  return {full,subset:subset?metrics(subset):null,native:native&&!checkpointFallback?metrics(native):null,
     server:result?.serverUsage?metrics(result.serverUsage):null,complete:BOOL(usage?.complete),
     requests:N(usage?.requests),measuredRequests:N(usage?.measuredRequests),coverage:coverageOf(usage,report),
     serverIdleBefore:BOOL(result?.serverUsage?.idleBefore),serverIdleAfter:BOOL(result?.serverUsage?.idleAfter),

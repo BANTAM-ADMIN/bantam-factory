@@ -55,13 +55,15 @@ tokens. Native Astra completed the same task in 90.3 seconds.
 |---|---:|---:|---:|
 | [Build a context packer](docs/fights/launch-2026-09-07/context-packet/README.md) | **58.1s · PASS 5/5** | 600s limit · artifact 5/5, unfinished | 110.6s · PASS 5/5 |
 | [Extend a transactional edit engine](docs/fights/launch-2026-09-07/patch-transaction/README.md) | **81.8s · PASS 5/5** | 559.0s · PASS 5/5 | 90.3s · PASS 5/5 |
+| [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 600s limit · TIMEOUT 4/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
 
 [Browse the fight gallery](docs/fights/launch-2026-09-07/index.html) ·
 [Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md)
 
-These are measured wins on these attempts, not a universal ranking. The cards retain
-OpenCode's partial request-level accounting and separates its passing artifact
-from its unfinished run. Frontier comparisons use a different model; same-model
+The first two tasks show measured wins; the stream parser shows a real miss.
+These are individual attempts, not a universal ranking. The cards retain
+partial request-level accounting and separate passing artifacts
+from unfinished runs. Frontier comparisons use a different model; same-model
 comparisons isolate the local weights, not every configuration difference.
 
 ### Put BANTAM against your own tools

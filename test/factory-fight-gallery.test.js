@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {publicShowcaseData} from '../scripts/factory-showcase.mjs';
 import {buildLaunchData} from '../scripts/factory-launch.mjs';
-import {buildFightGallery,renderFightGallery,writeFightGallery,stageFightGallery} from '../scripts/factory-fight-gallery.mjs';
+import {buildFightGallery,renderFightGallery,writeFightGallery,stageFightGallery,featuredFight} from '../scripts/factory-fight-gallery.mjs';
 import {PUBLIC_FACTORY_CARDS} from '../scripts/factory-card-catalog.mjs';
 
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -45,6 +45,17 @@ test('gallery keeps all six planned tasks, complete rosters, timeout and partial
   assert.deepEqual(writeFightGallery({root}),{published:1,planned:6});
   assert.throws(()=>writeFightGallery({root}),/Refusing to replace/);
   assert.deepEqual(writeFightGallery({root,replace:true}),{published:1,planned:6});
+});
+
+test('featured wins exclude timeouts, missing clocks and different-model comparisons',t=>{
+  const {root}=fixture(t),data=buildFightGallery(root),card=data.cards.find(c=>c.recorded);
+  assert.equal(featuredFight(data),null,'output-only is not a completed speed comparison');
+  card.rows[1].passed=true;card.rows[1].outcome='PASS';
+  assert.equal(featuredFight(data).ratio,600000/58000);
+  assert.match(renderFightGallery(data),/Selected highlight, not a universal ranking/);
+  card.rows[1].arm='codex-astra';assert.equal(featuredFight(data),null);
+  card.rows[1].arm='hermes';card.rows[0].wallMs=0;assert.equal(featuredFight(data),null);
+  card.rows[0].wallMs=700000;assert.equal(featuredFight(data),null,'a loss is not a featured win');
 });
 
 test('gallery rejects incomplete rosters, raw inputs, tampered packages and symlinked outputs',t=>{

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, cleanupForemanContainers } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, cleanupForemanContainers } from '../src/foreman.js';
+import { runProcess } from '../src/process-runner.js';
 import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
 import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
 import { shellContainerReceiptArgs } from '../src/executor.js';
@@ -145,4 +146,19 @@ test('worker shell receipts identify exact owned containers outside model-writab
   fs.writeFileSync(path.join(receipts,'bantam-shell-123.cid'),'owned');
   assert.throws(()=>shellContainerReceiptArgs(ws,'bantam-shell-123',{BANTAM_SHELL_CID_DIR:receipts}));
   assert.throws(()=>shellContainerReceiptArgs(ws,'../not-owned',{BANTAM_SHELL_CID_DIR:receipts}));
+});
+
+test('verifier admission rejects Bash syntax before any worker starts and accepts a corrected batch', async t => {
+  const cwd = fixture(t), marker = path.join(cwd, 'must-not-execute');
+  const shell = command => runProcess('/bin/sh', ['-c', command], { cwd, timeoutMs: 5000 });
+  await assert.rejects(validateForemanVerifiers([{...job('bad'), verify: 'node --check <(cat arcade.html)'}], shell), /cannot parse in POSIX/);
+  await validateForemanVerifiers([{...job('quoted'), verify: `printf '%s' "$(touch ${marker})"`}], shell);
+  assert.equal(fs.existsSync(marker), false, 'syntax checking must not execute command substitutions');
+  const m = model([action('enqueue', {jobs: [job('first'), {...job('bad'), verify: 'cat <(printf broken)'}]}), action('enqueue', {jobs: [job('corrected')]}), action('wait'), action('finish')]);
+  const executed = [];
+  const result = await driveForeman({task:'build', initial:{}, model:m, maxDecisions:5,
+    validateJobs: jobs => validateForemanVerifiers(jobs, shell),
+    execute: async j => {executed.push(j.id);return {pass:true};}, inspect:async()=>({}), verify:async()=>({pass:true})});
+  assert.deepEqual(executed, ['corrected']);assert.equal(result.pass, true);
+  assert.match(m.prompts[1], /cannot parse in POSIX/);
 });

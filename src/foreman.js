@@ -127,6 +127,18 @@ export function readForemanEvidence(output, id, selector) {
   } finally { fs.closeSync(fd); }
 }
 
+// Parse in the worker's actual shell without executing the proposed command.
+// A Bash-only verifier otherwise burns a complete job before it can ever pass.
+export async function validateForemanVerifiers(jobs, check) {
+  if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 8) throw Error('invalid job batch');
+  for (const job of jobs) {
+    if (typeof job?.verify !== 'string' || !job.verify.trim() || job.verify.length > 2000) throw Error('invalid job verify');
+    const quoted = "'" + job.verify.replaceAll("'", "'\\''") + "'";
+    const result = await check(`sh -n -c ${quoted}`);
+    if (!clean(result)) throw Error(`Job verifier cannot parse in POSIX /bin/sh: ${String(job.id).slice(0, 48)}. Correct the command before enqueueing. ${result.stderr?.slice(-1200) ?? ''}`);
+  }
+}
+
 export function foremanWorkerContext(job, dependencies) {
   // Do not flatten transport diagnostics into the product contract. In the
   // first live trial, `process.aborted:false` in a successful dependency's raw
@@ -246,6 +258,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   let cleanup = { pass: false, status: 'pending' };
   try {
     result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor' }, model: supervisor, execute, inspect,
+      validateJobs: jobs => validateForemanVerifiers(jobs, command => check(candidate, command)),
       verify: async () => { const r = await check(candidate, plan.verify); write(path.join(plan.output, 'final-verification.json'), r); return brief(r); }, emit, signal: ac.signal });
     // Never let teardown erase completed work, usage or the supervisor finish.
     write(path.join(plan.output, 'completion-checkpoint.json'), result);

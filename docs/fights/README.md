@@ -6,7 +6,8 @@ Real work orders. Independent checks. Recorded clocks and token receipts.
 
 [Browse the live launch gallery](https://bantam-admin.github.io/bantam-factory/)
 (source: [launch-2026-09-07/index.html](launch-2026-09-07/index.html)).
-Eight work orders, every planned contender recorded, misses included.
+Eleven work orders in three sections, every planned contender recorded,
+misses included.
 
 [Receipt reducer · six-system comparison](launch-2026-09-07/receipt-reducer/README.md):
 **BANTAM 112.5s, DeepSeek Harness 442.7s, Hermes 577.6s**, using the same local
@@ -46,9 +47,27 @@ but no clean completion at its **600s** time limit. Watch the replay, download
 the share image, and inspect the accounting.
 
 [Stream framer · launch series](launch-2026-09-07/stream-framer/README.md):
-native Astra passed **5/5 in 160.7s**. BANTAM timed out at 4/5 and OpenCode at
-0/5. Both local attempts retain their partial accounting; this is a disclosed
-loss, not an omitted run.
+**BANTAM 5/5 in 432.7s**, native Astra 5/5 in 160.7s, OpenCode TIMEOUT at 0/5
+on the same local weights. Astra was 2.7× quicker on this attempt. BANTAM's
+93.8% prefix reuse is its highest on any published card.
+
+## Selection series
+
+Three work orders about choosing and resolving. One recorded system each so
+far: a single-lane card is an observation, not a comparison, and each card
+says so rather than letting a one-row table imply a win.
+
+[Glob select](launch-2026-09-07/glob-select/README.md): BANTAM 5/5 in
+**264.1s**, 91.3% prefix reuse over 27 requests. The hidden group exercises a
+uniqueness precondition the visible tests never touch.
+
+[Path scope](launch-2026-09-07/path-scope/README.md): BANTAM 5/5 in **75.1s**,
+the quickest pass in the gallery. Deciding whether a path stays inside a
+workspace root without trusting a shared string prefix.
+
+[Semver range](launch-2026-09-07/semver-range/README.md): BANTAM 5/5 in
+**399.9s**, the heaviest published card at 66 requests and 1.7M input tokens
+against under 25K output.
 
 ## Native Claude Code references
 

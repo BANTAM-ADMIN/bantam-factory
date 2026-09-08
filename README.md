@@ -60,7 +60,7 @@ More completed work orders, including the misses:
 |---|---:|---:|---:|
 | [Build a context packer](docs/fights/launch-2026-09-07/context-packet/README.md) | **58.1s · PASS 5/5** | 600s limit · artifact 5/5, unfinished | 110.6s · PASS 5/5 |
 | [Extend a transactional edit engine](docs/fights/launch-2026-09-07/patch-transaction/README.md) | **81.8s · PASS 5/5** | 559.0s · PASS 5/5 | 90.3s · PASS 5/5 |
-| [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 600s limit · TIMEOUT 4/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
+| [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 432.7s · PASS 5/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
 
 Same weights, six systems. The 27B against itself in other harnesses, beside
 native Codex Astra, Sol and Terra:
@@ -73,6 +73,15 @@ native Codex Astra, Sol and Terra:
 | [Build a redaction planner](docs/fights/launch-2026-09-07/redaction-plan/README.md) | **175.6s · PASS 5/5** | 391.8s · PASS 5/5 | 600s limit · TIMEOUT, artifact 5/5 | Astra 117.0s · PASS 5/5 |
 | [Repair a retry controller](docs/fights/launch-2026-09-07/retry-budget/README.md) | **141.7s · PASS 5/5** | 445.8s · PASS 5/5 | 562.0s · PASS 5/5 | Astra 137.3s · PASS 5/5 |
 
+Three selection work orders carry one recorded system each so far. A
+single-lane card is an observation, not a comparison, and each one says so:
+
+| Work order | BANTAM · local 27B | Other systems |
+|---|---:|---|
+| [Match paths against globs](docs/fights/launch-2026-09-07/glob-select/README.md) | **264.1s · PASS 5/5** | not yet recorded |
+| [Keep a path inside its workspace](docs/fights/launch-2026-09-07/path-scope/README.md) | **75.1s · PASS 5/5** | not yet recorded |
+| [Resolve a semver range](docs/fights/launch-2026-09-07/semver-range/README.md) | **399.9s · PASS 5/5** | not yet recorded |
+
 Native Claude Code Sonnet, Opus and Fable ran the same work orders as
 [separately recorded references](docs/fights/launch-2026-09-07/references/README.md),
 shown on the gallery page beside BANTAM's own attempts.
@@ -81,8 +90,8 @@ shown on the gallery page beside BANTAM's own attempts.
 [Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md) ·
 [See the native Claude references](docs/fights/launch-2026-09-07/references/README.md)
 
-The first two tasks show measured wins; the stream parser shows a real miss.
-These are individual attempts, not a universal ranking. The cards retain
+The first two tasks show measured wins; the stream parser passes but stays
+2.7× behind Astra. These are individual attempts, not a universal ranking. The cards retain
 partial request-level accounting and separate passing artifacts
 from unfinished runs. Frontier comparisons use a different model; same-model
 comparisons isolate the local weights, not every configuration difference.

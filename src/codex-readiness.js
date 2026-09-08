@@ -3,13 +3,14 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {runProcess} from './process-runner.js';
+import {verifyCompetitorRegistration} from './competitor-registry.js';
 
 export function codexAuthCacheReadable(home=os.homedir()){
  try{const file=path.join(home,'.codex','auth.json');if(!fs.statSync(file).isFile())return false;fs.accessSync(file,fs.constants.R_OK);return true;}
  catch{return false;}
 }
 // Approved offline runtime execution, not an account-validation request.
-export async function checkCodexReadiness({output,out=s=>process.stdout.write(s),requireAuthentication=false},
+export async function checkCodexReadiness({output,out=s=>process.stdout.write(s),requireAuthentication=false,registration=null},
  {run=runProcess,authReadable=codexAuthCacheReadable}={}){
  if(typeof output!=='string'||!path.isAbsolute(output)||fs.existsSync(output))throw Error('Codex readiness needs a fresh absolute evidence directory.');
  const workspace=path.join(output,'workspace'),cids=path.join(output,'containers');
@@ -21,6 +22,11 @@ export async function checkCodexReadiness({output,out=s=>process.stdout.write(s)
   if(requireAuthentication&&!report.authCacheReadable)throw Error('No readable file-backed Codex auth cache for this isolated comparison. Keyring-only/custom-home accounts need another adapter; no login or credential export was attempted.');
   out('  Checking Codex offline (dummy credentials; no account request)…\n');
   const env=Object.fromEntries(['PATH','HOME','USER','LOGNAME','LANG','LC_ALL','TERM','TMPDIR'].filter(k=>process.env[k]!=null).map(k=>[k,process.env[k]]));
+  if(registration){
+   env.ASTRA_CONTAINER_CODEX_EXECUTABLE=verifyCompetitorRegistration(registration);
+   env.ASTRA_CONTAINER_CODEX_SHA256=registration.sha256;
+   report.registration={executable:env.ASTRA_CONTAINER_CODEX_EXECUTABLE,sha256:registration.sha256};
+  }
   report.result=await run(process.execPath,[fileURLToPath(new URL('../scripts/astra-container-cli.mjs',import.meta.url)),'--probe'],{
    cwd:workspace,env:{...env,ASTRA_CONTAINER_CID_DIR:cids},timeoutMs:45000,maxBuffer:1024*1024});
   for(const stream of ['stdout','stderr'])fs.writeFileSync(path.join(output,stream+'.log'),report.result[stream]??'',{mode:0o600});

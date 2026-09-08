@@ -4,8 +4,9 @@ import path from 'node:path';
 import {bantamConfigDirectory} from './config-directory.js';
 import crypto from 'node:crypto';
 
-export const REGISTERABLE_COMPETITORS=['hermes','opencode','deepseek','pi'];
+export const REGISTERABLE_COMPETITORS=['hermes','opencode','deepseek','pi','codex'];
 const candidates={
+ codex:['codex','bin/codex','node_modules/.bin/codex','node_modules/@openai/codex/bin/codex.js','bin/codex.js'],
  pi:['pi','bin/pi','node_modules/.bin/pi','node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js','dist/bundle/cli.js'],
  hermes:['hermes','bin/hermes','.venv/bin/hermes','venv/bin/hermes'],
  opencode:['opencode','bin/opencode','bin/opencode.exe','node_modules/.bin/opencode'],
@@ -19,7 +20,7 @@ export function executablePath(value){
  fs.accessSync(actual,fs.constants.R_OK|fs.constants.X_OK);return actual;
 }
 export function resolveCompetitorInstallation(name,location){
- if(!REGISTERABLE_COMPETITORS.includes(name))throw Error('Path registration currently supports hermes, opencode, deepseek and pi. Other adapters remain separate; no guessed command is run.');
+ if(!REGISTERABLE_COMPETITORS.includes(name))throw Error('Path registration currently supports hermes, opencode, deepseek, pi and codex. Other adapters remain separate; no guessed command is run.');
  if(typeof location!=='string'||!location.trim())throw Error('Supply an executable or installation directory.');
  const input=path.resolve(location);
  if(!fs.statSync(input).isDirectory())return executablePath(input);

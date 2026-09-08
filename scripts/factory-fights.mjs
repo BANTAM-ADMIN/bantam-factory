@@ -66,7 +66,8 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
   }
   const nativeModel=NATIVE_CODEX_MODELS[arm];
   const command=cardCommand(nativeModel?'codex-astra':arm,task,workspace,dir);
-  command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions')};
+  command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions'),
+    ...(arm.includes('codex')&&peerExecutables.codex?{ASTRA_CONTAINER_CODEX_EXECUTABLE:peerExecutables.codex.executable,ASTRA_CONTAINER_CODEX_SHA256:peerExecutables.codex.sha256}:{})};
   if(nativeModel){
     command.args=command.args.filter(a=>a!=='--ephemeral');
     command.args[command.args.indexOf('--model')+1]=nativeModel;
@@ -181,7 +182,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   const plan=fightPlan({arms,cards,kitId,repetitions});
   if(!peerExecutables||typeof peerExecutables!=='object'||Array.isArray(peerExecutables))throw Error('invalid peer executable selections');
   for(const [name,record]of Object.entries(peerExecutables)){
-    if(!['hermes','opencode','deepseek','pi'].includes(name)||!arms.includes(name==='deepseek'?'deepseek-local-27b':name))throw Error('unsupported or unselected peer executable');
+    if(!['hermes','opencode','deepseek','pi','codex'].includes(name)||!(name==='codex'?arms.some(a=>a.includes('codex')):arms.includes(name==='deepseek'?'deepseek-local-27b':name)))throw Error('unsupported or unselected peer executable');
     verifyCompetitorRegistration(record);
   }
   const needsLocal=arms.some(arm=>LOCAL.has(arm));

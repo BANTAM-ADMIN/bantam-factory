@@ -23,6 +23,21 @@ test('Pi registration locates its maintained npm CLI and passes the pinned execu
  assert.equal(command.args[command.args.indexOf('--max-output-tokens')+1],'32768');
 });
 
+test('one Codex registration serves native and factory-wrapped cards even when Codex is off PATH',t=>{
+ const root=temp(t),exe=binary(root,'Codex install/bin/codex'),record=registerCompetitor('codex',path.join(root,'Codex install'),{home:root});
+ const arms=['codex-astra','bantam-codex-astra'],registrations={codex:record};
+ const participants=discoverCardParticipants({find:()=>null,registrations});
+ for(const arm of arms){
+  assert.equal(participants.find(p=>p.id===arm).executable,exe);
+  assert.equal(participants.find(p=>p.id===arm).installed,true);
+  const command=freshCommand({arm,task:'EXACT',workspace:'/tmp/codex-card/ws',dir:'/tmp/codex-card',peerExecutables:registrations});
+  assert.equal(command.env.ASTRA_CONTAINER_CODEX_EXECUTABLE,exe);
+  assert.equal(command.env.ASTRA_CONTAINER_CODEX_SHA256,record.sha256);
+ }
+ const plan=makeCardsPlan({card:'context-packet',arms:arms.join(','),out:path.join(root,'run')},{registrations});
+ assert.equal(plan.peerExecutables.codex.executable,exe);
+});
+
 test('registration resolves explicit executable or bounded folder candidates, never executes them',t=>{
  const root=temp(t),home=path.join(root,'home'),exe=binary(root,'Hermes install/.venv/bin/hermes');
  const record=registerCompetitor('hermes',path.join(root,'Hermes install'),{home});

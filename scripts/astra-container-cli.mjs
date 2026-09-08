@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {nonRootIdentity,identityFiles,discoverPeerTools,linkedLibraries} from '../src/linux-peer-runtime.js';
+import {verifyCompetitorRegistration} from '../src/competitor-registry.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IMAGE = "ubuntu:24.04";
@@ -29,8 +30,9 @@ export function discoverCodexInstallation(selected,{resolvePackage=launcher=>cre
   const binary=path.join(vendor,'bin','codex');fs.accessSync(binary,fs.constants.R_OK|fs.constants.X_OK);
   return {launcher,binary,vendor,packaging:'npm-linux-x64'};
 }
-export function discoverRuntime() {
-  const installation=discoverCodexInstallation(execFileSync('which',['codex'],{encoding:'utf8',timeout:3000}).trim());
+export function discoverRuntime({executable,executableSha256}={}) {
+  const selected=executableSha256?verifyCompetitorRegistration({executable,sha256:executableSha256}):executable;
+  const installation=discoverCodexInstallation(selected??execFileSync('which',['codex'],{encoding:'utf8',timeout:3000}).trim());
   const tools=discoverPeerTools();
   return {
     ...installation,...tools,identity:nonRootIdentity(),libraries:linkedLibraries([...tools.tools,installation.binary]),
@@ -127,7 +129,7 @@ export async function main(args = process.argv.slice(2)) {
   const name = `astra-codex-${process.pid}-${crypto.randomUUID()}`;
   const cidfile = explicitCid || path.join(cidDir, `${name}.cid`);
   if (fs.existsSync(cidfile)) throw new Error("refusing to overwrite an existing CID receipt");
-  const runtime = discoverRuntime();
+  const runtime = discoverRuntime({executable:process.env.ASTRA_CONTAINER_CODEX_EXECUTABLE,executableSha256:process.env.ASTRA_CONTAINER_CODEX_SHA256});
   runtime.control=fs.mkdtempSync(path.join(path.dirname(cidfile),'runtime-'));
   for(const [file,contents]of Object.entries(identityFiles(runtime.identity)))fs.writeFileSync(path.join(runtime.control,file),contents,{flag:'wx',mode:0o600});
   if(probe){

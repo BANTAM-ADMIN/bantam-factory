@@ -57,7 +57,7 @@ bantamfactory cards --register hermes --path /path/to/hermes-install
 bantamfactory cards --check --arms hermes --yes
 ```
 
-Registration also supports `opencode`, `deepseek`, and `pi`. It records an existing
+Registration also supports `opencode`, `deepseek`, `pi`, and `codex`. It records an existing
 installation; it doesn't install competitors. The offline check starts disposable
 containers without making model calls.
 
@@ -65,6 +65,8 @@ For [Pi](https://github.com/earendil-works/pi/tree/main/packages/coding-agent),
 register an npm installation of `@earendil-works/pi-coding-agent`. Pi needs Node
 22.19 or newer; installing `node@22` alongside it supplies a separate runtime.
 The adapter keeps Pi's native tools and session log in a fresh container.
+
+A `codex` registration supplies both native Codex and Codex inside BANTAM FACTORY.
 
 ## Make the comparison count
 

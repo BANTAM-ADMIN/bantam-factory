@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {checkCodexReadiness} from '../src/codex-readiness.js';
 import {factoryCardsCommand} from '../src/factory-cards-command.js';
+import {registerCompetitor} from '../src/competitor-registry.js';
 const temp=t=>{const p=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-codex-ready-'));t.after(()=>fs.rmSync(p,{recursive:true,force:true}));return p;};
 const proof={credentialFixture:true,authReadonly:true,workspaceWrite:true,hostConfigAbsent:true,home:'/home/ubuntu',uid:1234,gid:2345,codex:'fixture-codex'};
 test('Codex readiness proves isolated runtime and cleanup, without handing real credentials to the probe',async t=>{
@@ -17,6 +18,23 @@ test('Codex readiness proves isolated runtime and cleanup, without handing real 
  }});
  assert.equal(report.passed,true);assert.equal(report.authCacheReadable,false);assert.equal(report.realCredentialsMounted,false);
 });
+test('Codex offline readiness uses a registered executable and refuses changed bytes before execution',async t=>{
+ const root=temp(t),exe=path.join(root,'codex');fs.writeFileSync(exe,'#!/bin/sh\nexit 90\n',{mode:0o755});
+ const registration=registerCompetitor('codex',exe,{home:root});let calls=0;
+ const run=async(_exe,_args,options)=>{
+  calls++;
+  assert.equal(options.env.ASTRA_CONTAINER_CODEX_EXECUTABLE,exe);
+  assert.equal(options.env.ASTRA_CONTAINER_CODEX_SHA256,registration.sha256);
+  const runtime=path.join(options.env.ASTRA_CONTAINER_CID_DIR,'runtime-test');fs.mkdirSync(runtime);
+  fs.writeFileSync(path.join(runtime,'cleanup.json'),JSON.stringify({absent:true}));
+  return {code:0,stdout:JSON.stringify(proof),stderr:''};
+ };
+ await checkCodexReadiness({output:path.join(root,'ready'),registration,out:()=>{}},{run,authReadable:()=>false});
+ fs.appendFileSync(exe,'# updated\n');
+ await assert.rejects(checkCodexReadiness({output:path.join(root,'changed'),registration,out:()=>{}},{run,authReadable:()=>false}),/changed/);
+ assert.equal(calls,1);
+});
+
 test('a missing account prerequisite or incomplete proof fails before scoring and retains a report',async t=>{
  let calls=0;const root=temp(t);
  await assert.rejects(checkCodexReadiness({output:path.join(root,'auth'),requireAuthentication:true,out:()=>{}},{authReadable:()=>false,run:()=>{calls++;}}),/file-backed/);

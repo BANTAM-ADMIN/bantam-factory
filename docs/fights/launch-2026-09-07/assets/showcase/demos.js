@@ -310,7 +310,6 @@
     // ---------------------------------------------------------------- self-improvement plan
     improve: {
       title: 'self-improve --plan',
-      caption: 'Output of the plan step on the maintainer\'s checkout on 2026-09-08, trimmed to fit. The plan step calls no model and writes nothing; the observed candidates come from 144 recorded self-host runs.',
       end: 'pass',
       steps: [
         { cmd: './bin/run-dev.sh self-improve --plan', wait: 900 },

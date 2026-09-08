@@ -338,7 +338,7 @@ class Extractor:
                     self.action(payload.get('name', kind), unpack(payload.get('arguments', payload.get('input', payload.get('action')))),
                         output.get('payload', {}).get('output') if output else None,
                         at=record.get('timestamp'), end=output.get('timestamp') if output else None)
-                elif kind == 'message' and payload.get('role') == 'assistant' and payload.get('channel') == 'final':
+                elif kind == 'message' and payload.get('role') == 'assistant' and (payload.get('channel') == 'final' or payload.get('phase') == 'final_answer'):
                     self.final = self.clean(text_content(payload.get('content')))
         return 'codex-native-session'
 

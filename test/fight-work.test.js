@@ -124,3 +124,22 @@ test('every published launch and reference contender has its complete reviewed w
   }
   assert.ok(attempts>0);
 });
+
+test('Codex delivery extraction recognizes final-answer phases without exposing reasoning or commentary', () => {
+  const script=String.raw`
+import importlib.util,json,pathlib,tempfile
+spec=importlib.util.spec_from_file_location('work',pathlib.Path('scripts/fight-work-export.py'))
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as temp:
+ root=pathlib.Path(temp);file=root/'native-sessions/run.jsonl';file.parent.mkdir()
+ for phase in ['final_answer',None]:
+  messages=[{'type':'reasoning','content':[{'type':'text','text':'PRIVATE_REASONING'}]},
+   {'type':'message','role':'assistant','phase':'commentary','content':[{'type':'output_text','text':'Still working'}]},
+   {'type':'message','role':'assistant',**({'phase':phase} if phase else {'channel':'final'}),'content':[{'type':'output_text','text':'Delivered the game'}]}]
+  file.write_text('\n'.join(json.dumps({'type':'response_item','payload':p}) for p in messages))
+  e=m.Extractor(root,{'startedAt':1000},{'kitId':'factory-2026-09-07'},b'{}',root);e.codex()
+  assert e.final=='Delivered the game' and not e.actions
+ print('Codex final delivery verified')
+`;
+  assert.match(execFileSync('python3',['-c',script],{cwd:path.resolve(import.meta.dirname,'..'),encoding:'utf8'}),/Codex final delivery verified/);
+});

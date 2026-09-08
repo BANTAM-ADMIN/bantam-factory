@@ -1890,6 +1890,18 @@ function ensurePrivateScratchDirectory(directory, uid) {
   }
 }
 
+export function shellContainerReceiptArgs(workspace, name, env = process.env) {
+  const configured = env.BANTAM_SHELL_CID_DIR;
+  if (configured === undefined) return [];
+  if (typeof configured !== 'string' || !path.isAbsolute(configured) || !/^bantam-shell-[a-z0-9-]+$/.test(name)) throw Error('invalid shell container receipt configuration');
+  const root = path.resolve(configured), source = fs.realpathSync(workspace);
+  if (fs.realpathSync(root) !== root || !fs.statSync(root).isDirectory() || (fs.statSync(root).mode & 0o077) !== 0
+      || root === source || root.startsWith(source + path.sep) || source.startsWith(root + path.sep)) throw Error('shell receipts require a separate private directory outside the workspace');
+  const file = path.join(root, `${name}.cid`);
+  if (fs.existsSync(file)) throw Error('shell container receipt already exists');
+  return ['--cidfile', file];
+}
+
 function dockerShellRunner(workspace, image, command, {
   network = false,
   envOverrides = {},
@@ -1909,6 +1921,7 @@ function dockerShellRunner(workspace, image, command, {
     args: [
       "run", "--rm", "--pull", "never",
       "--name", name,
+      ...shellContainerReceiptArgs(workspace, name),
       ...(network ? [] : ["--network", "none"]),
       "--read-only",
       "--cap-drop", "ALL",

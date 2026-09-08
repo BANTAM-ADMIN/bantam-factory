@@ -67,3 +67,22 @@ test('cross-lane dependencies wait for actual completion before dispatch', async
   release(); while (q.pending) await q.wait(1000);
   assert.deepEqual(started, ['implementation','review']);
 });
+test('cancel running local job drains it before requeue and leaves the Codex lane running', async () => {
+  const starts = [], signals = {}, releases = {}; let local = 0, peak = 0;
+  const q = new ForemanQueue({ codexWorkers: ['terra'], execute: async (j, deps, signal, progress) => {
+    starts.push(j.id); signals[j.id] = signal;
+    if (j.lane === 'local') { local++; peak = Math.max(peak,local); }
+    progress('test in snapshot is stale');
+    await new Promise(r => { releases[j.id] = r; });
+    if (j.lane === 'local') local--;
+    return { pass: true };
+  } });
+  q.submit([job('old'),{...job('review'),worker:'terra'}]); await Promise.resolve(); await Promise.resolve();
+  assert.equal(q.jobs[0].progress.source,'unverified-worker-output');
+  q.cancel('old'); assert.equal(signals.old.aborted,true); assert.equal(signals.review.aborted,false);
+  q.submit([job('fresh')]); assert.deepEqual(starts,['old','review']);
+  releases.old(); await q.wait(1000); await Promise.resolve();
+  assert.equal(q.jobs[0].status,'cancelled'); assert.deepEqual(starts,['old','review','fresh']);
+  releases.fresh(); releases.review(); while(q.pending) await q.wait(1000);
+  assert.equal(peak,1); assert.equal(q.jobs[1].status,'passed'); assert.equal(q.jobs[2].status,'passed');
+});

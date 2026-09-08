@@ -64,15 +64,18 @@ export async function foremanCommand(args, { cwd = process.cwd(), ask = null, lo
   return result.pass ? 0 : 1;
 }
 
-async function cleanupContainers(directory) {
+export async function cleanupForemanContainers(directory) {
   if (!fs.existsSync(directory)) return;
   for (const file of fs.readdirSync(directory)) {
-    if (!/^astra-codex-[a-z0-9-]+\.cid$/.test(file)) continue;
+    if (!/^(astra-codex|bantam-shell)-[a-z0-9-]+\.cid$/.test(file)) continue;
     const receipt = path.join(directory, file), stat = fs.lstatSync(receipt);
     if (!stat.isFile() || stat.isSymbolicLink()) throw Error('unsafe container receipt');
     const id = fs.readFileSync(receipt, 'utf8').trim();
     if (!/^[a-f0-9]{64}$/.test(id)) throw Error('invalid owned container receipt');
-    const r = await runProcess('docker', ['stop','--time','1',id], { timeoutMs: 10000 });
+    // A killed Docker client can leave a container in Created rather than
+    // Running. `stop` succeeds without removing that state. Remove only this
+    // exact receipt-owned container; candidate bytes live in retained binds.
+    const r = await runProcess('docker', ['rm','--force',id], { timeoutMs: 10000 });
     if (r.code !== 0 && !/No such container/i.test(r.stderr)) throw Error('cannot confirm owned Codex container stopped');
   }
 }
@@ -113,6 +116,18 @@ export function readForemanEvidence(output, id, selector) {
   } finally { fs.closeSync(fd); }
 }
 
+export function foremanWorkerTask(task, job, dependencies) {
+  // Do not flatten transport diagnostics into the product contract. In the
+  // first live trial, `process.aborted:false` in a successful dependency's raw
+  // receipt triggered an unrelated abort-lifecycle audit in a synchronous API.
+  // Full receipts stay in the job evidence; the worker needs completion state
+  // and integrated paths, not token coverage arrays or process-control keys.
+  const outcomes = dependencies.map(j => ({ id: j.id, status: j.status,
+    verified: j.result?.verification?.pass === true, integrated: j.result?.integrated === true,
+    changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null }));
+  return `OVERALL OPERATOR CONTRACT (binding):\n${task}\n\nYOUR BOUNDED JOB:\n${job.task}\n\nSUPERVISOR CONTEXT:\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features.`;
+}
+
 export async function runForeman(plan, { log = () => {} } = {}) {
   const startedAt = new Date().toISOString(), started = Date.now(), ac = new AbortController();
   const modelIdentity = await inspectLocalModel(plan.endpoint);
@@ -132,16 +147,16 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   const runToken = supervisor.beginRun(), timer = setTimeout(() => ac.abort(), Math.max(1, plan.timeoutMs - (Date.now() - started)));
   const stop = () => ac.abort(); process.once('SIGINT', stop); process.once('SIGTERM', stop);
   const remaining = () => Math.max(1, plan.timeoutMs - (Date.now() - started));
-  const check = async (ws, command) => runShellProcess(ws, command, { shellSandbox: 'docker', shellNetwork: false, workspaceReadOnly: true, timeoutMs: Math.min(60000, remaining()), signal: ac.signal });
-  const execute = async (job, dependencies) => {
+  const check = async (ws, command, signal = ac.signal) => runShellProcess(ws, command, { shellSandbox: 'docker', shellNetwork: false, workspaceReadOnly: true, timeoutMs: Math.min(60000, remaining()), signal });
+  const execute = async (job, dependencies, signal, progress) => {
     const dir = path.join(plan.output, 'jobs', job.id); fs.mkdirSync(dir, { recursive: true });
     const snapshot = store.capture(candidate, { message: `dispatch ${job.id}` });
     const ws = path.join(dir, 'ws'), before = path.join(dir, 'baseline');
     store.materialize(snapshot.commit, ws); store.materialize(snapshot.commit, before);
-    const task = `OVERALL OPERATOR CONTRACT (binding):\n${plan.task}\n\nYOUR BOUNDED JOB:\n${job.task}\n\nSUPERVISOR CONTEXT:\n${job.context}\n\nACTUAL DEPENDENCY EVIDENCE:\n${JSON.stringify(dependencies.map(j => ({ id: j.id, result: j.result })))}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features.`;
+    const task = foremanWorkerTask(plan.task, job, dependencies);
     fs.writeFileSync(path.join(dir, 'task.md'), task, { mode: 0o600 });
-    const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids); fs.mkdirSync(sessions);
-    let recorder = null, result, usage = null, settlement = null;
+    const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids, { mode: 0o700 }); fs.mkdirSync(sessions, { mode: 0o700 });
+    let recorder = null, result, usage = null, settlement = null, lastProgress = 0, outputTail = '';
     try {
       let command;
       if (job.worker === 'local') {
@@ -157,20 +172,27 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       }
       write(path.join(dir, 'command.json'), command);
       result = await runProcess(command.exe, command.args, { cwd: ws, env: cleanFightEnv({ ...command.env,
-        BANTAM_CONFIG_DIR: path.join(dir, 'config'), ASTRA_CONTAINER_CID_DIR: cids, ASTRA_CONTAINER_SESSION_DIR: sessions,
-        ASTRA_CONTAINER_TIMEOUT_SECONDS: String(Math.max(1, Math.ceil(remaining() / 1000))) }), timeoutMs: remaining(), signal: ac.signal, maxBuffer: 32 * 1024 * 1024,
-        onOutput: ({ stream, text }) => fs.appendFileSync(path.join(dir, `${stream}.log`), text, { mode: 0o600 }) });
+        BANTAM_CONFIG_DIR: path.join(dir, 'config'), BANTAM_SHELL_CID_DIR: cids, ASTRA_CONTAINER_CID_DIR: cids, ASTRA_CONTAINER_SESSION_DIR: sessions,
+        ASTRA_CONTAINER_TIMEOUT_SECONDS: String(Math.max(1, Math.ceil(remaining() / 1000))) }), timeoutMs: remaining(), signal, maxBuffer: 32 * 1024 * 1024,
+        onOutput: ({ stream, text }) => {
+          fs.appendFileSync(path.join(dir, `${stream}.log`), text, { mode: 0o600 });
+          outputTail = (outputTail + text).slice(-2000);
+          if (Date.now() - lastProgress >= 1000) { progress(outputTail); lastProgress = Date.now(); }
+        } });
     } finally {
       if (recorder) { usage = await recorder.close(); settlement = await settleServerCounters(plan.endpoint); write(path.join(dir, 'settlement.json'), settlement); if (settlement.observedBusy && !settlement.settled) ac.abort(); }
-      await cleanupContainers(cids);
+      try { await cleanupForemanContainers(cids); } catch (error) { ac.abort(); throw error; }
     }
-    if (job.worker !== 'local') usage = codexSessionUsage(sessions);
+    if (job.worker !== 'local') {
+      usage = codexSessionUsage(sessions);
+      if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'native process did not complete; recorded responses may omit in-flight usage' };
+    }
     const accepted = job.worker !== 'local' || acceptedBantamCompletion(readJson(path.join(dir, 'run.json')));
-    const checked = await check(ws, job.verify); write(path.join(dir, 'verification.json'), checked);
+    const checked = await check(ws, job.verify, signal); write(path.join(dir, 'verification.json'), checked);
     const verification = brief(checked);
     const record = { pass: clean(result) && accepted && verification.pass, acceptedCompletion: accepted, verification, usage, integrated: false, snapshot: snapshot.commit,
       process: { code: result.code, timedOut: Boolean(result.timedOut), aborted: Boolean(result.aborted), bufferExceeded: Boolean(result.bufferExceeded) } };
-    if (record.pass && !ac.signal.aborted) {
+    if (record.pass && !signal.aborted && !ac.signal.aborted) {
       // Capture immutable candidate bytes before transaction planning. Every
       // integration below is synchronous, so the two worker completions cannot
       // interleave their shared-candidate writes.
@@ -180,7 +202,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
         record.integrated = true;
       } catch (error) { record.pass = false; record.conflict = error.message; }
     }
-    if (ac.signal.aborted) record.pass = false;
+    if (signal.aborted || ac.signal.aborted) record.pass = false;
     write(path.join(dir, 'result.json'), record); return record;
   };
   const safeFile = relative => {
@@ -208,7 +230,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       verify: async () => { const r = await check(candidate, plan.verify); write(path.join(plan.output, 'final-verification.json'), r); return brief(r); }, emit, signal: ac.signal });
   } finally {
     ac.abort(); clearTimeout(timer); process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
-    supervisor.endRun(runToken); supervisor.close(); await cleanupContainers(supervisorCids);
+    supervisor.endRun(runToken); supervisor.close(); await cleanupForemanContainers(supervisorCids);
   }
   const sourceUnchanged = store.treeForWorkspace(plan.workspace, { excludePaths: [plan.output] }).tree === baseline.tree;
   const wallMs = Date.now() - started;

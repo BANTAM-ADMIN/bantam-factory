@@ -26,8 +26,15 @@ runtimes. Omit `--with-codex` to authorize only Astra and local BANTAM.
 Astra can enqueue up to eight jobs at once and continue reading files, reviewing
 results or planning while workers execute. Dependencies name earlier jobs;
 failed dependencies block downstream jobs. The supervisor can cancel queued
-work and submit repairs. Each dispatch includes the original task, the job's
+or running work and submit repairs. A cancelled running job retains its slot
+until cleanup finishes; cancelled candidates are never integrated. Bounded live
+output is marked unverified and lets Astra notice stale work before completion.
+Each dispatch includes the original task, the job's
 specific context/verification contract and actual dependency results.
+Dependency context contains verified/integrated outcomes and changed paths,
+not raw transport flags that could be misread as product requirements. Full
+receipts remain available separately. Snapshots do not update while a worker
+runs: when a prerequisite changes, cancel and redispatch against the new state.
 
 The supervisor is instructed to investigate context/process causes first using
 the actual worker trace, not to assume every failure proves weak reasoning.
@@ -69,7 +76,7 @@ Default limits: 600 seconds total, 12 admitted jobs, 40 supervisor decisions,
 500,000 observed supervisor input+output tokens (including cached input). The token limit is checked
 between supervisor calls: it can overshoot by one response and is not a provider
 spending cap or a worker token cap. The shared deadline bounds workers as well.
-Ctrl-C cancels the run; queued work is cancelled and owned Codex containers are
+Ctrl-C cancels the run; queued work is cancelled and owned Codex/shell containers are
 cleaned up. No automatic resume or publication is provided.
 
 Benchmark this as a separate hybrid contender against ordinary local BANTAM

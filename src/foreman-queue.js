@@ -8,7 +8,7 @@ export class ForemanQueue {
     if (!Array.isArray(codexWorkers) || codexWorkers.some(w => !['astra','sol','terra'].includes(w)) || new Set(codexWorkers).size !== codexWorkers.length) throw Error('invalid Codex worker allowlist');
     this.execute = execute; this.maxJobs = maxJobs; this.signal = signal; this.emit = emit;
     this.workers = new Set(['local', ...codexWorkers]);
-    this.jobs = []; this.active = new Map(); this.waiters = new Set(); this.closed = false;
+    this.jobs = []; this.active = new Map(); this.controls = new Map(); this.waiters = new Set(); this.closed = false;
   }
   submit(batch) {
     if (this.closed || this.signal?.aborted) throw Error('queue closed');
@@ -31,7 +31,10 @@ export class ForemanQueue {
   snapshot() { return structuredClone(this.jobs); }
   cancel(id) {
     const job = this.jobs.find(j => j.id === id);
-    if (!job || job.status !== 'queued') throw Error('only queued jobs can be cancelled');
+    if (!job || !['queued','running'].includes(job.status)) throw Error('only queued or running jobs can be cancelled');
+    if (job.status === 'running') {
+      job.cancelRequested = true; this.emit('job.cancel-requested', { id }); this.controls.get(id)?.abort(); return;
+    }
     job.status = 'cancelled'; job.finishedAt = Date.now(); this.emit('job.cancelled', { id }); this.pump();
   }
   pump() {
@@ -44,11 +47,23 @@ export class ForemanQueue {
       if (deps.some(j => j.status !== 'passed')) continue;
       if (this.active.has(job.lane)) continue;
       job.status = 'running'; job.startedAt = Date.now(); this.emit('job.started', { id: job.id, worker: job.worker, lane: job.lane, startedAt: job.startedAt });
+      const control = new AbortController(), abort = () => control.abort();
+      this.controls.set(job.id, control); this.signal?.addEventListener('abort', abort, { once: true });
+      if (this.signal?.aborted) abort();
+      const progress = value => {
+        if (job.status !== 'running' || control.signal.aborted) return;
+        job.progress = { at: Date.now(), source: 'unverified-worker-output', text: String(value).slice(-2000) };
+        this.emit('job.progress', { id: job.id, ...job.progress });
+      };
       // Defer execution so active is installed even for a synchronous test executor.
-      const running = Promise.resolve().then(() => this.execute(structuredClone(job), structuredClone(deps), this.signal))
-        .then(result => { job.result = result; job.status = result?.pass === true ? 'passed' : 'failed'; },
-          error => { job.status = 'failed'; job.result = { pass: false, error: String(error?.message ?? error) }; })
+      const running = Promise.resolve().then(() => {
+        if (control.signal.aborted) throw Error('job cancelled before execution');
+        return this.execute(structuredClone(job), structuredClone(deps), control.signal, progress);
+      })
+        .then(result => { job.result = result; job.status = control.signal.aborted ? 'cancelled' : result?.pass === true ? 'passed' : 'failed'; },
+          error => { job.status = control.signal.aborted ? 'cancelled' : 'failed'; job.result = { pass: false, error: String(error?.message ?? error) }; })
         .finally(() => {
+          this.signal?.removeEventListener('abort', abort); this.controls.delete(job.id);
           job.finishedAt = Date.now(); job.wallMs = job.finishedAt - job.startedAt;
           this.emit('job.finished', structuredClone(job)); this.active.delete(job.lane);
           this.changed(); this.pump();

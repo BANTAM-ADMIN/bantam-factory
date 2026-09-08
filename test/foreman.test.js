@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, integrateForemanCandidate, readForemanEvidence } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask } from '../src/foreman.js';
+import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
+import { shellContainerReceiptArgs } from '../src/executor.js';
 const usage = { inputTokens: 100, outputTokens: 10, cachedInputTokens: 80 };
 const action = (kind, fields = {}) => ({ action: kind, jobs: [], target: '', text: '', ...fields });
 const job = (id, worker = 'local') => ({ id, worker, task: 'build the module', context: 'preserve the API contract', verify: 'npm test', dependsOn: [] });
@@ -16,10 +18,21 @@ test('the model sees the same job ID rule as the queue validates', () => {
   assert.match(FOREMAN_INSTRUCTIONS, /no underscores/);
 });
 test('routine queue context omits detailed usage receipts and full verification logs without deleting evidence', () => {
-  const row = { id:'j1',worker:'local',status:'passed',dependsOn:[],queuedAt:1,result:{pass:true,usage:{inputTokens:20,calls:[{privateReceipt:'do not replay'}]},verification:{pass:true,code:0,stdout:'x'.repeat(20000),stderr:''}} };
+  const row = { id:'j1',worker:'local',status:'failed',dependsOn:[],queuedAt:1,result:{pass:false,usage:{inputTokens:20,calls:[{privateReceipt:'do not replay'}]},verification:{pass:false,code:1,stdout:'x'.repeat(20000),stderr:''}} };
   const summary = summarizeJobs({ snapshot: () => structuredClone([row]) });
   assert.equal(summary[0].result.usage.inputTokens,20); assert.equal(summary[0].result.usage.calls,undefined);
   assert.equal(summary[0].result.verification.stdoutTail.length,2000); assert.equal(row.result.verification.stdout.length,20000);
+});
+test('dependency process metadata cannot manufacture product lifecycle obligations', () => {
+  const task = 'Implement synchronous packContext. Include required sections in original input order. Invalid input throws an Error.';
+  const dependency = { id:'previous',status:'passed',result:{verification:{pass:true},integrated:true,changedFiles:['context-packet.js'],process:{aborted:false},usage:{calls:[{receipt:'retain privately'}]}} };
+  assert.ok(deriveCompletionContext({ task: task + JSON.stringify(dependency) }), 'reproduces the observed metadata contamination');
+  const prompt = foremanWorkerTask(task,job('repair'),[dependency]);
+  assert.equal(deriveCompletionContext({ task: prompt }),null);
+  assert.doesNotMatch(prompt,/"aborted"|retain privately/); assert.match(prompt,/"integrated":true/);
+  assert.equal(dependency.result.process.aborted,false);
+  const genuine = foremanWorkerTask('Run an abortable batch with one result per input. Each worker may throw. Stop starting work when the AbortSignal aborts and remove the abort listener before resolving.',job('batch'),[]);
+  assert.ok(deriveCompletionContext({task:genuine}), 'genuine lifecycle requirements remain active');
 });
 test('two-lane supervisor drives real queue, retains evidence, and cannot finish while workers run', async () => {
   const m = model([action('enqueue', { jobs: [job('local'), job('cloud','terra')] }), action('finish'), action('wait'), action('wait'), action('finish')]);
@@ -86,4 +99,14 @@ test('worker context evidence is paginated without losing Unicode, and cannot es
   assert.throws(() => readForemanEvidence(output,'example', '{"file":"../../secret"}'));
   fs.symlinkSync(path.join(output,'secret'),path.join(dir,'run.json')); fs.writeFileSync(path.join(output,'secret'),'private');
   assert.throws(() => readForemanEvidence(output,'example','{"file":"run.json"}'));
+});
+test('worker shell receipts identify exact owned containers outside model-writable workspaces', t => {
+  const root = fixture(t), ws = path.join(root,'ws'), receipts = path.join(root,'receipts');
+  fs.mkdirSync(ws); fs.mkdirSync(receipts,{mode:0o700});
+  assert.deepEqual(shellContainerReceiptArgs(ws,'bantam-shell-123',{}),[]);
+  assert.deepEqual(shellContainerReceiptArgs(ws,'bantam-shell-123',{BANTAM_SHELL_CID_DIR:receipts}),['--cidfile',path.join(receipts,'bantam-shell-123.cid')]);
+  assert.throws(()=>shellContainerReceiptArgs(ws,'bantam-shell-123',{BANTAM_SHELL_CID_DIR:ws}));
+  fs.writeFileSync(path.join(receipts,'bantam-shell-123.cid'),'owned');
+  assert.throws(()=>shellContainerReceiptArgs(ws,'bantam-shell-123',{BANTAM_SHELL_CID_DIR:receipts}));
+  assert.throws(()=>shellContainerReceiptArgs(ws,'../not-owned',{BANTAM_SHELL_CID_DIR:receipts}));
 });

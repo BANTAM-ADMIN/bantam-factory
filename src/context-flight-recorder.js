@@ -157,6 +157,12 @@ function decisionRecord({ turn, position, callIndex, prompt, previous }) {
       `${priorOutcome.transform.decisiveLinesDropped} decisive raw-observation line(s) were removed by the observation transform.`,
     ));
   }
+  if (priorOutcome?.guidanceResidency?.missing) {
+    risks.push(risk(
+      "guidance-block-clipped",
+      `${priorOutcome.guidanceResidency.missing}/${priorOutcome.guidanceResidency.blocks} guidance block(s) that must survive whole were clipped out of this prompt.`,
+    ));
+  }
   if (priorOutcome?.controllerEvidence.missing) {
     risks.push(risk(
       "prior-controller-evidence-missing",
@@ -264,6 +270,7 @@ function outcomeResidency(turn, prompt) {
       missingSamples: missing.slice(0, 5).map((line) => bounded(line, 240)),
     },
     controllerEvidence: controllerEvidenceReport(controllerEvidence, prompt),
+    guidanceResidency: wholeBlockResidency(delivered, prompt),
   };
 }
 
@@ -291,6 +298,38 @@ function outcomeResidency(turn, prompt) {
 // Compare a decisive prefix instead. 200 characters is well inside the head
 // budget, so any head-preserved block passes, and long enough that a block
 // genuinely dropped cannot match by accident.
+// Some annotations are authored guidance that prompt.js preserves whole rather
+// than head-clipping, because their payload is not quoted tool output. For
+// those the head check above proves nothing: the head always survives, so a
+// deleted body reports clean. Measured 2026-09-08 on ansi-wrap turn 7, where a
+// 6,969-character deletion registered as delivered.chars === raw.chars and
+// controllerEvidence.missing === 0. Check them whole.
+const WHOLE_BLOCK_HEAD = /^\[requirement-checklist\b/i;
+
+/** Guidance blocks that must reach the prompt intact, and whether they did. */
+function wholeBlockResidency(observation, prompt) {
+  const text = String(observation ?? "");
+  if (!text) return { blocks: 0, missing: 0, missingSamples: [] };
+  const lines = text.split("\n");
+  const blocks = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!WHOLE_BLOCK_HEAD.test(lines[i])) continue;
+    let end = i + 1;
+    while (end < lines.length && !CONTROLLER_BLOCK_HEAD.test(lines[end])) end++;
+    blocks.push(lines.slice(i, end).join("\n").trim());
+    i = end - 1;
+  }
+  if (!blocks.length) return { blocks: 0, missing: 0, missingSamples: [] };
+  const resident = (block) => typeof prompt === "string"
+    && block.split("\n").every((line) => line.trim() === "" || prompt.includes(line.trim()));
+  const missing = blocks.filter((block) => !resident(block));
+  return {
+    blocks: blocks.length,
+    missing: missing.length,
+    missingSamples: missing.slice(0, 3).map((block) => bounded(block, 240)),
+  };
+}
+
 function controllerEvidenceReport(suffix, prompt) {
   const text = String(suffix ?? "");
   if (!text) return { present: false, chars: 0, sha256: null, blocks: 0, missing: 0, missingSamples: [] };
@@ -320,7 +359,7 @@ function controllerEvidenceReport(suffix, prompt) {
   };
 }
 
-const CONTROLLER_BLOCK_HEAD = /^\[(?:auto-verify|scoped-verify|completion-audit|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|open_files|peer|cross-file|implementation-response|done-gate)\b/i;
+const CONTROLLER_BLOCK_HEAD = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|open_files|peer|cross-file|implementation-response|done-gate)\b/i;
 
 function parseOpenFilesBlock(block) {
   const text = String(block ?? "");

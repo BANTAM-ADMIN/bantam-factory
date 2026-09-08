@@ -1,6 +1,6 @@
 // Public receipts for contenders recorded after a card's original run window.
 // Only fixed identities, hashes, dates and numeric conditions can cross here.
-const ARMS = new Set(['deepseek-local-27b', 'hermes', 'opencode']);
+const ARMS = new Set(['deepseek-local-27b', 'hermes', 'opencode', 'pi']);
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const date = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
   && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;

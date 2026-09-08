@@ -40,6 +40,7 @@ Available contender IDs include:
 | --- | --- |
 | BANTAM FACTORY with your local model | `bantam-local-27b` |
 | Hermes / OpenCode | `hermes` / `opencode` |
+| Pi with the local model | `pi` |
 | DeepSeek Harness with the local model | `deepseek-local-27b` |
 | Native Codex | `codex-astra`, `codex-sol`, `codex-terra` |
 | Codex inside BANTAM FACTORY | `bantam-codex-astra` |
@@ -56,9 +57,14 @@ bantamfactory cards --register hermes --path /path/to/hermes-install
 bantamfactory cards --check --arms hermes --yes
 ```
 
-Registration also supports `opencode` and `deepseek`. It records an existing
+Registration also supports `opencode`, `deepseek`, and `pi`. It records an existing
 installation; it doesn't install competitors. The offline check starts disposable
 containers without making model calls.
+
+For [Pi](https://github.com/earendil-works/pi/tree/main/packages/coding-agent),
+register an npm installation of `@earendil-works/pi-coding-agent`. Pi needs Node
+22.19 or newer; installing `node@22` alongside it supplies a separate runtime.
+The adapter keeps Pi's native tools and session log in a fresh container.
 
 ## Make the comparison count
 

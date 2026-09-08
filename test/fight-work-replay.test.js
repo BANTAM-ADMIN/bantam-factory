@@ -23,6 +23,11 @@ test('terminal replay separates a request from its response and retains post-run
   assert.doesNotMatch(visible(100),/TEST OUTPUT|All groups passed|Delivered/);
 });
 
+test('Pi replay identifies recorder receipt times for both requests and responses',()=>{
+  const events=workReplayEvents(work({actions:[action({source:'native-tool-receipt'})]}));
+  assert.deepEqual(events.filter(e=>e.id.startsWith('action-')).map(e=>[e.atMs,e.precision]),[[100,'observed'],[600,'observed']]);
+});
+
 test('factory responses use an explicitly labelled next-turn bound when tool completion was not timestamped',()=>{
   const events=workReplayEvents(work({actions:[
     action({source:'factory-turn',turn:0,endedMs:null}),

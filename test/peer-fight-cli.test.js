@@ -168,7 +168,7 @@ test('candidate and evidence must be disjoint even through symlink ancestors; ex
 
 // Explicit opt-in: uses the installed native tools in Docker against this
 // scripted server only. It never calls the real local model or scores a bench.
-for (const arm of ['opencode', 'hermes']) for (const maxOutputTokens of [8192, 32768]) test(`${arm}: isolated native CLI executes a real file tool using a scripted recording endpoint (${maxOutputTokens} output)`, { skip: process.env.BANTAM_PEER_DOCKER_TEST !== '1', timeout: 120000 }, async t => {
+for (const arm of ['opencode', 'hermes', 'pi']) for (const maxOutputTokens of [8192, 32768]) test(`${arm}: isolated native CLI executes a real file tool using a scripted recording endpoint (${maxOutputTokens} output)`, { skip: process.env.BANTAM_PEER_DOCKER_TEST !== '1', timeout: 120000 }, async t => {
   const arena = fs.mkdtempSync(path.join(root, '.bantam/arenas/peer-scripted-'));
   const workspace = path.join(arena, 'candidate'), taskFile = path.join(arena, 'task.txt');
   fs.mkdirSync(workspace);
@@ -187,7 +187,7 @@ for (const arm of ['opencode', 'hermes']) for (const maxOutputTokens of [8192, 3
     if (!req.url.endsWith('/chat/completions') || requests.length > 12) { res.writeHead(400); res.end('unexpected scripted request'); return; }
     const hasResult = body.messages?.some(message => message.role === 'tool');
     const writer = body.tools?.find(tool => ['write', 'write_file'].includes(tool.function?.name));
-    const call = !hasResult && writer ? { id: 'call_scripted_write_1', type: 'function', function: { name: writer.function.name, arguments: JSON.stringify(writer.function.name === 'write' ? { filePath: '/workspace/native-smoke.txt', content: 'peer adapter smoke passed\n' } : { path: '/workspace/native-smoke.txt', content: 'peer adapter smoke passed\n' }) } } : null;
+    const call = !hasResult && writer ? { id: 'call_scripted_write_1', type: 'function', function: { name: writer.function.name, arguments: JSON.stringify(writer.function.parameters?.properties?.filePath ? { filePath: '/workspace/native-smoke.txt', content: 'peer adapter smoke passed\n' } : { path: '/workspace/native-smoke.txt', content: 'peer adapter smoke passed\n' }) } } : null;
     const usage = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, prompt_tokens_details: { cached_tokens: 0 } };
     const common = { id: `chatcmpl-scripted-${requests.length}`, created: Math.floor(Date.now() / 1000), model };
     if (body.stream) {
@@ -205,7 +205,8 @@ for (const arm of ['opencode', 'hermes']) for (const maxOutputTokens of [8192, 3
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); });
   const endpoint = `http://127.0.0.1:${server.address().port}/recorded/local/v1`;
-  const result = await runPeer({ arm, workspace, taskFile, output: path.join(arena, 'native-output'), endpoint, model, timeoutSeconds: 60, maxOutputTokens, probe: false });
+  const result = await runPeer({ arm, workspace, taskFile, output: path.join(arena, 'native-output'), endpoint, model, timeoutSeconds: 60, maxOutputTokens, probe: false,
+    ...(arm === 'pi' && process.env.BANTAM_PI_TEST_EXECUTABLE ? { executable: process.env.BANTAM_PI_TEST_EXECUTABLE } : {}) });
   t.diagnostic(`Scripted-only native evidence retained: ${arena}`);
   assert.equal(result.code, 0, `${arm} native launch failed; see ${arena}`);
   assert.equal(result.cleanup.absent, true);
@@ -223,4 +224,27 @@ for (const arm of ['opencode', 'hermes']) for (const maxOutputTokens of [8192, 3
     assert.ok(fs.existsSync(path.join(arena, 'native-output/native/usage.json')));
     assert.equal(JSON.parse(fs.readFileSync(path.join(arena, 'native-output/native/provider-check.json'))).maxOutputTokens, maxOutputTokens);
   }
+  if (arm === 'pi') {
+    assert.ok(completions.every(r => r.body.chat_template_kwargs?.enable_thinking === true && r.body.chat_template_kwargs?.preserve_thinking === true));
+    assert.ok(completions.every(r => !Object.hasOwn(r.body, 'reasoning_effort') && !Object.hasOwn(r.body, 'store')));
+    const journal = fs.readFileSync(path.join(arena, 'native-output/native/pi-events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    assert.ok(journal.every(chunk => Number.isFinite(Date.parse(chunk.at)) && typeof chunk.text === 'string'));
+    const events = journal.map(chunk => chunk.text).join('').trim().split('\n').map(JSON.parse);
+    assert.equal(events.filter(e => e.type === 'tool_execution_start').length, 1);
+    assert.equal(events.filter(e => e.type === 'tool_execution_end' && !e.isError).length, 1);
+    assert.ok(fs.readdirSync(path.join(arena, 'native-output/native/pi/sessions')).some(name => name.endsWith('.jsonl')));
+  }
+});
+
+test('Pi config and mounts use the explicit recorder, combined output cap and isolated agent state', () => {
+  const config = nativeConfig({ ...base, arm: 'pi', maxOutputTokens: 32768 });
+  assert.equal(config.providers.local.baseUrl, base.endpoint);
+  assert.equal(config.providers.local.models[0].id, base.model);
+  assert.equal(config.providers.local.models[0].maxTokens, 32768);
+  assert.equal(config.providers.local.models[0].contextWindow, 65536);
+  assert.equal(parseOptions(argumentsFor({ ...base, arm: 'pi' })).arm, 'pi');
+  const args = docker({ ...base, arm: 'pi' });
+  assert.ok(values(args, '--mount').includes('type=bind,src=/tmp/peer-test/output/control/native-config.json,dst=/state/pi/models.json,readonly'));
+  assert.ok(values(args, '--env').includes('PI_CODING_AGENT_DIR=/state/pi'));
+  assert.ok(values(args, '--env').includes('PI_OFFLINE=1'));
 });

@@ -25,6 +25,7 @@ const SYSTEMS={
   'bantam-local-27b':['BANTAM · 27B','local','Qwen 27B · same local weights'],
   'deepseek-local-27b':['DeepSeek Harness','local','Qwen 27B · same local weights'],
   opencode:['OpenCode','local','Qwen 27B · same local weights'],
+  pi:['Pi','local','Qwen 27B · same local weights'],
   hermes:['Hermes','local','Qwen 27B · same local weights'],
   'codex-astra':['Codex · Astra','astra','GPT-6 Astra · native CLI'],
   // Historical family key 'astra' is the frontier display bucket, not a model ID.

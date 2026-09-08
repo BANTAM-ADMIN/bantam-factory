@@ -16,8 +16,10 @@ const ARMS=Object.freeze([
   ['hermes','Hermes','same local model'],
   ['opencode','OpenCode','same local model'],
   ['deepseek-local-27b','DeepSeek Harness','same local model'],
+  ['pi','Pi','same local model'],
   ['codex-astra','Codex','GPT-6 Astra, cloud'],
 ]);
+const showcaseArms=data=>ARMS.filter(([arm])=>arm!=='pi'||data.cards.some(c=>c.rows?.some(r=>r.arm==='pi')));
 function read(name){
   const file=new URL(name,ROOT),stat=fs.lstatSync(file);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size>1024*1024)throw Error('Expected bounded showcase source');
@@ -35,7 +37,7 @@ export function showcaseRows(data){
   return data.cards.filter(c=>c.recorded).map(card=>{
     const metadata=PUBLIC_FACTORY_CARDS[card.id];
     if(!metadata)throw Error('Unrecognized showcase card');
-    return {...metadata,id:card.id,rows:ARMS.map(([arm,label,model])=>{
+    return {...metadata,id:card.id,rows:showcaseArms(data).map(([arm,label,model])=>{
       const row=card.rows.find(r=>r.arm===arm);
       return row?{...row,arm,label,model:row.model}:null;
     })};
@@ -51,7 +53,7 @@ export function renderShowcaseResults(data){
     const hash=new URLSearchParams({card:id,view:'results',layout:'compare',left:'bantam-local-27b',right:row.arm==='bantam-local-27b'?'hermes':row.arm});
     return `<td class="${row.arm==='bantam-local-27b'?'bantam-result':row.passed?'complete':'miss'}" data-arm="${row.arm}"><a href="${id}/share/index.html#${E(hash)}">${seconds(row.wallMs)}<small>${E(outcome+checks)}</small></a></td>`;
   };
-  return `<p>${cards.length} recorded jobs. The same work order, starting files, and independent checks for each contender. Local contenders use the same Qwen 27B weights; Codex uses GPT-6 Astra through its own CLI. Open any result for the complete record.</p><div class="table-wrap" tabindex="0" role="region" aria-label="Recorded fight results; scroll horizontally on small screens"><table class="results"><caption class="sr-only">Recorded outcomes and wall time by work order and harness</caption><thead><tr><th scope="col">Job</th>${ARMS.map(([,label,model])=>`<th scope="col">${label}<span>${model}</span></th>`).join('')}</tr></thead><tbody>${cards.map(card=>`<tr data-card="${card.id}"><th scope="row" class="job"><a href="${card.id}/share/index.html">${E(card.title)}</a><span class="kind">${E(card.kind)}</span></th>${card.rows.map(row=>cell(row,card.id)).join('')}</tr>`).join('')}</tbody></table></div><p class="fine">Times are wall clock. “Output only” means the files passed the checks, but the attempt did not complete within the recorded limit. Missing attempts are marked “Not run yet.”</p>`;
+  return `<p>${cards.length} recorded jobs. The same work order, starting files, and independent checks for each contender. Local contenders use the same Qwen 27B weights; Codex uses GPT-6 Astra through its own CLI. Open any result for the complete record.</p><div class="table-wrap" tabindex="0" role="region" aria-label="Recorded fight results; scroll horizontally on small screens"><table class="results"><caption class="sr-only">Recorded outcomes and wall time by work order and harness</caption><thead><tr><th scope="col">Job</th>${showcaseArms(data).map(([,label,model])=>`<th scope="col">${label}<span>${model}</span></th>`).join('')}</tr></thead><tbody>${cards.map(card=>`<tr data-card="${card.id}"><th scope="row" class="job"><a href="${card.id}/share/index.html">${E(card.title)}</a><span class="kind">${E(card.kind)}</span></th>${card.rows.map(row=>cell(row,card.id)).join('')}</tr>`).join('')}</tbody></table></div><p class="fine">Times are wall clock. “Output only” means the files passed the checks, but the attempt did not complete within the recorded limit. Missing attempts are marked “Not run yet.”</p>`;
 }
 export function renderShowcaseSpeeds(data){
   const rows=data.cards.filter(c=>c.recorded).flatMap(c=>c.rows);

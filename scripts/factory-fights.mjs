@@ -21,9 +21,9 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
 export const DEFAULT_FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 export const NATIVE_CODEX_MODELS=Object.freeze({'codex-astra':'gpt-6-astra','codex-sol':'gpt-5.6-sol','codex-terra':'gpt-5.6-terra'});
-export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
+export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
-const LOCAL=new Set(FIGHT_ARMS.slice(0,4));
+const LOCAL=new Set([...FIGHT_ARMS.slice(0,4),'pi']);
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const write=(file,data)=>fs.writeFileSync(file,JSON.stringify(data,null,2)+'\n',{mode:0o600});
 const quote=text=>`'${String(text).replace(/'/g,"'\\''")}'`;
@@ -57,7 +57,7 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
   if(arm.startsWith('claude-'))return {exe:process.execPath,args:[path.join(ROOT,'scripts/claude-fight-cli.mjs'),
     '--workspace',workspace,'--output',path.join(dir,'native'),'--task-file',path.join(dir,'task.md'),
     '--model',arm.slice('claude-'.length),'--timeout-seconds',String(Math.ceil(timeoutMs/1000))],env:{}};
-  if(['deepseek-local-27b','opencode','hermes'].includes(arm)) {
+  if(['deepseek-local-27b','opencode','hermes','pi'].includes(arm)) {
     return {exe:process.execPath,args:[path.join(ROOT,'scripts',arm==='deepseek-local-27b'?'deepseek-fight-cli.mjs':'peer-fight-cli.mjs'),
       ...(arm==='deepseek-local-27b'?[]:['--arm',arm]),'--workspace',workspace,'--task-file',path.join(dir,'task.md'),
       '--output',path.join(dir,'native'),'--endpoint',endpoint,'--model',model,'--timeout-seconds',String(Math.ceil(timeoutMs/1000)),
@@ -181,7 +181,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   const plan=fightPlan({arms,cards,kitId,repetitions});
   if(!peerExecutables||typeof peerExecutables!=='object'||Array.isArray(peerExecutables))throw Error('invalid peer executable selections');
   for(const [name,record]of Object.entries(peerExecutables)){
-    if(!['hermes','opencode','deepseek'].includes(name)||!arms.includes(name==='deepseek'?'deepseek-local-27b':name))throw Error('unsupported or unselected peer executable');
+    if(!['hermes','opencode','deepseek','pi'].includes(name)||!arms.includes(name==='deepseek'?'deepseek-local-27b':name))throw Error('unsupported or unselected peer executable');
     verifyCompetitorRegistration(record);
   }
   const needsLocal=arms.some(arm=>LOCAL.has(arm));

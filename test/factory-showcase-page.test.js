@@ -22,6 +22,14 @@ test('front-page results use recorded times and outcomes, and missing competitor
   assert.doesNotMatch(changed,/58\.1 s/);
 });
 
+test('Pi joins the public table only when a reviewed attempt exists',()=>{
+  const data=gallery();
+  assert.doesNotMatch(renderShowcaseResults(data),/>Pi</);
+  data.cards[0].rows.push({arm:'pi',model:'Qwen 27B · same local weights',wallMs:87654,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5});
+  const html=renderShowcaseResults(data);
+  assert.match(html,/>Pi</);assert.match(html,/87\.7 s/);
+});
+
 test('the scrolling race shares the table records and never includes private fields or archived references',()=>{
   const data=gallery();data.cards[0].rows[0].privatePrompt='PRIVATE_DO_NOT_PUBLISH';
   const html=renderFactoryShowcase(data),json=html.match(/<script id="fight-preview" type="application\/json">(.*?)<\/script>/s)[1];

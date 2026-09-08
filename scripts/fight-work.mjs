@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const hex = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
-const ARMS = new Set(['bantam-local-27b', 'deepseek-local-27b', 'hermes', 'opencode',
+const ARMS = new Set(['bantam-local-27b', 'deepseek-local-27b', 'hermes', 'opencode', 'pi',
   'codex-astra', 'codex-sol', 'codex-terra', 'bantam-codex-astra', 'claude-sonnet', 'claude-opus', 'claude-fable']);
 const BINDING = ['arm', 'wallMs', 'outcome', 'accepted', 'completed', 'publicExit', 'hiddenExit', 'protectedChanges'];
 const WORK_KEYS = ['schema', 'card', ...BINDING, 'startedAt', 'task', 'taskSha256', 'source', 'actions',

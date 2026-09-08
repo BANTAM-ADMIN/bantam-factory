@@ -12,6 +12,17 @@ const temp=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-competito
 function binary(root,name,content='#!/bin/sh\nexit 90\n'){
  const file=path.join(root,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content,{mode:0o755});return file;
 }
+test('Pi registration locates its maintained npm CLI and passes the pinned executable to shared cards',t=>{
+ const root=temp(t),home=path.join(root,'home'),exe=binary(root,'pi-install/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js');
+ const record=registerCompetitor('pi',path.join(root,'pi-install'),{home});
+ assert.equal(record.executable,exe);
+ const command=freshCommand({arm:'pi',task:'EXACT',workspace:'/tmp/pi-card/ws',dir:'/tmp/pi-card',endpoint:'http://127.0.0.1:1234',model:'local27b',peerOutputTokens:32768,peerExecutables:{pi:record}});
+ assert.equal(command.args[command.args.indexOf('--executable')+1],exe);
+ assert.equal(command.args[command.args.indexOf('--executable-sha256')+1],record.sha256);
+ assert.equal(command.args[command.args.indexOf('--arm')+1],'pi');
+ assert.equal(command.args[command.args.indexOf('--max-output-tokens')+1],'32768');
+});
+
 test('registration resolves explicit executable or bounded folder candidates, never executes them',t=>{
  const root=temp(t),home=path.join(root,'home'),exe=binary(root,'Hermes install/.venv/bin/hermes');
  const record=registerCompetitor('hermes',path.join(root,'Hermes install'),{home});

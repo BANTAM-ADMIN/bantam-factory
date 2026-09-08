@@ -21,14 +21,15 @@ export function workReplayEvents(work) {
     const at=timed(action.atMs)?action.atMs:null,next=byNextTurn(action);
     const factory=action.source.startsWith('factory-')&&action.source!=='factory-turn';
     const title=action.name.replaceAll('_',' ');
+    const clock=action.source==='native-tool-receipt'?'observed':'exact';
     if(at!==null){
-      add(action.id+'-request',at,factory?'factory':'request',(factory?'FACTORY / ':'$ ')+title,fields(action.request));
+      add(action.id+'-request',at,factory?'factory':'request',(factory?'FACTORY / ':'$ ')+title,fields(action.request),clock);
     }else{
       const by=timed(next)?next:work.wallMs;
       add(action.id+'-request',by,factory?'factory':'request',(factory?'FACTORY / ':'$ ')+title,fields(action.request),timed(next)?'by':'untimed');
     }
     const end=timed(action.endedMs)&&action.endedMs>=(at??0)?action.endedMs:null;
-    const by=end??(timed(next)?next:work.wallMs),precision=end!==null?'exact':timed(next)?'by':'untimed';
+    const by=end??(timed(next)?next:work.wallMs),precision=end!==null?clock:timed(next)?'by':'untimed';
     if(action.output!==null&&action.output!==undefined&&action.output!==''){
       add(action.id+'-response',by,'response','RESPONSE / '+title+(action.exitCode!==null?' · exit '+action.exitCode:''),fields(action.output),precision);
     }

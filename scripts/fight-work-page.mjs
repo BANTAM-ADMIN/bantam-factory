@@ -7,7 +7,7 @@ export function renderWorkLane(entry) {
     <div class="work-story"><h5>${E(entry.explanation.title)}</h5>${entry.explanation.paragraphs.map(p => `<p>${E(p.text)}</p>${p.actions.length?`<div class="story-evidence"><button type="button" data-evidence="${E(p.actions.join(','))}">Show the evidence ↗</button></div>`:''}`).join('')}
     <div class="work-delivery"><span>${entry.changedFiles} workspace change${entry.changedFiles===1?'':'s'}</span><button type="button" data-work-view="files">Open the work →</button></div></div>
     <div class="work-content" hidden aria-live="polite"></div>
-    <div class="work-terminal-panel" hidden><div class="work-terminal" data-playing="false"><div class="work-terminal-head"><span>TERMINAL / RECORDED WORK</span><button type="button" data-follow-terminal aria-pressed="true">Following ↓</button></div><div class="work-terminal-log" tabindex="0" role="region" aria-label="Recorded terminal messages"><div class="terminal-entries"></div><p class="terminal-cursor">Opening the recorded work…</p></div><div class="work-terminal-foot"><span class="terminal-state">Loading</span><span class="terminal-position">0.0s</span></div></div><p class="terminal-timing-note">Messages follow saved times. “By” marks a response available by the next recorded turn.</p></div>
+    <div class="work-terminal-panel" hidden><div class="work-terminal" data-playing="false"><div class="work-terminal-head"><span>TERMINAL / RECORDED WORK</span><button type="button" data-follow-terminal aria-pressed="true">Following ↓</button></div><div class="work-terminal-log" tabindex="0" role="region" aria-label="Recorded terminal messages"><div class="terminal-entries"></div><p class="terminal-cursor">Opening the recorded work…</p></div><div class="work-terminal-foot"><span class="terminal-state">Loading</span><span class="terminal-position">0.0s</span></div></div><p class="terminal-timing-note">Messages follow saved times. “By” marks a response available by the next recorded turn. “Observed” marks when the recorder received a native event.</p></div>
     <div class="work-download"><a href="../work/${E(entry.path)}" download>Download action record & files ↓</a><span>Recorded work</span></div>
   </section>`;
 }
@@ -71,7 +71,7 @@ export function fightWorkBrowser(replayEvents) {
       const fragment=document.createDocumentFragment();
       for(const event of visible.slice(state.count)){
         const item=document.createElement('article');item.className='terminal-entry';item.dataset.kind=event.kind;item.dataset.terminalEvent=event.id;
-        const when=event.precision==='untimed'?'untimed':event.precision==='final'?'final':(event.precision==='by'?'by ':'')+seconds(event.atMs);
+        const when=event.precision==='untimed'?'untimed':event.precision==='final'?'final':(event.precision==='by'?'by ':event.precision==='observed'?'observed ':'')+seconds(event.atMs);
         item.innerHTML=`<div class="terminal-entry-head"><time>${E(when)}</time><strong>${E(event.title)}</strong></div>${event.body?`<pre><code>${E(event.body)}</code></pre>`:''}`;
         fragment.append(item);
       }

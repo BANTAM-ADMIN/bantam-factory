@@ -6,7 +6,7 @@ import {runPeer} from '../scripts/peer-fight-cli.mjs';
 // Only called after explicit execution consent. Containers have --network none;
 // no model, provider login, operator memory or user project is supplied.
 export async function checkPeerReadiness({arms,peerExecutables={},output,out=s=>process.stdout.write(s)},{run=runPeer}={}){
- if(!Array.isArray(arms)||!arms.length||arms.some(a=>!['hermes','opencode'].includes(a))||new Set(arms).size!==arms.length)throw Error('Offline peer readiness currently supports selected Hermes/OpenCode participants.');
+ if(!Array.isArray(arms)||!arms.length||arms.some(a=>!['hermes','opencode','pi'].includes(a))||new Set(arms).size!==arms.length)throw Error('Offline peer readiness currently supports selected Hermes/OpenCode/Pi participants.');
  if(typeof output!=='string'||!path.isAbsolute(output)||fs.existsSync(output))throw Error('Readiness evidence needs a fresh absolute directory.');
  fs.mkdirSync(output,{recursive:true,mode:0o700});
  const report={schema:'bantam.peer-readiness.v1',startedAt:new Date().toISOString(),network:'none',results:[],passed:false};

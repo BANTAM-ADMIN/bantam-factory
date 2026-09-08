@@ -374,6 +374,49 @@ class Extractor:
             raise ValueError('No Claude tool invocations found in saved native records')
         return 'claude-native-session'
 
+    def pi(self):
+        pending = {}
+        buffer = ''
+        for line, chunk in self.lines(self.directory / 'native/native/pi-events.jsonl', 'pi-native-event-receipts'):
+            if not isinstance(chunk, dict) or not isinstance(chunk.get('text'), str) or stamp(chunk.get('at')) is None:
+                raise ValueError('Invalid Pi event receipt')
+            buffer += chunk['text']
+            while '\n' in buffer:
+                raw, buffer = buffer.split('\n', 1)
+                if not raw.strip():
+                    continue
+                try:
+                    event = json.loads(raw)
+                except ValueError:
+                    self.sources.append({'kind': 'incomplete-native-event', 'line': line})
+                    continue
+                if not isinstance(event, dict):
+                    raise ValueError('Invalid Pi native event')
+                kind, call = event.get('type'), event.get('toolCallId')
+                if kind == 'tool_execution_start':
+                    if not isinstance(call, str) or call in pending or not isinstance(event.get('toolName'), str):
+                        raise ValueError('Invalid or duplicate Pi tool start')
+                    pending[call] = self.action(event['toolName'], event.get('args'), at=chunk['at'], source='native-tool-receipt')
+                elif kind == 'tool_execution_end':
+                    action = pending.pop(call, None)
+                    if action is None:
+                        self.sources.append({'kind': 'unmatched-native-tool-result', 'line': line})
+                        continue
+                    action['output'] = self.clean(text_content(event.get('result')))
+                    action['endedMs'] = relative(chunk['at'], self.origin)
+                    action['state'] = 'failed' if event.get('isError') else 'completed'
+                elif kind == 'message_end' and event.get('message', {}).get('role') == 'assistant':
+                    # Stream updates and agent_end repeat these messages.
+                    # Only delivery text is public; reasoning stays private.
+                    delivery = text_content(event['message'].get('content'))
+                    if delivery:
+                        self.final = self.clean(delivery)
+                elif kind in ['auto_compaction_start', 'auto_compaction_end']:
+                    self.events.append({'type': kind, 'atMs': relative(chunk['at'], self.origin)})
+        if buffer.strip():
+            self.sources.append({'kind': 'incomplete-native-event-tail'})
+        return 'pi-native-json-events-with-receipt-times'
+
     def products(self):
         result = []
         final = self.result.get('finalFiles', {})
@@ -409,6 +452,8 @@ class Extractor:
             source = self.hermes()
         elif arm == 'opencode':
             source = self.opencode()
+        elif arm == 'pi':
+            source = self.pi()
         elif arm == 'deepseek-local-27b':
             source = self.deepseek()
         elif arm.startswith('codex-'):

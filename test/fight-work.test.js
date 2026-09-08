@@ -85,6 +85,31 @@ with tempfile.TemporaryDirectory() as temp:
   assert.match(execFileSync('python3',['-c',script],{cwd:path.resolve(import.meta.dirname,'..'),encoding:'utf8'}),/native records verified/);
 });
 
+test('Pi work extraction joins split native events, preserves tool results and excludes repeated private reasoning', () => {
+  const script=String.raw`
+import importlib.util,json,pathlib,tempfile
+spec=importlib.util.spec_from_file_location('work',pathlib.Path('scripts/fight-work-export.py'))
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as temp:
+ root=pathlib.Path(temp);file=root/'native/native/pi-events.jsonl';file.parent.mkdir(parents=True)
+ start=json.dumps({'type':'tool_execution_start','toolCallId':'c1','toolName':'write','args':{'path':'/workspace/x.js','content':'export const x=1'}})+'\n'
+ end=json.dumps({'type':'tool_execution_end','toolCallId':'c1','toolName':'write','result':{'content':[{'type':'text','text':'Written'}]},'isError':False})+'\n'
+ delivery={'role':'assistant','content':[{'type':'thinking','thinking':'PRIVATE_REASONING'},{'type':'text','text':'Delivered x.js'}]}
+ finish=json.dumps({'type':'message_end','message':delivery})+'\n'+json.dumps({'type':'agent_end','messages':[delivery]})+'\n'
+ chunks=[{'at':1000.1,'text':start[:30]},{'at':1000.2,'text':start[30:]},{'at':1000.4,'text':end+finish+'{"truncated'}]
+ file.write_text('\n'.join(json.dumps(c) for c in chunks))
+ e=m.Extractor(root,{'startedAt':1000},{'kitId':'factory-2026-09-07'},b'{}',root)
+ assert e.pi()=='pi-native-json-events-with-receipt-times'
+ assert len(e.actions)==1 and e.actions[0]['atMs']==200 and e.actions[0]['endedMs']==400
+ assert e.actions[0]['output']=='Written' and e.actions[0]['state']=='completed'
+ assert e.actions[0]['source']=='native-tool-receipt' and e.actions[0]['exitCode'] is None
+ assert e.final=='Delivered x.js' and 'PRIVATE_REASONING' not in json.dumps(e.actions)
+ assert any(s['kind']=='incomplete-native-event-tail' for s in e.sources)
+ print('Pi native records verified')
+`;
+  assert.match(execFileSync('python3',['-c',script],{cwd:path.resolve(import.meta.dirname,'..'),encoding:'utf8'}),/Pi native records verified/);
+});
+
 test('every published launch and reference contender has its complete reviewed work package', () => {
   const root=path.resolve(import.meta.dirname,'../docs/fights/launch-2026-09-07');
   const prefixes=LAUNCH_CARDS.flatMap(card=>[card,'references/'+card]);

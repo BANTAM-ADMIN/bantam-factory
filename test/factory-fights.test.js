@@ -33,7 +33,7 @@ test('grade requires complete expected groups, booleans and matching conjunction
 });
 test('native peer response allowance is explicit, bounded, and does not alter BANTAM prompts',()=>{
   const base={task:'EXACT',workspace:'/tmp/fresh/ws',dir:'/tmp/fresh',endpoint:'http://127.0.0.1:9999',model:'exact27b'};
-  for(const arm of ['deepseek-local-27b','opencode','hermes']){
+  for(const arm of ['deepseek-local-27b','opencode','hermes','pi']){
     const a=freshCommand({...base,arm}),b=freshCommand({...base,arm,peerOutputTokens:32768});
     assert.equal(a.args[a.args.indexOf('--max-output-tokens')+1],'8192');
     assert.equal(b.args[b.args.indexOf('--max-output-tokens')+1],'32768');
@@ -51,7 +51,7 @@ test('legacy default retains exact eighteen card/arm identities and ordering',()
   const cards=['receipt-reducer','snapshot-drift','job-planner'];
   const expected=cards.flatMap((card,index)=>[...arms.slice(index*2),...arms.slice(0,index*2)].map(arm=>({card,arm,repeat:1})));
   assert.deepEqual(DEFAULT_FIGHT_ARMS,arms);assert.deepEqual(FIGHT_CARDS,cards);
-  assert.deepEqual(FIGHT_ARMS,[...arms,'codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable']);
+  assert.deepEqual(FIGHT_ARMS,[...arms,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable']);
   assert.deepEqual(fightPlan(),expected);
   assert.deepEqual(fightPlan({kitId:'factory-2026-09-06'}),expected);
 });

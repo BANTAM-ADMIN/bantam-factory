@@ -3,6 +3,7 @@
 // Native configuration references (checked 2026-09-06):
 // https://opencode.ai/docs/cli/ and https://opencode.ai/docs/providers/
 // https://hermes-agent.nousresearch.com/docs/user-guide/configuration/
+// https://github.com/earendil-works/pi/tree/main/packages/coding-agent
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -47,7 +48,7 @@ function canonicalFuturePath(value) {
 }
 
 function validateOptions(options) {
-  if (!['hermes', 'opencode'].includes(options.arm)) throw new Error('arm must be hermes or opencode');
+  if (!['hermes', 'opencode', 'pi'].includes(options.arm)) throw new Error('arm must be hermes, opencode or pi');
   if (typeof options.model !== 'string' || !options.model.trim() || /[\x00-\x1f]/.test(options.model)) throw new Error('model is required and cannot contain control characters');
   if (!Number.isInteger(options.timeoutSeconds) || options.timeoutSeconds < 1 || options.timeoutSeconds > 1800) throw new Error('timeout must be 1..1800 seconds');
   outputBudget(options.maxOutputTokens);
@@ -72,7 +73,7 @@ export function parseOptions(argv) {
     if (!argv[i].startsWith("--") || !names.has(key) || Object.hasOwn(values, key) || typeof argv[i + 1] !== "string") throw new Error(`invalid or duplicate option: ${argv[i]}`);
     values[key] = argv[++i];
   }
-  if (!["hermes", "opencode"].includes(values.arm)) throw new Error("arm must be hermes or opencode");
+  if (!["hermes", "opencode", "pi"].includes(values.arm)) throw new Error("arm must be hermes, opencode or pi");
   for (const key of ["workspace", "task-file", "output"]) values[key] = absolute(values[key], key);
   if (!values.model || /[\x00-\x1f]/.test(values.model)) throw new Error("model is required and cannot contain control characters");
   const timeoutSeconds = values["timeout-seconds"] === undefined ? 600 : Number(values["timeout-seconds"]);
@@ -86,6 +87,13 @@ export function parseOptions(argv) {
 export function nativeConfig({ arm, endpoint, model, maxOutputTokens = 8192 }) {
   const baseURL = normalizeEndpoint(endpoint);
   const output = outputBudget(maxOutputTokens);
+  if (arm === 'pi') return { providers: { local: {
+    baseUrl: baseURL, api: 'openai-completions', apiKey: 'local-no-credential',
+    models: [{ id: model, name: model, reasoning: true, input: ['text'], contextWindow: 65536, maxTokens: output,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      compat: { supportsDeveloperRole: false, supportsStore: false, supportsReasoningEffort: false,
+        maxTokensField: 'max_tokens', thinkingFormat: 'qwen-chat-template' } }],
+  } } };
   if (arm === "opencode") return {
     $schema: "https://opencode.ai/config.json", autoupdate: false, share: "disabled",
     model: `local/${model}`, small_model: `local/${model}`, enabled_providers: ["local"],
@@ -115,6 +123,27 @@ export function discoverRuntime(arm,{executable:chosen,executableSha256}={}) {
     try{runtime.version=JSON.parse(fs.readFileSync(packageFile,'utf8')).version??'unknown';}catch{runtime.version='unknown (standalone binary; see offline probe version)';}
     runtime.mounts.push({ source: executable, target: "/opt/opencode" });
     runtime.entry = ["/opt/opencode"];
+  } else if (arm === 'pi') {
+    let root = path.dirname(executable), pkg;
+    while (root !== path.dirname(root)) {
+      try { const found = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+        if (found.name === '@earendil-works/pi-coding-agent') { pkg = found; break; }
+      } catch {}
+      root = path.dirname(root);
+    }
+    const entry = pkg?.bin?.pi;
+    if (typeof entry !== 'string' || !inside(root, path.resolve(root, entry)) || path.resolve(root, entry) !== executable) throw Error('Pi requires the official installed @earendil-works/pi-coding-agent CLI entry point');
+    const modules = path.resolve(root, '../..');
+    if (path.basename(modules) !== 'node_modules') throw Error('Pi requires an npm installation with its dependency tree');
+    const bundledNode = path.join(modules, 'node/bin/node');
+    nativeBinary = executablePath(fs.existsSync(bundledNode) ? bundledNode : process.execPath);
+    const nodeVersion = execFileSync(nativeBinary, ['--version'], { encoding: 'utf8', timeout: 3000 }).trim();
+    const [major, minor] = nodeVersion.replace(/^v/, '').split('.').map(Number);
+    if (!(major > 22 || major === 22 && minor >= 19)) throw Error('Pi requires Node 22.19 or newer; install node@22 alongside its npm package');
+    runtime.version = pkg.version;
+    runtime.nativeNodeVersion = nodeVersion;
+    runtime.mounts.push({ source: modules, target: '/opt/pi/node_modules' }, { source: nativeBinary, target: '/opt/pi/node' });
+    runtime.entry = ['/opt/pi/node', '/opt/pi/node_modules/@earendil-works/pi-coding-agent/' + path.relative(root, executable)];
   } else if (arm === "hermes") {
     let python = fs.readFileSync(executable, "utf8").split("\n", 1)[0].replace(/^#!/, "").trim();
     if(/^\/usr\/bin\/env python3?(?:\.\d+)?$/.test(python))python=execFileSync('which',[python.split(' ')[1]],{encoding:'utf8',timeout:3000}).trim();
@@ -154,6 +183,7 @@ export function buildDockerArgs({ options, runtime, control, state, cidfile, nam
     OPENCODE_DISABLE_PROJECT_CONFIG: "1", OPENCODE_AUTO_SHARE: "false", OPENCODE_DISABLE_TERMINAL_TITLE: "1",
     // OpenCode 1.18.23 otherwise applies its separate 32,000-token ceiling.
     ...(runtime.arm === 'opencode' ? { OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: String(outputBudget(options.maxOutputTokens)) } : {}),
+    ...(runtime.arm === 'pi' ? { PI_CODING_AGENT_DIR: '/state/pi', PI_OFFLINE: '1', PI_TELEMETRY: '0', PI_SKIP_VERSION_CHECK: '1' } : {}),
     HERMES_HOME: "/state/hermes",
     HERMES_CONTAINER: "1", HERMES_SKIP_NODE_BOOTSTRAP: "1", HERMES_YOLO_MODE: "1", TERMINAL_ENV: "local", TERMINAL_CWD: "/workspace",
     HERMES_WRITE_SAFE_ROOT: "/workspace", HERMES_INFERENCE_MODEL: options.model,
@@ -169,6 +199,7 @@ export function buildDockerArgs({ options, runtime, control, state, cidfile, nam
     "--tmpfs", "/tmp:rw,nosuid,nodev,size=768m,mode=1777", "--tmpfs", `/home/ubuntu:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid},mode=700`,
     ...mount(options.workspace, "/workspace", false), ...mount(state, "/state", false), ...mount(control, "/control"),
     ...(options.arm === 'hermes' ? [...mount(path.join(control, 'native-config.json'), '/state/hermes/config.yaml'), ...mount(path.join(control, 'empty.env'), '/state/hermes/.env')] : []),
+    ...(options.arm === 'pi' ? mount(path.join(control, 'native-config.json'), '/state/pi/models.json') : []),
     ...mount(SELF, "/opt/peer/scripts/peer-fight-cli.mjs"), ...mount(path.join(REPO, "src/process-runner.js"), "/opt/peer/src/process-runner.js"),
     ...['competitor-registry.js','linux-peer-runtime.js','config-directory.js'].flatMap(file=>mount(path.join(REPO,'src',file),'/opt/peer/src/'+file)),
     ...mount(path.join(control,'passwd'),'/etc/passwd'),...mount(path.join(control,'group'),'/etc/group'),
@@ -197,6 +228,10 @@ export async function runPeer(options, { runtime = discoverRuntime(options.arm,o
   fs.mkdirSync(control); fs.mkdirSync(state);
   for(const [file,content]of Object.entries(identityFiles(runtime.identity)))fs.writeFileSync(path.join(control,file),content,{flag:'wx',mode:0o600});
   if (options.arm === 'hermes') fs.mkdirSync(path.join(state, 'hermes'));
+  if (options.arm === 'pi') {
+    fs.mkdirSync(path.join(state, 'pi'));
+    fs.writeFileSync(path.join(state, 'pi-events.jsonl'), '', { flag: 'wx', mode: 0o600 });
+  }
   const name = `bantam-peer-${options.arm}-${crypto.randomUUID()}`, cidfile = path.join(output, "container.cid");
   writeJson(path.join(control, "native-config.json"), nativeConfig(options));
   writeJson(path.join(control, "invocation.json"), { ...options, entry: runtime.entry });
@@ -221,7 +256,13 @@ export async function runPeer(options, { runtime = discoverRuntime(options.arm,o
   const joinedSignal = signal ? AbortSignal.any([signal, cancellation.signal]) : cancellation.signal;
   try {
     execution = await processRunner("docker", dockerArgs, { timeoutMs: (options.timeoutSeconds + 15) * 1000, signal: joinedSignal, maxBuffer: 32 * 1024 * 1024,
-      onOutput: ({ stream, text }) => { fs.appendFileSync(path.join(output, `${stream}.log`), text); if(!options.probe)(stream === "stderr" ? process.stderr : process.stdout).write(text); } });
+      onOutput: ({ stream, text }) => {
+        // Pi's tool events have no clock. Preserve the host receipt time of
+        // each stdout chunk so replays can label when an event was observed.
+        if (options.arm === 'pi' && stream === 'stdout') fs.appendFileSync(path.join(state, 'pi-events.jsonl'), JSON.stringify({ at: new Date().toISOString(), text }) + '\n');
+        fs.appendFileSync(path.join(output, `${stream}.log`), text);
+        if(!options.probe)(stream === "stderr" ? process.stderr : process.stdout).write(text);
+      } });
   } catch (error) {
     execution = { code: null, signal: null, error: String(error.message ?? error) };
   } finally {
@@ -238,7 +279,7 @@ export async function runPeer(options, { runtime = discoverRuntime(options.arm,o
   const result = { schema: "bantam.peer-result.v1", arm: options.arm, nativeVersion: runtime.version, launcherDigest: launch.launcherDigest,
     startedAt: launch.startedAt, finishedAt: new Date().toISOString(), wallMs: Date.now() - started, code: execution.code, signal: execution.signal ?? null,
     timedOut: Boolean(execution.timedOut) || execution.code === 124, aborted: Boolean(execution.aborted), bufferExceeded: Boolean(execution.bufferExceeded), error: execution.error ?? null,
-    cleanup, nativeDirectory: state, transcript: options.arm === "opencode" ? "stdout.log (native JSON events) and native/data" : "native/hermes (native sessions) and native/usage.json",
+    cleanup, nativeDirectory: state, transcript: options.arm === 'pi' ? 'native/pi-events.jsonl (native JSON chunks with host receipt times) and native/pi/sessions' : options.arm === "opencode" ? "stdout.log (native JSON events) and native/data" : "native/hermes (native sessions) and native/usage.json",
     usageAuthority: "native secondary metadata; parent recording proxy is authoritative for full context and usage" };
   writeJson(path.join(output, "result.json"), result);
   if (!cleanup.absent) throw new Error("cannot confirm exact peer container cleanup");
@@ -276,7 +317,10 @@ async function runInside() {
     const resolved = execFileSync(exe, ['-S', '-c', check, config.model, config.endpoint, String(config.maxOutputTokens)], { encoding: 'utf8', timeout: 15000 });
     writeJson('/state/provider-check.json', JSON.parse(resolved.trim()));
   }
-  const args = config.arm === "opencode" ? ["run", "--pure", "--format", "json", "-m", `local/${config.model}`, task]
+  const args = config.arm === 'pi' ? [...prefix, '--print', '--mode', 'json', '--provider', 'local', '--model', config.model,
+    '--session-dir', '/state/pi/sessions', '--thinking', 'high', '--offline', '--no-approve',
+    '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--', task]
+    : config.arm === "opencode" ? ["run", "--pure", "--format", "json", "-m", `local/${config.model}`, task]
     : [...prefix, "-z", task, "--yolo", "--no-restore-cwd", "--model", config.model, "--provider", "custom", "--usage-file", "/state/usage.json"];
   const child = spawn("/usr/bin/timeout", ["--signal=TERM", "--kill-after=5s", `${config.timeoutSeconds}s`, exe, ...args], { stdio: "inherit" });
   return await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", code => resolve(code ?? 1)); });
@@ -284,7 +328,7 @@ async function runInside() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === SELF) {
   const work = process.argv[2] === "--inside" ? runInside() : process.argv.includes("--help")
-    ? (process.stdout.write("peer-fight-cli --arm hermes|opencode --workspace ABS --task-file ABS --output ABS --endpoint http://127.0.0.1:PORT[/v1] --model ID [--timeout-seconds 600] [--max-output-tokens 8192] [--probe]\n"), Promise.resolve(0))
+    ? (process.stdout.write("peer-fight-cli --arm hermes|opencode|pi --workspace ABS --task-file ABS --output ABS --endpoint http://127.0.0.1:PORT[/v1] --model ID [--timeout-seconds 600] [--max-output-tokens 8192] [--probe]\n"), Promise.resolve(0))
     : runPeer(parseOptions(process.argv.slice(2))).then(result => result.code ?? 1);
   work.then(code => { process.exitCode = code; }).catch(error => { process.stderr.write(`peer-fight-cli: ${error.message}\n`); process.exitCode = 1; });
 }

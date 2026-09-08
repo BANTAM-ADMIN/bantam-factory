@@ -117,6 +117,7 @@ export function sameModelScoreboard(data){
     &&/^Qwen 27B · same local (?:model|weights)$/.test(row.model)));
   if(!cards.length)return null;
   const labels=['BANTAM FACTORY','DeepSeek Harness','Hermes','OpenCode'];
+  if(cards.some(card=>card.rows.some(row=>row.arm==='pi'))){arms.push('pi');labels.push('Pi');}
   return {tasks:cards.length,systems:arms.map((arm,i)=>{
     const rows=cards.flatMap(card=>card.rows.filter(row=>row.arm===arm&&/^Qwen 27B · same local (?:model|weights)$/.test(row.model)));
     return {arm,label:labels[i],recorded:rows.length,completed:rows.filter(row=>row.passed===true).length,
@@ -131,7 +132,7 @@ function renderSameModelScoreboard(data){
 }
 
 // Presentation order only; it never reorders portable evidence or implies rank.
-const ARM_ORDER=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus','claude-fable'];
+const ARM_ORDER=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus','claude-fable'];
 const armRank=arm=>{const i=ARM_ORDER.indexOf(arm);return i<0?ARM_ORDER.length:i;};
 
 function renderReferences(data){

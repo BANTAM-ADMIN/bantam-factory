@@ -8,8 +8,9 @@ import {startModelRecorder} from './fight-model-proxy.mjs';
 import {execute,changedSealedFiles,treeHashes} from './repobrief-astra-fights.mjs';
 import {runShellProcess} from '../src/executor.js';
 import {cornerUsage} from '../src/fight.js';
+import {readCompetitorRegistry} from '../src/competitor-registry.js';
 const write=(p,data)=>fs.writeFileSync(p,JSON.stringify(data,null,2)+'\n');
-export async function preflight(output,arms=FIGHT_ARMS){
+export async function preflight(output,arms=FIGHT_ARMS,{peerExecutables=readCompetitorRegistry().tools,peerOutputTokens=8192}={}){
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('fresh absolute output required');
   if(arms.some(a=>!FIGHT_ARMS.includes(a)))throw Error('unknown arm');
   const upstream='http://127.0.0.1:8085',model=await inspectLocalModel(upstream);
@@ -25,7 +26,7 @@ export async function preflight(output,arms=FIGHT_ARMS){
     fs.writeFileSync(path.join(dir,'task.md'),task);
     const seal=treeHashes(workspace),local=!arm.includes('codex')&&!arm.startsWith('codex');
     const recorder=local?await startModelRecorder({upstream,output:path.join(dir,'wire')}):null;
-    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??upstream,model:model.id,timeoutMs:120000});
+    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??upstream,model:model.id,timeoutMs:120000,peerExecutables,peerOutputTokens});
     write(path.join(dir,'command.json'),command);process.stdout.write(`${arm}: smoke started\n`);
     let result,usage;
     try{result=await executeContender(command,{cwd:workspace,env:cleanFightEnv({...command.env,PWD:workspace}),dir,timeoutMs:120000,events:[],arm});}

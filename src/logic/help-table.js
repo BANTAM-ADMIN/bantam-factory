@@ -40,7 +40,20 @@ export function layoutHelpRows(rows, { cols = 100, indent = 4, gap = 2, cap = 24
   const width = Number.isFinite(cols) && cols > 0 ? cols : 100;
   const fitting = rows.map((r) => r.cmd.length).filter((n) => n <= cap);
   const column = (fitting.length ? Math.max(...fitting) : 0) + gap;
-  const descWidth = Math.max(16, width - indent - column);
+  // Once the description would become a skinny column, use the full width
+  // beneath each command. Reserve the last terminal cell to avoid auto-wrap.
+  if (width - indent - column < 40) {
+    const available = Math.max(8, width - indent - 3);
+    const fit = (text) => wrapWords(text, available).flatMap((line) =>
+      line.match(new RegExp(`.{1,${available}}`, 'gu')) ?? []);
+    const lines = [];
+    for (const { cmd, desc } of rows) {
+      for (const part of fit(cmd)) lines.push({ cmd: part, desc: '' });
+      for (const part of fit(desc)) lines.push({ cmd: '', desc: part });
+    }
+    return { column: 2, lines };
+  }
+  const descWidth = Math.max(16, width - indent - column - 1);
   const lines = [];
   for (const { cmd, desc } of rows) {
     const wrapped = wrapWords(desc, descWidth);
@@ -62,14 +75,14 @@ export function renderHelpRows(rows, { cols, indent = 4, gap, cap, paintCmd = (s
   const pad = " ".repeat(indent);
   return lines.map(({ cmd, desc }) => {
     const fill = " ".repeat(Math.max(0, column - cmd.length));
-    return pad + (cmd ? paintCmd(cmd) : "") + fill + (desc ? paintDesc(desc) : "");
+    return pad + (cmd ? paintCmd(cmd) : "") + (desc ? fill + paintDesc(desc) : "");
   });
 }
 
 /** A bulleted line wrapped with a hanging indent under the bullet. */
 export function renderBullet(text, { cols = 100, indent = 4, bullet = "· ", paint = (s) => s } = {}) {
   const width = Number.isFinite(cols) && cols > 0 ? cols : 100;
-  const lines = wrapWords(text, Math.max(16, width - indent - bullet.length));
+  const lines = wrapWords(text, Math.max(8, width - indent - bullet.length - 1));
   const pad = " ".repeat(indent);
   return lines.map((l, i) => pad + (i === 0 ? bullet : " ".repeat(bullet.length)) + paint(l));
 }

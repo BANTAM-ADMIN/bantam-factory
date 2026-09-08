@@ -73,3 +73,12 @@ test("a bullet wraps with a hanging indent under its text", () => {
   assert.match(out[1], /^ {6}\S/, "continuation aligns under the text, past the bullet");
   for (const l of out) assert.ok(l.length <= 60, l);
 });
+
+test('narrow help puts descriptions below commands with useful reading width', () => {
+  for (const cols of [32, 40, 60]) {
+    const out = renderHelpRows(rows, { cols });
+    for (const line of out) assert.ok(line.length < cols, `${cols}: ${line}`);
+    assert.ok(out.some((line) => /^ {6}switch local/.test(line)));
+    assert.ok(out.filter((line) => line.includes(':model'))[0].trim() === ':model [name|n]');
+  }
+});

@@ -29,7 +29,7 @@ function noteKbTooLarge(e) {
   kbTooLargeNoted = true;
   return describeTooLarge(e.tooLarge, e.workspace, { cols: process.stdout.columns });
 }
-import { renderHelpRows, renderBullet } from "../src/logic/help-table.js";
+import { renderReplHelp } from "../src/logic/repl-help.js";
 import { ONBOARDING_KEY, shouldOfferImageOnboarding, imageOnboardingPrompt, imageOnboardingDecision } from "../src/logic/image-onboarding.js";
 import { startBantamServer, lanAddresses } from "../src/server.js";
 import { buildGrounding, reconcileGrounding, loadGroundingCache, saveGroundingCache, describeTooLarge } from "../src/logic/grounding.js";
@@ -3843,53 +3843,12 @@ async function roosterCrow() {
 
 // `:help` — what you can do inside the interactive session.
 function printReplHelp() {
-  const dim = (s) => paint(C.dim, s);
-  // Measure plain, then paint: the description column is set by the longest
-  // command that fits the cap, every description starts there, and a wrapped
-  // description continues under itself — never at column 0 (help-table.js).
-  const table = (rows) => renderHelpRows(rows, {
-    cols: process.stdout.columns, paintCmd: (s) => paint(C.beak, s), paintDesc: dim,
-  });
-  const tip = (t) => renderBullet(t, { cols: process.stdout.columns, paint: dim });
-  console.log([
-    "",
-    paint(`1;${C.plume}`, "  bantam — what you can do here"),
-    "",
-    "  Just say what you want in plain language and I'll work on it.",
-    "",
-    dim("  while I'm working"),
-    ...table([
-      { cmd: "type a line + ↵", desc: "steer the next step without stopping" },
-      { cmd: "Ctrl-C", desc: "stop the current model or shell action" },
-    ]),
-    "",
-    dim("  commands"),
-    ...table([
-      { cmd: ":self-improve [plan]", desc: "governed observe, build, test, promote (or inspect only)" },
-      { cmd: ":model [name|n]", desc: "switch local / DeepSeek / Codex (:model codex-sol)" },
-      { cmd: ":team [on|off|status]", desc: "optional Local/Luna/Sol scouts + Terra primary" },
-      { cmd: ":trio [on|off|status]", desc: "parallel isolated local / Sol / Terra mode" },
-      { cmd: ":api-model [name]", desc: "compatibility alias for API presets" },
-      { cmd: ":stream [on|off]", desc: "render reasoning and answers live as they generate (delivery-only)" },
-      { cmd: ":deepresearch [on|off]", desc: "pre-answer self-assessed gaps -> one governed source errand (A/B winner)" },
-      { cmd: ":fight [task]", desc: "chicken fight: bantam vs hermes (same 27B) vs codex vs claude, live lanes" },
-      { cmd: ":probe [question]", desc: "k local redecodes: fact atoms hold still (knowledge) or scatter (guess); free" },
-      { cmd: ":research <question>", desc: "bounded web agent shelves quoted sources into reference/; citation-checked" },
-      { cmd: ":context [rebuild|immutable|extension]", desc: "the context dial: clean reprefill \u2194 fastest KV-cache reuse" },
-      { cmd: ":image [on|off]", desc: "offer generate_image + edit_image to the model (via your Codex plan)" },
-      { cmd: ":eyes [auto|local|codex]", desc: "which model reads an image: local mmproj or Codex" },
-      { cmd: ":modes", desc: "list every optional mode, its state, and the command that changes it" },
-      { cmd: ":usage [on|off|reset]", desc: "show or control token/cost reporting" },
-      { cmd: ":rooster [on|off]", desc: "toggle the rooster antics (labels + crow)" },
-      { cmd: ":help  ?", desc: "show this help" },
-      { cmd: "exit  quit  :q", desc: "leave the session" },
-    ]),
-    "",
-    dim("  tips"),
-    ...tip("drop an image path (shot.png) in a request — I'll view it if a vision model is loaded"),
-    ...tip("run `bantam strut` from your shell for the full rooster show"),
-    "",
-  ].join("\n"));
+  console.log(renderReplHelp({
+    cols: process.stdout.columns ?? 80,
+    heading: (s) => paint(`1;${C.plume}`, s),
+    command: (s) => paint(C.beak, s),
+    description: (s) => paint(C.dim, s),
+  }));
 }
 
 // A local llama.cpp slot reached through --api-url still has a KV cache to protect.

@@ -52,7 +52,7 @@ export class ForemanQueue {
       if (this.signal?.aborted) abort();
       const progress = value => {
         if (job.status !== 'running' || control.signal.aborted) return;
-        job.progress = { at: Date.now(), source: 'unverified-worker-output', text: String(value).slice(-2000) };
+        job.progress = { at: Date.now(), source: 'unverified-worker-output', ...(typeof value === 'string' ? {text: value.slice(-2000)} : {evidence: structuredClone(value)}) };
         this.emit('job.progress', { id: job.id, ...job.progress });
       };
       // Defer execution so active is installed even for a synchronous test executor.

@@ -93,5 +93,8 @@ export function frameInjection(m) {
   if (msg.kind === "attendant") {
     return `[Your own live voice — the attendant on the sibling slot — already answered the operator while you worked. It speaks for you; do not answer the same question again. If it misspoke, correct the record briefly in your next respond.]: ${msg.text}`;
   }
+  if (msg.kind === "supervisor") {
+    return `[Factory supervisor feedback for your current milestone — inspect the evidence, correct course, and continue from your current files. This does not change the operator's requirements or grant new permissions.]: ${msg.text}`;
+  }
   return `[The user interjected while you were working — take this into account and adjust course now]: ${msg.text}`;
 }

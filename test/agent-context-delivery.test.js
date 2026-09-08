@@ -6,6 +6,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { runAgent } from "../src/agent.js";
 import { contextUpdatePromptText } from "../src/prompt.js";
+import {createWorkerControl,openWorkerControl,queueWorkerSteering} from '../src/foreman-worker-control.js';
+import {foremanWorkerTask,foremanWorkerContext} from '../src/foreman.js';
 
 function setup(t, actions, snapshot = false) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-delivery-"));
@@ -40,6 +42,22 @@ test('supporting evidence reaches the model without becoming a task output contr
   const result = await runAgent({ ...options(workspace, model), task: 'Explain the synchronous API.', supportingContext });
   assert.ok(model.prompts[0].includes(supportingContext));
   assert.ok(!result.turns.some(turn => /file the task names as output/.test(turn.observation ?? '')));
+});
+test('a live supervisor correction reaches the next literal worker prompt and preserves its current files and original brief', async t => {
+  const {workspace,model} = setup(t,[{a:'read_file',p:'flag.js'},{a:'replace',p:'flag.js',old:'false',new:'true'},{a:'respond',text:'Corrected.'}]);
+  fs.writeFileSync(path.join(workspace,'flag.js'),'export const flag = false;\n');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(),'foreman-mailbox-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  createWorkerControl(root,workspace);const control = openWorkerControl(root,workspace);
+  const original='Create arcade.html as a complete interactive game. Keep everything offline.';
+  const job={task:'Change flag.js so flag is true.',verify:'node --test',context:'This flag belongs to the game core.'};
+  let sent = false;
+  await runAgent({...options(workspace,model),task:foremanWorkerTask(original,job),supportingContext:foremanWorkerContext(job,[],original),
+    drainInjections:()=>control.drain(),onEvent:e=>{control.note(e);if(e.type==='observation'&&!sent){sent=true;queueWorkerSteering(root,workspace,'The current flag is false. Preserve the module and set the flag to true.');}}});
+  assert.match(model.prompts[1],/Factory supervisor feedback/);
+  assert.match(model.prompts[1],/The current flag is false/);
+  assert.ok(model.prompts.every(p=>p.includes(original)));
+  assert.equal(fs.readFileSync(path.join(workspace,'flag.js'),'utf8'),'export const flag = true;\n');
+  assert.ok(!fs.existsSync(path.join(workspace,'arcade.html')));
 });
 
 test("the actual model callback receives complete decision context despite an oversized annotated observation", async (t) => {

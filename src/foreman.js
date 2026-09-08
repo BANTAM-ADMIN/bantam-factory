@@ -14,6 +14,7 @@ import { acceptedBantamCompletion } from '../scripts/repobrief-astra-fights.mjs'
 import { startModelRecorder } from '../scripts/fight-model-proxy.mjs';
 import { codexSessionUsage, settleServerCounters } from '../scripts/fight-usage.mjs';
 import { normalizeCardEndpoint } from './factory-cards-command.js';
+import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from './foreman-worker-control.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODELS = { astra: 'gpt-6-astra', sol: 'gpt-5.6-sol', terra: 'gpt-5.6-terra' };
@@ -111,7 +112,7 @@ export function readForemanEvidence(output, id, selector) {
   const request = JSON.parse(selector);
   if (!request || Object.keys(request).some(k => !['file','offset'].includes(k))) throw Error('evidence selector accepts file and byte offset');
   const file = request.file, offset = request.offset ?? 0;
-  if (typeof file !== 'string' || !/^(run\.json|stdout\.log|stderr\.log|verification\.json|task\.md|wire\/(exchanges\.jsonl|[0-9]{5}\.(request|response)\.body))$/.test(file)) throw Error('unsupported evidence file');
+  if (typeof file !== 'string' || !/^(run\.json|stdout\.log|stderr\.log|verification\.json|task\.md|feedback\.json|wire\/(exchanges\.jsonl|[0-9]{5}\.(request|response)\.body))$/.test(file)) throw Error('unsupported evidence file');
   if (!Number.isSafeInteger(offset) || offset < 0) throw Error('invalid evidence byte offset');
   const root = path.join(output, 'jobs', id), full = path.join(root, file);
   const realRoot = fs.realpathSync(root), real = fs.realpathSync(full);
@@ -139,7 +140,7 @@ export async function validateForemanVerifiers(jobs, check) {
   }
 }
 
-export function foremanWorkerContext(job, dependencies) {
+export function foremanWorkerContext(job, dependencies, task = '') {
   // Do not flatten transport diagnostics into the product contract. In the
   // first live trial, `process.aborted:false` in a successful dependency's raw
   // receipt triggered an unrelated abort-lifecycle audit in a synchronous API.
@@ -148,11 +149,11 @@ export function foremanWorkerContext(job, dependencies) {
   const outcomes = dependencies.map(j => ({ id: j.id, status: j.status,
     verified: j.result?.verification?.pass === true, integrated: j.result?.integrated === true,
     changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null }));
-  return `SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
+  return `${task ? `OVERALL OPERATOR BRIEF (project context):\n${task}\n\nYour assigned milestone contributes to this full goal. Preserve its applicable constraints; do not deliver unrelated milestones or claim the whole project is done. The supervisor owns final integration and full-task acceptance.\n\n` : ''}SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
 }
 export function foremanWorkerTask(task, job, dependencies = null) {
-  const contract = `OVERALL OPERATOR CONTRACT (binding):\n${task}\n\nYOUR BOUNDED JOB:\n${job.task}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features.`;
-  return dependencies === null ? contract : `${contract}\n\n${foremanWorkerContext(job, dependencies)}`;
+  const contract = `YOUR ASSIGNED MILESTONE:\n${job.task}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features. Preserve applicable constraints from the overall brief supplied as project context. Retain executable assertions for behavior you change; printing a status is not an assertion.`;
+  return dependencies === null ? contract : `${contract}\n\n${foremanWorkerContext(job, dependencies, task)}`;
 }
 
 export async function runForeman(plan, { log = () => {} } = {}) {
@@ -183,7 +184,8 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     const task = foremanWorkerTask(plan.task, job, dependencies);
     fs.writeFileSync(path.join(dir, 'task.md'), task, { mode: 0o600 });
     const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids, { mode: 0o700 }); fs.mkdirSync(sessions, { mode: 0o700 });
-    let recorder = null, result, usage = null, settlement = null, lastProgress = 0, outputTail = '';
+    if (job.worker === 'local') createWorkerControl(dir, ws);
+    let recorder = null, result, usage = null, settlement = null, lastProgress = 0, outputTail = '', lastFeedback = '';
     try {
       let command;
       if (job.worker === 'local') {
@@ -191,9 +193,10 @@ export async function runForeman(plan, { log = () => {} } = {}) {
         if (current.id !== modelIdentity.id) throw Error('local model changed');
         recorder = await startModelRecorder({ upstream: plan.endpoint, output: path.join(dir, 'wire') });
         const contextFile = path.join(dir, 'supporting-context.txt');
-        fs.writeFileSync(contextFile, foremanWorkerContext(job, dependencies), { mode: 0o600 });
+        fs.writeFileSync(contextFile, foremanWorkerContext(job, dependencies, plan.task), { mode: 0o600 });
         command = freshCommand({ arm: 'bantam-local-27b', task: foremanWorkerTask(plan.task, job), workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, contextTokens: current.props?.default_generation_settings?.n_ctx, timeoutMs: remaining() });
         command.args.push('--supporting-context-file', contextFile);
+        command.args.push('--supervisor-control', dir);
         command.args[command.args.indexOf('--verify') + 1] = job.verify;
       } else {
         command = { exe: path.join(ROOT, 'scripts/astra-container-cli.mjs'), args: ['exec','--json','--ignore-user-config','--skip-git-repo-check',
@@ -207,7 +210,13 @@ export async function runForeman(plan, { log = () => {} } = {}) {
         onOutput: ({ stream, text }) => {
           fs.appendFileSync(path.join(dir, `${stream}.log`), text, { mode: 0o600 });
           outputTail = (outputTail + text).slice(-2000);
-          if (Date.now() - lastProgress >= 1000) { progress(outputTail); lastProgress = Date.now(); }
+          if (Date.now() - lastProgress >= 1000) {
+            if (job.worker === 'local') {
+              const feedback = readWorkerFeedback(dir, ws), serialized = JSON.stringify(feedback);
+              if (feedback && serialized !== lastFeedback) { progress(feedback); lastFeedback = serialized; }
+            } else progress(outputTail);
+            lastProgress = Date.now();
+          }
         } });
     } finally {
       if (recorder) { usage = await recorder.close(); settlement = await settleServerCounters(plan.endpoint); write(path.join(dir, 'settlement.json'), settlement); if (settlement.observedBusy && !settlement.settled) ac.abort(); }
@@ -246,7 +255,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     if (action.action === 'evidence') { const j = queue.jobs.find(j => j.id === action.target); if (!j) throw Error('unknown job');
       if (action.text) return readForemanEvidence(plan.output, j.id, action.text);
       const dir = path.join(plan.output, 'jobs', j.id), wire = path.join(dir, 'wire');
-      return { status: j.status, result: j.result ?? null, files: ['run.json','stdout.log','stderr.log','verification.json','task.md'].filter(f => fs.existsSync(path.join(dir,f))),
+      return { status: j.status, result: j.result ?? null, files: ['run.json','stdout.log','stderr.log','verification.json','task.md','feedback.json'].filter(f => fs.existsSync(path.join(dir,f))),
         wireFiles: fs.existsSync(wire) ? fs.readdirSync(wire).filter(f => /^[0-9]{5}\.(request|response)\.body$/.test(f)).map(f => `wire/${f}`) : [],
         read: 'Use evidence with the same target and text as JSON: {"file":"run.json","offset":0}. Pages retain byte offsets; use nextOffset until eof.' };
     }
@@ -257,8 +266,11 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   let result;
   let cleanup = { pass: false, status: 'pending' };
   try {
-    result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor' }, model: supervisor, execute, inspect,
+    const baselineCheck = await check(candidate, plan.verify);
+    write(path.join(plan.output, 'baseline-verification.json'), baselineCheck);
+    result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, baselineVerification: brief(baselineCheck), wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor', liveSteering: 'Local workers receive supervisor corrections between actions. Worker feedback includes actual tool observations; read feedback.json for the current snapshot.' }, model: supervisor, execute, inspect,
       validateJobs: jobs => validateForemanVerifiers(jobs, command => check(candidate, command)),
+      steer: (job, text) => queueWorkerSteering(path.join(plan.output, 'jobs', job.id), path.join(plan.output, 'jobs', job.id, 'ws'), text),
       verify: async () => { const r = await check(candidate, plan.verify); write(path.join(plan.output, 'final-verification.json'), r); return brief(r); }, emit, signal: ac.signal });
     // Never let teardown erase completed work, usage or the supervisor finish.
     write(path.join(plan.output, 'completion-checkpoint.json'), result);

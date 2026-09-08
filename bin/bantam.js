@@ -13,6 +13,7 @@ import readline from "node:readline";
 import { repoRootFromCli } from "../src/repo-root.js";
 import { isChangeShapedRequest, runAgent } from "../src/agent.js";
 import { runIsAttended } from "../src/attendance.js";
+import { openWorkerControl } from "../src/foreman-worker-control.js";
 import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
@@ -2182,11 +2183,13 @@ if (cmd === undefined || cmd === "chat") {
   const detachModelCheckpoint = attachModelRequestCheckpoint(model, checkpoint);
   let checkpointDisarmed = false;
   const baseOnEvent = tui ? (e) => tui.handleEvent(e) : (autonomous ? liveLogger : makeInteractiveLogger());
-  const captureEvent = (checkpoint || factoryTelemetry)
+  const workerControl = args['supervisor-control'] === undefined ? null : openWorkerControl(args['supervisor-control'], workspace);
+  const captureEvent = (checkpoint || factoryTelemetry || workerControl)
     ? (event) => {
         checkpoint?.note(event);
         laneBridge?.note(event, checkpoint, { model });
         factoryTelemetry?.note(event);
+        workerControl?.note(event);
         baseOnEvent(event);
       }
     : baseOnEvent;
@@ -2219,6 +2222,7 @@ if (cmd === undefined || cmd === "chat") {
       task: args.task,
       supportingContext: typeof args["supporting-context-file"] === "string"
         ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
+      drainInjections: workerControl ? () => workerControl.drain() : null,
       workspace,
       shellNetwork: args["dangerously-allow-net"] ? true : undefined,
       model,

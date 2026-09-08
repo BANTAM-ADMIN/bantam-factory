@@ -51,6 +51,30 @@ test('routine queue context omits detailed usage receipts and full verification 
   assert.equal(summary[0].result.usage.inputTokens,20); assert.equal(summary[0].result.usage.calls,undefined);
   assert.equal(summary[0].result.verification.stdoutTail.length,2000); assert.equal(row.result.verification.stdout.length,20000);
 });
+test('green verification retains the actual test coverage instead of only a pass flag', () => {
+  const stdout = 'ok 1 - HTML packaging\nok 2 - JavaScript parses\n1..2\n# tests 2\n# pass 2\n';
+  const summary = summarizeJobs({snapshot:()=>[{result:{pass:true,verification:{pass:true,code:0,stdout,stderr:''}}}]});
+  assert.equal(summary[0].result.verification.stdoutTail, stdout);
+  assert.equal(summary[0].result.verification.stdoutTruncated, false);
+});
+test('a worker milestone does not inherit other jobs output obligations, while retaining the full project brief as context', () => {
+  const original = 'Create arcade.html with an interactive game. Write release-notes.md for the complete product.';
+  const j = {...job('core'),task:'Write engine.js and test/engine.test.js with deterministic assertions.'};
+  const task = foremanWorkerTask(original,j), context = foremanWorkerContext(j,[],original);
+  assert.deepEqual(requiredOutputPaths(task), ['engine.js','test/engine.test.js']);
+  assert.ok(context.includes(original));
+  assert.match(context,/supervisor owns final integration and full-task acceptance/);
+});
+test('supervisor can correct a running local worker and still must verify the complete candidate', async () => {
+  let release, received = '', checks = 0;
+  const m = model([action('enqueue',{jobs:[job('core')]}),action('steer',{target:'core',text:'Keep the files; replace printed booleans with assertions.'}),action('wait'),action('finish')]);
+  const result = await driveForeman({task:'complete product',initial:{},model:m,maxDecisions:4,
+    execute:async()=>{await new Promise(r=>{release=r;});return {pass:true};},
+    steer:async(j,text)=>{assert.equal(j.id,'core');received=text;release();return {queued:true};},
+    inspect:async()=>({}),verify:async()=>{checks++;return {pass:false,stderr:'Final product still missing UI.'};}});
+  assert.match(received,/assertions/);assert.equal(result.jobs.length,1);assert.equal(result.jobs[0].status,'passed');
+  assert.equal(checks,1);assert.equal(result.pass,false);
+});
 test('dependency process metadata cannot manufacture product lifecycle obligations', () => {
   const task = 'Implement synchronous packContext. Include required sections in original input order. Invalid input throws an Error.';
   const dependency = { id:'previous',status:'passed',result:{verification:{pass:true},integrated:true,changedFiles:['context-packet.js'],process:{aborted:false},usage:{calls:[{receipt:'retain privately'}]}} };

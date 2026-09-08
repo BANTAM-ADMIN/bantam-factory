@@ -1,0 +1,125 @@
+{
+  "schema": "bantam.fight-gallery.v1",
+  "public": true,
+  "rawEvidenceIncluded": false,
+  "cards": [
+    {
+      "id": "context-packet",
+      "title": "Context packet",
+      "kind": "BUILD",
+      "number": "01",
+      "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+      "recorded": true,
+      "sourceSha256": "f900707bc5bd3d57bece566b5292e9a6e49c0d5bb4843fbc1bb8f7a5cbafe0af",
+      "rows": [
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 58072,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "arm": "opencode",
+          "outcome": "OUTPUT_ONLY",
+          "passed": false,
+          "wallMs": 600004,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false
+        },
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 110560,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
+    },
+    {
+      "id": "patch-transaction",
+      "title": "Patch transaction",
+      "kind": "EXTEND",
+      "number": "02",
+      "description": "Check every preimage, then apply a set of compatible edits as one transaction.",
+      "recorded": true,
+      "sourceSha256": "375d0a2c1978208789817f3476e9a713e5ac06453c535ba6758ca0455dbbfeb4",
+      "rows": [
+        {
+          "label": "Codex · Astra",
+          "arm": "codex-astra",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 90337,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "BANTAM · local",
+          "arm": "bantam-local-27b",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 81772,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 559000,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true
+        }
+      ]
+    },
+    {
+      "id": "stream-framer",
+      "title": "Stream framer",
+      "kind": "REPAIR",
+      "number": "03",
+      "description": "Recover complete events across arbitrary byte chunks, with explicit stream termination.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "receipt-reducer",
+      "title": "Receipt reducer",
+      "kind": "BUILD",
+      "number": "01",
+      "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "snapshot-drift",
+      "title": "Snapshot drift",
+      "kind": "EXTEND",
+      "number": "02",
+      "description": "Bind a snapshot to real files. Detect what changed, and validate what did not.",
+      "recorded": false,
+      "rows": []
+    },
+    {
+      "id": "job-planner",
+      "title": "Job planner",
+      "kind": "REPAIR",
+      "number": "03",
+      "description": "Order dependent work deterministically. Propagate failure without losing the plan.",
+      "recorded": false,
+      "rows": []
+    }
+  ]
+}

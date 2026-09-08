@@ -4,6 +4,12 @@ Real work orders. Independent checks. Recorded clocks and token receipts.
 
 ## Latest factory
 
+[Browse the launch gallery](launch-2026-09-07/index.html).
+
+[Patch transaction · launch series](launch-2026-09-07/patch-transaction/README.md):
+**BANTAM 81.8s, OpenCode 559.0s, native Astra 90.3s.** All passed 5/5 and
+finished cleanly; complete recorded totals are available for every lane.
+
 [Context packet · launch series](launch-2026-09-07/context-packet/README.md):
 BANTAM 5/5 in **58.1s**, native Astra 5/5 in **110.6s**, OpenCode 5/5 artifact
 but no clean completion at its **600s** time limit. Watch the replay, download
@@ -39,12 +45,13 @@ evidence. Keep original evidence private and identify sanitized derivatives.
 Generated files here are ignored to prevent accidental reintroduction. Adding
 a reviewed public package must be an explicit publication decision.
 
-## Release blocker: Git history
+## Repository publication
 
-Moving files out of the current tree does not erase previous Git commits.
-The existing repository must remain private until the complete privacy audit
-and an explicitly approved history-cleanup or clean-public-repository process
-are finished. This move is not a secret-scan clearance.
+The approved history cleanup and fresh-private-repository handoff are recorded
+in the [privacy audit](../PRIVACY-RELEASE-AUDIT.md). Historical archives remain
+private. The release repository still requires final-revision checks and
+explicit approval before its visibility changes. A reviewed card is not blanket
+clearance for raw transcripts or unrelated release assets.
 
 See [bring-your-own comparisons](../BRING-YOUR-OWN-COMPARISONS.md) to generate
 new local cards, and [launch readiness](../LAUNCH-READINESS.md) for remaining work.

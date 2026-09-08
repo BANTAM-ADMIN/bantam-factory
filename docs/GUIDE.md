@@ -783,5 +783,5 @@ protocol and its configuration limits.
 - [Factory getting started](FACTORY-GETTING-STARTED.md) — isolated build, inspection, and explicit apply.
 - [`docs/PRINCIPLES.md`](PRINCIPLES.md) — the first principle (*it's the context, not the model*), the evidence table, and the diagnose loop.
 - [`docs/SELF-IMPROVEMENT.md`](SELF-IMPROVEMENT.md) — the full self-improvement loop: record → witness → rewind → A/B → score → evidence-gated promotion.
-- [`docs/ROADMAP.md`](ROADMAP.md) — the product thesis and where it's headed.
+- [`docs/FACTORY-MODEL.md`](FACTORY-MODEL.md) — the coding factory's design thesis.
 - [`docs/GROUNDING_TOOLS.md`](GROUNDING_TOOLS.md) — the symbolic-tool design in depth.

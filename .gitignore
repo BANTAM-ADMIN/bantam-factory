@@ -12,3 +12,4 @@ __pycache__/
 
 # Internal launch strategy belongs outside the repository.
 BANTAM-LAUNCH-PLAN.md
+/docs/ROADMAP.md

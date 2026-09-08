@@ -1,0 +1,92 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {publicShowcaseData} from '../scripts/factory-showcase.mjs';
+import {buildLaunchData} from '../scripts/factory-launch.mjs';
+import {buildFightGallery,renderFightGallery,writeFightGallery,stageFightGallery} from '../scripts/factory-fight-gallery.mjs';
+import {PUBLIC_FACTORY_CARDS} from '../scripts/factory-card-catalog.mjs';
+
+const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+function fixture(t,{recorded=true,root:existingRoot,id='context-packet'}={}){
+  const root=existingRoot??fs.mkdtempSync(path.join(os.tmpdir(),'bantam-gallery-test-'));
+  if(!existingRoot)t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const dir=path.join(root,id),share=path.join(dir,'share');
+  fs.mkdirSync(share,{recursive:true});
+  const row=arm=>({arm,model:'Qwen 27B · same local weights',recorded,outcome:arm==='opencode'?'OUTPUT_ONLY':'PASS',
+    accepted:true,completed:arm!=='opencode',wallMs:arm==='opencode'?600000:58000,groupsPassed:5,groupsTotal:5,
+    publicExit:0,hiddenExit:0,protectedChanges:0,tokenUpdates:[],accounting:{complete:arm!=='opencode',
+      full:{inputTokens:null,outputTokens:null,cacheHitTokens:null,freshInputTokens:null}}});
+  const source=JSON.stringify(publicShowcaseData({generatedAt:'2026-09-07T12:00:00Z',series:[{kind:'comparison',complete:recorded,
+    cards:[{card:id,repeat:1,rows:[row('bantam-local-27b'),row('opencode')]}]}]}));
+  fs.writeFileSync(path.join(dir,'showcase.json'),source);
+  fs.writeFileSync(path.join(dir,'README.md'),'Public test notes');
+  fs.writeFileSync(path.join(dir,'index.html'),'Public test replay');
+  fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify({schema:'bantam.factory-showcase-package.v1',private:false,redacted:true,
+    files:[['showcase.json',source],['index.html','Public test replay']].map(([name,bytes])=>({path:name,bytes:Buffer.byteLength(bytes),sha256:sha(bytes)}))}));
+  const files=[['index.html','<!doctype html><title>Test</title>'],['share-card.png',Buffer.from('synthetic asset')],['share-card.svg','<svg/>'],
+    ['fight-card.json',JSON.stringify(buildLaunchData(source))]];
+  for(const [name,bytes]of files)fs.writeFileSync(path.join(share,name),bytes);
+  fs.writeFileSync(path.join(share,'package.json'),JSON.stringify({schema:'bantam.launch-package.v1',public:true,redacted:true,
+    rawEvidenceIncluded:false,source:{sha256:sha(source)},files:files.map(([name,bytes])=>({path:name,bytes:Buffer.byteLength(bytes),sha256:sha(bytes)}))}));
+  return {root,dir,share};
+}
+
+test('gallery keeps all six planned tasks, complete rosters, timeout and partial-accounting disclosure',t=>{
+  const {root}=fixture(t),data=buildFightGallery(root),html=renderFightGallery(data);
+  assert.equal(data.cards.length,6);assert.equal(data.cards.filter(c=>c.recorded).length,1);
+  const card=data.cards.find(c=>c.id==='context-packet');
+  assert.equal(card.rows.length,2);assert.equal(card.rows[0].passed,true);assert.equal(card.rows[1].passed,false);
+  assert.match(html,/OUTPUT_ONLY/);assert.match(html,/600\.0s/);assert.match(html,/Partial accounting disclosed/);
+  assert.match(html,/1\/6/);assert.match(html,/Not published yet/);assert.match(html,/1\/1/);
+  assert.doesNotMatch(html,/<script|<iframe|<img[^>]+src="https?:/i);
+  assert.deepEqual(writeFightGallery({root}),{published:1,planned:6});
+  assert.throws(()=>writeFightGallery({root}),/Refusing to replace/);
+  assert.deepEqual(writeFightGallery({root,replace:true}),{published:1,planned:6});
+});
+
+test('gallery rejects incomplete rosters, raw inputs, tampered packages and symlinked outputs',t=>{
+  const missing=fixture(t,{recorded:false});assert.throws(()=>buildFightGallery(missing.root),/fully recorded/);
+  const altered=fixture(t);fs.appendFileSync(path.join(altered.share,'index.html'),'tamper');
+  assert.throws(()=>buildFightGallery(altered.root),/hash mismatch/);
+  const raw=fixture(t);fs.writeFileSync(path.join(raw.dir,'showcase.json'),JSON.stringify({schema:'bantam.factory-showcase.v1',mode:'private'}));
+  assert.throws(()=>buildFightGallery(raw.root),/redacted public/);
+  const linked=fixture(t);fs.symlinkSync(path.join(linked.dir,'showcase.json'),path.join(linked.root,'index.html'));
+  assert.throws(()=>writeFightGallery({root:linked.root,replace:true}),/Refusing to replace/);
+});
+
+test('gallery escapes display text and never turns unsupported labels into paths',t=>{
+  const {root}=fixture(t),data=buildFightGallery(root);
+  const card=data.cards.find(c=>c.recorded);card.rows[0].label='<img src=x onerror=alert(1)>';
+  assert.doesNotMatch(renderFightGallery(data),/<img src=x/);
+  card.id='../private';assert.throws(()=>renderFightGallery(data),/Unrecognized/);
+});
+
+test('publication requires the full six-card set and copies only the explicit reviewed file list',t=>{
+  const {root}=fixture(t),output=path.join(root,'staged');
+  assert.throws(()=>stageFightGallery({root,output}),/All six/);
+  assert.equal(fs.existsSync(output),false);
+  for(const id of Object.keys(PUBLIC_FACTORY_CARDS).filter(id=>id!=='context-packet'))fixture(t,{root,id});
+  fs.writeFileSync(path.join(root,'context-packet','private-run.json'),'PRIVATE_DO_NOT_UPLOAD');
+  fs.writeFileSync(path.join(root,'private.txt'),'PRIVATE_DO_NOT_UPLOAD');
+  assert.deepEqual(stageFightGallery({root,output}),{cards:6,files:56});
+  assert.equal(fs.existsSync(path.join(output,'private.txt')),false);
+  assert.equal(fs.existsSync(path.join(output,'context-packet','private-run.json')),false);
+  assert.equal(fs.readFileSync(path.join(output,'context-packet','README.md'),'utf8'),'Public test notes');
+  assert.throws(()=>stageFightGallery({root,output}),/fresh absolute/);
+  fs.appendFileSync(path.join(root,'context-packet','index.html'),'tamper');
+  assert.throws(()=>stageFightGallery({root,output:path.join(root,'bad')}),/Detailed package hash mismatch/);
+  assert.equal(fs.existsSync(path.join(root,'bad')),false);
+});
+
+test('Pages workflow is explicit public-only main-branch publication of staged assets',()=>{
+  const yaml=fs.readFileSync(new URL('../.github/workflows/fight-gallery.yml',import.meta.url),'utf8');
+  assert.match(yaml,/workflow_dispatch:/);assert.match(yaml,/default: false/);
+  assert.match(yaml,/inputs\.publish_reviewed_gallery == true/);
+  assert.match(yaml,/github\.event\.repository\.private == false/);
+  assert.match(yaml,/github\.ref == 'refs\/heads\/main'/);
+  assert.doesNotMatch(yaml,/^\s+(?:push|pull_request):/m);
+  assert.match(yaml,/path: fight-pages/);assert.match(yaml,/stageFightGallery/);
+});

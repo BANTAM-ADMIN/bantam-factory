@@ -147,6 +147,6 @@ for shell configuration and platform constraints.
 
 This workflow is a bounded implementation/inspection/apply path. It does not
 claim autonomous scheduling, guaranteed semantic correctness, or automatic
-promotion of experimental factory mechanisms. Use [the roadmap](ROADMAP.md)
-for outstanding release work and [the factory model](FACTORY-MODEL.md) for the
-design thesis.
+promotion of experimental factory mechanisms. See [the factory model](FACTORY-MODEL.md)
+for the design thesis and [supported setup and limits](LAUNCH-READINESS.md)
+before choosing a deployment configuration.

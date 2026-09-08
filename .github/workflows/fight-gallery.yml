@@ -1,0 +1,48 @@
+name: Publish reviewed fight gallery
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_reviewed_gallery:
+        description: Publish the reviewed six-card gallery to the public web
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reviewed-fight-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: inputs.publish_reviewed_gallery == true && github.event.repository.private == false && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Validate and stage only reviewed public assets
+        run: |
+          node --input-type=module -e '
+            import {stageFightGallery} from "./scripts/factory-fight-gallery.mjs";
+            console.log(stageFightGallery({root:process.cwd()+"/docs/fights/launch-2026-09-07",output:process.cwd()+"/fight-pages"}));
+          '
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: fight-pages
+      - name: Publish gallery
+        id: deployment
+        uses: actions/deploy-pages@v4

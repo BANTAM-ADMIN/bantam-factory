@@ -32,13 +32,14 @@ The Linux x64 archive SHA-256 was checked against the GitHub release asset diges
 Private reports remain outside the repository; this document intentionally does
 not include matched values, workstation paths or raw evidence.
 
-## Required before public launch
+## Publication checklist
 
-1. Complete the approved coordinated history cleanup: remove archived raw-card
-   paths and sanitize historical workstation identifiers. Preserve a verified
-   private bundle and the commit map. Check a fresh remote clone afterward.
-2. Finish review of remaining dated documents, image assets and fixture records
-   for unrelated personal work and provenance. Scan the exact release tree,
+1. The approved coordinated history cleanup is complete, including the final
+   historical example-credential correction described below. Verified private
+   bundles and commit maps preserve the originals; a remote installation
+   exercise is recorded below. Do not reintroduce old branches or clones.
+2. Dated documents, image assets and fixture records have been reviewed for
+   known personal identifiers and unrelated work. Re-scan the exact release tree,
    including newly added files, and inspect final public packages and their
    compressed/encoded payloads. Audit any release assets, hosted sites and
    externally shared bundles separately; a local Git scan does not cover them.
@@ -102,3 +103,28 @@ publication; that does not prevent a public GitHub source release.
 Local qualification: 4,159 tests passed, zero failed, 76 skipped, plus the new
 installed-command test passed separately. Hosted CI must pass on the release
 revision before publication. The repository visibility has not been changed.
+
+## Final historical example correction
+
+A manual documentation-history review found one literal API-key example that
+the pattern scanner did not flag. It was replaced throughout release history
+with an environment-variable placeholder. This demonstrates why a clean
+pattern scan alone is not sufficient. If the value was ever a real service
+credential, rotation remains necessary; history cleanup does not revoke it.
+
+The second cleanup preserved the prepared tip tree byte-for-byte. Gitleaks then
+scanned 80 rewritten commits (14.21 MB) with no findings, and the targeted
+documentation-history check found zero remaining literal examples. Reports,
+the original value, recovery bundle and commit map remain private and outside Git.
+
+Because unreachable objects can remain retrievable on GitHub, the intermediate
+repository was also retained as a private prelaunch archive. The current project
+URL now points to a fresh private repository containing only the final cleaned
+history. The pre-cleanup commit returns HTTP 404 there. Both archive repositories
+remain private; neither is the release target. No Pages site or release assets
+were migrated. The cleaned baseline `a25b4e7` passed hosted CI.
+
+The fresh launch-series cards are separate reviewed derivatives with raw evidence
+kept privately. Their public packages retain timeouts, failures and partial
+accounting. Recheck CI and scans on the final presentation revision before
+publication; explicit approval to change repository visibility is still required.

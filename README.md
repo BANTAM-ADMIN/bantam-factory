@@ -45,15 +45,21 @@ Fight cards put BANTAM and other coding systems on the same work order, with
 the same starting files and independent acceptance checks. See the result,
 the elapsed time, and the accounting behind it. Then run a comparison yourself.
 
-[![BANTAM: Context Packet, 5/5 in 58.1 seconds](docs/fights/launch-2026-09-07/context-packet/share/share-card.png)](docs/fights/launch-2026-09-07/context-packet/share/index.html)
+[![BANTAM: Patch Transaction, 5/5 in 81.8 seconds](docs/fights/launch-2026-09-07/patch-transaction/share/share-card.png)](docs/fights/launch-2026-09-07/patch-transaction/share/index.html)
 
-In the latest recorded Context Packet comparison, **BANTAM's local 27B passed
-5/5 in 58.1 seconds; native Astra passed 5/5 in 110.6 seconds**. OpenCode,
-using the same local weights as BANTAM, produced a passing artifact but reached
-the 600-second limit without clean completion.
-[Open the replay and full accounting](docs/fights/launch-2026-09-07/context-packet/README.md).
+**Same local 27B. Patch Transaction: BANTAM 81.8 seconds, OpenCode 559.0 seconds.
+Both passed 5/5 and finished cleanly.** BANTAM also used fewer input and output
+tokens. Native Astra completed the same task in 90.3 seconds.
 
-That is a measured win on this attempt, not a universal ranking. The card retains
+| Work order | BANTAM · local 27B | OpenCode · same 27B | Native Astra |
+|---|---:|---:|---:|
+| [Build a context packer](docs/fights/launch-2026-09-07/context-packet/README.md) | **58.1s · PASS 5/5** | 600s limit · artifact 5/5, unfinished | 110.6s · PASS 5/5 |
+| [Extend a transactional edit engine](docs/fights/launch-2026-09-07/patch-transaction/README.md) | **81.8s · PASS 5/5** | 559.0s · PASS 5/5 | 90.3s · PASS 5/5 |
+
+[Browse the fight gallery](docs/fights/launch-2026-09-07/index.html) ·
+[Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md)
+
+These are measured wins on these attempts, not a universal ranking. The cards retain
 OpenCode's partial request-level accounting and separates its passing artifact
 from its unfinished run. Frontier comparisons use a different model; same-model
 comparisons isolate the local weights, not every configuration difference.

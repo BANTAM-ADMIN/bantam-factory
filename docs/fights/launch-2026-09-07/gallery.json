@@ -361,6 +361,88 @@
   "references": {
     "cards": [
       {
+        "id": "context-packet",
+        "title": "Context packet",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+        "recorded": true,
+        "sourceSha256": "c9305d7d3e68a58ccb82e256ef44234ac2115ea3d20aea8196827aa5e7f80df0",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 80424,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 108365,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 74221,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "id": "patch-transaction",
+        "title": "Patch transaction",
+        "kind": "EXTEND",
+        "number": "02",
+        "description": "Check every preimage, then apply a set of compatible edits as one transaction.",
+        "recorded": true,
+        "sourceSha256": "68b0f06a7d89bee831ba56c84cd823eebdcbcacac24805459c3c1fc3e09aca41",
+        "rows": [
+          {
+            "label": "Claude · Sonnet",
+            "arm": "claude-sonnet",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 81451,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Opus",
+            "arm": "claude-opus",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 153545,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Claude · Fable",
+            "arm": "claude-fable",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 41182,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
         "id": "stream-framer",
         "title": "Stream framer",
         "kind": "REPAIR",

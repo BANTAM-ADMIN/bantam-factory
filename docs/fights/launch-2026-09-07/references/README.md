@@ -1,6 +1,6 @@
 # Native Claude Code references
 
-Fresh native Claude Code attempts on the launch work orders, three models per
+Fresh native Claude Code attempts on every launch work order, three models per
 work order: the `sonnet`, `opus` and `fable` aliases, which reported
 `claude-sonnet-5`, `claude-opus-5` and `claude-fable-5-1`. Each reference card
 is a separately recorded package beside the launch card of the same name. It is
@@ -9,17 +9,22 @@ same-model comparison.
 
 | Work order | Claude Sonnet | Claude Opus | Claude Fable | BANTAM local attempt |
 |---|---:|---:|---:|---:|
-| [Receipt reducer](receipt-reducer/README.md) | 36.6 s · 5/5 | 89.4 s · 5/5 | 58.5 s · 5/5 | [112.5 s · 5/5](../receipt-reducer/README.md) |
-| [Snapshot drift](snapshot-drift/README.md) | 35.7 s · 5/5 | 74.8 s · 5/5 | 82.5 s · 5/5 | [124.3 s · 5/5](../snapshot-drift/README.md) |
-| [Job planner](job-planner/README.md) | 49.7 s · 5/5 | 64.2 s · 5/5 | 65.4 s · 5/5 | [193.2 s · 5/5](../job-planner/README.md) |
+| [Context packet](context-packet/README.md) | 80.4 s · 5/5 | 108.4 s · 5/5 | 74.2 s · 5/5 | [**58.1 s · 5/5**](../context-packet/README.md) |
+| [Patch transaction](patch-transaction/README.md) | 81.5 s · 5/5 | 153.5 s · 5/5 | **41.2 s · 5/5** | [81.8 s · 5/5](../patch-transaction/README.md) |
+| [Stream framer](stream-framer/README.md) | **125.9 s · 5/5** | 185.7 s · 5/5 | 128.3 s · 5/5 | [600 s · TIMEOUT 4/5](../stream-framer/README.md) |
+| [Receipt reducer](receipt-reducer/README.md) | **36.6 s · 5/5** | 89.4 s · 5/5 | 58.5 s · 5/5 | [112.5 s · 5/5](../receipt-reducer/README.md) |
+| [Snapshot drift](snapshot-drift/README.md) | **35.7 s · 5/5** | 74.8 s · 5/5 | 82.5 s · 5/5 | [124.3 s · 5/5](../snapshot-drift/README.md) |
+| [Job planner](job-planner/README.md) | **49.7 s · 5/5** | 64.2 s · 5/5 | 65.4 s · 5/5 | [193.2 s · 5/5](../job-planner/README.md) |
 
-All nine attempts passed 5/5 with complete native aggregate token and cache
-accounting. Every Claude attempt here was quicker than BANTAM's local 27B
-attempt on the same work order. Different models, native policies and run
-windows matter: this table compares individual observations across cohorts,
-not simultaneous trials or a general ranking. The launch cards and all their
-contender outcomes remain unchanged. References for the remaining launch work
-orders are recording and are not results until published here.
+All eighteen attempts passed 5/5 with complete native aggregate token and
+cache accounting. Bold marks the quickest attempt in each row. BANTAM's local
+27B attempt was quicker than all three Claude attempts on Context packet and
+within a second of Sonnet on Patch transaction; the Claude attempts were
+quicker on the other four work orders, including Stream framer, where BANTAM's
+attempt timed out. Different models, native policies and run windows matter:
+this table compares individual observations across cohorts, not simultaneous
+trials or a general ranking. The launch cards and all their contender outcomes
+remain unchanged.
 
 ## Shared conditions
 
@@ -31,8 +36,8 @@ disabled; the existing file credential was mounted read-only. Offline
 dummy-auth runtime checks passed before scoring. No installer, login or manual
 candidate repair was used.
 
-Claude attempts ran serially in their own queue while a separate local/Codex
-comparison was recording on the same machine, so CPU and I/O contention
+Claude attempts ran serially in their own queue while separate local/Codex
+comparisons were recording on the same machine, so CPU and I/O contention
 remained possible. The local model was not used by Claude. Work-order and
 starter materials were frozen; candidates received the same independent
 graders.

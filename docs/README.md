@@ -5,6 +5,9 @@
 The public gallery contains reviewed, inspectable cards. Older historical packages
 are covered by the [archive policy](fights/README.md).
 
+[Next fights: the factory builds its toolbox](NEXT-FIGHTS.md) proposes useful
+tools, MCP access, and shareable improvements as the next public series.
+
 This index distinguishes operating guidance from proposals and dated evidence.
 Navigation was reconciled with the implemented CLI on 2026-09-07.
 Recorded measurements retain the date and configuration of their own artifacts.

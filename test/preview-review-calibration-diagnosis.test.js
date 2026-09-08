@@ -86,24 +86,26 @@ test("every diagnosis still names the case it belongs to", async (t) => {
   );
 });
 
-// The default preview budget is tuned for the interactive operator loop, where
-// a human is waiting. Calibration is a batch evidence run over a whole manifest
-// and inherited that budget, which is what expired on CI.
+// A browser that hangs consumes whatever budget it is given, so a larger one
+// buys nothing. Measured across two CI runs: a healthy launch on the runner
+// takes 4.5-5.4s, and a starved one, reproduced locally on two loaded cores,
+// takes 6s. A sick one produced nothing at 25000 ms and nothing at 75000 ms.
+// Calibration therefore keeps the preview runner's own default and exposes an
+// override for a host that genuinely needs one.
 
-test("calibration asks for more browser time than the interactive default", () => {
-  assert.ok(calibrationPreviewTimeoutMs({}) > 25000,
-    `expected a budget above the 25s interactive default, got ${calibrationPreviewTimeoutMs({})}`);
+test("calibration leaves the preview budget to the runner by default", () => {
+  assert.equal(calibrationPreviewTimeoutMs({}), null);
 });
 
-test("the calibration browser budget is overridable and validated", () => {
+test("an explicit budget is honoured and a nonsense one is ignored", () => {
   assert.equal(calibrationPreviewTimeoutMs({ BANTAM_CALIBRATION_PREVIEW_TIMEOUT_MS: "90000" }), 90000);
   for (const bad of ["0", "-1", "abc", "", "1.5"]) {
-    assert.equal(calibrationPreviewTimeoutMs({ BANTAM_CALIBRATION_PREVIEW_TIMEOUT_MS: bad }),
-      calibrationPreviewTimeoutMs({}), `rejected value ${JSON.stringify(bad)} must fall back to the default`);
+    assert.equal(calibrationPreviewTimeoutMs({ BANTAM_CALIBRATION_PREVIEW_TIMEOUT_MS: bad }), null,
+      `nonsense value ${JSON.stringify(bad)} must fall back to the runner default`);
   }
 });
 
-test("the budget reaches the preview runner", async (t) => {
+test("no override means no timeoutMs is forced on the runner", async (t) => {
   const root = scriptedManifest();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   let seen = null;
@@ -111,5 +113,36 @@ test("the budget reaches the preview runner", async (t) => {
     seen = options;
     return { ok: true, screenshot: "/nowhere/preview.png", screenshotBytes: 0, browserTimedOut: true };
   }), /browser ran out of time/i);
-  assert.equal(seen?.timeoutMs, calibrationPreviewTimeoutMs({}));
+  assert.equal(seen?.timeoutMs, undefined);
+});
+
+// The runner records the browser's own stderr whenever the browser did not
+// exit cleanly, a SIGKILL from the timeout included. The first diagnosis
+// printed that tail only for a non-zero exit code, and a killed browser
+// reports no code at all, so the one place the cause is actually written was
+// withheld from every timeout.
+
+test("a timed-out browser still reports what it printed", async (t) => {
+  const root = scriptedManifest();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  await assert.rejects(
+    runWith(root, () => ({
+      ok: true, screenshot: "/nowhere/preview.png", screenshotBytes: 0,
+      browserTimedOut: true, browserExit: null,
+      browserStderrTail: "Fontconfig error: Cannot load default config file",
+    })),
+    /Fontconfig error: Cannot load default config file/,
+  );
+});
+
+test("a silent browser says the output was empty rather than inventing a cause", async (t) => {
+  const root = scriptedManifest();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  await assert.rejects(
+    runWith(root, () => ({
+      ok: true, screenshot: "/nowhere/preview.png", screenshotBytes: 0,
+      browserTimedOut: true, browserExit: null, browserStderrTail: "",
+    })),
+    /printed nothing/i,
+  );
 });

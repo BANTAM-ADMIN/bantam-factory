@@ -80,11 +80,103 @@
       "reason": "supervisor observed-token admission limit reached",
       "supervisorCalls": 23,
       "operatorStopped": false
+    },
+    {
+      "id": "astra-supervised-local-final",
+      "kind": "supervisor qualification",
+      "startedAt": "2026-09-08T22:43:49.617Z",
+      "wallMs": 902971,
+      "wallLimitMs": 900000,
+      "completed": false,
+      "reason": "15-minute deadline reached before repair completion and final verification",
+      "supervisorCalls": 30,
+      "operatorStopped": false,
+      "sourceCommit": "f20fee0903edec8eaaec37946916b108df035256",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
+      "artifactSha256": "1b90e73f18f6443812e17ea9310cef7aef5b057a1b396ed604c57a754f606ee7",
+      "usage": {
+        "supervisor": {
+          "inputTokens": 832876,
+          "outputTokens": 2485,
+          "cacheHitTokens": 778240,
+          "freshInputTokens": 54636
+        },
+        "localOutputTokens": null,
+        "localObservedOutputTokens": 45768,
+        "localUsageComplete": false,
+        "actualCostUsd": null,
+        "astraApiEquivalentUsd": {
+          "low": 1.44885,
+          "high": 1.58544
+        }
+      },
+      "contextAudit": {
+        "originalTaskPresentInEverySupervisorRequest": true,
+        "originalTaskPresentInEveryWorkerDecision": true,
+        "workerDecisionPromptsMatchLiteralRequests": true,
+        "workerContextTokens": 72192,
+        "sourceUnchanged": true,
+        "cleanupPassed": true
+      },
+      "integratedCandidate": {
+        "checks": {
+          "gravity_visible": false,
+          "hard_drop_scores": false,
+          "pause_overlay": true,
+          "pause_resumes": true,
+          "frame_time_gravity": false,
+          "preview_matches_spawn": false,
+          "hold_resets_after_lock": false
+        },
+        "viewports": [
+          {
+            "width": 390,
+            "overflow": false,
+            "controlsWithinWidth": true
+          },
+          {
+            "width": 320,
+            "overflow": false,
+            "controlsWithinWidth": true
+          }
+        ],
+        "pageErrors": []
+      },
+      "repairSnapshot": {
+        "integrated": false,
+        "completionAccepted": false,
+        "artifactSha256": "8ab2f24018b560eee3813ffbfc82c7f2b012ce6f5ad72f5674548f903ff45265",
+        "checks": {
+          "gravity_visible": true,
+          "hard_drop_scores": true,
+          "pause_overlay": true,
+          "pause_resumes": true,
+          "frame_time_gravity": true,
+          "preview_matches_spawn": true,
+          "hold_resets_after_lock": true
+        },
+        "viewports": [
+          {
+            "width": 390,
+            "overflow": false,
+            "controlsWithinWidth": true
+          },
+          {
+            "width": 320,
+            "overflow": false,
+            "controlsWithinWidth": true
+          }
+        ],
+        "pageErrors": [],
+        "result": "Targeted post-run checks pass; requested behavioral test file and final verification were not completed."
+      }
     }
   ],
   "notes": [
     "The playable Astra factory build follows preview fixes. Earlier attempts and local refinements remain recorded here.",
-    "Native and wrapped Astra fresh builds had 10-minute limits. The supervisor diagnostics exposed a Bash-only verifier and render-loop preview misclassification; those are corrected in the next qualification run.",
-    "Generated games have no maintainer edits. Raw prompts, account data and model reasoning remain private."
+    "Native and wrapped Astra fresh builds had 10-minute limits. The supervisor diagnostics exposed a Bash-only verifier and render-loop preview misclassification. The final qualification used those fixes and a 15-minute limit; it reached the deadline before repair completion and final verification.",
+    "Generated games have no maintainer edits. Raw prompts, account data and model reasoning remain private.",
+    "The supervisor qualification used Astra only for supervision and the local 27B for all product edits. It retained the original brief in every decision. The integrated candidate had gameplay defects; the unintegrated repair snapshot passes targeted post-run checks. Neither is presented as a completed showcase build.",
+    "Astra API-equivalent estimates use the same standard rates and cache-write range as the playable comparison; actual Codex account charges were not supplied. Local usage is a measured lower bound because cancelled requests lack complete receipts."
   ]
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Offline presentation only. Never runs a model, contender, judge or imported code.
 import fs from 'node:fs';
+import {SHOWCASE_BOARD_CSS} from './fight-design.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {gzipSync} from 'node:zlib';
@@ -190,7 +191,7 @@ function scoreTable(series){
 
 export function renderShowcase({data,payloads}){
   const brand=fs.readFileSync(path.join(ROOT,'docs/brand/bantam-mark.svg')).toString('base64');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>BANTAM Arena · Recorded factory trials</title><style>${CSS}</style></head><body>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="referrer" content="no-referrer"><title>BANTAM Arena · Recorded factory trials</title><style>${CSS}${SHOWCASE_BOARD_CSS}</style></head><body>
 <div class="top-stripe"></div><header class="topbar"><a class="wordmark" href="#"><img src="data:image/svg+xml;base64,${brand}" alt="" width="44" height="44"><span>BANTAM <i>ARENA</i></span></a><div class="top-status"><span class="dot"></span> RECORDED EVIDENCE <span class="divider">/</span> ${data.mode==='public'?'PUBLIC SUMMARY':'PRIVATE EDITION'}</div><button id="download-summary" class="quiet">↓ Export data</button></header>
 <div class="layout"><aside class="rail"><p class="eyebrow">THE RECORD</p><nav id="series-nav" aria-label="Recorded series"></nav><div class="rail-foot"><span class="small-square"></span><p>Every edition stands alone.<br>Every outcome stays on record.</p></div></aside><main id="main"><section class="hero"><div><p class="eyebrow" id="edition-label">FACTORY SYSTEM TRIALS</p><h1 id="headline">Intelligence.<br><em>Put to work.</em></h1><p id="series-subtitle" class="hero-sub">Real work. Recorded clocks. Independent acceptance.</p></div><div class="hero-score"><span class="eyebrow">STRICT PASS / RECORDED</span><strong id="hero-score">—<small>/ —</small></strong><p id="hero-score-note">Artifact acceptance and harness completion are separate measures.</p><div class="mini-stats"><div><b id="accepted-count">—</b><span>PROJECTS ACCEPTED</span></div><div><b id="completed-count">—</b><span>CLEAN COMPLETIONS</span></div></div></div></section>
 <div class="privacy ${data.mode}"><span>${data.mode==='public'?'PUBLIC SUMMARY':'PRIVATE · NOT REDACTED'}</span> ${data.mode==='public'?'Only allowlisted measurements and public task labels. Context, source, private paths and raw evidence are deliberately omitted.':'This portable file contains private context, source, transcripts and machine paths. Review before posting or recording. Nothing is uploaded.'}</div>
@@ -263,9 +264,10 @@ function client(){
       return append(b,el('span',`${String(i+1).padStart(2,'0')} / ${entry.kind==='comparison'?'SYSTEM COMPARISON':'LOCAL QUALIFICATION'}`),el('b',entry.title),el('em',`${entry.counts.pass}/${entry.counts.observed} PASS · ${entry.complete?'recorded':'partial'}`));
     }));
     $('edition-label').textContent=`EDITION ${String(si+1).padStart(2,'0')} / ${s.complete?'RECORDED SERIES':'PARTIAL SERIES'}`;
-    const headline=$('headline');headline.replaceChildren(el('span',s.kind==='comparison'?'Same weights.':'One factory.'),el('br'),el('em',s.kind==='comparison'?'Different processes.':'Another worker.'));
+    const solo=new Set(s.cards.flatMap(card=>card.rows.map(row=>row.arm))).size===1;
+    const headline=$('headline');headline.replaceChildren(el('span',solo?'One system.':'The fight.'),el('br'),el('em',solo?'Real work.':'On record.'));
     const localSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='local').map(r=>r.arm))).size,frontierSystems=new Set(s.cards.flatMap(c=>c.rows.filter(r=>r.family==='astra').map(r=>r.arm))).size;
-    $('series-subtitle').textContent=s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same selected local model. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
+    $('series-subtitle').textContent=solo?`${s.cards.length} work order${s.cards.length===1?'':'s'}. One recorded system. This edition stands on its own; competitor attempts are not included.`:s.kind==='comparison'?`${localSystems} local harness${localSystems===1?'':'es'} on the same selected local model. ${frontierSystems} frontier configuration${frontierSystems===1?'':'s'} recorded separately. ${s.cards.length} work order${s.cards.length===1?'':'s'}; one frozen contract for each.`:`${s.cards[0]?.rows[0]?.model??'Local worker'} inside BANTAM. A separately recorded edition, not a replacement for the original comparison.`;
     $('hero-score').replaceChildren(document.createTextNode(String(s.counts.pass)),el('small',`/ ${s.counts.observed}`));
     $('hero-score-note').textContent=`${s.counts.groupsMeasured?`${s.counts.groupsPassed}/${s.counts.groupsTotal} independent groups passed across ${s.counts.groupsMeasured} measured attempts.`:'No independent group results recorded.'} ${s.counts.planned-s.counts.observed?`${s.counts.planned-s.counts.observed} planned attempts have no final record.`:'Every recorded outcome remains visible.'}`;
     $('accepted-count').textContent=`${s.counts.accepted}/${s.counts.observed}`;$('completed-count').textContent=`${s.counts.completed}/${s.counts.observed}`;

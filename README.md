@@ -1,126 +1,40 @@
-# BANTAM
+<p align="center">
+  <a href="https://bantam-admin.github.io/bantam-factory/">
+    <img src="docs/brand/bantam-banner.svg" alt="BANTAM — Small model. Heavy hitter. Your model. Your hardware. A better coding factory." width="100%">
+  </a>
+</p>
 
-**Your model. Your hardware. A better coding factory.**
+<p align="center">
+  <strong>A coding agent for the model you already run.</strong><br>
+  Build features. Fix bugs. Check the work. Keep the receipts.
+</p>
 
-BANTAM turns a local language model into a working coding agent: one that reads
-your project, builds features, repairs bugs, runs checks, and leaves evidence
-you can inspect. Built to get more speed, accuracy and useful work from the
-model you already run—not to sell you another model subscription.
+<p align="center">
+  <a href="#quick-start"><strong>Get started</strong></a> ·
+  <a href="https://bantam-admin.github.io/bantam-factory/"><strong>Watch the fight cards</strong></a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-The idea is industrial, not magical. Break difficult work into clear jobs.
-Put the right context at each station. Catch mistakes with checks, not wishes.
-Verify the result before calling it finished.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-f2b544?style=flat-square&labelColor=19251f" alt="License: Apache 2.0"></a>
+  <a href="docs/GETTING-STARTED.md"><img src="https://img.shields.io/badge/Node.js-20%2B-9fdbb8?style=flat-square&labelColor=19251f" alt="Node.js 20 or newer"></a>
+  <a href="docs/LAUNCH-READINESS.md"><img src="https://img.shields.io/badge/status-public_beta-f2b544?style=flat-square&labelColor=19251f" alt="Public beta"></a>
+</p>
 
-**Local work. Frontier backup. Fight cards that show what actually happened.**
+BANTAM turns a local language model into a working coding agent. It reads your
+project, edits files, runs your checks, and uses failure evidence to repair the
+result. You bring the model and the task. BANTAM supplies the process.
 
-[Get started](docs/GETTING-STARTED.md) · [See the fight cards](docs/fights/README.md) ·
-[Compare your tools](docs/BRING-YOUR-OWN-COMPARISONS.md) · [System handbook](docs/BANTAM-SYSTEM-HANDBOOK.md)
+**Local inference on your hardware. Optional frontier power. Results you can inspect.**
 
-## Make your local model do real work
+<a id="start-with-what-you-already-have"></a>
 
-Most people do not need another chatbot. They need the feature built, the bug
-fixed, and the tests passing. BANTAM is built for that job.
+## Quick start
 
-- **Context with a purpose.** Source, tool results, failure evidence and task
-  requirements feed the next decision. Factory checks target recurring mistakes
-  such as stale verification, unsupported conclusions and missing deliverables.
-- **Actions, not just suggestions.** BANTAM uses constrained generation where
-  supported, validates actions locally, and executes project commands in Docker
-  by default. It can edit your files and run your toolchain.
-- **Verification is part of the workflow.** Give BANTAM `npm test`, `pytest`, or
-  your own acceptance command. Failures become repair evidence. Strict autonomous
-  completion requires the configured checks and applicable completion gates.
-- **An auditable factory.** Recorded runs, durable factory events and replayable
-  evidence let you examine how the work happened—not just read a confident summary.
-- **Built for local speed.** The cache-fast context mode reuses growing prompt
-  prefixes with compatible servers. Fight cards expose wall time and token/cache
-  accounting so you can measure the benefit on your own machine.
+**Linux or WSL2 · Node.js 20+ · Git · Docker**
 
-A passing verifier proves what that verifier checked. BANTAM makes that evidence
-visible; it does not turn incomplete tests into a guarantee of correctness.
-
-## Don't take the pitch on faith. Watch the fight.
-
-Fight cards put BANTAM and other coding systems on the same work order, with
-the same starting files and independent acceptance checks. See the result,
-the elapsed time, and the accounting behind it. Then run a comparison yourself.
-
-[![BANTAM: Receipt Reducer, 5/5 in 112.5 seconds against five other systems](docs/fights/launch-2026-09-07/receipt-reducer/share/share-card.png)](docs/fights/launch-2026-09-07/receipt-reducer/share/index.html)
-
-**Same local 27B. Receipt Reducer: BANTAM 112.5 seconds, DeepSeek Harness
-442.7 seconds, Hermes 577.6 seconds. All passed 5/5 and finished cleanly.**
-BANTAM used 47.4% fewer input tokens and 69.4% fewer output tokens than DeepSeek.
-Native Terra finished in 107.2s, Astra in 114.1s and Sol in 166.7s—all 5/5.
-The local factory was close to the fastest frontier result on this work order.
-[Inspect every counter and condition](docs/fights/launch-2026-09-07/receipt-reducer/README.md).
-
-More completed work orders, including the misses:
-
-| Work order | BANTAM · local 27B | OpenCode · same 27B | Native Astra |
-|---|---:|---:|---:|
-| [Build a context packer](docs/fights/launch-2026-09-07/context-packet/README.md) | **58.1s · PASS 5/5** | 600s limit · artifact 5/5, unfinished | 110.6s · PASS 5/5 |
-| [Extend a transactional edit engine](docs/fights/launch-2026-09-07/patch-transaction/README.md) | **81.8s · PASS 5/5** | 559.0s · PASS 5/5 | 90.3s · PASS 5/5 |
-| [Repair a streaming frame parser](docs/fights/launch-2026-09-07/stream-framer/README.md) | 432.7s · PASS 5/5 | 600s limit · TIMEOUT 0/5 | **160.7s · PASS 5/5** |
-
-Same weights, six systems. The 27B against itself in other harnesses, beside
-native Codex Astra, Sol and Terra:
-
-| Work order | BANTAM · local 27B | DeepSeek Harness · same 27B | Hermes · same 27B | Fastest native Codex |
-|---|---:|---:|---:|---:|
-| [Build a receipt reducer](docs/fights/launch-2026-09-07/receipt-reducer/README.md) | **112.5s · PASS 5/5** | 442.7s · PASS 5/5 | 577.6s · PASS 5/5 | Terra 107.2s · PASS 5/5 |
-| [Extend a snapshot-drift detector](docs/fights/launch-2026-09-07/snapshot-drift/README.md) | **124.3s · PASS 5/5** | 465.8s · PASS 5/5 | 497.0s · PASS 5/5 | Terra 106.2s · PASS 5/5 |
-| [Repair a job planner](docs/fights/launch-2026-09-07/job-planner/README.md) | **193.2s · PASS 5/5** | 483.5s · PASS 5/5 | 600s limit · TIMEOUT 2/5 | Astra 118.4s · PASS 5/5 |
-| [Build a redaction planner](docs/fights/launch-2026-09-07/redaction-plan/README.md) | **175.6s · PASS 5/5** | 391.8s · PASS 5/5 | 600s limit · TIMEOUT, artifact 5/5 | Astra 117.0s · PASS 5/5 |
-| [Repair a retry controller](docs/fights/launch-2026-09-07/retry-budget/README.md) | **141.7s · PASS 5/5** | 445.8s · PASS 5/5 | 562.0s · PASS 5/5 | Astra 137.3s · PASS 5/5 |
-
-Three selection work orders against native Codex Astra. All six attempts
-passed every acceptance group; the clock went both ways:
-
-| Work order | BANTAM · local 27B | Native Astra |
-|---|---:|---:|
-| [Keep a path inside its workspace](docs/fights/launch-2026-09-07/path-scope/README.md) | **75.1s · PASS 5/5** | 107.9s · PASS 5/5 |
-| [Match paths against globs](docs/fights/launch-2026-09-07/glob-select/README.md) | 264.1s · PASS 5/5 | **155.8s · PASS 5/5** |
-| [Resolve a semver range](docs/fights/launch-2026-09-07/semver-range/README.md) | 399.9s · PASS 5/5 | **136.2s · PASS 5/5** |
-
-Native Claude Code Sonnet, Opus and Fable ran the same work orders as
-[separately recorded references](docs/fights/launch-2026-09-07/references/README.md),
-shown on the gallery page beside BANTAM's own attempts.
-
-[Browse the live fight gallery](https://bantam-admin.github.io/bantam-factory/) ·
-[Inspect the Patch Transaction accounting](docs/fights/launch-2026-09-07/patch-transaction/README.md) ·
-[See the native Claude references](docs/fights/launch-2026-09-07/references/README.md)
-
-The first two tasks show measured wins; the stream parser passes but stays
-2.7× behind Astra. These are individual attempts, not a universal ranking. The cards retain
-partial request-level accounting and separate passing artifacts
-from unfinished runs. Frontier comparisons use a different model; same-model
-comparisons isolate the local weights, not every configuration difference.
-
-### Put BANTAM against your own tools
-
-```bash
-bantamfactory cards --card all --arms bantam-local-27b,opencode --live --public
-```
-
-Choose installed contenders, review the plan, and approve the run. Watch a live
-local scoreboard, then export a static replay and share image. `--public`
-creates a sanitized local package; it does **not** upload your project or publish
-anything automatically.
-
-Installed-harness comparisons support OpenCode, Hermes, DeepSeek Harness and
-Codex through their implemented adapters. Explicit Claude Sonnet/Opus comparisons
-also support an existing Linux x64 standalone CLI with file-backed authentication.
-Point BANTAM at supported installations;
-you do not need to install every rival. A model's OpenAI-compatible API is not
-automatically an agent-harness interface—see the
-[adapter and accounting guide](docs/BRING-YOUR-OWN-COMPARISONS.md) for supported
-paths and how to bring your tools into the comparison.
-
-## Start with what you already have
-
-Use an existing llama.cpp server, a compatible API backend such as vLLM, or your
-installed Codex CLI. First-run setup offers discovery and manual connection
-options, checks compatibility with your consent, and remembers your choice.
+Install from source and open guided setup:
 
 ```bash
 git clone https://github.com/BANTAM-ADMIN/bantam-factory.git
@@ -130,91 +44,141 @@ docker pull alpine:3
 ./bin/bantamfactory setup
 ```
 
-Want the command available in every project folder? Run `npm link` inside this
-checkout, then:
+Setup helps you connect an existing model server or your installed Codex CLI.
+With a suitable NVIDIA GPU, it also offers an optional model and runtime download.
+[Connection and hardware options →](docs/FIRST-RUN-SETUP.md)
+
+To use BANTAM from any project folder, run `npm link` in this checkout. Then:
 
 ```bash
 cd /path/to/your/project
-bantamfactory
+bantamfactory --verify "npm test"
 ```
 
-`npm link` registers both `bantamfactory` and `bantam`, replacing existing links
-for those names. To leave another installation untouched, use this checkout's
-explicit `bin/bantamfactory` path instead. No npm registry package is required.
+Tell it what needs doing:
 
-For an unattended task with an explicit verifier:
+> Fix the date parser's ISO-week handling. Add coverage for year boundaries and keep the existing tests passing.
+
+Use your project's actual verification command: `npm test`, `pytest`, or another
+check. Inspect the changed files and the verification result when it finishes.
+
+<a id="platforms"></a>
+
+<details>
+<summary><strong>Unattended tasks, installation details & platform support</strong></summary>
+
+For a bounded task with explicit verification:
 
 ```bash
 bantamfactory run --task "Fix the failing tests without weakening them" \
   --verify "npm test" --autonomous --save-run=.bantam/runs/repair.json
 ```
 
-Don't have a local server? Setup offers an optional, revision-pinned DavidAU
-27B bundle for a 24GB NVIDIA GPU, with download consent and integrity checks.
-Already have your own model stack? Keep it—BANTAM can connect without replacing
-your model or restarting your server.
+`npm link` registers both `bantamfactory` and `bantam`, replacing existing links
+for those names. Use this checkout's explicit `bin/bantamfactory` path to keep
+another installation's links. No npm registry package is required.
 
-[Installation guide](docs/GETTING-STARTED.md) ·
-[Connection and hardware options](docs/FIRST-RUN-SETUP.md) ·
-[Model runtime guide](docs/MODEL-RUNTIMES-AND-IMPROVEMENT.md)
+Install the toolchain and dependencies your project needs. Linux is the primary
+supported platform; Windows uses WSL2 with Docker integration. Native Windows is
+unsupported. macOS is unqualified and requires a different sandbox configuration.
+See [the full installation guide](docs/GETTING-STARTED.md) and
+[platform limits](docs/LAUNCH-READINESS.md).
 
-## Add Codex power when you want it
+</details>
 
-Local does not have to mean local-only. BANTAM can use your installed Codex CLI
-and account, with Luna, Terra, Sol or Astra options. Setup asks before sharing
-task context or using your account quota. Provider access and limits still apply.
+## Small model. Real work.
 
-For heavier coordination, the optional **Astra foreman** can supervise a local
-BANTAM worker and one Codex worker: assigning bounded jobs, inspecting evidence,
-and requiring final verification on the integrated result.
+BANTAM is built around a simple idea: useful coding work needs more than a good
+model response. It needs context, executable actions, feedback, and a checked finish.
+
+| What you need | What BANTAM brings |
+| --- | --- |
+| **Work on your code** | Project context, file edits, and commands through your existing toolchain. |
+| **Catch mistakes early** | Validated actions, supported generation constraints, and checks that feed the next repair. |
+| **Keep inference local** | Connect your own model server and run on your hardware. |
+| **Use frontier help** | Opt into supported Codex models and experimental supervised workflows. |
+| **Understand the result** | Saved runs, verification evidence, and clocks and token receipts you can inspect. |
+
+With local models and local tools, inference stays on your machine. Hosted models
+and external tools receive the context you send them. Project commands run in
+Docker by default, with shell network access off by default.
+[How the factory works →](docs/FACTORY-MODEL.md)
+
+## Watch the fight
+
+Same work order. Same starting files. Independent acceptance checks. See what
+BANTAM and the other systems delivered, how long it took, and what the meters recorded.
+
+[![Receipt Reducer: BANTAM and five other systems, with recorded outcomes and elapsed times](docs/fights/launch-2026-09-07/receipt-reducer/share/share-card.png)](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html)
+
+**Receipt Reducer, same local 27B:** BANTAM finished in **112.5s**, DeepSeek Harness
+in **442.7s**, and Hermes in **577.6s**. All three passed 5/5 and completed cleanly.
+Native Terra finished in **107.2s**, Astra in **114.1s**, and Sol in **166.7s**.
+[Inspect the run conditions and accounting →](docs/fights/launch-2026-09-07/receipt-reducer/README.md)
+
+**[Explore the fight gallery →](https://bantam-admin.github.io/bantam-factory/)**
+Choose a task, compare agents side by side, replay the measurements, and download
+the record. The gallery includes slower results, failures, unfinished runs, and
+[separately recorded frontier references](docs/fights/launch-2026-09-07/references/README.md).
+These are individual development-task observations, not a universal ranking.
+
+### Run BANTAM first. Bring the competition later.
+
+A solo card is useful on its own. Run a frozen work order through BANTAM and
+inspect whether it earns its finish:
 
 ```bash
-bantamfactory foreman --task "Build the requested feature" --verify "npm test" \
-  --endpoint http://127.0.0.1:8085 --with-codex terra
+bantamfactory cards --card context-packet --arms bantam-local-27b --live --public
 ```
 
-This supervised mode is experimental, opt-in, and works in a separate candidate
-workspace. It adds review and coordination—not a promise that more agents make
-every task faster. [Foreman guide](docs/FOREMAN.md).
+When you're ready, run a comparison with installed contenders on that work order:
 
-## Keep control of the work
+```bash
+bantamfactory cards --card context-packet \
+  --arms bantam-local-27b,opencode --live --public
+```
 
-With a local model and local tools, inference stays on your machine. Hosted
-models and external image tools receive the context you send them. Model and
-runtime downloads are optional; project shell network access is off by default
-in the Docker sandbox.
+The second command makes a **new comparison**, including a new BANTAM attempt.
+It does not splice results into the earlier run. Keep the original card and its
+conditions when comparing later evidence. Use `bantamfactory cards --list` to
+see available tasks and participants.
 
-Want a separate review-and-apply boundary? The
-[isolated factory workflow](docs/FACTORY-GETTING-STARTED.md) snapshots your source,
-builds and verifies a private candidate, and requires an explicit apply step to
-update your project. Opening `bantamfactory` alone starts the interactive agent;
-it does not automatically select isolated factory builds.
+BANTAM asks you to review the plan before execution. `--public` creates a sanitized
+local summary; it does not upload or publish the run. Competitors are explicitly
+selected, and only the recorded roster appears on the card.
+[Bring your own tools →](docs/BRING-YOUR-OWN-COMPARISONS.md)
 
-Private run transcripts stay private by default. Reviewed fight-card exports
-share measurements without bundling raw project context. Imported evidence is
-not permission to execute code or automatically change the factory.
+## Local work. Frontier backup.
 
-## Platforms
+Connect an existing llama.cpp server, a compatible API backend, or your installed
+Codex CLI through setup. BANTAM can use supported Codex models while retaining
+its own action and verification workflow. Hosted usage consumes provider access
+and quota; setup asks before using your account or sharing task context.
 
-**Linux, Node.js 20+, and Docker** are the primary supported setup. BANTAM uses
-the development tools you already have: install the toolchain and dependencies
-your project needs. Windows users should use Linux under WSL2 with Docker
-integration; native Windows execution is unsupported. macOS is unqualified and
-requires a different sandbox configuration; read the security guidance before
-using host execution.
+For heavier coordination, the experimental Astra foreman can supervise a local
+BANTAM worker and a Codex worker in a separate candidate workspace.
+[Explore the foreman →](docs/FOREMAN.md)
 
-Managed GPU profiles have hardware-specific limits. Bring-your-own servers are
-the primary path. [Supported setup and limits](docs/LAUNCH-READINESS.md) ·
-[Security model](SECURITY.md)
+Want a separate build-and-apply boundary? The
+[isolated factory workflow](docs/FACTORY-GETTING-STARTED.md) builds a private
+candidate and requires an explicit apply step to update your project.
+
+## Go deeper
+
+| Start here | Explore |
+| --- | --- |
+| [Installation & your first task](docs/GETTING-STARTED.md) | [Factory design](docs/FACTORY-MODEL.md) |
+| [Model connections & hardware](docs/FIRST-RUN-SETUP.md) | [System handbook](docs/BANTAM-SYSTEM-HANDBOOK.md) |
+| [Fight gallery](https://bantam-admin.github.io/bantam-factory/) | [Comparison adapters & accounting](docs/BRING-YOUR-OWN-COMPARISONS.md) |
+| [Security model](SECURITY.md) | [All documentation](docs/README.md) |
+
+A passing verifier establishes what that verifier checked. BANTAM makes the
+evidence visible so you can assess its scope.
 
 ## Build a better factory
 
-BANTAM is Apache-2.0 licensed. Contributions that improve context delivery,
-verification, adapters and reproducible comparisons are welcome. Bring a failure,
-show the evidence, build the fix, and prove it catches the mistake.
+Bring a useful task, a reproducible failure, or a better way to catch mistakes.
+Contributions to context delivery, verification, adapters, and the user experience
+are welcome. **[Contributing guide →](CONTRIBUTING.md)**
 
-[Contributing](CONTRIBUTING.md) · [Factory doctrine](docs/FACTORY-MODEL.md) ·
-[Technical guide](docs/GUIDE.md) · [License](LICENSE)
-
-Public-beta release candidate. Bring your model. Bring your hardest useful task.
-Put the factory to work.
+Apache-2.0 licensed. Public beta. Your model. Your hardware. Put it to work.

@@ -93,7 +93,7 @@ test('cloud-only factory execution skips every local-model probe and produces se
  assert.equal(executions,1);assert.equal(manifest.modelId,null);assert.equal(manifest.endpoint,null);assert.equal(manifest.complete,true);
  writeFightCardExport(output);
  const rendered=writeFactoryReplay(output);assert.equal(rendered.lanes,1);
- const html=fs.readFileSync(rendered.output,'utf8');assert.ok(html.includes('1 selected participants. 1 frozen work orders.'));assert.ok(html.includes('Your tools.'));
+ const html=fs.readFileSync(rendered.output,'utf8');assert.ok(html.includes('1 selected participants. 1 frozen work orders.'));assert.ok(html.includes('One system.'));
 });
 test('legacy REPL no longer includes Claude or Codex in implicit fight selection',()=>{
  const source=fs.readFileSync(new URL('../bin/bantam.js',import.meta.url),'utf8');

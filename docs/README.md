@@ -1,7 +1,9 @@
 # BANTAM documentation map
 
-> Referenced historical fight-card packages are privately archived outside this repository.
-> Their links now lead to the archive policy, not the old evidence.
+**[Get started](GETTING-STARTED.md) · [Watch the fight cards](https://bantam-admin.github.io/bantam-factory/) · [Back to BANTAM](../README.md)**
+
+The public gallery contains reviewed, inspectable cards. Older historical packages
+are covered by the [archive policy](fights/README.md).
 
 This index distinguishes operating guidance from proposals and dated evidence.
 Navigation was reconciled with the implemented CLI on 2026-09-07.

@@ -255,7 +255,7 @@ test('self-contained replay keeps full exact evidence compressed and escapes hos
   const root=fixture(t),{attack}=series(root,{hostile:true});const result=writeFactoryReplay(root);
   assert.equal(result.cards,1);assert.equal(result.lanes,6);
   const html=fs.readFileSync(result.output,'utf8');
-  assert.ok(html.includes('The complete score sheet'));assert.ok(html.includes('Same silicon.'));assert.ok(html.includes('./fight-card.json'));
+  assert.ok(html.includes('The complete score sheet'));assert.ok(html.includes('The fight.'));assert.ok(html.includes('./fight-card.json'));
   assert.ok(!html.includes(attack));assert.ok(!html.includes('<img src=x'));assert.ok(html.includes('\\u003c/script\\u003e'));
   const match=html.match(/id="payload-r1-receipt-reducer-bantam-local-27b" type="application\/octet-stream">([^<]+)<\/script>/);
   assert.ok(match);const payload=JSON.parse(gunzipSync(Buffer.from(match[1],'base64')));

@@ -89,7 +89,8 @@ test('single-card share images put local BANTAM first without reordering evidenc
   const data=fixture();data.series[0].cards=data.series[0].cards.slice(0,1);
   data.series[0].cards[0].rows.reverse();const before=structuredClone(data);
   const svg=renderShareCard(data);
-  assert.match(svg,/<text x="70" y="319"[^>]*>BANTAM/);
+  const labels=[...svg.matchAll(/<text[^>]*>([^<]+)<\/text>/g)].map(m=>m[1]);
+  assert.ok(labels.indexOf('BANTAM · local')<labels.indexOf('DeepSeek Harness'));
   assert.deepEqual(data,before);
 });
 
@@ -184,7 +185,32 @@ test('an unrecorded fourth corner keeps the planned denominator and unknown coun
   assert.deepEqual(missing.accounting.full,metrics(null,null,null,null));
   assert.match(visibleProse(html),/2\/4\s*attempts passed and completed/);
   assert.match(visibleProse(svg),/3\/4 attempts recorded/);
-  assert.match(visibleProse(svg),/OpenCode\s+NOT RECORDED\s+Unknown/);
+  assert.match(visibleProse(svg),/OpenCode\s+Unknown\s+NOT RECORDED/);
+});
+
+test('a solo BANTAM card stands alone without inventing a competitor or comparative win',()=>{
+  const data=fourCornerFixture();
+  const card=data.series[0].cards[0];
+  card.rows=card.rows.filter(row=>row.arm==='bantam-local-27b');
+  const before=structuredClone(data),html=renderLaunchPage(data),svg=renderShareCard(data);
+  assert.match(visibleProse(html),/BANTAM \/ solo run/);
+  assert.match(visibleProse(html),/One recorded system/);
+  assert.match(visibleProse(svg),/SOLO RUN \/ ON RECORD/);
+  assert.match(visibleProse(svg),/1\/1 attempts recorded/);
+  assert.doesNotMatch(visibleProse(html)+visibleProse(svg),/OpenCode|DeepSeek|Hermes|Astra|BANTAM wins|faster than/);
+  assert.deepEqual(embedded(html),before);
+  assert.deepEqual(data,before);
+});
+
+test('share graphics retain all twelve contenders and published links remain scoped',()=>{
+  const data=fourCornerFixture(),card=data.series[0].cards[0];
+  card.rows=Array.from({length:12},(_,i)=>({...structuredClone(card.rows[0]),arm:'system-'+i,label:'System '+i}));
+  const svg=renderShareCard(data);
+  for(let i=0;i<12;i++)assert.ok(svg.includes('>System '+i+'</text>'));
+  const html=renderLaunchPage(data,{previewImage:'share-card.png',publishedPath:'references/patch-transaction/share/index.html'});
+  assert.match(html,/href="\.\.\/\.\.\/\.\.\/index.html"/);
+  assert.match(html,/og:image" content="https:\/\/bantam-admin.github.io\/bantam-factory\/references\/patch-transaction\/share\/share-card.png"/);
+  assert.throws(()=>renderLaunchPage(data,{publishedPath:'../private/index.html'}),/Invalid published/);
 });
 
 // Adapted from the existing showcase CDP helper. Keep the browser process,
@@ -258,6 +284,18 @@ test('actual Chromium verifies mobile/desktop replay, exports, accessibility and
       expect('frontierGroupIsNotAstraOnly',[...document.querySelectorAll('.lane-group')].some(h=>h.textContent==='Frontier references · different models from the local worker'));
       expect('counterBinding',[...document.querySelectorAll('.lane')].every(n=>Number(n.querySelector('.token-inputTokens').textContent.replaceAll(',',''))===expectedInputs[n.dataset.arm]));
       expect('accessibleButtons',[...document.querySelectorAll('button')].every(b=>(b.getAttribute('aria-label')||b.textContent).trim()));
+      const visibleLanes=()=>[...document.querySelectorAll('.lane')].filter(n=>!n.hidden);
+      get('view-compare').click();
+      expect('twoContenders',visibleLanes().length===2);
+      expect('sideBySide',Math.abs(visibleLanes()[0].getBoundingClientRect().top-visibleLanes()[1].getBoundingClientRect().top)<2);
+      get('compare-right').value='codex-astra';get('compare-right').dispatchEvent(new Event('change'));
+      expect('chooseFrontier',visibleLanes().some(n=>n.dataset.arm==='codex-astra'));
+      get('compare-left').value='codex-astra';get('compare-left').dispatchEvent(new Event('change'));
+      expect('distinctPair',get('compare-left').value!==get('compare-right').value&&visibleLanes().length===2);
+      expect('compareNoOverflow',document.documentElement.scrollWidth<=innerWidth);
+      get('view-all').click();
+      expect('restoreRoster',visibleLanes().length===Object.keys(expectedInputs).length);
+
       expect('accessibleTimeline',Boolean(get('timeline').getAttribute('aria-label')||get('timeline').labels?.length));
       get('download-data').click();await wait(()=>downloads.length>0);
       const exported=JSON.parse(await downloads.at(-1).text()),embedded=JSON.parse(get('launch-data').textContent);

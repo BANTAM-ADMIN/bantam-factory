@@ -1,33 +1,64 @@
-# Publish the reviewed fight gallery
+# The public fight gallery
 
-The gallery is a static site: no backend, telemetry or third-party image host.
-Opening a committed HTML file on GitHub shows its source. Download the reviewed
-directory and open `index.html` locally to view it before publishing.
+**[Open the live gallery](https://bantam-admin.github.io/bantam-factory/)**
 
-## Public launch
+The gallery is a static GitHub Pages site. It loads no external assets and has
+no backend or telemetry. The same self-contained pages work offline.
 
-Only after the repository owner approves publication and the release checks pass:
+## Update the presentation
 
-1. Change the **release** repository's visibility to public. Keep all historical
-   archive repositories private. Visibility changes are not performed by this workflow.
-2. In repository **Settings → Pages**, choose **GitHub Actions** as the source.
-3. Open **Actions → Publish reviewed fight gallery → Run workflow**, choose
-   `main`, and explicitly enable `publish_reviewed_gallery`.
-4. Inspect the deployment URL reported by the workflow and test a replay, image
-   download and JSON download. Then use that verified URL for the README's gallery
-   and replay links. Do not advertise a planned URL as an already-live site.
+The gallery, public replay, live board and detailed replay share their visual
+language through `scripts/fight-design.mjs`. The public replay and share image
+are rendered by `scripts/factory-launch-page.mjs`; the gallery is rendered by
+`scripts/factory-fight-gallery.mjs`.
 
-The workflow is manual, defaults to no publication, refuses private repositories
-and non-main refs, and stages only named public assets from all six reviewed
-cards. Incomplete galleries and mismatched evidence/asset hashes stop staging.
-It does not upload the repository root, other documentation, raw benchmark
-directories or arbitrary files placed beside the reviewed packages.
+Rebuild the existing reviewed packages into a **fresh** directory:
 
-The expected project-site address is `https://bantam-admin.github.io/bantam-factory/`,
-but the successful deployment output—not this prediction—is authoritative.
-Normal commits never redeploy automatically; each update needs explicit dispatch.
+```bash
+node scripts/refresh-fight-presentation.mjs \
+  "$PWD/docs/fights/launch-2026-09-07" \
+  "$PWD/.bantam/presentation-preview" \
+  /absolute/path/to/chromium
+```
 
-This follows GitHub's [custom Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
-Pages settings and a public deployment have deliberately not been activated
-during private release preparation. A local staging pass does not prove the
-external deployment has succeeded.
+This validates the input packages, regenerates HTML and share graphics, and
+updates presentation hashes in the new output. It preserves the original
+showcase JSON, downloadable measurements and source seals byte for byte.
+It does not run models, overwrite the input, add unpublished tasks, or upload.
+The browser runs with its own profile and GPU acceleration disabled.
+
+Open the output's `index.html`. Check the gallery, a solo card where available,
+a comparison, phone layout, replay controls, and image/JSON downloads. Copy
+reviewed presentation changes back to the corresponding committed packages;
+retain their refreshed manifests. Do not copy raw `.bantam` run directories.
+
+## BANTAM first, comparisons later
+
+One recorded BANTAM attempt is a complete solo card. It needs no placeholder
+opponents. New competitor evidence must carry its own recorded conditions;
+a later comparison must not turn missing attempts into failures or silently
+replace earlier results.
+
+`LAUNCH_SECTIONS` is the explicit public task list. Registering a task in the
+factory catalog does not publish it. Add a new public section or card only
+when its reviewed package is ready. Publication validates the complete listed
+roster, retains failures, and keeps separately recorded references distinct.
+
+## Publish an approved update
+
+Normal commits do not redeploy the site. After reviewing and committing an
+approved public update, use **Actions → Publish reviewed fight gallery → Run
+workflow**, select `main`, and enable `publish_reviewed_gallery`.
+
+The workflow stages only named assets from the reviewed packages. It refuses
+private repositories, non-main refs, missing published cards, and mismatched
+evidence or asset hashes. It does not upload the repository root, raw runs,
+or arbitrary neighboring files.
+
+After deployment, open the reported Pages URL and check a replay and both
+downloads. The deployment result establishes what is live; a local preview
+or successful commit alone does not.
+
+The repository uses GitHub Actions as its Pages source. See
+[GitHub's custom Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+for hosting configuration.

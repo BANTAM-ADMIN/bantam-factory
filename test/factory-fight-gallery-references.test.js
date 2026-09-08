@@ -10,7 +10,7 @@ import {buildFightGallery,renderFightGallery,stageFightGallery,featuredFight} fr
 import {FACTORY_KITS} from '../scripts/factory-card-catalog.mjs';
 
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
-const LAUNCH_CARDS=[...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06']];
+const LAUNCH_CARDS=[...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06'],...FACTORY_KITS['factory-controls-2026-09-07']];
 
 // A reviewed public package, identical in shape to a launch card, written at an explicit directory.
 function writeCard(dir,id,arms,{wallMs=arm=>58000,outcome=arm=>'PASS'}={}){
@@ -72,12 +72,12 @@ test('gallery page renders a references table with BANTAM beside each reference 
 test('publication stages reviewed reference packages beside the launch cards using the same explicit file list',t=>{
   const root=gallery(t,{fullLaunch:true}),output=path.join(root,'pages');
   const staged=stageFightGallery({root,output});
-  assert.equal(staged.cards,6);
+  assert.equal(staged.cards,8);
   for(const name of ['README.md','index.html','showcase.json','package.json','share/index.html','share/fight-card.json','share/package.json','share/share-card.png','share/share-card.svg'])
     assert.ok(fs.existsSync(path.join(output,'references','context-packet',name)),`staged references/context-packet/${name}`);
   assert.ok(fs.existsSync(path.join(output,'references','README.md')));
   assert.match(fs.readFileSync(path.join(output,'index.html'),'utf8'),/references\/context-packet\/share\/index\.html/);
-  assert.equal(staged.files,2+6*9+1+9);
+  assert.equal(staged.files,2+8*9+1+9);
 });
 
 test('a reference package with an unrecorded row or a mismatched card is refused',t=>{

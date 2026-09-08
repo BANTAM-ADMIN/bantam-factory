@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_reviewed_gallery:
-        description: Publish the reviewed six-card gallery to the public web
+        description: Publish the reviewed fight gallery to the public web
         required: true
         type: boolean
         default: false

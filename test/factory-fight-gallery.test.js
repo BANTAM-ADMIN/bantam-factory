@@ -34,17 +34,17 @@ function fixture(t,{recorded=true,root:existingRoot,id='context-packet'}={}){
   return {root,dir,share};
 }
 
-test('gallery keeps all six planned tasks, complete rosters, timeout and partial-accounting disclosure',t=>{
+test('gallery keeps all planned tasks, complete rosters, timeout and partial-accounting disclosure',t=>{
   const {root}=fixture(t),data=buildFightGallery(root),html=renderFightGallery(data);
-  assert.equal(data.cards.length,6);assert.equal(data.cards.filter(c=>c.recorded).length,1);
+  assert.equal(data.cards.length,8);assert.equal(data.cards.filter(c=>c.recorded).length,1);
   const card=data.cards.find(c=>c.id==='context-packet');
   assert.equal(card.rows.length,2);assert.equal(card.rows[0].passed,true);assert.equal(card.rows[1].passed,false);
   assert.match(html,/OUTPUT_ONLY/);assert.match(html,/600\.0s/);assert.match(html,/Partial accounting disclosed/);
-  assert.match(html,/1\/6/);assert.match(html,/Not published yet/);assert.match(html,/1\/1/);
+  assert.match(html,/1\/8/);assert.match(html,/Not published yet/);assert.match(html,/1\/1/);
   assert.doesNotMatch(html,/<script|<iframe|<img[^>]+src="https?:/i);
-  assert.deepEqual(writeFightGallery({root}),{published:1,planned:6});
+  assert.deepEqual(writeFightGallery({root}),{published:1,planned:8});
   assert.throws(()=>writeFightGallery({root}),/Refusing to replace/);
-  assert.deepEqual(writeFightGallery({root,replace:true}),{published:1,planned:6});
+  assert.deepEqual(writeFightGallery({root,replace:true}),{published:1,planned:8});
 });
 
 test('featured wins exclude timeouts, missing clocks and different-model comparisons',t=>{
@@ -75,14 +75,14 @@ test('gallery escapes display text and never turns unsupported labels into paths
   card.id='../private';assert.throws(()=>renderFightGallery(data),/Unrecognized/);
 });
 
-test('publication requires the full six-card set and copies only the explicit reviewed file list',t=>{
+test('publication requires the full planned card set and copies only the explicit reviewed file list',t=>{
   const {root}=fixture(t),output=path.join(root,'staged');
-  assert.throws(()=>stageFightGallery({root,output}),/All six/);
+  assert.throws(()=>stageFightGallery({root,output}),/All planned/);
   assert.equal(fs.existsSync(output),false);
   for(const id of Object.keys(PUBLIC_FACTORY_CARDS).filter(id=>id!=='context-packet'))fixture(t,{root,id});
   fs.writeFileSync(path.join(root,'context-packet','private-run.json'),'PRIVATE_DO_NOT_UPLOAD');
   fs.writeFileSync(path.join(root,'private.txt'),'PRIVATE_DO_NOT_UPLOAD');
-  assert.deepEqual(stageFightGallery({root,output}),{cards:6,files:56});
+  assert.deepEqual(stageFightGallery({root,output}),{cards:8,files:74});
   assert.equal(fs.existsSync(path.join(output,'private.txt')),false);
   assert.equal(fs.existsSync(path.join(output,'context-packet','private-run.json')),false);
   assert.equal(fs.readFileSync(path.join(output,'context-packet','README.md'),'utf8'),'Public test notes');

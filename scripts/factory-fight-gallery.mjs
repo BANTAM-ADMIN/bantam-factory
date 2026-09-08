@@ -17,7 +17,7 @@ function readBounded(file,max=4*1024*1024){
   return fs.readFileSync(file);
 }
 
-const LAUNCH_CARDS=[...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06']];
+const LAUNCH_CARDS=[...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06'],...FACTORY_KITS['factory-controls-2026-09-07']];
 
 // One reviewed public card package: a single-work-order showcase whose share
 // package hashes match it byte for byte. Used for launch cards and references.
@@ -131,7 +131,7 @@ export function writeFightGallery({root,replace=false}){
 
 // Publication staging copies explicit reviewed filenames, never the enclosing
 // docs directory or arbitrary files found beside a card. A partial gallery is
-// useful locally but is not this six-card launch artifact.
+// useful locally but is not the planned launch artifact.
 function stageCardFiles(dir,prefix,files){
   const manifest=JSON.parse(readBounded(path.join(dir,'package.json')));
   if(manifest.schema!=='bantam.factory-showcase-package.v1'||manifest.private!==false||manifest.redacted!==true)throw Error('Expected public detailed package');
@@ -151,7 +151,7 @@ function stageCardFiles(dir,prefix,files){
 
 export function stageFightGallery({root,output}){
   const data=buildFightGallery(root);
-  if(data.cards.some(card=>!card.recorded))throw Error('All six launch cards must be recorded before publication');
+  if(data.cards.some(card=>!card.recorded))throw Error('All planned launch cards must be recorded before publication');
   if(!path.isAbsolute(output)||fs.existsSync(output))throw Error('Expected fresh absolute publication output');
   const files=[['index.html',renderFightGallery(data)],['gallery.json',JSON.stringify(data,null,2)+'\n']];
   for(const card of data.cards)stageCardFiles(path.join(root,card.id),card.id,files);

@@ -3054,7 +3054,7 @@ async function runAgentCore({
         repairObs = [
           `[output-limit] Your previous ${parsed.partialAction?.action || "action"}${subject} reached the model's output limit before its JSON object could close.`,
           "Do NOT regenerate the same monolithic action: it will hit the same fixed limit again.",
-          "Emit one much smaller valid action now. For a large new program, write a compact runnable skeleton first, split substantial code into multiple files/modules, then extend it with bounded replace/edit_lines/patch actions.",
+          "Emit one much smaller valid action now. For a large new program, write a compact runnable skeleton first, then extend it with bounded replace/edit_lines/patch actions. Preserve the requested delivery format: if the user requires one self-contained file, keep the program in that file; split into modules only when the task permits it.",
           `Keep this next action comfortably below the limit (under ~${Math.max(500, Math.floor((Number(model?.nPredict) || 8192) * 0.75)).toLocaleString()} output tokens).`,
         ].join(" ");
       } else {

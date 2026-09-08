@@ -821,6 +821,25 @@ describe('prompt-resident source recovery', () => {
     for (const name of names) assert.match(model.prompts[1], new RegExp(`# ${name}\\.js \\(current`));
   });
 
+  it('output-limit recovery preserves a requested single-file deliverable', async (t) => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-output-limit-format-'));
+    t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+    const prompts = [];
+    const model = { nPredict: 8192, assistantPrefill: '', actTemperature: null,
+      async complete(prompt) {
+        prompts.push(String(prompt));
+        return prompts.length === 1
+          ? { content: '{"a":"write_file","p":"game.html","content":"unfinished', tokens: 8192, stoppedLimit: true }
+          : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>' }), tokens: 20, stoppedEos: true };
+      } };
+    await runAgent({ task: 'Build a game in one self-contained HTML file.', workspace, model, maxTurns: 1,
+      useGrammar: false, grounding: false, shellSandbox: 'host', verificationPolicy: 'after_edit' });
+    assert.match(prompts[1], /output-limit/);
+    assert.match(prompts[1], /keep the program in that file/);
+    assert.match(prompts[1], /modules only when the task permits/);
+    assert.doesNotMatch(prompts[1], /split substantial code into multiple files/);
+  });
+
   it('automatic game preview requests the interaction evidence required by done', async (t) => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-auto-preview-context-'));
     t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));

@@ -24,7 +24,15 @@ const UNIT_BOUND_RE = /\b\d+[\s-]*(?:bit|digit|byte|char|character|word|item|ele
 // 2. rejection demands: sentences that require error behavior.
 const REJECT_SENTENCE_RE = /[^.!?\n]*\b(?:must\s+(?:not\s+)?(?:throw|reject|error|mutate|modify)|throws?\s+(?:an?\s+)?(?:Error|TypeError|RangeError|exception)|is\s+invalid|are\s+invalid|invalid\s+when|reject(?:s|ed)?\s+\w|errors?\s+must)\b[^.!?\n]*[.!?]?/gi;
 
-// 3. collection shape demands: a named input's element preconditions. Their
+// 3. prohibitions: a stated rule about what an input may not be, contain or do.
+// These are rejection rules, but the phrasing carries none of the verbs the
+// rejection family looks for. Measured 2026-09-08 on csv-record: the task said
+// a bare field "may not contain" a quote, that clause produced no quote, and
+// the candidate accepted the very input it forbids. Anchored to a prohibition
+// verb rather than any modal, so ordinary advisory prose stays out.
+const PROHIBITION_RE=/[^.!?\n]*\b(?:may|must|can|shall)\s*(?:not|never)\b[^.!?\n]*[.!?]?/gi;
+
+// 4. collection shape demands: a named input's element preconditions. Their
 // violations are rejection cases that visible tests routinely never touch.
 // Measured 2026-09-08 on glob-select: a candidate implemented six of the seven
 // constraints in one such sentence, dropped "unique", ticked the requirement
@@ -44,7 +52,12 @@ function clip(s) {
 }
 
 export function extractRequirements(task) {
-  const source = String(task ?? "");
+  // Assignments are hard-wrapped prose, so a requirement sentence routinely
+  // spans a line break. Every family stops at a newline, which quoted those
+  // sentences from the wrap onwards and dropped the subject the rule applies
+  // to ("may not contain" without saying what may not contain it). Match
+  // against a single-line view; sentence punctuation still bounds each quote.
+  const source = String(task ?? "").replace(/[^\S\n]*\n[^\S\n]*/g, " ");
   const out = [];
   const seen = new Set();
   const push = (s) => {
@@ -57,6 +70,10 @@ export function extractRequirements(task) {
 
   // rejection-demand sentences first: they carry the most contract per char.
   for (const m of source.matchAll(REJECT_SENTENCE_RE)) push(m[0]);
+
+  // prohibitions: a forbidden input is a rejection case whichever way the
+  // sentence is phrased.
+  for (const m of source.matchAll(PROHIBITION_RE)) push(m[0]);
 
   // collection shape demands: the precondition sentence names several element
   // constraints at once, and dropping one of them still leaves tests green.

@@ -11,6 +11,39 @@ const DEFAULT_MODELS = [
   { name: "gpt-5.6-sol", effort: "high" },
 ];
 
+// The preview runner's default browser budget (25s) is tuned for the
+// interactive operator loop, where a human is waiting on one page. Calibration
+// is a batch evidence run over a whole manifest, and it inherited that budget.
+// Measured on CI 2026-09-08: a cold shared runner spent 26.6s on a one-element
+// page, wrote no PNG, and the run failed on a missing screenshot.
+const CALIBRATION_PREVIEW_TIMEOUT_MS = 75000;
+
+/** Browser budget for one calibration case, overridable for slow hosts. */
+export function calibrationPreviewTimeoutMs(env = process.env) {
+  const raw = String(env?.BANTAM_CALIBRATION_PREVIEW_TIMEOUT_MS ?? "").trim();
+  if (!/^\d+$/.test(raw)) return CALIBRATION_PREVIEW_TIMEOUT_MS;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : CALIBRATION_PREVIEW_TIMEOUT_MS;
+}
+
+// A calibration that produced no pixels used to report one sentence naming the
+// case and nothing else, so a timeout, a crashed browser and a missing binary
+// all read identically. The runner already computes why; quote it back.
+function describeMissingScreenshot(report, timeoutMs) {
+  const reasons = [];
+  if (report?.browserTimedOut) reasons.push(`the browser ran out of time after ${timeoutMs} ms`);
+  if (report?.screenshotCaptureTimedOut) reasons.push("the screenshot capture ran out of time");
+  const exitCode = Number(report?.browserExit);
+  if (Number.isInteger(exitCode) && exitCode !== 0) {
+    const tail = String(report?.browserStderrTail ?? "").trim();
+    reasons.push(`the browser exited non-zero (exit ${exitCode})${tail ? `: ${tail}` : ""}`);
+  }
+  if (!reasons.length) {
+    reasons.push(`the browser reported no failure within its ${timeoutMs} ms budget, so the page rendered no pixels`);
+  }
+  return reasons.join("; ");
+}
+
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 export function classifyPreviewReview(text) {
@@ -48,6 +81,8 @@ export async function runPreviewReviewCalibration({
   outputRoot,
   models = DEFAULT_MODELS,
   reviewer = codexReviewer,
+  preview = runPreviewSync,
+  previewTimeoutMs = calibrationPreviewTimeoutMs(),
   onEvent = () => {},
 } = {}) {
   const resolvedManifest = path.resolve(manifestPath);
@@ -78,9 +113,9 @@ export async function runPreviewReviewCalibration({
   const evidencePath = path.join(destination, "evidence.json");
 
   for (const specimen of manifest.cases) {
-    const report = runPreviewSync(workspace, specimen.entry);
+    const report = preview(workspace, specimen.entry, { timeoutMs: previewTimeoutMs });
     if (!report.screenshotBytes || !report.screenshot) {
-      throw new Error(`calibration screenshot missing for ${specimen.id}`);
+      throw new Error(`calibration screenshot missing for ${specimen.id}: ${describeMissingScreenshot(report, previewTimeoutMs)}`);
     }
     const screenshotName = `${specimen.id}.png`;
     const screenshotPath = path.join(screenshotRoot, screenshotName);

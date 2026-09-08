@@ -198,7 +198,7 @@ import { decidePlanAudit, repositoryDocumentContractCue } from "./plan-audit-pol
 import { decideSeamSteer, SEAM_STEER_TIP } from "./seam-steer.js";
 import { scaledReconLimit, scaledProgressNudgeAfter } from "./recon-budget.js";
 import { ReadLedger } from "./read-ledger.js";
-import { budgetTurns, createHistoryWindow } from "./history-budget.js";
+import { budgetTurns, createHistoryWindow, historyCharBudget as deriveHistoryCharBudget } from "./history-budget.js";
 import { extractLoci, renderLoci, isUnbalanced, renderEditRegion } from "./failure-locus.js";
 import { deliverableCommand, invokesCommand, smokeNudge } from "./smoke-run.js";
 import { checkEditedApi } from "./api-check.js";
@@ -1847,10 +1847,15 @@ async function runAgentCore({
   // The extension trajectory has no panel and trades prompt size for byte-
   // stable prefixes, so its default budget is wider: an eviction slides the
   // history window and silently resets the slot cache to the head checkpoint.
-  const historyCharBudget = positiveInt(
-    process.env.BANTAM_HISTORY_CHAR_BUDGET,
-    extensionTrajectory ? 120000 : 36000,
-  );
+  // Derived from the window the server actually advertises, so an eviction is
+  // driven by the real context limit rather than a constant that ignores it.
+  // BANTAM_CONTEXT_TOKENS carries the inspected n_ctx; when it is absent the
+  // previously documented constants still apply.
+  const historyCharBudget = deriveHistoryCharBudget({
+    contextTokens: positiveInt(process.env.BANTAM_CONTEXT_TOKENS, null),
+    extensionTrajectory,
+    override: positiveInt(process.env.BANTAM_HISTORY_CHAR_BUDGET, null),
+  });
   // Turn-level replay capture: with BANTAM_SAVE_PROMPTS=1 every turn records
   // its exact assembled prompt, so `bantam replay <artifact> --turn N` can
   // rewind to the precise moment of a failure and test context adjustments.

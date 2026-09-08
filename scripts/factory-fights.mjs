@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {treeHashes,changedSealedFiles,cardCommand,execute,acceptedBantamCompletion} from './repobrief-astra-fights.mjs';
 import {cornerUsage} from '../src/fight.js';
+import {historyCharBudget} from '../src/history-budget.js';
 import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 import {startModelRecorder} from './fight-model-proxy.mjs';
@@ -48,7 +49,7 @@ export function cleanFightEnv(overrides={}) {
   return {...env,NO_COLOR:'1',...overrides};
 }
 
-export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={}}) {
+export function freshCommand({arm,task,workspace,dir,endpoint,model,contextTokens=null,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={}}) {
   if(!FIGHT_ARMS.includes(arm))throw Error('unknown arm');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
   if(typeof verificationWorkspaceReadOnly!=='boolean'||typeof terminalClosure!=='boolean')throw Error('verification and closure options must be boolean');
@@ -75,6 +76,9 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
       BANTAM_TEACHER:'0',BANTAM_DEEPRESEARCH:'0',BANTAM_PROMPT_TRAJECTORY:'extension',BANTAM_IMMUTABLE_HISTORY:'1'};
     if(arm==='bantam-local-27b'){
       command.args[command.args.indexOf('--endpoint')+1]=endpoint;command.env.BANTAM_ENDPOINT=endpoint;
+      // The inspected window, so history eviction follows the served context
+      // instead of a constant. Only this lane uses the inspected local server.
+      if(Number.isInteger(contextTokens)&&contextTokens>0)command.env.BANTAM_CONTEXT_TOKENS=String(contextTokens);
     }
     if(verificationWorkspaceReadOnly){command.args.push('--verify-workspace-read-only');command.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
     if(terminalClosure)command.env.BANTAM_TERMINAL_CLOSURE='1';
@@ -174,6 +178,8 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   }
   const needsLocal=arms.some(arm=>LOCAL.has(arm));
   const model=needsLocal?await inspect(endpoint):null;
+  const rawContext=model?.props?.default_generation_settings?.n_ctx;
+  const localContextTokens=Number.isInteger(rawContext)&&rawContext>0?rawContext:null;
   const kitSeal=treeHashes(kitRoot),runtimeSeal=sourceSeal();
   for(const card of cards){const meta=JSON.parse(fs.readFileSync(path.join(kitRoot,card,'card.json'),'utf8'));if(meta.id!==card||!Array.isArray(meta.groups)||!meta.groups.length)throw Error('invalid card descriptor');}
   fs.mkdirSync(output,{recursive:true,mode:0o700});
@@ -183,7 +189,8 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     design:`Exploratory system regression/demo on the frozen ${kitId} kit: fresh contender workspaces on already-seen adaptive development tasks, identical starter/task bytes per contender, rotated order within queues. No teacher or manual repairs. Native sampling/tool/resource differences are recorded, not a pure context ablation or held-out evaluation. One repeat is not a statistical ranking. Historical cards remain unchanged.`,
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
-    limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
+    limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens,
+      localContextTokens,bantamHistoryCharBudget:localContextTokens===null?null:historyCharBudget({contextTokens:localContextTokens,extensionTrajectory:true})},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,
       codexModel:!arms.some(a=>a.includes('codex'))||arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
       codexModels:Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??'gpt-6-astra'])),
@@ -224,7 +231,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     fs.mkdirSync(path.join(dir,'native-sessions'));
     const recorder=LOCAL.has(arm)?await startModelRecorder({upstream:endpoint,output:path.join(dir,'wire')}):null;
     const countersBefore=recorder?await optionalServerCounters(endpoint):null;
-    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure,peerExecutables});
+    const command=freshCommand({arm,task,workspace,dir,endpoint:recorder?.endpoint??endpoint,model:model?.id,contextTokens:localContextTokens,timeoutMs,probeEnabled,peerOutputTokens,verificationWorkspaceReadOnly,terminalClosure,peerExecutables});
     write(path.join(dir,'command.json'),command);
     process.stdout.write(`${card} ${arm}: started\n`);
     const current={phase:'running',startedAt:Date.now(),exchanges:recorder?.exchanges};active.set(progressKey(item),current);publish();

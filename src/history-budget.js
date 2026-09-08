@@ -35,6 +35,29 @@ function historyView(turn, observation) {
   return view;
 }
 
+// A fixed character budget cannot know the window the server actually serves.
+// Compacting far below it wastes the window twice over: the unused remainder is
+// never used, and every eviction rebases the prompt prefix, so the server
+// re-prefills each surviving turn instead of reusing its slot cache. Derive the
+// budget from the advertised window, keep real headroom for the non-history
+// prompt and the response, and never exceed the size where a small model's
+// action discipline degrades. An explicit operator override always wins, and an
+// unknown window keeps the previously documented constants.
+export const HISTORY_CHARS_PER_TOKEN = 4;
+export const HISTORY_MAX_HISTORY_TOKENS = 44000;
+export const HISTORY_MIN_CHAR_BUDGET = 4000;
+const HISTORY_WINDOW_SHARE = { extension: 0.6, panel: 0.125 };
+
+export function historyCharBudget({ contextTokens, extensionTrajectory = false, override } = {}) {
+  const explicit = Number(override);
+  if (Number.isInteger(explicit) && explicit > 0) return explicit;
+  const context = Number(contextTokens);
+  if (!Number.isInteger(context) || context <= 0) return extensionTrajectory ? 120000 : 36000;
+  const share = HISTORY_WINDOW_SHARE[extensionTrajectory ? "extension" : "panel"];
+  const tokens = Math.min(Math.floor(context * share), HISTORY_MAX_HISTORY_TOKENS);
+  return Math.max(HISTORY_MIN_CHAR_BUDGET, tokens * HISTORY_CHARS_PER_TOKEN);
+}
+
 export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
   if (!list.length) return [];

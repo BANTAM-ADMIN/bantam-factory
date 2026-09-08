@@ -85,6 +85,14 @@ function embedded(html) {
   return JSON.parse(block[1]);
 }
 
+test('single-card share images put local BANTAM first without reordering evidence',()=>{
+  const data=fixture();data.series[0].cards=data.series[0].cards.slice(0,1);
+  data.series[0].cards[0].rows.reverse();const before=structuredClone(data);
+  const svg=renderShareCard(data);
+  assert.match(svg,/<text x="70" y="319"[^>]*>BANTAM/);
+  assert.deepEqual(data,before);
+});
+
 test('launch exports only the supplied public record, preserving incomplete meters and completion distinctions', () => {
   const data=fixture(),before=structuredClone(data),html=renderLaunchPage(data),serialized=JSON.stringify(embedded(html));
   assert.ok(!html.includes('Work completed..'));

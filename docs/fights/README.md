@@ -16,6 +16,11 @@ separate server totals are documented alongside the replay.
 **BANTAM 81.8s, OpenCode 559.0s, native Astra 90.3s.** All passed 5/5 and
 finished cleanly; complete recorded totals are available for every lane.
 
+[Snapshot drift · six-system comparison](launch-2026-09-07/snapshot-drift/README.md):
+**BANTAM 124.3s, DeepSeek Harness 465.8s, Hermes 497.0s**, all 5/5. Native
+Terra was fastest overall at 106.2s. Sol's five passing functional groups did
+not override its protected-test modification: that attempt remains a FAIL.
+
 [Context packet · launch series](launch-2026-09-07/context-packet/README.md):
 BANTAM 5/5 in **58.1s**, native Astra 5/5 in **110.6s**, OpenCode 5/5 artifact
 but no clean completion at its **600s** time limit. Watch the replay, download
@@ -24,7 +29,7 @@ the share image, and inspect the accounting.
 [Stream framer · launch series](launch-2026-09-07/stream-framer/README.md):
 native Astra passed **5/5 in 160.7s**. BANTAM timed out at 4/5 and OpenCode at
 0/5. Both local attempts retain their partial accounting; this is a disclosed
-loss, not an omitted run. Four of the six launch work orders are now published;
+loss, not an omitted run. Five of the six launch work orders are now published;
 the remaining comparisons are running and are not yet published results.
 
 ## Additional native Claude references

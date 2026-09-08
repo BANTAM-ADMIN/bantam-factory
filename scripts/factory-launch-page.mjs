@@ -42,6 +42,13 @@ function comparisonSummary(series){
     local:countFamily('local'),frontier:countFamily('astra')};
 }
 
+// Presentation order only: do not reorder the portable evidence or imply rank.
+function shareDisplayRows(rows){
+  const order=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus'];
+  const rank=row=>{const i=order.indexOf(row.arm);return i<0?order.length:i;};
+  return rows.map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(x=>x.row);
+}
+
 // Spotlight the local factory, not the whole roster's combined pass rate.
 // Missing attempts stay in its denominator; accepted artifacts without clean
 // completion must not turn into a verified-finish headline.
@@ -67,7 +74,7 @@ function recordedComparisonShare(data){
   const hero=localFactoryHeadline(s);
   const title=one?s.cards[0].title:'Recorded factory comparison';
   const brand=BRAND.replace(/<svg[^>]*>/,'<svg x="70" y="48" width="52" height="52" viewBox="0 0 100 100" color="#e8a33d">');
-  const details=one&&s.rows.length<=6?s.rows.map((row,i)=>`<text x="70" y="${319+i*30}" fill="#202923" font-family="Arial,sans-serif" font-size="19">${E(row.label)}</text><text x="780" y="${319+i*30}" text-anchor="end" fill="#526058" font-family="monospace" font-size="18">${E(row.outcome)}</text><text x="1130" y="${319+i*30}" text-anchor="end" fill="#202923" font-family="monospace" font-size="19">${E(seconds(row.wallMs))}</text>`).join('')
+  const details=one&&s.rows.length<=6?shareDisplayRows(s.rows).map((row,i)=>`<text x="70" y="${319+i*30}" fill="#202923" font-family="Arial,sans-serif" font-size="19">${E(row.label)}</text><text x="780" y="${319+i*30}" text-anchor="end" fill="#526058" font-family="monospace" font-size="18">${E(row.outcome)}</text><text x="1130" y="${319+i*30}" text-anchor="end" fill="#202923" font-family="monospace" font-size="19">${E(seconds(row.wallMs))}</text>`).join('')
     :`<text x="70" y="345" fill="#526058" font-family="Arial,sans-serif" font-size="22">All ${s.total} planned attempts remain in the accompanying record.</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="BANTAM recorded system comparison">
   <rect width="1200" height="630" fill="#f1eee5"/><rect width="1200" height="7" fill="#d68b22"/>${brand}

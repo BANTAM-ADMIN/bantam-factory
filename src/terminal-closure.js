@@ -5,10 +5,31 @@ export function terminalClosureAllowance(value) {
   return value;
 }
 
-export function terminalClosureEligible({allowance, used, turnsUsed, workTurnLimit, action,
+// A turn budget cannot see the clock, so a run can be killed mid-turn with its
+// work already verified green and never emit DONE. Reserve room for one final
+// slow action, bounded so a short deadline still gets a floor and a long one
+// does not hand back minutes. A missing or nonsensical deadline reserves
+// nothing and never forces closure.
+export function wallClosureReserveMs(deadlineMs) {
+  const deadline = Number(deadlineMs);
+  if (!Number.isFinite(deadline) || deadline <= 0) return 0;
+  return Math.min(60000, Math.max(15000, Math.floor(deadline * 0.08)));
+}
+
+export function wallClosureDue({startedAtMs, nowMs, deadlineMs} = {}) {
+  const deadline = Number(deadlineMs), started = Number(startedAtMs), now = Number(nowMs);
+  if (!Number.isFinite(deadline) || deadline <= 0) return false;
+  if (!Number.isFinite(started) || !Number.isFinite(now)) return false;
+  const elapsed = now - started;
+  if (!(elapsed >= 0)) return false;
+  return elapsed >= deadline - wallClosureReserveMs(deadline);
+}
+
+export function terminalClosureEligible({allowance, used, turnsUsed, workTurnLimit, action, deadlineReached = false,
   proof, generation, configuredCommand, workspace, verificationWorkspaceReadOnly,
   pendingAudit, interrupted, controllerStopped, resultDone, callerExcludedActions = [], freshEvidence = false}) {
-  if (allowance !== 1 || used || turnsUsed !== workTurnLimit || !Number.isSafeInteger(workTurnLimit)
+  const budgetExhausted = deadlineReached === true || turnsUsed === workTurnLimit;
+  if (allowance !== 1 || used || !budgetExhausted || !Number.isSafeInteger(workTurnLimit)
       || workTurnLimit < 1 || !action || ['done','respond'].includes(action.a)
       || interrupted || controllerStopped || resultDone || pendingAudit || !freshEvidence
       || callerExcludedActions.includes('done') || !configuredCommand) return false;

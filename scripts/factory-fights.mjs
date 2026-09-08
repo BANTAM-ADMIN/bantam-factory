@@ -8,6 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {treeHashes,changedSealedFiles,cardCommand,execute,acceptedBantamCompletion} from './repobrief-astra-fights.mjs';
 import {cornerUsage} from '../src/fight.js';
 import {historyCharBudget} from '../src/history-budget.js';
+import {wallClosureReserveMs} from '../src/terminal-closure.js';
 import {runShellProcess} from '../src/executor.js';
 import {runProcess} from '../src/process-runner.js';
 import {startModelRecorder} from './fight-model-proxy.mjs';
@@ -79,6 +80,9 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
       // The inspected window, so history eviction follows the served context
       // instead of a constant. Only this lane uses the inspected local server.
       if(Number.isInteger(contextTokens)&&contextTokens>0)command.env.BANTAM_CONTEXT_TOKENS=String(contextTokens);
+      // The wall budget this runner actually enforces, so verified-green work
+      // can close out instead of being killed mid-turn at the limit.
+      command.env.BANTAM_DEADLINE_MS=String(timeoutMs);
     }
     if(verificationWorkspaceReadOnly){command.args.push('--verify-workspace-read-only');command.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
     if(terminalClosure)command.env.BANTAM_TERMINAL_CLOSURE='1';
@@ -190,7 +194,8 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     baseCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens,
-      localContextTokens,bantamHistoryCharBudget:localContextTokens===null?null:historyCharBudget({contextTokens:localContextTokens,extensionTrajectory:true})},
+      localContextTokens,bantamHistoryCharBudget:localContextTokens===null?null:historyCharBudget({contextTokens:localContextTokens,extensionTrajectory:true}),
+      bantamWallDeadlineMs:timeoutMs,bantamWallClosureReserveMs:wallClosureReserveMs(timeoutMs)},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,
       codexModel:!arms.some(a=>a.includes('codex'))||arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
       codexModels:Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??'gpt-6-astra'])),

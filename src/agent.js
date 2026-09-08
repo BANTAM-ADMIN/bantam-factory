@@ -31,7 +31,7 @@ import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from
 import { verificationCadenceEffect } from "./verification-cadence.js";
 import { createRepairHandoff, repairHandoffContext, repairHandoffOffer } from "./repair-handoff.js";
 import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedFocusedFailure, focusedFailureReminder } from "./verification-recovery.js";
-import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote } from "./terminal-closure.js";
+import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote, wallClosureDue } from "./terminal-closure.js";
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
 import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
@@ -412,7 +412,12 @@ async function runAgentCore({
   workspace,
   model = new ModelClient(),
   maxTurns = 30,
-  terminalClosureTurns = process.env.BANTAM_TERMINAL_CLOSURE === "1" ? 1 : 0,
+  // Total wall budget the caller will actually enforce. Without it a run can be
+  // killed mid-turn with verified-green work and never emit DONE. Declaring one
+  // implies the single DONE-only closure turn, otherwise the grant that the
+  // deadline triggers could never be spent.
+  wallDeadlineMs = positiveInt(process.env.BANTAM_DEADLINE_MS, null),
+  terminalClosureTurns = process.env.BANTAM_TERMINAL_CLOSURE === "1" || wallDeadlineMs ? 1 : 0,
   maxInvalidPerTurn = 3,
   verificationScript = null,
   profileText = null,   // standing operator preferences (see src/operator-profile.js)
@@ -2061,8 +2066,13 @@ async function runAgentCore({
     .filter((update) => update?.kind === "edit-recovery")
     .flatMap((update) => (update.paths ?? []).map((entry) => `${entry.path}:${update.generation}`)));
   let terminalClosureAvailable = false;
-  while ((turns.length < maxTurns || terminalClosureAvailable) && !done && !interrupted) {
-    const terminalClosureTurn = turns.length >= maxTurns && terminalClosureAvailable;
+  // The caller kills the run at the wall budget. Stop starting work turns once
+  // the reserve for one final action is reached, so a granted DONE-only turn
+  // can actually be spent instead of being cut off mid-turn.
+  const wallDeadlineReached = () => wallClosureDue({
+    startedAtMs: runStartedAtMs, nowMs: Date.now(), deadlineMs: wallDeadlineMs });
+  while (((turns.length < maxTurns && !wallDeadlineReached()) || terminalClosureAvailable) && !done && !interrupted) {
+    const terminalClosureTurn = (turns.length >= maxTurns || wallDeadlineReached()) && terminalClosureAvailable;
     if (terminalClosureTurn) terminalClosureAvailable = false;
     let executionShadowPhaseForTurn = null;
     let executionShadowBoundariesForTurn = [];
@@ -5739,7 +5749,7 @@ async function runAgentCore({
       const pending = collectionAuditEnabled ? currentAuditState() : null;
       if (landingPassNote === 0 && terminalClosureEligible({
         allowance: terminalClosureTurns, used: metrics.terminalClosure.used,
-        turnsUsed: turns.length + 1, workTurnLimit: maxTurns, action, proof: doneVerificationProof,
+        turnsUsed: turns.length + 1, workTurnLimit: maxTurns, deadlineReached: wallDeadlineReached(), action, proof: doneVerificationProof,
         generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
         verificationWorkspaceReadOnly, pendingAudit: cliContract && !cliVerificationPassed(cliContract, cliVerification,
           { generation: workspaceEditGeneration }) ? { ...pending, needsCli: true } : pending, interrupted,

@@ -54,7 +54,7 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,timeoutMs=60
       ...(arm==='deepseek-local-27b'?[]:['--arm',arm]),'--workspace',workspace,'--task-file',path.join(dir,'task.md'),
       '--output',path.join(dir,'native'),'--endpoint',endpoint,'--model',model,'--timeout-seconds',String(Math.ceil(timeoutMs/1000)),
       '--max-output-tokens',String(peerOutputTokens),
-      ...(peerExecutables[arm]?['--executable',peerExecutables[arm].executable,'--executable-sha256',peerExecutables[arm].sha256]:[])],env:{}};
+      ...(peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm]?['--executable',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].executable,'--executable-sha256',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].sha256]:[])],env:{}};
   }
   const command=cardCommand(arm,task,workspace,dir);
   command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions')};
@@ -150,7 +150,7 @@ function markdown(manifest) {
   return '# Fresh factory fight cards\n\n'+manifest.design+'\n\n| Card | Contender | Outcome | Groups | Seconds | Input | Fresh input | Output |\n|---|---|---|---:|---:|---:|---:|---:|\n'+rows.join('\n')+'\n\nUnknown token totals are not zero. Candidate acceptance and run completion are retained separately in manifest.json. No failed candidate was repaired by the operator.\n';
 }
 
-export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters}={}) {
+export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',arms=FIGHT_ARMS,cards,kitId=DEFAULT_KIT_ID,repetitions=1,timeoutMs=600000,probeEnabled=true,peerOutputTokens=8192,parallelQueues=true,verificationWorkspaceReadOnly=false,terminalClosure=false,peerExecutables={},peerReadiness=null,codexReadiness=null,deepseekReadiness=null}={}, {inspect=inspectLocalModel,contender=executeContender,grade=gradeFactoryFight,settle=settleServerCounters}={}) {
   if(!path.isAbsolute(output??'')||fs.existsSync(output))throw Error('requires a fresh absolute output directory');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>600000)throw Error('deadline must be 1..600 seconds');
   if(!Number.isInteger(peerOutputTokens)||peerOutputTokens<1024||peerOutputTokens>32768)throw Error('peer output tokens must be 1024..32768');
@@ -159,7 +159,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   const plan=fightPlan({arms,cards,kitId,repetitions});
   if(!peerExecutables||typeof peerExecutables!=='object'||Array.isArray(peerExecutables))throw Error('invalid peer executable selections');
   for(const [name,record]of Object.entries(peerExecutables)){
-    if(!['hermes','opencode'].includes(name)||!arms.includes(name))throw Error('unsupported or unselected peer executable');
+    if(!['hermes','opencode','deepseek'].includes(name)||!arms.includes(name==='deepseek'?'deepseek-local-27b':name))throw Error('unsupported or unselected peer executable');
     verifyCompetitorRegistration(record);
   }
   const needsLocal=arms.some(arm=>LOCAL.has(arm));
@@ -175,7 +175,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     sourceSeal:runtimeSeal,kitSeal,modelId:model?.id??null,modelFileSha256:null,endpoint:needsLocal?endpoint:null,
     limits:{wallMs:timeoutMs,bantamTurns:60+(terminalClosure?1:0),bantamWorkTurns:60,terminalClosureAllowance:terminalClosure?1:0,peerDeclaredContext:65536,peerDeclaredOutput:peerOutputTokens},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,codexModel:'gpt-6-astra',codexEffort:'medium',
-      verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,codexReadiness,
+      verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,codexReadiness,deepseekReadiness,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',
       sampling:'native configured values, retained in local wire requests',
       outputPolicy:'BANTAM separates up-to-4096 reasoning and up-to-8192 action requests; peers share their declared output allowance between reasoning and action. Native input reservation/compaction may depend on the declared output allowance.',

@@ -4,10 +4,11 @@ import path from 'node:path';
 import {bantamConfigDirectory} from './config-directory.js';
 import crypto from 'node:crypto';
 
-export const REGISTERABLE_COMPETITORS=['hermes','opencode'];
+export const REGISTERABLE_COMPETITORS=['hermes','opencode','deepseek'];
 const candidates={
  hermes:['hermes','bin/hermes','.venv/bin/hermes','venv/bin/hermes'],
  opencode:['opencode','bin/opencode','bin/opencode.exe','node_modules/.bin/opencode'],
+ deepseek:['dsh','bin/dsh','node_modules/.bin/dsh','node_modules/@deepseek-ai/dsh/lib/bin.js','lib/bin.js'],
 };
 export const competitorRegistryPath=home=>path.join(bantamConfigDirectory(home),'competitors.json');
 export function executablePath(value){
@@ -17,7 +18,7 @@ export function executablePath(value){
  fs.accessSync(actual,fs.constants.R_OK|fs.constants.X_OK);return actual;
 }
 export function resolveCompetitorInstallation(name,location){
- if(!REGISTERABLE_COMPETITORS.includes(name))throw Error('Path registration currently supports hermes and opencode. Other adapters remain separate; no guessed command is run.');
+ if(!REGISTERABLE_COMPETITORS.includes(name))throw Error('Path registration currently supports hermes, opencode and deepseek. Other adapters remain separate; no guessed command is run.');
  if(typeof location!=='string'||!location.trim())throw Error('Supply an executable or installation directory.');
  const input=path.resolve(location);
  if(!fs.statSync(input).isDirectory())return executablePath(input);

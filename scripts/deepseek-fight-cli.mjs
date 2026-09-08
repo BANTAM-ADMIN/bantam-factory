@@ -8,6 +8,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runProcess } from "../src/process-runner.js";
+import {discoverDeepseekRuntime} from '../src/deepseek-runtime.js';
+import {identityFiles,nonRootIdentity} from '../src/linux-peer-runtime.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const DEEPSEEK_VERSION = "0.1.2-rc.1";
@@ -27,9 +29,11 @@ export function parseArgs(args) {
     ["--workspace", "workspace"], ["--task-file", "taskFile"], ["--output", "output"],
     ["--endpoint", "endpoint"], ["--model", "model"], ["--timeout-seconds", "timeoutSeconds"],
     ["--max-output-tokens", "maxOutputTokens"],
+    ['--executable','executable'],['--executable-sha256','executableSha256'],
   ]);
   const result = {};
   for (let index = 0; index < args.length; index++) {
+    if(args[index]==='--probe'&&!result.probe){result.probe=true;continue;}
     const key = keys.get(args[index]);
     if (!key || Object.hasOwn(result, key) || !args[index + 1] || args[index + 1].startsWith("--")) {
       throw new Error(`unknown, duplicate, or incomplete argument: ${args[index]}`);
@@ -44,6 +48,8 @@ export function parseArgs(args) {
     throw new Error("timeout must be 1..1800 seconds");
   }
   result.maxOutputTokens = outputCap(Number(result.maxOutputTokens ?? 8192));
+  if(result.executable)absolute(result.executable,'executable');
+  if(result.executableSha256&&(!result.executable||!/^[a-f0-9]{64}$/.test(result.executableSha256)))throw Error('executable SHA-256 requires an explicit executable');
   return result;
 }
 
@@ -82,7 +88,7 @@ export function buildPatch({ endpoint, model, maxOutputTokens = 8192 }) {
   ], null, 2)}\n`;
 }
 
-export function buildDockerArgs({ workspace, home, patchFile, cidfile, name, image, task, timeoutSeconds = 600 }) {
+export function buildDockerArgs({ workspace, home, patchFile, cidfile, name, image, task, timeoutSeconds = 600, runtime=null, control=null, probe=false }) {
   const root = absolute(workspace, "workspace");
   if (["/", os.homedir(), REPO].includes(root) || inside(root, REPO)) {
     throw new Error("use a disposable candidate, not a home, repository root, or their ancestor");
@@ -97,24 +103,44 @@ export function buildDockerArgs({ workspace, home, patchFile, cidfile, name, ima
   if (inside(root, state) || inside(state, root)) throw new Error("native home must be outside the candidate");
   const mount = (source, target, readonly = false) => ["--mount",
     `type=bind,src=${absolute(source, "mount source")},dst=${target}${readonly ? ",readonly" : ""}`];
+  const {uid,gid}=runtime?nonRootIdentity(runtime.identity):{uid:1000,gid:1000};
+  const node=runtime?'/usr/bin/node':'/usr/local/bin/node',entry=runtime?.entry??'/opt/deepseek/node_modules/@deepseek-ai/dsh/lib/bin.js';
+  const nativeHome=runtime?'/home/ubuntu':'/home/node';
+  const run=probe?[node,'-e',`const fs=require('node:fs'),cp=require('node:child_process'),os=require('node:os');
+    if(typeof require('node:zlib').createZstdDecompress!=='function'||typeof require('node:module').stripTypeScriptTypes!=='function'||typeof Promise.withResolvers!=='function')
+      throw Error('Selected Node lacks runtime APIs required by DeepSeek headless; use the Node supplied with the installation or a compatible Node on PATH. Nothing was installed.');
+    const entry=${JSON.stringify(entry)};
+    const version=cp.execFileSync(process.execPath,[entry,'--version'],{encoding:'utf8',timeout:15000}).trim();
+    cp.execFileSync(process.execPath,[entry,'--help'],{encoding:'utf8',timeout:15000});
+    fs.writeFileSync('/workspace/offline-probe.txt','DEEPSEEK_OFFLINE_OK\\n');
+    console.log(JSON.stringify({probe:true,arm:'deepseek',version,node:process.version,headlessRuntimeApis:true,home:os.homedir(),uid:process.getuid(),gid:process.getgid(),candidateWritable:true}));`]
+    :[node,entry,'--profile','headless','--patch','/run/fight.patch.yml','--',task];
   return [
     "run", "--rm", "--pull", "never", "--init", "--name", name, "--cidfile", absolute(cidfile, "CID receipt"),
     "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-    "--pids-limit", "256", "--memory", "2g", "--cpus", "2", "--user", "1000:1000",
+    "--pids-limit", "256", "--memory", "2g", "--cpus", "2", "--user", `${uid}:${gid}`,
     // The local inference/recording proxy listens on loopback. This is NOT an
     // egress sandbox: host network services and outbound network remain reachable.
-    "--network", "host",
+    "--network", probe?'none':'host',
     "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m,mode=1777",
-    "--tmpfs", "/home/node:rw,nosuid,nodev,size=128m,uid=1000,gid=1000,mode=700",
+    "--tmpfs", `${nativeHome}:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid},mode=700`,
+    ...(runtime?[
+      ...mount(path.join(control,'passwd'),'/etc/passwd',true),...mount(path.join(control,'group'),'/etc/group',true),
+      ...runtime.mounts.flatMap(m=>mount(m.source,m.target,true)),
+      ...runtime.toolMounts.flatMap(m=>mount(m.source,m.target,true)),
+      ...runtime.libraries.flatMap(file=>mount(fs.realpathSync(file),file,true)),
+      ...mount(runtime.gitCore,'/opt/git-core',true),...mount(runtime.npm,'/opt/npm',true),
+      '--env','GIT_EXEC_PATH=/opt/git-core','--env','PATH=/tmp/dsh-tools:/usr/bin:/bin',
+    ]:[]),
     ...mount(root, "/workspace"), ...mount(state, "/dsh"), ...mount(patchFile, "/run/fight.patch.yml", true),
-    "--env", "HOME=/home/node", "--env", "DSH_HOME=/dsh",
+    "--env", `HOME=${nativeHome}`, "--env", "DSH_HOME=/dsh",
     "--env", "DSH_PERMISSION_MODE=danger-full-access", "--env", "DSH_TELEMETRY_DISABLED=1",
     "--env", "DSH_TELEMETRY_MODE=DISABLED", "--env", "BANTAM_LOCAL_PLACEHOLDER_KEY=local-no-secret",
     "--env", "NO_COLOR=1", "--env", "LANG=C.UTF-8", "--env", "GIT_CONFIG_NOSYSTEM=1",
     "--workdir", "/workspace", image,
     "/usr/bin/timeout", "--signal=TERM", "--kill-after=5s", `${timeoutSeconds}s`,
-    "/usr/local/bin/node", "/opt/deepseek/node_modules/@deepseek-ai/dsh/lib/bin.js",
-    "--profile", "headless", "--patch", "/run/fight.patch.yml", "--", task,
+    ...(runtime?['/bin/sh','-c',`mkdir -p /tmp/dsh-tools && printf '#!/bin/sh\\nexec /usr/bin/node /opt/npm/bin/npm-cli.js "$@"\\n' > /tmp/dsh-tools/npm && chmod 755 /tmp/dsh-tools/npm && exec "$@"`,'dsh-runtime']:[]),
+    ...run,
   ];
 }
 
@@ -212,9 +238,11 @@ export function inspectRuntime(imageReference = process.env.BANTAM_DEEPSEEK_IMAG
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseArgs(args);
-  if (process.platform !== "linux" || process.arch !== "x64" || process.getuid?.() !== 1000 || process.getgid?.() !== 1000) {
-    throw new Error("qualified runtime requires Linux x64, uid/gid 1000");
+  if (process.platform !== "linux" || process.arch !== "x64") {
+    throw new Error("DeepSeek comparison requires Linux x64");
   }
+  nonRootIdentity();
+  if(!options.executable&&(process.getuid()!==1000||process.getgid()!==1000))throw Error('Prepared DeepSeek image requires uid/gid 1000; select an installed npm runtime for other non-root identities');
   const workspace = fs.realpathSync(absolute(options.workspace, "workspace"));
   if (!fs.statSync(workspace).isDirectory()) throw new Error("workspace must be a directory");
   const taskFile = absolute(options.taskFile, "task file");
@@ -227,15 +255,18 @@ export async function main(args = process.argv.slice(2)) {
   if (fs.existsSync(output)) throw new Error("output must be a new directory; refusing to overwrite an attempt");
   const endpoint = normalizeEndpoint(options.endpoint);
   const patch = buildPatch({ endpoint, model: options.model, maxOutputTokens: options.maxOutputTokens });
-  const runtime = inspectRuntime();
+  const installed=options.executable?discoverDeepseekRuntime(options.executable,options.executableSha256):null;
+  const runtime = installed?{...installed,image:JSON.parse(execFileSync('docker',['image','inspect','ubuntu:24.04'],{encoding:'utf8',timeout:5000}))[0].Id}:inspectRuntime();
   const name = `deepseek-fight-${process.pid}-${crypto.randomUUID()}`;
   const home = path.join(output, "native-home");
   const patchFile = path.join(output, "fight.patch.yml");
   const cidfile = path.join(output, "container.cid");
+  const control=path.join(output,'runtime-control');
   const dockerArgs = buildDockerArgs({ workspace, home, patchFile, cidfile, name,
-    image: runtime.image, task, timeoutSeconds: options.timeoutSeconds });
+    image: runtime.image, task, timeoutSeconds: options.timeoutSeconds,runtime:installed,control,probe:options.probe });
   fs.mkdirSync(output, { mode: 0o700 });
   fs.mkdirSync(home, { mode: 0o700 });
+  if(installed){fs.mkdirSync(control,{mode:0o700});for(const [file,value]of Object.entries(identityFiles(installed.identity)))fs.writeFileSync(path.join(control,file),value,{flag:'wx',mode:0o600});}
   fs.writeFileSync(patchFile, patch, { flag: "wx", mode: 0o444 });
   const write = (file, value) => fs.writeFileSync(path.join(output, file), typeof value === "string" ? value : `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
   const launch = { schema: "bantam.deepseek-fight-launch.v1", runtime, profile: "headless", toolsMode: "native standard default",
@@ -244,18 +275,22 @@ export async function main(args = process.argv.slice(2)) {
     timeoutSeconds: options.timeoutSeconds,
     taskSha256: sha256(task), patchSha256: sha256(patch), dockerArgs, name, cidfile,
     isolation: "outer Docker; only candidate/native-home writable; no host home, auth, grader, or repository mounts",
-    network: "host network for loopback model proxy; NOT an egress isolation boundary",
+    network: options.probe?'none; offline runtime check':"host network for loopback model proxy; NOT an egress isolation boundary",
     nativeEvidence: "native home is worker-visible and writable; external recorder/independent grader remain authoritative",
   };
   write("launch.json", launch);
   const abort = new AbortController();
   const signalHandlers = new Map(["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => [signal, () => abort.abort()]));
   for (const [signal, handler] of signalHandlers) process.once(signal, handler);
+  let cleanupReceipt;
   const cleanup = () => {
     const saved = fs.existsSync(cidfile) ? fs.readFileSync(cidfile, "utf8").trim() : "";
     const target = /^[0-9a-f]{64}$/.test(saved) ? saved : name;
     try { execFileSync("docker", ["rm", "--force", target], { stdio: "ignore", timeout: 10000 }); }
     catch { /* This exact --rm container may already have exited. */ }
+    let absent=false;try{execFileSync('docker',['inspect',name],{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:5000});}
+    catch(error){absent=/No such (?:object|container)/i.test(String(error.stderr??''));}
+    cleanupReceipt={name,absent};
   };
   const startedAt = new Date().toISOString();
   const started = performance.now();
@@ -270,6 +305,7 @@ export async function main(args = process.argv.slice(2)) {
   write("stdout.log", result.stdout);
   write("stderr.log", result.stderr);
   const summary = { schema: "bantam.deepseek-fight-result.v1", startedAt, endedAt: new Date().toISOString(),
+    cleanup:cleanupReceipt,
     wallMs: Math.round(performance.now() - started),
     process: { code: result.code, signal: result.signal, timedOut: result.timedOut || result.code === 124,
       aborted: result.aborted, bufferExceeded: result.bufferExceeded, error: result.error?.message ?? null },

@@ -182,7 +182,8 @@ test("published DeepSeek standard profile transmits 32K cap and persists scripte
     const result = await runProcess(process.execPath, [path.join(REPO, "scripts/deepseek-fight-cli.mjs"),
       "--workspace", workspace, "--task-file", taskFile, "--output", output,
       "--endpoint", `http://127.0.0.1:${server.address().port}`, "--model", "/models/exact-local27b.gguf", "--timeout-seconds", "45",
-      "--max-output-tokens", "32768"],
+      "--max-output-tokens", "32768",
+      ...(process.env.BANTAM_TEST_DEEPSEEK_EXECUTABLE?['--executable',process.env.BANTAM_TEST_DEEPSEEK_EXECUTABLE]:[])],
     { cwd: REPO, timeoutMs: 70000, maxBuffer: 4 * 1024 * 1024 });
     const saved = fs.existsSync(path.join(output, "result.json")) ? JSON.parse(fs.readFileSync(path.join(output, "result.json"))) : null;
     const nativeError = fs.existsSync(path.join(output, "stderr.log")) ? fs.readFileSync(path.join(output, "stderr.log"), "utf8") : "";
@@ -231,7 +232,8 @@ test("DeepSeek deadline reports interruption and removes only its owned containe
   try {
     const result = await runProcess(process.execPath, [path.join(REPO, "scripts/deepseek-fight-cli.mjs"),
       "--workspace", workspace, "--task-file", taskFile, "--output", output,
-      "--endpoint", `http://127.0.0.1:${server.address().port}`, "--model", "deadline-smoke", "--timeout-seconds", "2"],
+      "--endpoint", `http://127.0.0.1:${server.address().port}`, "--model", "deadline-smoke", "--timeout-seconds", "2",
+      ...(process.env.BANTAM_TEST_DEEPSEEK_EXECUTABLE?['--executable',process.env.BANTAM_TEST_DEEPSEEK_EXECUTABLE]:[])],
     { cwd: REPO, timeoutMs: 20000 });
     const saved = JSON.parse(fs.readFileSync(path.join(output, "result.json")));
     assert.equal(result.code, 124, result.stderr);

@@ -7,10 +7,11 @@ import {writeFactoryReplay} from '../scripts/factory-fight-replay.mjs';
 import {writeFightCardExport} from '../scripts/factory-fight-export.mjs';
 import {writeShowcase} from '../scripts/factory-showcase.mjs';
 import {loadConnection,discoverModelServers} from './first-run.js';
-import {readCompetitorRegistry,registerCompetitor,executablePath,verifyCompetitorRegistration} from './competitor-registry.js';
+import {readCompetitorRegistry,registerCompetitor,executablePath,executableDigest,verifyCompetitorRegistration} from './competitor-registry.js';
 import {checkPeerReadiness,readinessLocation} from './peer-readiness.js';
 import {checkCodexReadiness} from './codex-readiness.js';
 import {nonRootIdentity} from './linux-peer-runtime.js';
+import {checkDeepseekReadiness} from './deepseek-readiness.js';
 
 const LOCAL=new Set(['bantam-local-27b','hermes','opencode','deepseek-local-27b']);
 export const CARDS_HELP=`BANTAM FACTORY · fight cards
@@ -19,8 +20,10 @@ bantamfactory cards                 Guided, explicitly approved comparison
 bantamfactory cards --list          List frozen tasks and installed participants
 bantamfactory cards --register hermes --path /path/to/installation-or-executable
 bantamfactory cards --register opencode --path /path/to/installation-or-executable
+bantamfactory cards --register deepseek --path /path/to/dsh-or-npm-installation
 bantamfactory cards --check --arms hermes,opencode --yes  Offline runtime checks; no model requests
 bantamfactory cards --check --arms codex-astra --yes     Offline Codex check; dummy credentials
+bantamfactory cards --check --arms deepseek-local-27b --yes  Offline DeepSeek runtime check
 bantamfactory cards --replay DIR    Rebuild replay/export from saved evidence; no inference
 bantamfactory cards --card context-packet --arms bantam-local-27b,hermes --dry-run
 bantamfactory cards --card context-packet --arms bantam-local-27b,opencode --endpoint http://127.0.0.1:8085 --yes
@@ -29,7 +32,7 @@ Options: --kit ID (default factory-2026-09-07), --card ID, --arms ID,...,
          --endpoint URL, --out NEW-DIRECTORY, --timeout-seconds 1..600,
          --repetitions 1..3, --serial, --list, --replay DIR, --check, --dry-run, --yes, --help
          --public (also generate an allowlisted public summary; never upload)
-         --register hermes|opencode --path PATH (save location only; no execution)
+         --register hermes|opencode|deepseek --path PATH (save location only; no execution)
 
 No rival installations, model downloads, cloud requests or uploads occur from
 listing or planning. Execution requires Docker and the selected runtimes.
@@ -58,6 +61,11 @@ export function findCardImage(image,{exec=execFileSync}={}){
 export function discoverCardParticipants({find=findCardExecutable,registrations={},inspectImages=false,inspectImage=findCardImage}={}){
  return FIGHT_ARMS.map(id=>{
   if(id==='deepseek-local-27b'){
+   const registration=registrations.deepseek;
+   let executable=registration?.executable??find('dsh');
+   if(executable){try{executable=executablePath(executable);}catch{executable=null;}}
+   if(registration||executable)return {id,pool:'local',executable,installed:Boolean(executable),...(registration?{registration}:{}),
+    detail:executable?`${executable} (installed npm adapter; offline qualification required)`:'Registered DeepSeek executable unavailable; register its updated path. No image fallback.'};
    const image='bantam/deepseek-fight:0.1.2-rc.1',imageId=inspectImages?inspectImage(image):null;
    return {id,pool:'local',executable:null,installed:Boolean(imageId),imageId,
     detail:imageId?`Prepared adapter image detected: ${image} (${imageId}); runtime not yet qualified`:
@@ -93,7 +101,7 @@ export function makeCardsPlan(args,{cwd=process.cwd(),now=()=>new Date(),connect
  const endpoint=arms.some(a=>LOCAL.has(a))?normalizeCardEndpoint(args.endpoint??(connection?.kind==='api'&&connection.dialect==='llamacpp'?connection.apiUrl:'http://127.0.0.1:8085')):null;
  const output=path.resolve(cwd,args.out??path.join('.bantam','fight-cards',now().toISOString().replace(/[:.]/g,'-')));
  if(fs.existsSync(output))throw Error('Choose a new output directory; existing evidence is never overwritten.');
- const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name)).map(([name,r])=>[name,{executable:r.executable,sha256:r.sha256}]));
+ const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name==='deepseek'?'deepseek-local-27b':name)).map(([name,r])=>[name,{executable:r.executable,sha256:r.sha256}]));
  return {kitId,cards:[card],arms,repetitions,timeoutMs,output,endpoint,parallelQueues:!args.serial,...(Object.keys(peerExecutables).length?{peerExecutables}:{})};
 }
 export function preflightCards(plan,{exec=execFileSync,participants=discoverCardParticipants()}={}){
@@ -102,7 +110,7 @@ export function preflightCards(plan,{exec=execFileSync,participants=discoverCard
  if(missing.length)throw Error(`Selected participants not installed/on PATH: ${missing.join(', ')}. Nothing was launched.`);
  for(const registration of Object.values(plan.peerExecutables??{}))verifyCompetitorRegistration(registration);
  check('docker',['info'],'Docker is unavailable');
- for(const image of new Set(['alpine:3',...(plan.arms.some(a=>a!=='bantam-local-27b')?['ubuntu:24.04']:[]),...(plan.arms.includes('deepseek-local-27b')?['bantam/deepseek-fight:0.1.2-rc.1']:[])])){
+ for(const image of new Set(['alpine:3',...(plan.arms.some(a=>a!=='bantam-local-27b')?['ubuntu:24.04']:[]),...(plan.arms.includes('deepseek-local-27b')&&!plan.peerExecutables?.deepseek?['bantam/deepseek-fight:0.1.2-rc.1']:[])])){
   check('docker',['image','inspect',image],`Required Docker image missing: ${image}`);
  }
  if(plan.arms.some(a=>a.includes('codex'))){
@@ -113,12 +121,12 @@ export function preflightCards(plan,{exec=execFileSync,participants=discoverCard
 export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(s),interactive=Boolean(process.stdin.isTTY&&process.stderr.isTTY),
  discover=discoverCardParticipants,findExecutable=findCardExecutable,servers=discoverModelServers,connection=loadConnection(),
  registry=readCompetitorRegistry,register=registerCompetitor,
- preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness,checkCodex=checkCodexReadiness,showcase=writeShowcase}={}){
+ preflight=preflightCards,run=runFactoryFights,exportCard=writeFightCardExport,replay=writeFactoryReplay,checkPeers=checkPeerReadiness,checkCodex=checkCodexReadiness,checkDeepseek=checkDeepseekReadiness,showcase=writeShowcase}={}){
  const allowed=new Set(['_','help','list','replay','dry-run','yes','kit','card','arms','endpoint','out','timeout-seconds','repetitions','serial','register','path','check','public']);
  for(const key of Object.keys(args))if(!allowed.has(key))throw Error(`Unknown cards option: --${key}`);
  if(args.help){out(CARDS_HELP);return 0;}
  if(args.register!==undefined||args.path!==undefined){
-  if(typeof args.register!=='string'||typeof args.path!=='string'||Object.keys(args).some(k=>!['_','register','path'].includes(k)))throw Error('Use --register hermes|opencode --path PATH, without run options.');
+  if(typeof args.register!=='string'||typeof args.path!=='string'||Object.keys(args).some(k=>!['_','register','path'].includes(k)))throw Error('Use --register hermes|opencode|deepseek --path PATH, without run options.');
   const entry=register(args.register,args.path);
   out(`Registered ${args.register}: ${entry.executable}\nSHA-256: ${entry.sha256}\nNo harness was executed, account authorized, or software installed. Run cards to select a comparison.\n`);return 0;
  }
@@ -131,6 +139,8 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  }
  const registrations=registry().tools;
  const participants=discover({registrations,inspectImages:Boolean(args.list||(interactive&&!args['dry-run']))});
+ const detectedDeepseek=participants.find(p=>p.id==='deepseek-local-27b')?.executable;
+ if(!registrations.deepseek&&detectedDeepseek)registrations.deepseek={executable:detectedDeepseek,sha256:executableDigest(detectedDeepseek)};
  const list=()=>{
   out('\nBANTAM FACTORY · frozen work orders\n');
   for(const [kit,cards]of Object.entries(FACTORY_KITS))for(const id of cards)out(`  ${kit} / ${id} — ${PUBLIC_FACTORY_CARDS[id]?.description??id}\n`);
@@ -143,8 +153,8 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  if(args.check){
   if(typeof args.arms!=='string'||Object.keys(args).some(k=>!['_','check','arms','out','yes','dry-run'].includes(k)))throw Error('Use --check --arms hermes,opencode [--out NEW-DIRECTORY] [--yes|--dry-run].');
   const arms=args.arms.split(',').map(a=>a.trim());
-  if(!arms.length||arms.some(a=>!['hermes','opencode','codex-astra','bantam-codex-astra'].includes(a))||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/Codex runtimes only.');
-  const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name)));
+  if(!arms.length||arms.some(a=>!['hermes','opencode','deepseek-local-27b','codex-astra','bantam-codex-astra'].includes(a))||new Set(arms).size!==arms.length)throw Error('--check supports selected Hermes/OpenCode/DeepSeek/Codex runtimes only.');
+  const peerExecutables=Object.fromEntries(Object.entries(registrations).filter(([name])=>arms.includes(name==='deepseek'?'deepseek-local-27b':name)));
   const output=args.out?path.resolve(args.out):readinessLocation(path.resolve('.bantam/fight-cards/offline-check'));
   out(`Offline runtime checks: ${arms.join(', ')}\nEvidence: ${output}\nNo model inference, cloud login, downloads or publication. Installed program code will execute in network-disabled containers.\n`);
   if(args['dry-run'])return 0;
@@ -156,8 +166,10 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
   if(fs.existsSync(output))throw Error('Choose a fresh readiness evidence directory.');
   preflight({arms,peerExecutables},{participants});
   const peers=arms.filter(a=>['hermes','opencode'].includes(a)),codex=arms.some(a=>a.includes('codex'));
-  if(peers.length)await checkPeers({arms:peers,peerExecutables,output:codex?path.join(output,'peers'):output});
-  if(codex)await checkCodex({output:peers.length?path.join(output,'codex'):output});
+  const deepseek=arms.includes('deepseek-local-27b'),mixed=Number(peers.length>0)+Number(codex)+Number(deepseek)>1;
+  if(peers.length)await checkPeers({arms:peers,peerExecutables,output:mixed?path.join(output,'peers'):output});
+  if(codex)await checkCodex({output:mixed?path.join(output,'codex'):output});
+  if(deepseek)await checkDeepseek({output:mixed?path.join(output,'deepseek'):output,registration:peerExecutables.deepseek});
   out('Offline readiness passed. This is not a coding score or token-accounting qualification.\n');return 0;
  }
  const selected={...args};
@@ -182,6 +194,11 @@ export async function factoryCardsCommand(args,{ask,out=s=>process.stdout.write(
  }else if(!interactive)throw Error('Noninteractive execution requires --card, --arms and --yes. Use --dry-run to inspect without running.');
  else if(!/^y(es)?$/i.test((await ask('Run exactly this comparison, using the listed local/cloud resources? [y/N] ')).trim())){out('Cancelled; no tasks launched.\n');return 0;}
  preflight(plan,{participants});
+ if(plan.arms.includes('deepseek-local-27b')){
+  const output=readinessLocation(plan.output)+'.deepseek';
+  out(`Checking DeepSeek offline before scored work. Evidence: ${output}\n`);
+  plan.deepseekReadiness=await checkDeepseek({output,registration:plan.peerExecutables?.deepseek});
+ }
  if(plan.arms.some(a=>a.includes('codex'))){
   const output=readinessLocation(plan.output)+'.codex';out(`Checking Codex offline before scored work. Evidence: ${output}\n`);
   plan.codexReadiness=await checkCodex({output,requireAuthentication:true});

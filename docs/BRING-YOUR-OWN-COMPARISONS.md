@@ -92,7 +92,7 @@ lane ID `bantam-local-27b` is retained for evidence compatibility, not a check
 that the user's selected model has 27B parameters.
 
 Preflight checks selected executables and Docker/image availability, then runs
-selected Hermes/OpenCode offline startup checks before any scored contender.
+selected Hermes/OpenCode/DeepSeek/Codex offline startup checks before any scored contender.
 It does not pull images or prove compatibility of every harness version. Missing runtime
 prerequisites fail before contender execution. All local inference contenders
 run serially. Frontier work may overlap; use `--serial` to serialize everything.
@@ -103,8 +103,10 @@ run serially. Frontier work may overlap; use `--serial` to serialize everything.
   outer containers. Runtime discovery uses the registered executable or PATH; for Hermes
   it also resolves that environment's installed Python package. It does not
   copy the operator's whole home or reuse personal harness memory/configuration.
-- `scripts/deepseek-fight-cli.mjs` uses a separately prepared, identified
-  DeepSeek Harness container. This is not silently provisioned by first-run setup.
+- `scripts/deepseek-fight-cli.mjs` can use an existing npm-installed `dsh`
+  (registered path first, then PATH) with read-only package/dependency mounts.
+  If none is selected/detected, the separately prepared, identified DeepSeek
+  image remains supported. Neither path silently installs software.
 - `src/fight.js` contains the existing Claude Code CLI corners. They are not
   automatically included in the newer six-arm factory runner, and installing
   BANTAM does not grant permission to use a Claude subscription.
@@ -123,14 +125,38 @@ guided `cards` command.
 ```bash
 bantamfactory cards --register hermes --path /path/to/hermes-install
 bantamfactory cards --register opencode --path /path/to/opencode-executable
+bantamfactory cards --register deepseek --path /path/to/npm-installation-or-dsh
 bantamfactory cards --check --arms hermes,opencode --yes
+bantamfactory cards --check --arms deepseek-local-27b --yes
 ```
 
 Registration resolves a bounded set of known executable locations and saves
 the exact executable path and SHA-256. It does not run the tool, authorize an
 account or install anything. A changed registered executable requires explicit
 re-registration; a missing one does not silently fall back to a different PATH
-installation. Registration currently supports only Hermes and OpenCode.
+installation. Registration supports Hermes, OpenCode and DeepSeek Harness.
+
+DeepSeek currently supports the npm `@deepseek-ai/dsh/lib/bin.js` layout,
+including a global/npm-prefix installation. Linked/external dependency layouts
+(for example some pnpm/source-tree arrangements) need another adapter; they are
+not silently copied or installed. Only the dependency closure is mounted, not
+the installation's parent project or operator home. Package root dotfiles are
+excluded; writable settings and sessions are new for each contender.
+
+The installed adapter prefers Node in the selected npm prefix, then Node on
+PATH—not necessarily the older Node running BANTAM. Its offline check verifies
+the runtime APIs needed by the tested DeepSeek headless profile as well as
+startup, candidate writes and container cleanup. An incompatible Node fails
+before scored work. No Node download or version-manager change is automatic.
+Installed execution supports non-root Linux x64 UID/GID values; the legacy
+prepared-image path still requires UID/GID 1000.
+
+Qualification used the already-installed 0.1.2-rc.1 image's npm packages and
+bundled Node in a temporary prefix, mounted into Ubuntu—not a fresh download.
+Scripted HTTP checks exercised native tool execution, exact model/output routing,
+session usage with cached tokens, deadline handling and cleanup on both paths.
+These are transport/runtime tests, not a new model benchmark or proof that every
+DeepSeek version/package layout works.
 
 The offline check requires explicit consent, uses network-disabled disposable
 containers, and verifies version/help startup, writable candidate space, an

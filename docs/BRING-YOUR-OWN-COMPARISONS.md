@@ -63,6 +63,12 @@ with artifact acceptance distinct from process completion. Browser disconnects
 do not erase recorded progress; `progress.json` retains the latest public snapshot.
 One local inference queue is serial even when a frontier queue runs alongside it.
 
+`--peer-output-tokens` exposes the existing native-peer allowance (1,024–32,768;
+default 8,192) in the reviewed plan. A 32,768 allowance avoids forcing the earlier
+OpenCode 8,192-token cutoff, but may change native context reservation/compaction.
+It applies to all selected native local peers, not BANTAM or Codex. Record the
+choice; differing reasoning/action budgets are not a pure context ablation.
+
 Local counter windows now retain post-cleanup observations in each contender's
 `server-usage.json`. The runner waits up to ten seconds for two unchanged idle
 samples, 250 ms apart, so canceled requests can finish before the next local

@@ -14,6 +14,9 @@ test('all explicitly selects the complete frozen build/extend/repair kit',()=>{
  const plan=makeCardsPlan({card:'all',arms:'bantam-local-27b,hermes,codex-astra',out:'/tmp/bantam-all-plan-not-created'},{connection:null});
  assert.deepEqual(plan.cards,['context-packet','patch-transaction','stream-framer']);
  assert.deepEqual(plan.arms,['bantam-local-27b','hermes','codex-astra']);
+ assert.equal(plan.peerOutputTokens,8192);
+ assert.equal(makeCardsPlan({card:'all','peer-output-tokens':32768,out:'/tmp/bantam-all-plan-not-created'},{connection:null}).peerOutputTokens,32768);
+ assert.throws(()=>makeCardsPlan({'peer-output-tokens':32769},{connection:null}),/peer-output-tokens/);
 });
 test('live projection distinguishes work, grading, incomplete receipts and accepted completion',()=>{
  const m=manifest(),active=new Map([[progressKey(item),{phase:'running',startedAt:100,exchanges:[{generation:true,index:1,status:200,finished:true,usage:{inputTokens:100,outputTokens:10,cacheHitTokens:80,freshInputTokens:20}},{generation:true,index:2}]}]]);

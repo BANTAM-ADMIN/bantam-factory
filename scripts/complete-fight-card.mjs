@@ -11,7 +11,7 @@ import {publicFollowups} from './fight-followups.mjs';
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const canonical = object => JSON.stringify(Object.entries(object).sort(([a], [b]) => a.localeCompare(b)));
 const key = row => `${row.card}/${row.repeat}/${row.arm}`;
-const peers = new Set(['deepseek-local-27b', 'hermes', 'opencode']);
+const peers = new Set(['deepseek-local-27b', 'hermes', 'opencode', 'pi']);
 
 function matchResult(row, result) {
   if (!result || row.recorded !== true || row.outcome !== result.outcome || row.wallMs !== result.wallMs

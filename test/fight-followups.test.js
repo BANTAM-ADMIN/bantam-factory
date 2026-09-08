@@ -58,6 +58,17 @@ test('follow-up composition preserves the baseline and an accepted timeout with 
   assert.match(renderLaunchPage(portable), /Original BANTAM FACTORY result retained/);
 });
 
+test('Pi follow-ups retain the baseline and appear in the same-model scoreboard', () => {
+  const f=fixture();
+  f.incoming.plan[0].arm='pi';f.incoming.results[0].arm='pi';
+  f.followupSource.series[0].cards[0].rows[0].arm='pi';
+  const result=compose(f),rows=buildLaunchData(bytes(result)).series[0].cards[0].rows;
+  assert.deepEqual(result.series[0].followups[0].arms,['pi']);
+  const score=sameModelScoreboard({cards:[{recorded:true,rows}]});
+  assert.equal(score.systems.find(s=>s.arm==='pi').recorded,1);
+  assert.equal(score.systems.find(s=>s.arm==='pi').completed,0);
+});
+
 test('composition refuses different weights, material, grading or limits', () => {
   for (const change of [
     f => {f.incoming.modelFileSha256 = 'b'.repeat(64);},

@@ -18,12 +18,14 @@ U+FE30 to U+FE4F, U+FF00 to U+FF60 or U+FFE0 to U+FFE6 counts two. A surrogate
 pair is one code point. A code point of width two never straddles a line: if it
 does not fit, the line ends first.
 
-Break the text into lines no wider than `width`. Break at a space when one
-exists in the current line, dropping that single space; otherwise break exactly
-at the width limit, mid-word. An existing LF forces a break and is not counted.
-A run of spaces at a break point collapses to the one dropped space, and
-trailing spaces before a forced break are kept. An empty text yields one empty
-line.
+Break the text into lines no wider than `width`, filling each line as far as
+it will go. Break at the last space that leaves the line no wider than
+`width`, dropping that single space; when the line holds no such space, break
+exactly at the width limit, mid-word. Breaking at an earlier space is wrong
+even though the resulting line is also no wider than `width`. An existing LF
+forces a break and is not counted. A run of spaces at a break point collapses
+to the one dropped space, and trailing spaces before a forced break are kept.
+An empty text yields one empty line.
 
 Styling must survive wrapping. If a line ends while any SGR state is active,
 append `ESC [0m` to that line and re-open the active state at the start of the

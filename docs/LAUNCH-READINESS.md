@@ -37,6 +37,21 @@ No additional model or supervisor experiments are required for this beta gate.
 
 ## Fresh evidence
 
+The [launch gallery](fights/launch-2026-09-07/index.html) now contains three
+complete task cards and nine recorded system attempts. BANTAM passed Context
+Packet in 58.1s and Patch Transaction in 81.8s; its Stream Framer attempt timed
+out at 4/5. All competitor results, accounting limitations and conditions are
+retained. Three further work orders are being compared across BANTAM, DeepSeek
+Harness, Hermes and native Codex Astra/Sol/Terra. Pending runs are not results.
+The static gallery is reviewed locally, not yet deployed to a public website.
+
+Native Sol and Terra are explicit optional contenders, not additions to the
+default quota-consuming roster. Their isolated runner and portable accounting
+paths have mocked integration coverage; `bb31e5f` passed hosted CI. Real model
+outcomes belong in completed cards, not inferred from those adapter tests.
+
+### Earlier reviewed comparison
+
 The [September 7 context-packet card](fights/context-packet-2026-09-07-public/README.md)
 was run from a clean clone of `7459b17`: BANTAM and Hermes passed all five
 groups; OpenCode left the starter unimplemented after reaching its output cap.
@@ -99,6 +114,5 @@ with explicit endpoint/output and `--yes`, using the existing older Q4_K_P
   offline inspection, hostile candidate text, mobile layout and receipt-timed
   counters. The actual one-lane replay was also visually inspected in Chromium.
 
-Next live qualification should run the committed front door against installed
-peer harnesses, after portable runtime readiness and explicit selection paths
-are tightened. A BANTAM-only pass is not evidence that those peers run correctly.
+Subsequent installed-peer exercises and comparisons are identified above. This
+earlier BANTAM-only pass is not evidence that those peers run correctly.

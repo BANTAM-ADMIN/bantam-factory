@@ -120,7 +120,7 @@ the original value, recovery bundle and commit map remain private and outside Gi
 Because unreachable objects can remain retrievable on GitHub, the intermediate
 repository was also retained as a private prelaunch archive. The current project
 URL now points to a fresh private repository containing only the final cleaned
-history. The pre-cleanup commit returns HTTP 404 there. Both archive repositories
+history. The pre-cleanup commit returns HTTP 404 there. Those archive repositories
 remain private; neither is the release target. No Pages site or release assets
 were migrated. The cleaned baseline `a25b4e7` passed hosted CI.
 
@@ -128,3 +128,28 @@ The fresh launch-series cards are separate reviewed derivatives with raw evidenc
 kept privately. Their public packages retain timeouts, failures and partial
 accounting. Recheck CI and scans on the final presentation revision before
 publication; explicit approval to change repository visibility is still required.
+
+## Private planning withdrawal and latest gallery review
+
+The requested roadmap document was moved to private storage and removed from
+all reachable release history. Its private copy matched the original bytes.
+A verified recovery bundle and commit map remain outside the release repository;
+the prepared tip tree was unchanged by the history-only rewrite. Gitleaks scanned
+82 rewritten commits (14.63 MB) with no findings. Both local history inspection
+and a fresh GitHub clone found no remaining history for the withdrawn path.
+
+The intermediate repository was retained as a third private historical archive.
+The original project URL now points to another fresh private repository with
+only the cleaned history. The removed pre-cleanup commit lookup reports no
+commit found. All historical archives must remain private. No Pages site or
+release assets were migrated. Cleaned revision `06fb455` and the subsequent
+native-model comparison revision `bb31e5f` passed hosted CI. A manual Pages
+dispatch with publication consent disabled correctly skipped deployment.
+
+The three-task launch gallery at `e8997f2` retains all nine recorded attempts,
+including both parser timeouts. Desktop and mobile gallery layouts were visually
+reviewed. Its generated public directory passed a redacted secret scan with no
+findings; package hashes were validated. Focused accounting/gallery tests passed
+37 tests with one skip, and share-page tests passed seven with two browser-gated
+skips. These are focused checks, not a new full-suite result. Later cards,
+changes and the final release revision still require their own checks.

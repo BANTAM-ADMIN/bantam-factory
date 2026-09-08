@@ -8,7 +8,7 @@ directory and open `index.html` locally to view it before publishing.
 
 Only after the repository owner approves publication and the release checks pass:
 
-1. Change the **release** repository's visibility to public. Keep both historical
+1. Change the **release** repository's visibility to public. Keep all historical
    archive repositories private. Visibility changes are not performed by this workflow.
 2. In repository **Settings → Pages**, choose **GitHub Actions** as the source.
 3. Open **Actions → Publish reviewed fight gallery → Run workflow**, choose

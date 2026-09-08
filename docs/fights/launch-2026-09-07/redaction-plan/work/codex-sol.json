@@ -1,0 +1,256 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "redaction-plan",
+  "arm": "codex-sol",
+  "wallMs": 241160,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T04:34:13.476Z",
+  "task": "# Build an auditable literal-redaction planner\n\nImplement `planRedactions(text, rules)` in `redaction-plan.js`, exported as an\nES module, and its CLI. This is a deterministic literal replacement tool, not\na secret detector or a guarantee that arbitrary private information is removed.\n\n`text` must be a string. `rules` must be a dense array of non-null, non-array\nobjects, each with a unique nonempty string `id`, nonempty string `literal`,\nand string `replacement` (which may be empty). Extra fields are ignored.\nValidate every rule before doing any matching, even when text is empty.\nIDs are opaque strings, including names such as `__proto__`.\n\nFind all exact, case-sensitive literal occurrences in the ORIGINAL text,\nincluding overlapping occurrences of a literal. Do not treat literals as\nregular expressions. Offsets are zero-based JavaScript UTF-16 code-unit indices,\nas used by `String.slice`, not UTF-8 byte indices.\n\nSelect nonoverlapping edits in this order: earliest start first; at the same\nstart, longest matched literal first; with equal length, earlier rule-array\nposition first. After selecting an edit, reject matches starting before its\nend. Touching edits are allowed. Only original-text matches are considered:\nnever reprocess replacement text. Preserve all unselected source characters.\n\nReturn exactly `{text, edits, originalBytes, redactedBytes}`. `text` is the\nresult. Each edit is exactly `{start,end,id}`, ordered by source position, where\nend is exclusive. Byte counts use `Buffer.byteLength(value,'utf8')`. Do not\nmutate either input; frozen inputs must work. Invalid inputs throw an Error.\n\nExample: text `ababa`, rules `[{id:'long',literal:'aba',replacement:'X'},\n{id:'short',literal:'ba',replacement:'Y'}]` produces text `XY` and edits\n`[{start:0,end:3,id:'long'},{start:3,end:5,id:'short'}]`.\n\nCLI: `node redaction-plan.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{text,rules}`; extra fields are ignored.\nSuccess prints exactly the API result as one JSON value followed by newline,\nexits 0, and writes no stderr. Invalid arguments/files/JSON/API input exit 2,\nwith nonempty stderr and no stdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"pwd && rg --files -g '!*node_modules*' | sort && sed -n '1,240p' redaction-plan.js 2>/dev/null || true && sed -n '1,200p' package.json\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "/workspace\npackage.json\nredaction-plan.js\ntest/public.test.js\nexport function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+        }
+      ],
+      "atMs": 11219.0,
+      "endedMs": 11286.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"sed -n '1,280p' test/public.test.js && git status --short\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\nfatal: not a git repository (or any parent up to mount point /recording)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n"
+        }
+      ],
+      "atMs": 18970.0,
+      "endedMs": 19054.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Delete File: /workspace/redaction-plan.js\\n*** Add File: /workspace/redaction-plan.js\\n+import {readFileSync} from 'node:fs';\\n+import {fileURLToPath} from 'node:url';\\n+import {resolve} from 'node:path';\\n+\\n+function validateRules(rules) {\\n+  if (!Array.isArray(rules)) {\\n+    throw new Error('rules must be an array');\\n+  }\\n+\\n+  const validated = new Array(rules.length);\\n+  const ids = new Set();\\n+\\n+  for (let index = 0; index < rules.length; index += 1) {\\n+    if (!Object.prototype.hasOwnProperty.call(rules, index)) {\\n+      throw new Error('rules must be a dense array');\\n+    }\\n+\\n+    const rule = rules[index];\\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\\n+      throw new Error(`rule at index ${index} must be a non-null, non-array object`);\\n+    }\\n+\\n+    const {id, literal, replacement} = rule;\\n+    if (typeof id !== 'string' || id.length === 0) {\\n+      throw new Error(`rule at index ${index} must have a nonempty string id`);\\n+    }\\n+    if (ids.has(id)) {\\n+      throw new Error(`rule id ${JSON.stringify(id)} is not unique`);\\n+    }\\n+    if (typeof literal !== 'string' || literal.length === 0) {\\n+      throw new Error(`rule at index ${index} must have a nonempty string literal`);\\n+    }\\n+    if (typeof replacement !== 'string') {\\n+      throw new Error(`rule at index ${index} must have a string replacement`);\\n+    }\\n+\\n+    ids.add(id);\\n+    validated[index] = {id, literal, replacement, index};\\n+  }\\n+\\n+  return validated;\\n+}\\n+\\n+export function planRedactions(text, rules) {\\n+  if (typeof text !== 'string') {\\n+    throw new Error('text must be a string');\\n+  }\\n+\\n+  // Validation is deliberately completed before examining the text.\\n+  const validatedRules = validateRules(rules);\\n+  const edits = [];\\n+  const resultParts = [];\\n+  let sourcePosition = 0;\\n+\\n+  while (sourcePosition < text.length) {\\n+    let selected;\\n+\\n+    for (const rule of validatedRules) {\\n+      if (!text.startsWith(rule.literal, sourcePosition)) {\\n+        continue;\\n+      }\\n+      if (\\n+        selected === undefined ||\\n+        rule.literal.length > selected.literal.length ||\\n+        (rule.literal.length === selected.literal.length && rule.index < selected.index)\\n+      ) {\\n+        selected = rule;\\n+      }\\n+    }\\n+\\n+    if (selected === undefined) {\\n+      resultParts.push(text[sourcePosition]);\\n+      sourcePosition += 1;\\n+      continue;\\n+    }\\n+\\n+    const end = sourcePosition + selected.literal.length;\\n+    edits.push({start: sourcePosition, end, id: selected.id});\\n+    resultParts.push(selected.replacement);\\n+    sourcePosition = end;\\n+  }\\n+\\n+  const redactedText = resultParts.join('');\\n+  return {\\n+    text: redactedText,\\n+    edits,\\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\\n+    redactedBytes: Buffer.byteLength(redactedText, 'utf8'),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  try {\\n+    if (process.argv.length !== 3) {\\n+      throw new Error('usage: node redaction-plan.js INPUT_JSON_FILE');\\n+    }\\n+\\n+    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\\n+      throw new Error('input JSON must be a non-null, non-array object');\\n+    }\\n+\\n+    const result = planRedactions(input.text, input.rules);\\n+    process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+  } catch (error) {\\n+    const message = error instanceof Error ? error.message : String(error);\\n+    process.stderr.write(`redaction-plan: ${message || 'unknown error'}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n+\\n+const isDirectExecution =\\n+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);\\n+\\n+if (isDirectExecution) {\\n+  runCli();\\n+}\\n*** End Patch\";\ntext(await tools.apply_patch(patch));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\napply_patch verification failed: invalid patch: multiple operations target /workspace/redaction-plan.js"
+        }
+      ],
+      "atMs": 80922.0,
+      "endedMs": 80971.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/redaction-plan.js\\n@@\\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\\n+import {readFileSync} from 'node:fs';\\n+import {fileURLToPath} from 'node:url';\\n+import {resolve} from 'node:path';\\n+\\n+function validateRules(rules) {\\n+  if (!Array.isArray(rules)) {\\n+    throw new Error('rules must be an array');\\n+  }\\n+\\n+  const validated = new Array(rules.length);\\n+  const ids = new Set();\\n+\\n+  for (let index = 0; index < rules.length; index += 1) {\\n+    if (!Object.prototype.hasOwnProperty.call(rules, index)) {\\n+      throw new Error('rules must be a dense array');\\n+    }\\n+\\n+    const rule = rules[index];\\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\\n+      throw new Error(`rule at index ${index} must be a non-null, non-array object`);\\n+    }\\n+\\n+    const {id, literal, replacement} = rule;\\n+    if (typeof id !== 'string' || id.length === 0) {\\n+      throw new Error(`rule at index ${index} must have a nonempty string id`);\\n+    }\\n+    if (ids.has(id)) {\\n+      throw new Error(`rule id ${JSON.stringify(id)} is not unique`);\\n+    }\\n+    if (typeof literal !== 'string' || literal.length === 0) {\\n+      throw new Error(`rule at index ${index} must have a nonempty string literal`);\\n+    }\\n+    if (typeof replacement !== 'string') {\\n+      throw new Error(`rule at index ${index} must have a string replacement`);\\n+    }\\n+\\n+    ids.add(id);\\n+    validated[index] = {id, literal, replacement, index};\\n+  }\\n+\\n+  return validated;\\n+}\\n+\\n+export function planRedactions(text, rules) {\\n+  if (typeof text !== 'string') {\\n+    throw new Error('text must be a string');\\n+  }\\n+\\n+  // Validation is deliberately completed before examining the text.\\n+  const validatedRules = validateRules(rules);\\n+  const edits = [];\\n+  const resultParts = [];\\n+  let sourcePosition = 0;\\n+\\n+  while (sourcePosition < text.length) {\\n+    let selected;\\n+\\n+    for (const rule of validatedRules) {\\n+      if (!text.startsWith(rule.literal, sourcePosition)) {\\n+        continue;\\n+      }\\n+      if (\\n+        selected === undefined ||\\n+        rule.literal.length > selected.literal.length ||\\n+        (rule.literal.length === selected.literal.length && rule.index < selected.index)\\n+      ) {\\n+        selected = rule;\\n+      }\\n+    }\\n+\\n+    if (selected === undefined) {\\n+      resultParts.push(text[sourcePosition]);\\n+      sourcePosition += 1;\\n+      continue;\\n+    }\\n+\\n+    const end = sourcePosition + selected.literal.length;\\n+    edits.push({start: sourcePosition, end, id: selected.id});\\n+    resultParts.push(selected.replacement);\\n+    sourcePosition = end;\\n+  }\\n+\\n+  const redactedText = resultParts.join('');\\n+  return {\\n+    text: redactedText,\\n+    edits,\\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\\n+    redactedBytes: Buffer.byteLength(redactedText, 'utf8'),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  try {\\n+    if (process.argv.length !== 3) {\\n+      throw new Error('usage: node redaction-plan.js INPUT_JSON_FILE');\\n+    }\\n+\\n+    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\\n+      throw new Error('input JSON must be a non-null, non-array object');\\n+    }\\n+\\n+    const result = planRedactions(input.text, input.rules);\\n+    process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+  } catch (error) {\\n+    const message = error instanceof Error ? error.message : String(error);\\n+    process.stderr.write(`redaction-plan: ${message || 'unknown error'}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n+\\n+const isDirectExecution =\\n+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);\\n+\\n+if (isDirectExecution) {\\n+  runCli();\\n+}\\n*** End Patch\";\ntext(await tools.apply_patch(patch));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 125091.0,
+      "endedMs": 125164.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"npm test\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: literal replacement has an original-position receipt\nok 1 - literal replacement has an original-position receipt\n  ---\n  duration_ms: 1.326288\n  ...\n# Subtest: longest same-start match wins\nok 2 - longest same-start match wins\n  ---\n  duration_ms: 0.142961\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.102981\n"
+        }
+      ],
+      "atMs": 136683.0,
+      "endedMs": 136954.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"node --input-type=module - <<'NODE'\\nimport assert from 'node:assert/strict';\\nimport {planRedactions} from './redaction-plan.js';\\n\\nassert.deepEqual(\\n  planRedactions('ababa', [\\n    {id: 'long', literal: 'aba', replacement: 'X'},\\n    {id: 'short', literal: 'ba', replacement: 'Y'},\\n  ]),\\n  {\\n    text: 'XY',\\n    edits: [\\n      {start: 0, end: 3, id: 'long'},\\n      {start: 3, end: 5, id: 'short'},\\n    ],\\n    originalBytes: 5,\\n    redactedBytes: 2,\\n  },\\n);\\n\\nconst frozenRules = Object.freeze([\\n  Object.freeze({id: '__proto__', literal: '\\ud83d\\ude00', replacement: '\\u00e9'}),\\n  Object.freeze({id: 'later', literal: '\\ud83d\\ude00', replacement: 'wrong'}),\\n]);\\nassert.deepEqual(planRedactions('A\\ud83d\\ude00B', frozenRules), {\\n  text: 'A\\u00e9B',\\n  edits: [{start: 1, end: 3, id: '__proto__'}],\\n  originalBytes: 6,\\n  redactedBytes: 4,\\n});\\nassert.throws(() => planRedactions('', [{id: 'bad', literal: 'x'}]), Error);\\nconst sparse = new Array(1);\\nassert.throws(() => planRedactions('', sparse), Error);\\nassert.throws(() => planRedactions('x', [\\n  {id: '__proto__', literal: 'x', replacement: ''},\\n  {id: '__proto__', literal: 'y', replacement: ''},\\n]), Error);\\nconsole.log('api edge checks passed');\\nNODE\\n\\ntmp_dir=$(mktemp -d)\\ntrap 'rm -rf \\\"$tmp_dir\\\"' EXIT\\nprintf '%s' '{\\\"text\\\":\\\"ababa\\\",\\\"rules\\\":[{\\\"id\\\":\\\"long\\\",\\\"literal\\\":\\\"aba\\\",\\\"replacement\\\":\\\"X\\\"},{\\\"id\\\":\\\"short\\\",\\\"literal\\\":\\\"ba\\\",\\\"replacement\\\":\\\"Y\\\"}]}' > \\\"$tmp_dir/good.json\\\"\\nnode redaction-plan.js \\\"$tmp_dir/good.json\\\" > \\\"$tmp_dir/out\\\" 2> \\\"$tmp_dir/err\\\"\\ngood_status=$?\\nprintf 'good_status=%s stdout=%s stderr_bytes=%s\\\\n' \\\"$good_status\\\" \\\"$(tr -d '\\\\n' < \\\"$tmp_dir/out\\\")\\\" \\\"$(wc -c < \\\"$tmp_dir/err\\\")\\\"\\nprintf '%s' '{bad json' > \\\"$tmp_dir/bad.json\\\"\\nset +e\\nnode redaction-plan.js \\\"$tmp_dir/bad.json\\\" > \\\"$tmp_dir/bad-out\\\" 2> \\\"$tmp_dir/bad-err\\\"\\nbad_status=$?\\nset -e\\nprintf 'bad_status=%s stdout_bytes=%s stderr_bytes=%s\\\\n' \\\"$bad_status\\\" \\\"$(wc -c < \\\"$tmp_dir/bad-out\\\")\\\" \\\"$(wc -c < \\\"$tmp_dir/bad-err\\\")\\\"\\n\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\nexec_command failed: CreateProcess { message: \"Rejected(\\\"`/bin/sh -lc \\\\\\\"node --input-type=module - <<'NODE'\\\\nimport assert from 'node:assert/strict';\\\\nimport {planRedactions} from './redaction-plan.js';\\\\n\\\\nassert.deepEqual(\\\\n  planRedactions('ababa', [\\\\n    {id: 'long', literal: 'aba', replacement: 'X'},\\\\n    {id: 'short', literal: 'ba', replacement: 'Y'},\\\\n  ]),\\\\n  {\\\\n    text: 'XY',\\\\n    edits: [\\\\n      {start: 0, end: 3, id: 'lo\u20261679 chars truncated\u2026on' > \\\\\\\\\\\\\\\"\\\\\\\"'$tmp_dir/bad.json\\\\\\\"\\\\nset +e\\\\nnode redaction-plan.js \\\\\\\"$tmp_dir/bad.json\\\\\\\" > \\\\\\\"$tmp_dir/bad-out\\\\\\\" 2> \\\\\\\"$tmp_dir/bad-err\\\\\\\"\\\\nbad_status=$?\\\\nset -e\\\\nprintf '\\\\\\\"'bad_status=%s stdout_bytes=%s stderr_bytes=%s\\\\\\\\\\\\\\\\n' \\\\\\\\\\\\\\\"\\\\\\\"'$bad_status\\\\\\\" \\\\\\\"$(wc -c < \\\\\\\"$tmp_dir/bad-out\\\\\\\")\\\\\\\" \\\\\\\"$(wc -c < \\\\\\\"$tmp_dir/bad-err\\\\\\\")\\\\\\\"\\\\n'` rejected: rm -f style commands are not permitted. Use a safer approach\\\")\" }"
+        }
+      ],
+      "atMs": 180430.0,
+      "endedMs": 180482.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"node --input-type=module - <<'NODE'\\nimport assert from 'node:assert/strict';\\nimport {planRedactions} from './redaction-plan.js';\\nassert.deepEqual(planRedactions('ababa', [\\n  {id: 'long', literal: 'aba', replacement: 'X'},\\n  {id: 'short', literal: 'ba', replacement: 'Y'},\\n]), {text: 'XY', edits: [{start: 0, end: 3, id: 'long'}, {start: 3, end: 5, id: 'short'}], originalBytes: 5, redactedBytes: 2});\\nconst frozenRules = Object.freeze([\\n  Object.freeze({id: '__proto__', literal: '\\ud83d\\ude00', replacement: '\\u00e9'}),\\n  Object.freeze({id: 'later', literal: '\\ud83d\\ude00', replacement: 'wrong'}),\\n]);\\nassert.deepEqual(planRedactions('A\\ud83d\\ude00B', frozenRules), {text: 'A\\u00e9B', edits: [{start: 1, end: 3, id: '__proto__'}], originalBytes: 6, redactedBytes: 4});\\nassert.throws(() => planRedactions('', [{id: 'bad', literal: 'x'}]), Error);\\nconst sparse = new Array(1);\\nassert.throws(() => planRedactions('', sparse), Error);\\nassert.throws(() => planRedactions('x', [\\n  {id: '__proto__', literal: 'x', replacement: ''},\\n  {id: '__proto__', literal: 'y', replacement: ''},\\n]), Error);\\nconsole.log('api edge checks passed');\\nNODE\\n\\ntmp_dir=$(mktemp -d)\\nprintf '%s' '{\\\"text\\\":\\\"ababa\\\",\\\"rules\\\":[{\\\"id\\\":\\\"long\\\",\\\"literal\\\":\\\"aba\\\",\\\"replacement\\\":\\\"X\\\"},{\\\"id\\\":\\\"short\\\",\\\"literal\\\":\\\"ba\\\",\\\"replacement\\\":\\\"Y\\\"}]}' > \\\"$tmp_dir/good.json\\\"\\nnode redaction-plan.js \\\"$tmp_dir/good.json\\\" > \\\"$tmp_dir/out\\\" 2> \\\"$tmp_dir/err\\\"\\ngood_status=$?\\nprintf 'good_status=%s stdout=%s stderr_bytes=%s\\\\n' \\\"$good_status\\\" \\\"$(tr -d '\\\\n' < \\\"$tmp_dir/out\\\")\\\" \\\"$(wc -c < \\\"$tmp_dir/err\\\")\\\"\\nprintf '%s' '{bad json' > \\\"$tmp_dir/bad.json\\\"\\nset +e\\nnode redaction-plan.js \\\"$tmp_dir/bad.json\\\" > \\\"$tmp_dir/bad-out\\\" 2> \\\"$tmp_dir/bad-err\\\"\\nbad_status=$?\\nset -e\\nprintf 'bad_status=%s stdout_bytes=%s stderr_bytes=%s\\\\n' \\\"$bad_status\\\" \\\"$(wc -c < \\\"$tmp_dir/bad-out\\\")\\\" \\\"$(wc -c < \\\"$tmp_dir/bad-err\\\")\\\"\\nrm \\\"$tmp_dir/good.json\\\" \\\"$tmp_dir/out\\\" \\\"$tmp_dir/err\\\" \\\"$tmp_dir/bad.json\\\" \\\"$tmp_dir/bad-out\\\" \\\"$tmp_dir/bad-err\\\"\\nrmdir \\\"$tmp_dir\\\"\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "api edge checks passed\ngood_status=0 stdout={\"text\":\"XY\",\"edits\":[{\"start\":0,\"end\":3,\"id\":\"long\"},{\"start\":3,\"end\":5,\"id\":\"short\"}],\"originalBytes\":5,\"redactedBytes\":2} stderr_bytes=0\nbad_status=2 stdout_bytes=0 stderr_bytes=68\n"
+        }
+      ],
+      "atMs": 215219.0,
+      "endedMs": 215322.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "afterSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "before": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "diff": ""
+    },
+    {
+      "path": "redaction-plan.js",
+      "state": "changed",
+      "beforeSha256": "900b6d09006497db276b37cf36eda6320cb138933887746f90fdaa38f63182da",
+      "afterSha256": "3d2f061934d3db394f404599015368f8242610bfe128cc7e8b7ee7cdbdc56b42",
+      "before": "export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n",
+      "after": "import {readFileSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\nimport {resolve} from 'node:path';\n\nfunction validateRules(rules) {\n  if (!Array.isArray(rules)) {\n    throw new Error('rules must be an array');\n  }\n\n  const validated = new Array(rules.length);\n  const ids = new Set();\n\n  for (let index = 0; index < rules.length; index += 1) {\n    if (!Object.prototype.hasOwnProperty.call(rules, index)) {\n      throw new Error('rules must be a dense array');\n    }\n\n    const rule = rules[index];\n    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n      throw new Error(`rule at index ${index} must be a non-null, non-array object`);\n    }\n\n    const {id, literal, replacement} = rule;\n    if (typeof id !== 'string' || id.length === 0) {\n      throw new Error(`rule at index ${index} must have a nonempty string id`);\n    }\n    if (ids.has(id)) {\n      throw new Error(`rule id ${JSON.stringify(id)} is not unique`);\n    }\n    if (typeof literal !== 'string' || literal.length === 0) {\n      throw new Error(`rule at index ${index} must have a nonempty string literal`);\n    }\n    if (typeof replacement !== 'string') {\n      throw new Error(`rule at index ${index} must have a string replacement`);\n    }\n\n    ids.add(id);\n    validated[index] = {id, literal, replacement, index};\n  }\n\n  return validated;\n}\n\nexport function planRedactions(text, rules) {\n  if (typeof text !== 'string') {\n    throw new Error('text must be a string');\n  }\n\n  // Validation is deliberately completed before examining the text.\n  const validatedRules = validateRules(rules);\n  const edits = [];\n  const resultParts = [];\n  let sourcePosition = 0;\n\n  while (sourcePosition < text.length) {\n    let selected;\n\n    for (const rule of validatedRules) {\n      if (!text.startsWith(rule.literal, sourcePosition)) {\n        continue;\n      }\n      if (\n        selected === undefined ||\n        rule.literal.length > selected.literal.length ||\n        (rule.literal.length === selected.literal.length && rule.index < selected.index)\n      ) {\n        selected = rule;\n      }\n    }\n\n    if (selected === undefined) {\n      resultParts.push(text[sourcePosition]);\n      sourcePosition += 1;\n      continue;\n    }\n\n    const end = sourcePosition + selected.literal.length;\n    edits.push({start: sourcePosition, end, id: selected.id});\n    resultParts.push(selected.replacement);\n    sourcePosition = end;\n  }\n\n  const redactedText = resultParts.join('');\n  return {\n    text: redactedText,\n    edits,\n    originalBytes: Buffer.byteLength(text, 'utf8'),\n    redactedBytes: Buffer.byteLength(redactedText, 'utf8'),\n  };\n}\n\nfunction runCli() {\n  try {\n    if (process.argv.length !== 3) {\n      throw new Error('usage: node redaction-plan.js INPUT_JSON_FILE');\n    }\n\n    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n      throw new Error('input JSON must be a non-null, non-array object');\n    }\n\n    const result = planRedactions(input.text, input.rules);\n    process.stdout.write(`${JSON.stringify(result)}\\n`);\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`redaction-plan: ${message || 'unknown error'}\\n`);\n    process.exitCode = 2;\n  }\n}\n\nconst isDirectExecution =\n  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);\n\nif (isDirectExecution) {\n  runCli();\n}\n",
+      "displaySha256": "3d2f061934d3db394f404599015368f8242610bfe128cc7e8b7ee7cdbdc56b42",
+      "diff": "--- starter/redaction-plan.js\n+++ delivered/redaction-plan.js\n@@ -1 +1,117 @@\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n+import {readFileSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n+import {resolve} from 'node:path';\n+\n+function validateRules(rules) {\n+  if (!Array.isArray(rules)) {\n+    throw new Error('rules must be an array');\n+  }\n+\n+  const validated = new Array(rules.length);\n+  const ids = new Set();\n+\n+  for (let index = 0; index < rules.length; index += 1) {\n+    if (!Object.prototype.hasOwnProperty.call(rules, index)) {\n+      throw new Error('rules must be a dense array');\n+    }\n+\n+    const rule = rules[index];\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n+      throw new Error(`rule at index ${index} must be a non-null, non-array object`);\n+    }\n+\n+    const {id, literal, replacement} = rule;\n+    if (typeof id !== 'string' || id.length === 0) {\n+      throw new Error(`rule at index ${index} must have a nonempty string id`);\n+    }\n+    if (ids.has(id)) {\n+      throw new Error(`rule id ${JSON.stringify(id)} is not unique`);\n+    }\n+    if (typeof literal !== 'string' || literal.length === 0) {\n+      throw new Error(`rule at index ${index} must have a nonempty string literal`);\n+    }\n+    if (typeof replacement !== 'string') {\n+      throw new Error(`rule at index ${index} must have a string replacement`);\n+    }\n+\n+    ids.add(id);\n+    validated[index] = {id, literal, replacement, index};\n+  }\n+\n+  return validated;\n+}\n+\n+export function planRedactions(text, rules) {\n+  if (typeof text !== 'string') {\n+    throw new Error('text must be a string');\n+  }\n+\n+  // Validation is deliberately completed before examining the text.\n+  const validatedRules = validateRules(rules);\n+  const edits = [];\n+  const resultParts = [];\n+  let sourcePosition = 0;\n+\n+  while (sourcePosition < text.length) {\n+    let selected;\n+\n+    for (const rule of validatedRules) {\n+      if (!text.startsWith(rule.literal, sourcePosition)) {\n+        continue;\n+      }\n+      if (\n+        selected === undefined ||\n+        rule.literal.length > selected.literal.length ||\n+        (rule.literal.length === selected.literal.length && rule.index < selected.index)\n+      ) {\n+        selected = rule;\n+      }\n+    }\n+\n+    if (selected === undefined) {\n+      resultParts.push(text[sourcePosition]);\n+      sourcePosition += 1;\n+      continue;\n+    }\n+\n+    const end = sourcePosition + selected.literal.length;\n+    edits.push({start: sourcePosition, end, id: selected.id});\n+    resultParts.push(selected.replacement);\n+    sourcePosition = end;\n+  }\n+\n+  const redactedText = resultParts.join('');\n+  return {\n+    text: redactedText,\n+    edits,\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\n+    redactedBytes: Buffer.byteLength(redactedText, 'utf8'),\n+  };\n+}\n+\n+function runCli() {\n+  try {\n+    if (process.argv.length !== 3) {\n+      throw new Error('usage: node redaction-plan.js INPUT_JSON_FILE');\n+    }\n+\n+    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n+      throw new Error('input JSON must be a non-null, non-array object');\n+    }\n+\n+    const result = planRedactions(input.text, input.rules);\n+    process.stdout.write(`${JSON.stringify(result)}\\n`);\n+  } catch (error) {\n+    const message = error instanceof Error ? error.message : String(error);\n+    process.stderr.write(`redaction-plan: ${message || 'unknown error'}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n+\n+const isDirectExecution =\n+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);\n+\n+if (isDirectExecution) {\n+  runCli();\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "afterSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "displaySha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: literal replacement has an original-position receipt\nok 1 - literal replacement has an original-position receipt\n  ---\n  duration_ms: 1.336708\n  ...\n# Subtest: longest same-start match wins\nok 2 - longest same-start match wins\n  ---\n  duration_ms: 0.14221\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 39.439402\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"redaction-plan\",\"pass\":true,\"groups\":[{\"name\":\"literal-matching-and-edit-receipts\",\"pass\":true},{\"name\":\"overlap-priority-and-single-pass\",\"pass\":true},{\"name\":\"unicode-bytes-and-opaque-identities\",\"pass\":true},{\"name\":\"validation-and-immutability\",\"pass\":true},{\"name\":\"cli-and-error-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "dfbdfc6a0e64b03b2aacd5e36665a38342b455788d32fa34825b0d37afd876fd"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "9d35508f84fdc22a8e9e1e21a52c05f02e3403ac1f4dc667f51f8a2ae65be622"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "926dab071e3d280c80ebcbbf328f1eeb50d72bb212ca5bc99deaaab2311073ac"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e7209e1aa47f509defc1a504881683c20df03ff99135799cd403dd4d8f3d233c"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 7,
+    "withResults": 7,
+    "normalizedPathOccurrences": 11,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Delivered and independently accepted.",
+    "paragraphs": [
+      {
+        "text": "Delivered redaction-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 241.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+        "actions": [
+          "action-3",
+          "action-4",
+          "action-7"
+        ]
+      }
+    ]
+  }
+}

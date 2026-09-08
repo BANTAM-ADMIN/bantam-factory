@@ -1,0 +1,94 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "claude-sonnet.json",
+      "bytes": 35554,
+      "sha256": "cdcaad4630621573c5dceb0f04fbc1177be4542dc7f714c45979a058a48cfcae",
+      "arm": "claude-sonnet",
+      "wallMs": 35692,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered snapshot.js. The project suite and all five independent acceptance groups passed, with a clean finish in 35.7 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-opus.json",
+      "bytes": 58431,
+      "sha256": "c22e35a933173c27b8763335602753f5e5508cc3dc0488a52fa4deb107871289",
+      "arm": "claude-opus",
+      "wallMs": 74753,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered snapshot.js, test/extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 74.8 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-5",
+              "action-6",
+              "action-7"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-fable.json",
+      "bytes": 54656,
+      "sha256": "879af1f5208ae5befb15c350132b6d8c7469ebdd73de1d4b5a3a48201736fcf9",
+      "arm": "claude-fable",
+      "wallMs": 82525,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered snapshot.js, test/verify.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 82.5 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-5"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

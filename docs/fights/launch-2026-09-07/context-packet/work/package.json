@@ -1,0 +1,184 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 101804,
+      "sha256": "dc361393767ba8c8f568001d951c6999968267cfabfbd28df4b64d5bbb54968e",
+      "arm": "bantam-local-27b",
+      "wallMs": 58072,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Built. Challenged. Checked. Done.",
+        "paragraphs": [
+          {
+            "text": "The factory built the packer, ran the project tests and checked its command-line behavior. A supervisor then questioned fractional byte limits. The worker tested that question: the implementation already rejected them correctly.",
+            "actions": [
+              "action-4",
+              "action-6",
+              "action-7",
+              "action-8"
+            ]
+          },
+          {
+            "text": "A console message was not enough to close the check. The factory required an executable assertion, kept it as regression coverage, verified the current files and directed the worker to finish. Accepted work in 58.1 seconds.",
+            "actions": [
+              "action-9",
+              "action-12",
+              "action-13",
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 114332,
+      "sha256": "e8689a2a1b1d69a8d62c9a6aa186619eb9b9dc1a6d8e0a90ce967c34128252f7",
+      "arm": "opencode",
+      "wallMs": 600004,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 26,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Accepted output, still checking at the bell.",
+        "paragraphs": [
+          {
+            "text": "OpenCode built the packer, corrected its added tests and ran more API and command-line probes. Its last recorded command ran the tests again and listed the delivered files.",
+            "actions": [
+              "action-7",
+              "action-16",
+              "action-18",
+              "action-24",
+              "action-26"
+            ]
+          },
+          {
+            "text": "The delivered workspace passed independent acceptance. The harness reached the ten-minute boundary without a clean finish, so this is OUTPUT_ONLY.",
+            "actions": [
+              "action-26"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 42661,
+      "sha256": "e8a4b06a5007393d95aff0c37e620d960e73b7c767964d25bc0293e511f732b3",
+      "arm": "codex-astra",
+      "wallMs": 110560,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered context-packet.js, test/edge.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 110.6 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 100728,
+      "sha256": "748ff4ff6fb6c17406cd3df51d87ee82aecc7d8ea73b4e89134e6fa1e44ea74a",
+      "arm": "deepseek-local-27b",
+      "wallMs": 600007,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 26,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The code passed. The run kept going.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek built a working packer, then spent further actions repairing syntax and expectations in its added test suite. Its final test run passed all 19 tests.",
+            "actions": [
+              "action-7",
+              "action-10",
+              "action-19",
+              "action-25",
+              "action-26"
+            ]
+          },
+          {
+            "text": "The native session began compaction at 579.5 seconds. The ten-minute limit arrived without a clean finish. Independent acceptance passed all five groups; the recorded outcome is OUTPUT_ONLY.",
+            "actions": [
+              "action-26"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 90329,
+      "sha256": "bce058a8a44f0d6461e5a96f436187aba4c67a3391a1a90cc4259bcd7fa9eba2",
+      "arm": "hermes",
+      "wallMs": 512194,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 22,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Correct work, a much longer route.",
+        "paragraphs": [
+          {
+            "text": "Hermes wrote the packer and an extra test suite, revised the test expectations and checked the command line. All five independent groups passed, with a clean finish in 512.2 seconds.",
+            "actions": [
+              "action-7",
+              "action-8",
+              "action-17",
+              "action-20",
+              "action-21",
+              "action-22"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

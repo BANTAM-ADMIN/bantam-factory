@@ -1,0 +1,449 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "receipt-reducer",
+  "arm": "deepseek-local-27b",
+  "wallMs": 442738,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T02:52:58.243Z",
+  "task": "# Receipt reducer: build a small run-log report tool\n\nImplement `receipt-report.js` using Node.js builtins only. Export the synchronous\nfunction `reduceEvents(text)` and support `node receipt-report.js LOGFILE`.\n\nThe input is a UTF-8 JSONL string. Ignore whitespace-only lines; CRLF and a\nmissing final newline are allowed. Each nonblank line must parse as a non-null\nnon-array object with these fields:\n\n- `id` and `job`: nonempty strings (preserve their characters; do not trim).\n- `attempt`: a positive safe integer, starting at 1; gaps are allowed.\n- `seq`: a nonnegative safe integer.\n- `type`: exactly `started`, `succeeded`, or `failed`.\n\nOther fields are ignored, including for duplicate comparison. Reject invalid\nJSON or any invalid required field with an Error. Do not coerce types.\n\nEvents may arrive in any order. Deduplicate by `id` before reducing. Repeated\nIDs with identical five required fields are ignored and counted in `duplicates`\n(every extra copy counts). A repeated ID with any different required field is\nan error. Different events may share `seq`. For each `(job, attempt)` there must\nbe exactly one `started` event and at most one terminal (`succeeded` or `failed`)\nevent. A terminal's `seq` must be strictly greater than its start's `seq`.\nOrphan terminals, repeated starts with different IDs, repeated terminals with\ndifferent IDs, and contradictory terminals are errors. Different attempts are\nindependent; their sequence ranges may overlap.\n\nReturn exactly:\n\n```\n{\n  jobs: [{job, attempts: [{attempt, status, startedSeq, finishedSeq}]}],\n  duplicates: NUMBER\n}\n```\n\nJobs are sorted by JavaScript string `<`/`>` order (UTF-16 code units, not locale\ncollation); attempts are sorted numerically. Status is `running` for start-only\nattempts, otherwise the terminal type. `finishedSeq` is null for running\nattempts. Empty input returns `{jobs: [], duplicates: 0}`. IDs such as\n`__proto__` and jobs containing whitespace or Unicode are ordinary strings.\n\nThe CLI takes exactly one file argument, prints only the report as JSON followed\nby a newline on stdout, and exits 0 on success. Invalid arguments, unreadable\ninput, or invalid events produce a nonempty stderr message, no stdout, and exit\n2. Importing the module must not run the CLI. Do not add third-party dependencies\nor modify `package.json` or existing public tests. You may add tests. Run\n`npm test` before finishing. The same starter and contract go to every arm;\nindependent acceptance is separate from your tests.\n",
+  "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+  "source": "deepseek-native-session",
+  "actions": [
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && find /workspace -maxdepth 3 -type f | head -50",
+        "description": "List workspace contents"
+      },
+      "output": "total 8\ndrwxrwxr-x 1 node node  66 Sep  8 02:52 .\ndrwxr-xr-x 1 root root  36 Sep  8 02:52 ..\n-rw-rw-r-- 1 node node  99 Sep  8 02:52 package.json\n-rw-rw-r-- 1 node node 139 Sep  8 02:52 receipt-report.js\ndrwxrwxr-x 1 node node  44 Sep  8 02:52 test\n/workspace/package.json\n/workspace/receipt-report.js\n/workspace/test/receipt-report.test.js\n",
+      "atMs": 8793.0,
+      "endedMs": 8834.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/package.json"
+      },
+      "output": "<path>/workspace/package.json</path>\n<type>file</type>\n<content>\n1: {\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n(End of file - total 1 lines)\n</content>",
+      "atMs": 10065.0,
+      "endedMs": 10077.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/receipt-report.js"
+      },
+      "output": "<path>/workspace/receipt-report.js</path>\n<type>file</type>\n<content>\n1: // Implement the public work order in task.md. Builtins only.\n2: export function reduceEvents(text) {\n3:   throw new Error('not implemented');\n4: }\n\n(End of file - total 4 lines)\n</content>",
+      "atMs": 10066.0,
+      "endedMs": 10078.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.test.js"
+      },
+      "output": "<path>/workspace/test/receipt-report.test.js</path>\n<type>file</type>\n<content>\n1: import test from 'node:test';\n2: import assert from 'node:assert/strict';\n3: import { reduceEvents } from '../receipt-report.js';\n4: const jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\n5: test('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\n6: test('unordered completion and an independent running attempt', () => {\n7:   assert.deepEqual(reduceEvents(jsonl([\n8:     {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n9:     {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n10:     {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n11:   ])), {jobs:[{job:'build', attempts:[\n12:     {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n13:     {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n14:   ]}], duplicates:0});\n15: });\n16: test('retransmission is counted', () => {\n17:   const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n18:   assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n19: });\n20: test('orphan and malformed events fail', () => {\n21:   assert.throws(() => reduceEvents('{bad'));\n22:   assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n23: });\n\n(End of file - total 23 lines)\n</content>",
+      "atMs": 10066.0,
+      "endedMs": 10079.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "todo_write",
+      "category": "other",
+      "request": {
+        "todos": [
+          {
+            "content": "Implement receipt-report.js (reducer + CLI)",
+            "status": "in_progress"
+          },
+          {
+            "content": "Add extra tests (don't touch existing test file)",
+            "status": "pending"
+          },
+          {
+            "content": "Run npm test and manual CLI smoke checks",
+            "status": "pending"
+          }
+        ]
+      },
+      "output": "Updated todo list: 2 pending, 1 in progress, 0 completed.",
+      "atMs": 265182.0,
+      "endedMs": 265200.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/receipt-report.js",
+        "content": "// receipt-report.js \u2014 reduce a run log (JSONL of events) into a receipt report.\n//\n// Usage: node receipt-report.js LOGFILE\n//\n// Node.js builtins only. Importing this module does not run the CLI.\n\nimport { readFileSync, realpathSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\n// Validate one parsed JSON value as an event. Returns exactly the five\n// required fields (extra fields are ignored, including for duplicate\n// comparison). Types are never coerced.\nfunction validateEvent(event, lineNo) {\n  if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n    fail(`line ${lineNo}: event must be a JSON object`);\n  }\n  const { id, job, attempt, seq, type } = event;\n  if (typeof id !== 'string' || id.length === 0) {\n    fail(`line ${lineNo}: \"id\" must be a nonempty string`);\n  }\n  if (typeof job !== 'string' || job.length === 0) {\n    fail(`line ${lineNo}: \"job\" must be a nonempty string`);\n  }\n  if (typeof attempt !== 'number' || !Number.isSafeInteger(attempt) || attempt < 1) {\n    fail(`line ${lineNo}: \"attempt\" must be a positive safe integer`);\n  }\n  if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) {\n    fail(`line ${lineNo}: \"seq\" must be a nonnegative safe integer`);\n  }\n  if (type !== 'started' && type !== 'succeeded' && type !== 'failed') {\n    fail(`line ${lineNo}: \"type\" must be exactly \"started\", \"succeeded\", or \"failed\"`);\n  }\n  return { id, job, attempt, seq, type };\n}\n\nfunction sameRequiredFields(a, b) {\n  return a.job === b.job && a.attempt === b.attempt && a.seq === b.seq && a.type === b.type;\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a UTF-8 JSONL string');\n  }\n\n  // CRLF (and bare CR) line endings and a missing final newline are allowed;\n  // whitespace-only lines are ignored.\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  const uniqueEvents = new Map(); // id -> first event with that id\n  let duplicates = 0;\n\n  for (let i = 0; i < lines.length; i++) {\n    const lineNo = i + 1;\n    const line = lines[i].trim();\n    if (line === '') continue;\n\n    let parsed;\n    try {\n      parsed = JSON.parse(line);\n    } catch {\n      fail(`line ${lineNo}: invalid JSON`);\n    }\n    const event = validateEvent(parsed, lineNo);\n\n    // Deduplicate by id before reducing.\n    const first = uniqueEvents.get(event.id);\n    if (first === undefined) {\n      uniqueEvents.set(event.id, event);\n    } else if (sameRequiredFields(first, event)) {\n      duplicates += 1;\n    } else {\n      fail(`line ${lineNo}: duplicate id with different required fields: ${JSON.stringify(event.id)}`);\n    }\n  }\n\n  // Group surviving events by (job, attempt).\n  const byJob = new Map(); // job -> Map(attempt -> { start, terminal })\n  for (const event of uniqueEvents.values()) {\n    let attempts = byJob.get(event.job);\n    if (attempts === undefined) {\n      attempts = new Map();\n      byJob.set(event.job, attempts);\n    }\n    let record = attempts.get(event.attempt);\n    if (record === undefined) {\n      record = { start: null, terminal: null };\n      attempts.set(event.attempt, record);\n    }\n    if (event.type === 'started') {\n      // A second start for this (job, attempt) necessarily has a different id,\n      // because identical ids were deduplicated above.\n      if (record.start !== null) {\n        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated start with different id`);\n      }\n      record.start = event;\n    } else {\n      // A second terminal is either a repeated terminal (different id, since\n      // identical ids were deduplicated) or a contradiction (both succeeded\n      // and failed present). Both are errors.\n      if (record.terminal !== null) {\n        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated or contradictory terminal event`);\n      }\n      record.terminal = event;\n    }\n  }\n\n  const jobs = [];\n  for (const [job, attempts] of byJob) {\n    const attemptReports = [];\n    for (const [attempt, record] of attempts) {\n      if (record.start === null) {\n        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal event without a start event`);\n      }\n      const { start, terminal } = record;\n      if (terminal !== null && terminal.seq <= start.seq) {\n        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal seq ${terminal.seq} must be strictly greater than start seq ${start.seq}`);\n      }\n      attemptReports.push({\n        attempt,\n        status: terminal === null ? 'running' : terminal.type,\n        startedSeq: start.seq,\n        finishedSeq: terminal === null ? null : terminal.seq,\n      });\n    }\n    attemptReports.sort((a, b) => a.attempt - b.attempt);\n    jobs.push({ job, attempts: attemptReports });\n  }\n\n  // Jobs in JavaScript string \"<\"/\">\" order (UTF-16 code units, not locale).\n  jobs.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  return { jobs, duplicates };\n}\n\nfunction runCli(argv) {\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    return 2;\n  }\n  const file = argv[0];\n  let text;\n  try {\n    text = readFileSync(file, 'utf8');\n  } catch (err) {\n    process.stderr.write(`receipt-report: unable to read ${JSON.stringify(file)}: ${err.message}\\n`);\n    return 2;\n  }\n  let report;\n  try {\n    report = reduceEvents(text);\n  } catch (err) {\n    process.stderr.write(`receipt-report: ${err.message}\\n`);\n    return 2;\n  }\n  process.stdout.write(`${JSON.stringify(report)}\\n`);\n  return 0;\n}\n\nconst isMainModule = (() => {\n  try {\n    return (\n      Boolean(process.argv[1]) &&\n      import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href\n    );\n  } catch {\n    return false;\n  }\n})();\n\nif (isMainModule) {\n  const code = runCli(process.argv.slice(2));\n  if (code !== 0) process.exitCode = code;\n}\n\nexport default reduceEvents;\n"
+      },
+      "output": "<path>/workspace/receipt-report.js</path>\n<type>file</type>\n<content>\nUpdated file\n</content>",
+      "atMs": 294871.0,
+      "endedMs": 294889.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { mkdtempSync, rmSync, writeFileSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { reduceEvents } from '../receipt-report.js';\n\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\nconst script = fileURLToPath(new URL('../receipt-report.js', import.meta.url));\nconst runCli = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n\ntest('empty and whitespace-only input', () => {\n  assert.deepEqual(reduceEvents(''), { jobs: [], duplicates: 0 });\n  assert.deepEqual(reduceEvents(' \\t\\r\\n  \\n'), { jobs: [], duplicates: 0 });\n});\n\ntest('CRLF endings and missing final newline are allowed', () => {\n  const events = [\n    { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n  ];\n  const crlf = events.map(event => JSON.stringify(event)).join('\\r\\n'); // no final newline\n  assert.deepEqual(reduceEvents(crlf), {\n    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n    duplicates: 0,\n  });\n});\n\ntest('blank lines in the middle are ignored', () => {\n  const text = [\n    '',\n    '   ',\n    JSON.stringify({ id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' }),\n    '\\r',\n    JSON.stringify({ id: 't', job: 'j', attempt: 1, seq: 2, type: 'failed' }),\n    '',\n  ].join('\\n');\n  assert.deepEqual(reduceEvents(text), {\n    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'failed', startedSeq: 1, finishedSeq: 2 }] }],\n    duplicates: 0,\n  });\n});\n\ntest('duplicates: every extra identical copy is counted, other fields ignored', () => {\n  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n  const report = reduceEvents(jsonl([e, { ...e, extra: 1 }, { ...e, note: 'x', other: [1, 2] }, e]));\n  assert.equal(report.duplicates, 3);\n  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [{ attempt: 1, status: 'running', startedSeq: 3, finishedSeq: null }] }]);\n});\n\ntest('a repeated id with any different required field is an error', () => {\n  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n  for (const delta of [{ seq: 4 }, { type: 'succeeded' }, { job: 'k' }, { attempt: 2 }]) {\n    assert.throws(() => reduceEvents(jsonl([e, { ...e, ...delta }])), JSON.stringify(delta));\n  }\n});\n\ntest('orphan terminal is an error', () => {\n  assert.throws(() => reduceEvents(jsonl([{ id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' }])));\n});\n\ntest('repeated start with different ids is an error', () => {\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's2', job: 'j', attempt: 1, seq: 1, type: 'started' },\n  ])));\n});\n\ntest('repeated or contradictory terminals are errors', () => {\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'succeeded' },\n  ])));\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'failed' },\n  ])));\n});\n\ntest('terminal seq must be strictly greater than start seq', () => {\n  const start = { id: 's', job: 'j', attempt: 1, seq: 5, type: 'started' };\n  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 5, type: 'succeeded' }])));\n  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 4, type: 'failed' }])));\n  // strictly greater passes\n  assert.equal(reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 6, type: 'succeeded' }])).jobs[0].attempts[0].status, 'succeeded');\n});\n\ntest('attempt gaps are allowed and attempts are independent', () => {\n  const report = reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's5', job: 'j', attempt: 5, seq: 1, type: 'started' },\n    { id: 't5', job: 'j', attempt: 5, seq: 2, type: 'failed' },\n    { id: 's9', job: 'j', attempt: 9, seq: 2, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [\n    { attempt: 1, status: 'running', startedSeq: 1, finishedSeq: null },\n    { attempt: 5, status: 'failed', startedSeq: 1, finishedSeq: 2 },\n    { attempt: 9, status: 'running', startedSeq: 2, finishedSeq: null },\n  ]}]);\n});\n\ntest('seqs may be shared across attempts and jobs', () => {\n  const report = reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 5, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 9, type: 'failed' },\n    { id: 's2', job: 'j', attempt: 2, seq: 5, type: 'started' },\n    { id: 'sk', job: 'k', attempt: 1, seq: 4, type: 'started' },\n    { id: 'tk', job: 'k', attempt: 1, seq: 5, type: 'succeeded' },\n  ]));\n  assert.deepEqual(report, {\n    jobs: [\n      { job: 'j', attempts: [\n        { attempt: 1, status: 'failed', startedSeq: 5, finishedSeq: 9 },\n        { attempt: 2, status: 'running', startedSeq: 5, finishedSeq: null },\n      ]},\n      { job: 'k', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 4, finishedSeq: 5 }]},\n    ],\n    duplicates: 0,\n  });\n});\n\ntest('field validation is strict and never coerces', () => {\n  const ok = { id: 'a', job: 'j', attempt: 1, seq: 0, type: 'started' };\n  const bad = [\n    { ...ok, attempt: 0 },\n    { ...ok, attempt: -1 },\n    { ...ok, attempt: 1.5 },\n    { ...ok, attempt: '1' },\n    { ...ok, attempt: 2 ** 53 },\n    { ...ok, attempt: true },\n    { ...ok, seq: -1 },\n    { ...ok, seq: 0.5 },\n    { ...ok, seq: '0' },\n    { ...ok, seq: 2 ** 53 },\n    { ...ok, id: '' },\n    { ...ok, id: 1 },\n    { ...ok, job: '' },\n    { ...ok, job: null },\n    { ...ok, type: 'Started' },\n    { ...ok, type: 'done' },\n    { ...ok, type: 5 },\n  ];\n  for (const event of bad) {\n    assert.throws(() => reduceEvents(jsonl([event])), JSON.stringify(event));\n  }\n  assert.throws(() => reduceEvents(jsonl([{ job: 'j', attempt: 1, seq: 0, type: 'started' }])), 'missing id');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', seq: 0, type: 'started' }])), 'missing attempt');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, type: 'started' }])), 'missing seq');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, seq: 0 }])), 'missing type');\n  // safe-integer boundary is valid\n  assert.equal(reduceEvents(jsonl([{ ...ok, seq: 2 ** 53 - 1 }])).duplicates, 0);\n});\n\ntest('non-object or invalid JSON lines are rejected', () => {\n  for (const line of ['null', '[1]', '42', '\"x\"', 'true', '{bad', '']) {\n    if (line === '') continue; // covered by the empty test\n    assert.throws(() => reduceEvents(line), line);\n  }\n});\n\ntest('ids such as __proto__ and whitespace/unicode strings are ordinary', () => {\n  const report = reduceEvents(jsonl([\n    { id: '__proto__', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: '  spaced id  ', job: 'job with spaces', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 'unicod\u00e9', job: '\u65e5\u672c job', attempt: 1, seq: 0, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs.map(job => job.job), ['j', 'job with spaces', '\u65e5\u672c job']);\n  assert.equal(report.jobs[0].attempts[0].status, 'running');\n  assert.equal(report.jobs[1].attempts[0].status, 'succeeded');\n  // __proto__ did not escape into the result object\n  assert.equal(report.__proto__, undefined);\n});\n\ntest('jobs sort by UTF-16 code units, attempts numerically', () => {\n  const report = reduceEvents(jsonl([\n    { id: 'a', job: 'a1', attempt: 1, seq: 1, type: 'started' },\n    { id: 'b', job: 'a ', attempt: 1, seq: 1, type: 'started' },\n    { id: 'c', job: 'a', attempt: 10, seq: 1, type: 'started' },\n    { id: 'd', job: 'a', attempt: 2, seq: 1, type: 'started' },\n    { id: 'e', job: 'B', attempt: 1, seq: 1, type: 'started' },\n    { id: 'f', job: 'Z', attempt: 1, seq: 1, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs.map(job => job.job), ['B', 'Z', 'a', 'a ', 'a1']);\n  assert.deepEqual(report.jobs[2].attempts.map(attempt => attempt.attempt), [2, 10]);\n});\n\ntest('CLI: success, invalid args, unreadable input, invalid events', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'receipt-report-'));\n  try {\n    const good = join(dir, 'good.jsonl');\n    writeFileSync(good, jsonl([\n      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n      { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    ]));\n\n    const ok = runCli(good);\n    assert.equal(ok.status, 0, ok.stderr);\n    assert.deepEqual(JSON.parse(ok.stdout), {\n      jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n      duplicates: 0,\n    });\n    assert.ok(ok.stdout.endsWith('\\n'));\n    assert.equal(ok.stdout, `${JSON.stringify(JSON.parse(ok.stdout))}\\n`);\n    assert.equal(ok.stderr, '');\n\n    const noArgs = runCli();\n    assert.equal(noArgs.status, 2, noArgs.stdout + noArgs.stderr);\n    assert.equal(noArgs.stdout, '');\n    assert.ok(noArgs.stderr.length > 0);\n\n    const twoArgs = runCli(good, good);\n    assert.equal(twoArgs.status, 2);\n    assert.equal(twoArgs.stdout, '');\n    assert.ok(twoArgs.stderr.length > 0);\n\n    const missing = runCli(join(dir, 'does-not-exist.jsonl'));\n    assert.equal(missing.status, 2);\n    assert.equal(missing.stdout, '');\n    assert.ok(missing.stderr.length > 0);\n\n    const bad = join(dir, 'bad.jsonl');\n    writeFileSync(bad, jsonl([\n      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n      { id: 't', job: 'j', attempt: 1, seq: 1, type: 'succeeded' },\n    ]));\n    const badRun = runCli(bad);\n    assert.equal(badRun.status, 2);\n    assert.equal(badRun.stdout, '');\n    assert.ok(badRun.stderr.length > 0);\n\n    const invalidJson = join(dir, 'invalid.jsonl');\n    writeFileSync(invalidJson, '{oops\\n');\n    const invalidRun = runCli(invalidJson);\n    assert.equal(invalidRun.status, 2);\n    assert.equal(invalidRun.stdout, '');\n    assert.ok(invalidRun.stderr.length > 0);\n  } finally {\n    rmSync(dir, { recursive: true, force: true });\n  }\n});\n\ntest('importing the module does not run the CLI', () => {\n  assert.equal(typeof reduceEvents, 'function');\n});\n"
+      },
+      "output": "<path>/workspace/test/receipt-report.extra.test.js</path>\n<type>file</type>\n<content>\nCreated file\n</content>",
+      "atMs": 341994.0,
+      "endedMs": 342010.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "old_string": "  // __proto__ did not escape into the result object\n  assert.equal(report.__proto__, undefined);",
+        "new_string": "  // __proto__ did not escape into the result object or Object.prototype\n  assert.equal(Object.hasOwn(report, '__proto__'), false);\n  assert.equal(Object.hasOwn({}, 'polluted'), false);"
+      },
+      "output": "The file /workspace/test/receipt-report.extra.test.js has been updated successfully.",
+      "atMs": 347221.0,
+      "endedMs": 347237.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "old_string": "  for (const delta of [{ seq: 4 }, { type: 'succeeded' }, { job: 'k' }, { attempt: 2 }]) {\n    assert.throws(() => reduceEvents(jsonl([e, { ...e, ...delta }])), JSON.stringify(delta));\n  }",
+        "new_string": "  for (const delta of [{ seq: 4 }, { type: 'succeeded' }, { job: 'k' }, { attempt: 2 }]) {\n    assert.throws(() => reduceEvents(jsonl([e, { ...e, ...delta }])), undefined, JSON.stringify(delta));\n  }"
+      },
+      "output": "The file /workspace/test/receipt-report.extra.test.js has been updated successfully.",
+      "atMs": 377781.0,
+      "endedMs": 377806.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "old_string": "  for (const event of bad) {\n    assert.throws(() => reduceEvents(jsonl([event])), JSON.stringify(event));\n  }\n  assert.throws(() => reduceEvents(jsonl([{ job: 'j', attempt: 1, seq: 0, type: 'started' }])), 'missing id');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', seq: 0, type: 'started' }])), 'missing attempt');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, type: 'started' }])), 'missing seq');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, seq: 0 }])), 'missing type');",
+        "new_string": "  for (const event of bad) {\n    assert.throws(() => reduceEvents(jsonl([event])), undefined, JSON.stringify(event));\n  }\n  assert.throws(() => reduceEvents(jsonl([{ job: 'j', attempt: 1, seq: 0, type: 'started' }])), undefined, 'missing id');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', seq: 0, type: 'started' }])), undefined, 'missing attempt');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, type: 'started' }])), undefined, 'missing seq');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, seq: 0 }])), undefined, 'missing type');"
+      },
+      "output": "The file /workspace/test/receipt-report.extra.test.js has been updated successfully.",
+      "atMs": 377807.0,
+      "endedMs": 377822.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "old_string": "  for (const line of ['null', '[1]', '42', '\"x\"', 'true', '{bad', '']) {\n    if (line === '') continue; // covered by the empty test\n    assert.throws(() => reduceEvents(line), line);\n  }",
+        "new_string": "  for (const line of ['null', '[1]', '42', '\"x\"', 'true', '{bad']) {\n    assert.throws(() => reduceEvents(line), undefined, line);\n  }"
+      },
+      "output": "The file /workspace/test/receipt-report.extra.test.js has been updated successfully.",
+      "atMs": 377822.0,
+      "endedMs": 377837.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | tail -40",
+        "description": "Run npm test suite"
+      },
+      "output": "  ...\n# Subtest: importing the module does not run the CLI\nok 17 - importing the module does not run the CLI\n  ---\n  duration_ms: 0.09652\n  type: 'test'\n  ...\n# Subtest: empty input\nok 18 - empty input\n  ---\n  duration_ms: 1.01686\n  type: 'test'\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 19 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.29588\n  type: 'test'\n  ...\n# Subtest: retransmission is counted\nok 20 - retransmission is counted\n  ---\n  duration_ms: 0.202941\n  type: 'test'\n  ...\n# Subtest: orphan and malformed events fail\nok 21 - orphan and malformed events fail\n  ---\n  duration_ms: 0.24029\n  type: 'test'\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 20\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 203.571109\n",
+      "atMs": 380233.0,
+      "endedMs": 380743.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | grep -B2 -A25 \"not ok\"",
+        "description": "Show failing test details"
+      },
+      "output": "  ...\n# Subtest: ids such as __proto__ and whitespace/unicode strings are ordinary\nnot ok 14 - ids such as __proto__ and whitespace/unicode strings are ordinary\n  ---\n  duration_ms: 0.20252\n  type: 'test'\n  location: '/workspace/test/receipt-report.extra.test.js:164:1'\n  failureType: 'testCodeFailure'\n  error: 'job \"job with spaces\" attempt 1: terminal event without a start event'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    fail (file:///workspace/receipt-report.js:12:9)\n    reduceEvents (file:///workspace/receipt-report.js:116:9)\n    TestContext.<anonymous> (file:///workspace/test/receipt-report.extra.test.js:165:18)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n    Test.postRun (node:internal/test_runner/test:1173:19)\n    Test.run (node:internal/test_runner/test:1101:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n# Subtest: jobs sort by UTF-16 code units, attempts numerically\nok 15 - jobs sort by UTF-16 code units, attempts numerically\n  ---\n  duration_ms: 0.13308\n  type: 'test'\n  ...\n# Subtest: CLI: success, invalid args, unreadable input, invalid events\n",
+      "atMs": 382308.0,
+      "endedMs": 382612.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/receipt-report.extra.test.js",
+        "old_string": "    { id: '__proto__', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: '  spaced id  ', job: 'job with spaces', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 'unicod\u00e9', job: '\u65e5\u672c job', attempt: 1, seq: 0, type: 'started' },",
+        "new_string": "    { id: '__proto__', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's2', job: 'job with spaces', attempt: 1, seq: 1, type: 'started' },\n    { id: '  spaced id  ', job: 'job with spaces', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 'unicod\u00e9', job: '\u65e5\u672c job', attempt: 1, seq: 0, type: 'started' },"
+      },
+      "output": "The file /workspace/test/receipt-report.extra.test.js has been updated successfully.",
+      "atMs": 390280.0,
+      "endedMs": 390304.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | tail -10",
+        "description": "Re-run npm test suite"
+      },
+      "output": "  ...\n1..21\n# tests 21\n# suites 0\n# pass 21\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 204.14278\n",
+      "atMs": 393206.0,
+      "endedMs": 393514.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /tmp && mkdir -p rr-smoke && cd rr-smoke\n# CRLF file, no final newline\nprintf '{\"id\":\"t\",\"job\":\"beta\",\"attempt\":1,\"seq\":9,\"type\":\"failed\"}\\r\\n{\"id\":\"s\",\"job\":\"beta\",\"attempt\":1,\"seq\":3,\"type\":\"started\"}\\r\\n{\"id\":\"s2\",\"job\":\"alpha\",\"attempt\":2,\"seq\":1,\"type\":\"started\"}' > log.jsonl\nnode /workspace/receipt-report.js log.jsonl; echo \"exit=$?\"\necho \"---\"\n# success, verify stdout is exactly JSON + newline (hexdump tail)\nnode /workspace/receipt-report.js log.jsonl | xxd | tail -2\necho \"---\"\n# no args\nnode /workspace/receipt-report.js; echo \"exit=$?\"\necho \"---\"\n# two args\nnode /workspace/receipt-report.js log.jsonl log.jsonl; echo \"exit=$?\"\necho \"---\"\n# missing file\nnode /workspace/receipt-report.js nope.jsonl; echo \"exit=$?\"\necho \"---\"\n# invalid event (orphan terminal)\nprintf '{\"id\":\"t\",\"job\":\"j\",\"attempt\":1,\"seq\":1,\"type\":\"succeeded\"}\\n' > bad.jsonl\nnode /workspace/receipt-report.js bad.jsonl 1>out.txt 2>err.txt; echo \"exit=$? stdout_bytes=$(wc -c < out.txt) stderr_bytes=$(wc -c < err.txt)\"\necho \"---\"\n# empty file -> empty report\nprintf '' > empty.jsonl\nnode /workspace/receipt-report.js empty.jsonl; echo \"exit=$?\"\necho \"---\"\n# importing the module runs no CLI\nnode -e \"const m = await import('/workspace/receipt-report.js'); console.log('imported ok:', typeof m.reduceEvents)\" --input-type=module",
+        "description": "Smoke test CLI success and failure paths"
+      },
+      "output": "{\"jobs\":[{\"job\":\"alpha\",\"attempts\":[{\"attempt\":2,\"status\":\"running\",\"startedSeq\":1,\"finishedSeq\":null}]},{\"job\":\"beta\",\"attempts\":[{\"attempt\":1,\"status\":\"failed\",\"startedSeq\":3,\"finishedSeq\":9}]}],\"duplicates\":0}\nexit=0\n---\n---\nexit=2\n---\nexit=2\n---\nexit=2\n---\nexit=2 stdout_bytes=0 stderr_bytes=72\n---\n{\"jobs\":[],\"duplicates\":0}\nexit=0\n---\nimported ok: function\n[stderr]\nbash: line 7: xxd: command not found\nnode:events:497\n      throw er; // Unhandled 'error' event\n      ^\n\nError: write EPIPE\n    at afterWriteDispatched (node:internal/stream_base_commons:159:15)\n    at writeGeneric (node:internal/stream_base_commons:150:3)\n    at Socket._writeGeneric (node:net:966:11)\n    at Socket._write (node:net:978:8)\n    at writeOrBuffer (node:internal/streams/writable:572:12)\n    at _write (node:internal/streams/writable:501:10)\n    at Writable.write (node:internal/streams/writable:510:10)\n    at runCli (file:///workspace/receipt-report.js:158:18)\n    at file:///workspace/receipt-report.js:174:16\n    at ModuleJob.run (node:internal/modules/esm/module_job:345:25)\nEmitted 'error' event on Socket instance at:\n    at emitErrorNT (node:internal/streams/destroy:170:8)\n    at emitErrorCloseNT (node:internal/streams/destroy:129:3)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {\n  errno: -32,\n  code: 'EPIPE',\n  syscall: 'write'\n}\n\nNode.js v22.19.0\nusage: node receipt-report.js LOGFILE\nusage: node receipt-report.js LOGFILE\nreceipt-report: unable to read \"nope.jsonl\": ENOENT: no such file or directory, open 'nope.jsonl'\n",
+      "atMs": 402260.0,
+      "endedMs": 402424.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /tmp/rr-smoke\nnode /workspace/receipt-report.js empty.jsonl | od -c | tail -3\necho \"---\"\n# duplicate counting via CLI: 3 identical copies -> duplicates 2\nprintf '{\"id\":\"s\",\"job\":\"j\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}\\n{\"id\":\"s\",\"job\":\"j\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}\\n{\"id\":\"s\",\"job\":\"j\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}\\n' > dup.jsonl\nnode /workspace/receipt-report.js dup.jsonl; echo \"exit=$?\"\necho \"---\"\n# conflict: same id different seq -> exit 2\nprintf '{\"id\":\"s\",\"job\":\"j\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}\\n{\"id\":\"s\",\"job\":\"j\",\"attempt\":1,\"seq\":2,\"type\":\"started\"}\\n' > conflict.jsonl\nnode /workspace/receipt-report.js conflict.jsonl 2>&1; echo \"exit=$?\"\necho \"---\"\n# symlinked invocation still runs CLI\nln -sf /workspace/receipt-report.js link.js\nnode link.js log.jsonl >/dev/null; echo \"symlink exit=$?\"\necho \"---\"\n# directory as arg\nnode /workspace/receipt-report.js . 2>&1; echo \"dir exit=$?\"",
+        "description": "Verify newline, duplicates, conflicts, symlink, dir arg"
+      },
+      "output": "0000000   {   \"   j   o   b   s   \"   :   [   ]   ,   \"   d   u   p   l\n0000020   i   c   a   t   e   s   \"   :   0   }  \\n\n0000033\n---\n{\"jobs\":[{\"job\":\"j\",\"attempts\":[{\"attempt\":1,\"status\":\"running\",\"startedSeq\":1,\"finishedSeq\":null}]}],\"duplicates\":2}\nexit=0\n---\nreceipt-report: line 2: duplicate id with different required fields: \"s\"\nexit=2\n---\nsymlink exit=0\n---\nreceipt-report: unable to read \".\": EISDIR: illegal operation on a directory, read\ndir exit=2\n",
+      "atMs": 416760.0,
+      "endedMs": 416866.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && md5sum package.json test/receipt-report.test.js && ls -la test/ && rm -rf /tmp/rr-smoke && npm test 2>&1 | tail -8",
+        "description": "Verify untouched files, clean up, final npm test"
+      },
+      "output": "5722fe23910c9fc980837644f961bc25  package.json\n70dbe15bef960a07d006ca15aa20ce14  test/receipt-report.test.js\ntotal 16\ndrwxrwxr-x 1 node node   100 Sep  8 02:59 .\ndrwxrwxr-x 1 node node    66 Sep  8 02:57 ..\n-rw------- 1 node node 10691 Sep  8 02:59 receipt-report.extra.test.js\n-rw-rw-r-- 1 node node  1195 Sep  8 02:52 receipt-report.test.js\n# tests 21\n# suites 0\n# pass 21\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 205.575868\n",
+      "atMs": 423105.0,
+      "endedMs": 423419.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "chmod 644 /workspace/test/receipt-report.extra.test.js && npm test 2>&1 | grep -E \"^# (tests|pass|fail)\"",
+        "description": "Normalize test file permissions, final test run",
+        "workdir": "/workspace"
+      },
+      "output": "# tests 21\n# pass 21\n# fail 0\n",
+      "atMs": 426037.0,
+      "endedMs": 426355.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-19"
+    },
+    {
+      "name": "todo_write",
+      "category": "other",
+      "request": {
+        "todos": [
+          {
+            "content": "Implement receipt-report.js (reducer + CLI)",
+            "status": "completed"
+          },
+          {
+            "content": "Add extra tests (don't touch existing test file)",
+            "status": "completed"
+          },
+          {
+            "content": "Run npm test and manual CLI smoke checks",
+            "status": "completed"
+          }
+        ]
+      },
+      "output": "Updated todo list: 0 pending, 0 in progress, 3 completed.",
+      "atMs": 428390.0,
+      "endedMs": 428406.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-20"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "Done. `npm test` passes 21/21 (4 pre-existing public tests + 17 new), with `package.json` and the existing public test file untouched.\n\n## Implementation \u2014 `receipt-report.js`\n\n**`reduceEvents(text)`** (named + default export, builtins only):\n- **Lines**: splits on `\\r\\n`/`\\n`/`\\r` (CRLF and missing final newline fine), trims and skips whitespace-only lines, `JSON.parse`s each remaining line.\n- **Strict validation, no coercion**: object must be non-null non-array; `id`/`job` nonempty strings (never trimmed); `attempt` positive safe integer; `seq` nonnegative safe integer (via `Number.isSafeInteger`, so `0`, `1.5`, `\"1\"`, `2**53` are all rejected); `type` exactly one of the three literals. Invalid JSON or fields \u2192 `Error` with line number.\n- **Dedup by `id`** using a `Map` (so `__proto__` ids are ordinary keys): identical five fields \u2192 extra copies counted in `duplicates`; any differing required field \u2192 `Error`. Extra/other fields never participate.\n- **Reduction**: groups by `(job, attempt)` with `Map`s \u2014 exactly one `started` (second start \u21d2 different-id error), at most one terminal (second terminal \u21d2 repeated/contradictory error), terminal `seq` strictly greater than start `seq`, orphan terminals rejected. `Map` keying keeps Unicode/whitespace jobs exact.\n- **Output**: jobs sorted by `<`/`>` (UTF-16 code units), attempts sorted numerically, `status` `running`/`succeeded`/`failed`, `finishedSeq: null` when running; empty input \u2192 `{jobs: [], duplicates: 0}`.\n\n**CLI**: runs only when the module is the resolved main entry (`realpathSync` + `pathToFileURL` comparison, so symlinked invocations work and imports stay side-effect-free). Exactly one file arg; success prints `JSON.stringify(report) + \"\\n\"` to stdout and exits 0; bad args, unreadable file, or invalid events write a nonempty stderr message, nothing to stdout, and set exit code 2 (via `process.exitCode`, so stdout always drains fully).\n\n**Tests** \u2014 added `test/receipt-report.extra.test.js` (public test file unmodified): CRLF/no-final-newline/blank-line handling, duplicate counting (every extra copy) and ignored extra fields, conflicting-id errors, orphan/repeated-start/repeated-terminal/contradictory-terminal/seq-ordering errors, strict field validation (no coercion, safe-integer boundaries, missing fields), non-object lines, UTF-16 job ordering (`B` < `Z` < `a` < `\"a \"` < `a1` < `\u65e5\u672c`), numeric attempt order, `__proto__`/whitespace ids, shared seqs, attempt gaps, and CLI behavior (success output bytes, exit codes 0/2, empty stdout on failure) via `spawnSync`.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "afterSha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "before": "{\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "diff": ""
+    },
+    {
+      "path": "receipt-report.js",
+      "state": "changed",
+      "beforeSha256": "da6a822887f12982b665843bf181f61615af52895a3a7d42aa37ad5aac345ecc",
+      "afterSha256": "51fc16276e9815365ed20104149572568d1dce80a47028450b62b15b8b2b535c",
+      "before": "// Implement the public work order in task.md. Builtins only.\nexport function reduceEvents(text) {\n  throw new Error('not implemented');\n}\n",
+      "after": "// receipt-report.js \u2014 reduce a run log (JSONL of events) into a receipt report.\n//\n// Usage: node receipt-report.js LOGFILE\n//\n// Node.js builtins only. Importing this module does not run the CLI.\n\nimport { readFileSync, realpathSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\n// Validate one parsed JSON value as an event. Returns exactly the five\n// required fields (extra fields are ignored, including for duplicate\n// comparison). Types are never coerced.\nfunction validateEvent(event, lineNo) {\n  if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n    fail(`line ${lineNo}: event must be a JSON object`);\n  }\n  const { id, job, attempt, seq, type } = event;\n  if (typeof id !== 'string' || id.length === 0) {\n    fail(`line ${lineNo}: \"id\" must be a nonempty string`);\n  }\n  if (typeof job !== 'string' || job.length === 0) {\n    fail(`line ${lineNo}: \"job\" must be a nonempty string`);\n  }\n  if (typeof attempt !== 'number' || !Number.isSafeInteger(attempt) || attempt < 1) {\n    fail(`line ${lineNo}: \"attempt\" must be a positive safe integer`);\n  }\n  if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) {\n    fail(`line ${lineNo}: \"seq\" must be a nonnegative safe integer`);\n  }\n  if (type !== 'started' && type !== 'succeeded' && type !== 'failed') {\n    fail(`line ${lineNo}: \"type\" must be exactly \"started\", \"succeeded\", or \"failed\"`);\n  }\n  return { id, job, attempt, seq, type };\n}\n\nfunction sameRequiredFields(a, b) {\n  return a.job === b.job && a.attempt === b.attempt && a.seq === b.seq && a.type === b.type;\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a UTF-8 JSONL string');\n  }\n\n  // CRLF (and bare CR) line endings and a missing final newline are allowed;\n  // whitespace-only lines are ignored.\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  const uniqueEvents = new Map(); // id -> first event with that id\n  let duplicates = 0;\n\n  for (let i = 0; i < lines.length; i++) {\n    const lineNo = i + 1;\n    const line = lines[i].trim();\n    if (line === '') continue;\n\n    let parsed;\n    try {\n      parsed = JSON.parse(line);\n    } catch {\n      fail(`line ${lineNo}: invalid JSON`);\n    }\n    const event = validateEvent(parsed, lineNo);\n\n    // Deduplicate by id before reducing.\n    const first = uniqueEvents.get(event.id);\n    if (first === undefined) {\n      uniqueEvents.set(event.id, event);\n    } else if (sameRequiredFields(first, event)) {\n      duplicates += 1;\n    } else {\n      fail(`line ${lineNo}: duplicate id with different required fields: ${JSON.stringify(event.id)}`);\n    }\n  }\n\n  // Group surviving events by (job, attempt).\n  const byJob = new Map(); // job -> Map(attempt -> { start, terminal })\n  for (const event of uniqueEvents.values()) {\n    let attempts = byJob.get(event.job);\n    if (attempts === undefined) {\n      attempts = new Map();\n      byJob.set(event.job, attempts);\n    }\n    let record = attempts.get(event.attempt);\n    if (record === undefined) {\n      record = { start: null, terminal: null };\n      attempts.set(event.attempt, record);\n    }\n    if (event.type === 'started') {\n      // A second start for this (job, attempt) necessarily has a different id,\n      // because identical ids were deduplicated above.\n      if (record.start !== null) {\n        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated start with different id`);\n      }\n      record.start = event;\n    } else {\n      // A second terminal is either a repeated terminal (different id, since\n      // identical ids were deduplicated) or a contradiction (both succeeded\n      // and failed present). Both are errors.\n      if (record.terminal !== null) {\n        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated or contradictory terminal event`);\n      }\n      record.terminal = event;\n    }\n  }\n\n  const jobs = [];\n  for (const [job, attempts] of byJob) {\n    const attemptReports = [];\n    for (const [attempt, record] of attempts) {\n      if (record.start === null) {\n        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal event without a start event`);\n      }\n      const { start, terminal } = record;\n      if (terminal !== null && terminal.seq <= start.seq) {\n        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal seq ${terminal.seq} must be strictly greater than start seq ${start.seq}`);\n      }\n      attemptReports.push({\n        attempt,\n        status: terminal === null ? 'running' : terminal.type,\n        startedSeq: start.seq,\n        finishedSeq: terminal === null ? null : terminal.seq,\n      });\n    }\n    attemptReports.sort((a, b) => a.attempt - b.attempt);\n    jobs.push({ job, attempts: attemptReports });\n  }\n\n  // Jobs in JavaScript string \"<\"/\">\" order (UTF-16 code units, not locale).\n  jobs.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  return { jobs, duplicates };\n}\n\nfunction runCli(argv) {\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    return 2;\n  }\n  const file = argv[0];\n  let text;\n  try {\n    text = readFileSync(file, 'utf8');\n  } catch (err) {\n    process.stderr.write(`receipt-report: unable to read ${JSON.stringify(file)}: ${err.message}\\n`);\n    return 2;\n  }\n  let report;\n  try {\n    report = reduceEvents(text);\n  } catch (err) {\n    process.stderr.write(`receipt-report: ${err.message}\\n`);\n    return 2;\n  }\n  process.stdout.write(`${JSON.stringify(report)}\\n`);\n  return 0;\n}\n\nconst isMainModule = (() => {\n  try {\n    return (\n      Boolean(process.argv[1]) &&\n      import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href\n    );\n  } catch {\n    return false;\n  }\n})();\n\nif (isMainModule) {\n  const code = runCli(process.argv.slice(2));\n  if (code !== 0) process.exitCode = code;\n}\n\nexport default reduceEvents;\n",
+      "displaySha256": "51fc16276e9815365ed20104149572568d1dce80a47028450b62b15b8b2b535c",
+      "diff": "--- starter/receipt-report.js\n+++ delivered/receipt-report.js\n@@ -1,4 +1,178 @@\n-// Implement the public work order in task.md. Builtins only.\n+// receipt-report.js \u2014 reduce a run log (JSONL of events) into a receipt report.\n+//\n+// Usage: node receipt-report.js LOGFILE\n+//\n+// Node.js builtins only. Importing this module does not run the CLI.\n+\n+import { readFileSync, realpathSync } from 'node:fs';\n+import { resolve } from 'node:path';\n+import { pathToFileURL } from 'node:url';\n+\n+function fail(message) {\n+  throw new Error(message);\n+}\n+\n+// Validate one parsed JSON value as an event. Returns exactly the five\n+// required fields (extra fields are ignored, including for duplicate\n+// comparison). Types are never coerced.\n+function validateEvent(event, lineNo) {\n+  if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n+    fail(`line ${lineNo}: event must be a JSON object`);\n+  }\n+  const { id, job, attempt, seq, type } = event;\n+  if (typeof id !== 'string' || id.length === 0) {\n+    fail(`line ${lineNo}: \"id\" must be a nonempty string`);\n+  }\n+  if (typeof job !== 'string' || job.length === 0) {\n+    fail(`line ${lineNo}: \"job\" must be a nonempty string`);\n+  }\n+  if (typeof attempt !== 'number' || !Number.isSafeInteger(attempt) || attempt < 1) {\n+    fail(`line ${lineNo}: \"attempt\" must be a positive safe integer`);\n+  }\n+  if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) {\n+    fail(`line ${lineNo}: \"seq\" must be a nonnegative safe integer`);\n+  }\n+  if (type !== 'started' && type !== 'succeeded' && type !== 'failed') {\n+    fail(`line ${lineNo}: \"type\" must be exactly \"started\", \"succeeded\", or \"failed\"`);\n+  }\n+  return { id, job, attempt, seq, type };\n+}\n+\n+function sameRequiredFields(a, b) {\n+  return a.job === b.job && a.attempt === b.attempt && a.seq === b.seq && a.type === b.type;\n+}\n+\n export function reduceEvents(text) {\n-  throw new Error('not implemented');\n+  if (typeof text !== 'string') {\n+    fail('input must be a UTF-8 JSONL string');\n+  }\n+\n+  // CRLF (and bare CR) line endings and a missing final newline are allowed;\n+  // whitespace-only lines are ignored.\n+  const lines = text.split(/\\r\\n|\\n|\\r/);\n+  const uniqueEvents = new Map(); // id -> first event with that id\n+  let duplicates = 0;\n+\n+  for (let i = 0; i < lines.length; i++) {\n+    const lineNo = i + 1;\n+    const line = lines[i].trim();\n+    if (line === '') continue;\n+\n+    let parsed;\n+    try {\n+      parsed = JSON.parse(line);\n+    } catch {\n+      fail(`line ${lineNo}: invalid JSON`);\n+    }\n+    const event = validateEvent(parsed, lineNo);\n+\n+    // Deduplicate by id before reducing.\n+    const first = uniqueEvents.get(event.id);\n+    if (first === undefined) {\n+      uniqueEvents.set(event.id, event);\n+    } else if (sameRequiredFields(first, event)) {\n+      duplicates += 1;\n+    } else {\n+      fail(`line ${lineNo}: duplicate id with different required fields: ${JSON.stringify(event.id)}`);\n+    }\n+  }\n+\n+  // Group surviving events by (job, attempt).\n+  const byJob = new Map(); // job -> Map(attempt -> { start, terminal })\n+  for (const event of uniqueEvents.values()) {\n+    let attempts = byJob.get(event.job);\n+    if (attempts === undefined) {\n+      attempts = new Map();\n+      byJob.set(event.job, attempts);\n+    }\n+    let record = attempts.get(event.attempt);\n+    if (record === undefined) {\n+      record = { start: null, terminal: null };\n+      attempts.set(event.attempt, record);\n+    }\n+    if (event.type === 'started') {\n+      // A second start for this (job, attempt) necessarily has a different id,\n+      // because identical ids were deduplicated above.\n+      if (record.start !== null) {\n+        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated start with different id`);\n+      }\n+      record.start = event;\n+    } else {\n+      // A second terminal is either a repeated terminal (different id, since\n+      // identical ids were deduplicated) or a contradiction (both succeeded\n+      // and failed present). Both are errors.\n+      if (record.terminal !== null) {\n+        fail(`job ${JSON.stringify(event.job)} attempt ${event.attempt}: repeated or contradictory terminal event`);\n+      }\n+      record.terminal = event;\n+    }\n+  }\n+\n+  const jobs = [];\n+  for (const [job, attempts] of byJob) {\n+    const attemptReports = [];\n+    for (const [attempt, record] of attempts) {\n+      if (record.start === null) {\n+        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal event without a start event`);\n+      }\n+      const { start, terminal } = record;\n+      if (terminal !== null && terminal.seq <= start.seq) {\n+        fail(`job ${JSON.stringify(job)} attempt ${attempt}: terminal seq ${terminal.seq} must be strictly greater than start seq ${start.seq}`);\n+      }\n+      attemptReports.push({\n+        attempt,\n+        status: terminal === null ? 'running' : terminal.type,\n+        startedSeq: start.seq,\n+        finishedSeq: terminal === null ? null : terminal.seq,\n+      });\n+    }\n+    attemptReports.sort((a, b) => a.attempt - b.attempt);\n+    jobs.push({ job, attempts: attemptReports });\n+  }\n+\n+  // Jobs in JavaScript string \"<\"/\">\" order (UTF-16 code units, not locale).\n+  jobs.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n+  return { jobs, duplicates };\n }\n+\n+function runCli(argv) {\n+  if (argv.length !== 1) {\n+    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n+    return 2;\n+  }\n+  const file = argv[0];\n+  let text;\n+  try {\n+    text = readFileSync(file, 'utf8');\n+  } catch (err) {\n+    process.stderr.write(`receipt-report: unable to read ${JSON.stringify(file)}: ${err.message}\\n`);\n+    return 2;\n+  }\n+  let report;\n+  try {\n+    report = reduceEvents(text);\n+  } catch (err) {\n+    process.stderr.write(`receipt-report: ${err.message}\\n`);\n+    return 2;\n+  }\n+  process.stdout.write(`${JSON.stringify(report)}\\n`);\n+  return 0;\n+}\n+\n+const isMainModule = (() => {\n+  try {\n+    return (\n+      Boolean(process.argv[1]) &&\n+      import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href\n+    );\n+  } catch {\n+    return false;\n+  }\n+})();\n+\n+if (isMainModule) {\n+  const code = runCli(process.argv.slice(2));\n+  if (code !== 0) process.exitCode = code;\n+}\n+\n+export default reduceEvents;\n"
+    },
+    {
+      "path": "test/receipt-report.extra.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "69cd35e66a37fc15bc4cd42565198d67de94e5e0ec872e96b60904e8f8c3c2a2",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { mkdtempSync, rmSync, writeFileSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { reduceEvents } from '../receipt-report.js';\n\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\nconst script = fileURLToPath(new URL('../receipt-report.js', import.meta.url));\nconst runCli = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n\ntest('empty and whitespace-only input', () => {\n  assert.deepEqual(reduceEvents(''), { jobs: [], duplicates: 0 });\n  assert.deepEqual(reduceEvents(' \\t\\r\\n  \\n'), { jobs: [], duplicates: 0 });\n});\n\ntest('CRLF endings and missing final newline are allowed', () => {\n  const events = [\n    { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n  ];\n  const crlf = events.map(event => JSON.stringify(event)).join('\\r\\n'); // no final newline\n  assert.deepEqual(reduceEvents(crlf), {\n    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n    duplicates: 0,\n  });\n});\n\ntest('blank lines in the middle are ignored', () => {\n  const text = [\n    '',\n    '   ',\n    JSON.stringify({ id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' }),\n    '\\r',\n    JSON.stringify({ id: 't', job: 'j', attempt: 1, seq: 2, type: 'failed' }),\n    '',\n  ].join('\\n');\n  assert.deepEqual(reduceEvents(text), {\n    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'failed', startedSeq: 1, finishedSeq: 2 }] }],\n    duplicates: 0,\n  });\n});\n\ntest('duplicates: every extra identical copy is counted, other fields ignored', () => {\n  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n  const report = reduceEvents(jsonl([e, { ...e, extra: 1 }, { ...e, note: 'x', other: [1, 2] }, e]));\n  assert.equal(report.duplicates, 3);\n  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [{ attempt: 1, status: 'running', startedSeq: 3, finishedSeq: null }] }]);\n});\n\ntest('a repeated id with any different required field is an error', () => {\n  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n  for (const delta of [{ seq: 4 }, { type: 'succeeded' }, { job: 'k' }, { attempt: 2 }]) {\n    assert.throws(() => reduceEvents(jsonl([e, { ...e, ...delta }])), undefined, JSON.stringify(delta));\n  }\n});\n\ntest('orphan terminal is an error', () => {\n  assert.throws(() => reduceEvents(jsonl([{ id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' }])));\n});\n\ntest('repeated start with different ids is an error', () => {\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's2', job: 'j', attempt: 1, seq: 1, type: 'started' },\n  ])));\n});\n\ntest('repeated or contradictory terminals are errors', () => {\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'succeeded' },\n  ])));\n  assert.throws(() => reduceEvents(jsonl([\n    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'failed' },\n  ])));\n});\n\ntest('terminal seq must be strictly greater than start seq', () => {\n  const start = { id: 's', job: 'j', attempt: 1, seq: 5, type: 'started' };\n  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 5, type: 'succeeded' }])));\n  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 4, type: 'failed' }])));\n  // strictly greater passes\n  assert.equal(reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 6, type: 'succeeded' }])).jobs[0].attempts[0].status, 'succeeded');\n});\n\ntest('attempt gaps are allowed and attempts are independent', () => {\n  const report = reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's5', job: 'j', attempt: 5, seq: 1, type: 'started' },\n    { id: 't5', job: 'j', attempt: 5, seq: 2, type: 'failed' },\n    { id: 's9', job: 'j', attempt: 9, seq: 2, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [\n    { attempt: 1, status: 'running', startedSeq: 1, finishedSeq: null },\n    { attempt: 5, status: 'failed', startedSeq: 1, finishedSeq: 2 },\n    { attempt: 9, status: 'running', startedSeq: 2, finishedSeq: null },\n  ]}]);\n});\n\ntest('seqs may be shared across attempts and jobs', () => {\n  const report = reduceEvents(jsonl([\n    { id: 's1', job: 'j', attempt: 1, seq: 5, type: 'started' },\n    { id: 't1', job: 'j', attempt: 1, seq: 9, type: 'failed' },\n    { id: 's2', job: 'j', attempt: 2, seq: 5, type: 'started' },\n    { id: 'sk', job: 'k', attempt: 1, seq: 4, type: 'started' },\n    { id: 'tk', job: 'k', attempt: 1, seq: 5, type: 'succeeded' },\n  ]));\n  assert.deepEqual(report, {\n    jobs: [\n      { job: 'j', attempts: [\n        { attempt: 1, status: 'failed', startedSeq: 5, finishedSeq: 9 },\n        { attempt: 2, status: 'running', startedSeq: 5, finishedSeq: null },\n      ]},\n      { job: 'k', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 4, finishedSeq: 5 }]},\n    ],\n    duplicates: 0,\n  });\n});\n\ntest('field validation is strict and never coerces', () => {\n  const ok = { id: 'a', job: 'j', attempt: 1, seq: 0, type: 'started' };\n  const bad = [\n    { ...ok, attempt: 0 },\n    { ...ok, attempt: -1 },\n    { ...ok, attempt: 1.5 },\n    { ...ok, attempt: '1' },\n    { ...ok, attempt: 2 ** 53 },\n    { ...ok, attempt: true },\n    { ...ok, seq: -1 },\n    { ...ok, seq: 0.5 },\n    { ...ok, seq: '0' },\n    { ...ok, seq: 2 ** 53 },\n    { ...ok, id: '' },\n    { ...ok, id: 1 },\n    { ...ok, job: '' },\n    { ...ok, job: null },\n    { ...ok, type: 'Started' },\n    { ...ok, type: 'done' },\n    { ...ok, type: 5 },\n  ];\n  for (const event of bad) {\n    assert.throws(() => reduceEvents(jsonl([event])), undefined, JSON.stringify(event));\n  }\n  assert.throws(() => reduceEvents(jsonl([{ job: 'j', attempt: 1, seq: 0, type: 'started' }])), undefined, 'missing id');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', seq: 0, type: 'started' }])), undefined, 'missing attempt');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, type: 'started' }])), undefined, 'missing seq');\n  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, seq: 0 }])), undefined, 'missing type');\n  // safe-integer boundary is valid\n  assert.equal(reduceEvents(jsonl([{ ...ok, seq: 2 ** 53 - 1 }])).duplicates, 0);\n});\n\ntest('non-object or invalid JSON lines are rejected', () => {\n  for (const line of ['null', '[1]', '42', '\"x\"', 'true', '{bad']) {\n    assert.throws(() => reduceEvents(line), undefined, line);\n  }\n});\n\ntest('ids such as __proto__ and whitespace/unicode strings are ordinary', () => {\n  const report = reduceEvents(jsonl([\n    { id: '__proto__', job: 'j', attempt: 1, seq: 1, type: 'started' },\n    { id: 's2', job: 'job with spaces', attempt: 1, seq: 1, type: 'started' },\n    { id: '  spaced id  ', job: 'job with spaces', attempt: 1, seq: 2, type: 'succeeded' },\n    { id: 'unicod\u00e9', job: '\u65e5\u672c job', attempt: 1, seq: 0, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs.map(job => job.job), ['j', 'job with spaces', '\u65e5\u672c job']);\n  assert.equal(report.jobs[0].attempts[0].status, 'running');\n  assert.equal(report.jobs[1].attempts[0].status, 'succeeded');\n  // __proto__ did not escape into the result object or Object.prototype\n  assert.equal(Object.hasOwn(report, '__proto__'), false);\n  assert.equal(Object.hasOwn({}, 'polluted'), false);\n});\n\ntest('jobs sort by UTF-16 code units, attempts numerically', () => {\n  const report = reduceEvents(jsonl([\n    { id: 'a', job: 'a1', attempt: 1, seq: 1, type: 'started' },\n    { id: 'b', job: 'a ', attempt: 1, seq: 1, type: 'started' },\n    { id: 'c', job: 'a', attempt: 10, seq: 1, type: 'started' },\n    { id: 'd', job: 'a', attempt: 2, seq: 1, type: 'started' },\n    { id: 'e', job: 'B', attempt: 1, seq: 1, type: 'started' },\n    { id: 'f', job: 'Z', attempt: 1, seq: 1, type: 'started' },\n  ]));\n  assert.deepEqual(report.jobs.map(job => job.job), ['B', 'Z', 'a', 'a ', 'a1']);\n  assert.deepEqual(report.jobs[2].attempts.map(attempt => attempt.attempt), [2, 10]);\n});\n\ntest('CLI: success, invalid args, unreadable input, invalid events', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'receipt-report-'));\n  try {\n    const good = join(dir, 'good.jsonl');\n    writeFileSync(good, jsonl([\n      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n      { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n    ]));\n\n    const ok = runCli(good);\n    assert.equal(ok.status, 0, ok.stderr);\n    assert.deepEqual(JSON.parse(ok.stdout), {\n      jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n      duplicates: 0,\n    });\n    assert.ok(ok.stdout.endsWith('\\n'));\n    assert.equal(ok.stdout, `${JSON.stringify(JSON.parse(ok.stdout))}\\n`);\n    assert.equal(ok.stderr, '');\n\n    const noArgs = runCli();\n    assert.equal(noArgs.status, 2, noArgs.stdout + noArgs.stderr);\n    assert.equal(noArgs.stdout, '');\n    assert.ok(noArgs.stderr.length > 0);\n\n    const twoArgs = runCli(good, good);\n    assert.equal(twoArgs.status, 2);\n    assert.equal(twoArgs.stdout, '');\n    assert.ok(twoArgs.stderr.length > 0);\n\n    const missing = runCli(join(dir, 'does-not-exist.jsonl'));\n    assert.equal(missing.status, 2);\n    assert.equal(missing.stdout, '');\n    assert.ok(missing.stderr.length > 0);\n\n    const bad = join(dir, 'bad.jsonl');\n    writeFileSync(bad, jsonl([\n      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n      { id: 't', job: 'j', attempt: 1, seq: 1, type: 'succeeded' },\n    ]));\n    const badRun = runCli(bad);\n    assert.equal(badRun.status, 2);\n    assert.equal(badRun.stdout, '');\n    assert.ok(badRun.stderr.length > 0);\n\n    const invalidJson = join(dir, 'invalid.jsonl');\n    writeFileSync(invalidJson, '{oops\\n');\n    const invalidRun = runCli(invalidJson);\n    assert.equal(invalidRun.status, 2);\n    assert.equal(invalidRun.stdout, '');\n    assert.ok(invalidRun.stderr.length > 0);\n  } finally {\n    rmSync(dir, { recursive: true, force: true });\n  }\n});\n\ntest('importing the module does not run the CLI', () => {\n  assert.equal(typeof reduceEvents, 'function');\n});\n",
+      "displaySha256": "69cd35e66a37fc15bc4cd42565198d67de94e5e0ec872e96b60904e8f8c3c2a2",
+      "diff": "--- starter/test/receipt-report.extra.test.js\n+++ delivered/test/receipt-report.extra.test.js\n@@ -0,0 +1,249 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import { spawnSync } from 'node:child_process';\n+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';\n+import { tmpdir } from 'node:os';\n+import { join } from 'node:path';\n+import { fileURLToPath } from 'node:url';\n+import { reduceEvents } from '../receipt-report.js';\n+\n+const jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\n+const script = fileURLToPath(new URL('../receipt-report.js', import.meta.url));\n+const runCli = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n+\n+test('empty and whitespace-only input', () => {\n+  assert.deepEqual(reduceEvents(''), { jobs: [], duplicates: 0 });\n+  assert.deepEqual(reduceEvents(' \\t\\r\\n  \\n'), { jobs: [], duplicates: 0 });\n+});\n+\n+test('CRLF endings and missing final newline are allowed', () => {\n+  const events = [\n+    { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n+    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+  ];\n+  const crlf = events.map(event => JSON.stringify(event)).join('\\r\\n'); // no final newline\n+  assert.deepEqual(reduceEvents(crlf), {\n+    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n+    duplicates: 0,\n+  });\n+});\n+\n+test('blank lines in the middle are ignored', () => {\n+  const text = [\n+    '',\n+    '   ',\n+    JSON.stringify({ id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' }),\n+    '\\r',\n+    JSON.stringify({ id: 't', job: 'j', attempt: 1, seq: 2, type: 'failed' }),\n+    '',\n+  ].join('\\n');\n+  assert.deepEqual(reduceEvents(text), {\n+    jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'failed', startedSeq: 1, finishedSeq: 2 }] }],\n+    duplicates: 0,\n+  });\n+});\n+\n+test('duplicates: every extra identical copy is counted, other fields ignored', () => {\n+  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n+  const report = reduceEvents(jsonl([e, { ...e, extra: 1 }, { ...e, note: 'x', other: [1, 2] }, e]));\n+  assert.equal(report.duplicates, 3);\n+  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [{ attempt: 1, status: 'running', startedSeq: 3, finishedSeq: null }] }]);\n+});\n+\n+test('a repeated id with any different required field is an error', () => {\n+  const e = { id: 'a', job: 'j', attempt: 1, seq: 3, type: 'started' };\n+  for (const delta of [{ seq: 4 }, { type: 'succeeded' }, { job: 'k' }, { attempt: 2 }]) {\n+    assert.throws(() => reduceEvents(jsonl([e, { ...e, ...delta }])), undefined, JSON.stringify(delta));\n+  }\n+});\n+\n+test('orphan terminal is an error', () => {\n+  assert.throws(() => reduceEvents(jsonl([{ id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' }])));\n+});\n+\n+test('repeated start with different ids is an error', () => {\n+  assert.throws(() => reduceEvents(jsonl([\n+    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+    { id: 's2', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+  ])));\n+});\n+\n+test('repeated or contradictory terminals are errors', () => {\n+  assert.throws(() => reduceEvents(jsonl([\n+    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n+    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'succeeded' },\n+  ])));\n+  assert.throws(() => reduceEvents(jsonl([\n+    { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+    { id: 't1', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n+    { id: 't2', job: 'j', attempt: 1, seq: 3, type: 'failed' },\n+  ])));\n+});\n+\n+test('terminal seq must be strictly greater than start seq', () => {\n+  const start = { id: 's', job: 'j', attempt: 1, seq: 5, type: 'started' };\n+  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 5, type: 'succeeded' }])));\n+  assert.throws(() => reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 4, type: 'failed' }])));\n+  // strictly greater passes\n+  assert.equal(reduceEvents(jsonl([start, { id: 't', job: 'j', attempt: 1, seq: 6, type: 'succeeded' }])).jobs[0].attempts[0].status, 'succeeded');\n+});\n+\n+test('attempt gaps are allowed and attempts are independent', () => {\n+  const report = reduceEvents(jsonl([\n+    { id: 's1', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+    { id: 's5', job: 'j', attempt: 5, seq: 1, type: 'started' },\n+    { id: 't5', job: 'j', attempt: 5, seq: 2, type: 'failed' },\n+    { id: 's9', job: 'j', attempt: 9, seq: 2, type: 'started' },\n+  ]));\n+  assert.deepEqual(report.jobs, [{ job: 'j', attempts: [\n+    { attempt: 1, status: 'running', startedSeq: 1, finishedSeq: null },\n+    { attempt: 5, status: 'failed', startedSeq: 1, finishedSeq: 2 },\n+    { attempt: 9, status: 'running', startedSeq: 2, finishedSeq: null },\n+  ]}]);\n+});\n+\n+test('seqs may be shared across attempts and jobs', () => {\n+  const report = reduceEvents(jsonl([\n+    { id: 's1', job: 'j', attempt: 1, seq: 5, type: 'started' },\n+    { id: 't1', job: 'j', attempt: 1, seq: 9, type: 'failed' },\n+    { id: 's2', job: 'j', attempt: 2, seq: 5, type: 'started' },\n+    { id: 'sk', job: 'k', attempt: 1, seq: 4, type: 'started' },\n+    { id: 'tk', job: 'k', attempt: 1, seq: 5, type: 'succeeded' },\n+  ]));\n+  assert.deepEqual(report, {\n+    jobs: [\n+      { job: 'j', attempts: [\n+        { attempt: 1, status: 'failed', startedSeq: 5, finishedSeq: 9 },\n+        { attempt: 2, status: 'running', startedSeq: 5, finishedSeq: null },\n+      ]},\n+      { job: 'k', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 4, finishedSeq: 5 }]},\n+    ],\n+    duplicates: 0,\n+  });\n+});\n+\n+test('field validation is strict and never coerces', () => {\n+  const ok = { id: 'a', job: 'j', attempt: 1, seq: 0, type: 'started' };\n+  const bad = [\n+    { ...ok, attempt: 0 },\n+    { ...ok, attempt: -1 },\n+    { ...ok, attempt: 1.5 },\n+    { ...ok, attempt: '1' },\n+    { ...ok, attempt: 2 ** 53 },\n+    { ...ok, attempt: true },\n+    { ...ok, seq: -1 },\n+    { ...ok, seq: 0.5 },\n+    { ...ok, seq: '0' },\n+    { ...ok, seq: 2 ** 53 },\n+    { ...ok, id: '' },\n+    { ...ok, id: 1 },\n+    { ...ok, job: '' },\n+    { ...ok, job: null },\n+    { ...ok, type: 'Started' },\n+    { ...ok, type: 'done' },\n+    { ...ok, type: 5 },\n+  ];\n+  for (const event of bad) {\n+    assert.throws(() => reduceEvents(jsonl([event])), undefined, JSON.stringify(event));\n+  }\n+  assert.throws(() => reduceEvents(jsonl([{ job: 'j', attempt: 1, seq: 0, type: 'started' }])), undefined, 'missing id');\n+  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', seq: 0, type: 'started' }])), undefined, 'missing attempt');\n+  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, type: 'started' }])), undefined, 'missing seq');\n+  assert.throws(() => reduceEvents(jsonl([{ id: 'a', job: 'j', attempt: 1, seq: 0 }])), undefined, 'missing type');\n+  // safe-integer boundary is valid\n+  assert.equal(reduceEvents(jsonl([{ ...ok, seq: 2 ** 53 - 1 }])).duplicates, 0);\n+});\n+\n+test('non-object or invalid JSON lines are rejected', () => {\n+  for (const line of ['null', '[1]', '42', '\"x\"', 'true', '{bad']) {\n+    assert.throws(() => reduceEvents(line), undefined, line);\n+  }\n+});\n+\n+test('ids such as __proto__ and whitespace/unicode strings are ordinary', () => {\n+  const report = reduceEvents(jsonl([\n+    { id: '__proto__', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+    { id: 's2', job: 'job with spaces', attempt: 1, seq: 1, type: 'started' },\n+    { id: '  spaced id  ', job: 'job with spaces', attempt: 1, seq: 2, type: 'succeeded' },\n+    { id: 'unicod\u00e9', job: '\u65e5\u672c job', attempt: 1, seq: 0, type: 'started' },\n+  ]));\n+  assert.deepEqual(report.jobs.map(job => job.job), ['j', 'job with spaces', '\u65e5\u672c job']);\n+  assert.equal(report.jobs[0].attempts[0].status, 'running');\n+  assert.equal(report.jobs[1].attempts[0].status, 'succeeded');\n+  // __proto__ did not escape into the result object or Object.prototype\n+  assert.equal(Object.hasOwn(report, '__proto__'), false);\n+  assert.equal(Object.hasOwn({}, 'polluted'), false);\n+});\n+\n+test('jobs sort by UTF-16 code units, attempts numerically', () => {\n+  const report = reduceEvents(jsonl([\n+    { id: 'a', job: 'a1', attempt: 1, seq: 1, type: 'started' },\n+    { id: 'b', job: 'a ', attempt: 1, seq: 1, type: 'started' },\n+    { id: 'c', job: 'a', attempt: 10, seq: 1, type: 'started' },\n+    { id: 'd', job: 'a', attempt: 2, seq: 1, type: 'started' },\n+    { id: 'e', job: 'B', attempt: 1, seq: 1, type: 'started' },\n+    { id: 'f', job: 'Z', attempt: 1, seq: 1, type: 'started' },\n+  ]));\n+  assert.deepEqual(report.jobs.map(job => job.job), ['B', 'Z', 'a', 'a ', 'a1']);\n+  assert.deepEqual(report.jobs[2].attempts.map(attempt => attempt.attempt), [2, 10]);\n+});\n+\n+test('CLI: success, invalid args, unreadable input, invalid events', () => {\n+  const dir = mkdtempSync(join(tmpdir(), 'receipt-report-'));\n+  try {\n+    const good = join(dir, 'good.jsonl');\n+    writeFileSync(good, jsonl([\n+      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+      { id: 't', job: 'j', attempt: 1, seq: 2, type: 'succeeded' },\n+    ]));\n+\n+    const ok = runCli(good);\n+    assert.equal(ok.status, 0, ok.stderr);\n+    assert.deepEqual(JSON.parse(ok.stdout), {\n+      jobs: [{ job: 'j', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 1, finishedSeq: 2 }] }],\n+      duplicates: 0,\n+    });\n+    assert.ok(ok.stdout.endsWith('\\n'));\n+    assert.equal(ok.stdout, `${JSON.stringify(JSON.parse(ok.stdout))}\\n`);\n+    assert.equal(ok.stderr, '');\n+\n+    const noArgs = runCli();\n+    assert.equal(noArgs.status, 2, noArgs.stdout + noArgs.stderr);\n+    assert.equal(noArgs.stdout, '');\n+    assert.ok(noArgs.stderr.length > 0);\n+\n+    const twoArgs = runCli(good, good);\n+    assert.equal(twoArgs.status, 2);\n+    assert.equal(twoArgs.stdout, '');\n+    assert.ok(twoArgs.stderr.length > 0);\n+\n+    const missing = runCli(join(dir, 'does-not-exist.jsonl'));\n+    assert.equal(missing.status, 2);\n+    assert.equal(missing.stdout, '');\n+    assert.ok(missing.stderr.length > 0);\n+\n+    const bad = join(dir, 'bad.jsonl');\n+    writeFileSync(bad, jsonl([\n+      { id: 's', job: 'j', attempt: 1, seq: 1, type: 'started' },\n+      { id: 't', job: 'j', attempt: 1, seq: 1, type: 'succeeded' },\n+    ]));\n+    const badRun = runCli(bad);\n+    assert.equal(badRun.status, 2);\n+    assert.equal(badRun.stdout, '');\n+    assert.ok(badRun.stderr.length > 0);\n+\n+    const invalidJson = join(dir, 'invalid.jsonl');\n+    writeFileSync(invalidJson, '{oops\\n');\n+    const invalidRun = runCli(invalidJson);\n+    assert.equal(invalidRun.status, 2);\n+    assert.equal(invalidRun.stdout, '');\n+    assert.ok(invalidRun.stderr.length > 0);\n+  } finally {\n+    rmSync(dir, { recursive: true, force: true });\n+  }\n+});\n+\n+test('importing the module does not run the CLI', () => {\n+  assert.equal(typeof reduceEvents, 'function');\n+});\n"
+    },
+    {
+      "path": "test/receipt-report.test.js",
+      "state": "unchanged",
+      "beforeSha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "afterSha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { reduceEvents } from '../receipt-report.js';\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\ntest('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\ntest('unordered completion and an independent running attempt', () => {\n  assert.deepEqual(reduceEvents(jsonl([\n    {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n    {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n    {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n  ])), {jobs:[{job:'build', attempts:[\n    {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n    {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n  ]}], duplicates:0});\n});\ntest('retransmission is counted', () => {\n  const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n  assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n});\ntest('orphan and malformed events fail', () => {\n  assert.throws(() => reduceEvents('{bad'));\n  assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { reduceEvents } from '../receipt-report.js';\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\ntest('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\ntest('unordered completion and an independent running attempt', () => {\n  assert.deepEqual(reduceEvents(jsonl([\n    {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n    {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n    {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n  ])), {jobs:[{job:'build', attempts:[\n    {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n    {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n  ]}], duplicates:0});\n});\ntest('retransmission is counted', () => {\n  const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n  assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n});\ntest('orphan and malformed events fail', () => {\n  assert.throws(() => reduceEvents('{bad'));\n  assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n});\n",
+      "displaySha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty and whitespace-only input\nok 1 - empty and whitespace-only input\n  ---\n  duration_ms: 1.326441\n  ...\n# Subtest: CRLF endings and missing final newline are allowed\nok 2 - CRLF endings and missing final newline are allowed\n  ---\n  duration_ms: 0.220611\n  ...\n# Subtest: blank lines in the middle are ignored\nok 3 - blank lines in the middle are ignored\n  ---\n  duration_ms: 0.1905\n  ...\n# Subtest: duplicates: every extra identical copy is counted, other fields ignored\nok 4 - duplicates: every extra identical copy is counted, other fields ignored\n  ---\n  duration_ms: 0.23662\n  ...\n# Subtest: a repeated id with any different required field is an error\nok 5 - a repeated id with any different required field is an error\n  ---\n  duration_ms: 0.3054\n  ...\n# Subtest: orphan terminal is an error\nok 6 - orphan terminal is an error\n  ---\n  duration_ms: 0.135391\n  ...\n# Subtest: repeated start with different ids is an error\nok 7 - repeated start with different ids is an error\n  ---\n  duration_ms: 0.16619\n  ...\n# Subtest: repeated or contradictory terminals are errors\nok 8 - repeated or contradictory terminals are errors\n  ---\n  duration_ms: 0.25602\n  ...\n# Subtest: terminal seq must be strictly greater than start seq\nok 9 - terminal seq must be strictly greater than start seq\n  ---\n  duration_ms: 0.366181\n  ...\n# Subtest: attempt gaps are allowed and attempts are independent\nok 10 - attempt gaps are allowed and attempts are independent\n  ---\n  duration_ms: 0.84241\n  ...\n# Subtest: seqs may be shared across attempts and jobs\nok 11 - seqs may be shared across attempts and jobs\n  ---\n  duration_ms: 0.28484\n  ...\n# Subtest: field validation is strict and never coerces\nok 12 - field validation is strict and never coerces\n  ---\n  duration_ms: 0.466171\n  ...\n# Subtest: non-object or invalid JSON lines are rejected\nok 13 - non-object or invalid JSON lines are rejected\n  ---\n  duration_ms: 0.1613\n  ...\n# Subtest: ids such as __proto__ and whitespace/unicode strings are ordinary\nok 14 - ids such as __proto__ and whitespace/unicode strings are ordinary\n  ---\n  duration_ms: 0.29653\n  ...\n# Subtest: jobs sort by UTF-16 code units, attempts numerically\nok 15 - jobs sort by UTF-16 code units, attempts numerically\n  ---\n  duration_ms: 0.20315\n  ...\n# Subtest: CLI: success, invalid args, unreadable input, invalid events\nok 16 - CLI: success, invalid args, unreadable input, invalid events\n  ---\n  duration_ms: 131.974924\n  ...\n# Subtest: importing the module does not run the CLI\nok 17 - importing the module does not run the CLI\n  ---\n  duration_ms: 0.12509\n  ...\n# Subtest: empty input\nok 18 - empty input\n  ---\n  duration_ms: 1.253191\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 19 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.239281\n  ...\n# Subtest: retransmission is counted\nok 20 - retransmission is counted\n  ---\n  duration_ms: 0.74055\n  ...\n# Subtest: orphan and malformed events fail\nok 21 - orphan and malformed events fail\n  ---\n  duration_ms: 0.23819\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 21\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 184.886515\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"receipt-reducer\",\"pass\":true,\"groups\":[{\"name\":\"ordering-and-independent-attempts\",\"pass\":true},{\"name\":\"deduplication-and-opaque-identities\",\"pass\":true},{\"name\":\"invalid-fields-are-not-coerced\",\"pass\":true},{\"name\":\"invalid-lifecycles-are-rejected\",\"pass\":true},{\"name\":\"cli-report-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "989cd7eedadbd80977a36cf5f3eb6a47426b3313d9bee64224512abbeb8dafad"
+    },
+    {
+      "kind": "deepseek-native-session",
+      "sha256": "caf039f7f5a085063a4b743df0a6e715c39aafe55da8431c91bd914d698e45ee"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "b04904720c3a80d195199cdfbb1b41ef841df4498b0d2f439405696d8ff2cd35"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "094610adc8f292f00e900450ad77c46266d083d6490fb2f1f331a5ad8e1be8aa"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 20,
+    "withResults": 20,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Passed, with a longer testing detour.",
+    "paragraphs": [
+      {
+        "text": "DeepSeek implemented the reducer and added tests, then investigated a failing assertion and corrected the extra suite. It went on to check CLI output, file permissions and the supplied files before finishing in 442.7 seconds.",
+        "actions": [
+          "action-6",
+          "action-7",
+          "action-13",
+          "action-14",
+          "action-17",
+          "action-19"
+        ]
+      }
+    ]
+  }
+}

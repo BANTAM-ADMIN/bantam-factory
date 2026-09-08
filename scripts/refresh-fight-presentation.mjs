@@ -12,6 +12,8 @@ import {publicPerformance} from './fight-performance.mjs';
 import {renderShowcase} from './factory-showcase.mjs';
 import {renderLaunchPage,renderShareCard} from './factory-launch-page.mjs';
 import {captureLaunchImage} from './factory-launch-browser.mjs';
+import {readFightDemo} from './fight-demo.mjs';
+import {readFightWork} from './fight-work.mjs';
 
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function refreshManifest(directory){
@@ -64,7 +66,9 @@ export async function refreshFightPresentation({root,output,browser,performanceS
     }
     const presentation=JSON.parse(fs.readFileSync(path.join(share,'package.json'))).presentation??'comparison';
     fs.writeFileSync(path.join(directory,'index.html'),renderShowcase({data:source,payloads:[]}));
-    fs.writeFileSync(path.join(share,'index.html'),renderLaunchPage(data,{previewImage:'share-card.png',presentation,publishedPath:prefix+'/share/index.html'}));
+    const demo=readFightDemo(directory,data.series.flatMap(s=>s.cards.flatMap(c=>c.rows)));
+    const work=readFightWork(directory,prefix.split('/').pop(),data.series[0].cards[0].rows);
+    fs.writeFileSync(path.join(share,'index.html'),renderLaunchPage(data,{previewImage:'share-card.png',presentation,publishedPath:prefix+'/share/index.html',demo:demo?.receipt??null,work:work?.receipt??null}));
     fs.writeFileSync(path.join(share,'share-card.svg'),renderShareCard(data,{presentation}));
     // Only this newly staged copy is replaced. Capture owns a separate browser.
     fs.unlinkSync(path.join(share,'share-card.png'));

@@ -1,0 +1,207 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "redaction-plan",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 83198,
+      "sha256": "cb54d4e7356eb23d89b5dfcb799d6b419c4bb8a16949004a55021b97e24802c5",
+      "arm": "bantam-local-27b",
+      "wallMs": 133204,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 21,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "The redactor left receipts and checks.",
+        "paragraphs": [
+          {
+            "text": "The factory built literal redaction with edit receipts, tested the API and CLI, and challenged whether importing the module caused side effects. The worker turned verification into a saved assertion file.",
+            "actions": [
+              "action-6",
+              "action-11",
+              "action-14",
+              "action-16",
+              "action-18",
+              "action-19"
+            ]
+          },
+          {
+            "text": "Project tests and all five independent groups passed on the delivered work. Clean finish: 133.2 seconds.",
+            "actions": [
+              "action-20",
+              "action-21"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 86915,
+      "sha256": "041c90714b892b40fb66449b8fe77c8d940631badd6913b14865a7e7e7cd510d",
+      "arm": "deepseek-local-27b",
+      "wallMs": 391761,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 15,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Passed after correcting a test expectation.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek implemented the redactor, added regression tests and corrected an added test after running the suite. It checked the CLI and final workspace, then finished with accepted work in 391.8 seconds.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-9",
+              "action-10",
+              "action-12",
+              "action-15"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 143635,
+      "sha256": "41ac1f5990b1ff08efeee6791010a9cde1501945124811fc8b84b03c42ec0524",
+      "arm": "hermes",
+      "wallMs": 600007,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 31,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Independent checks passed; the project did not.",
+        "paragraphs": [
+          {
+            "text": "Hermes repeatedly changed the implementation and its added regression tests, then continued checking near the time limit. It passed all five independent groups, but the delivered project test suite still failed.",
+            "actions": [
+              "action-13",
+              "action-19",
+              "action-22",
+              "action-26",
+              "action-30",
+              "action-31"
+            ]
+          },
+          {
+            "text": "The ten-minute boundary arrived without a clean finish. Passing the API acceptance groups did not repair the failing delivered test suite.",
+            "actions": [
+              "action-30"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 39724,
+      "sha256": "9b877cf4cc310f621b2e852467ea6b23ea395fd3fa9b3c4775b48d3233740cad",
+      "arm": "codex-astra",
+      "wallMs": 116972,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered redaction-plan.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 117.0 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 35472,
+      "sha256": "7fc10b19414fd1624f739782ba7aded103a12d6ce0de62b8ee09d5da358cebdb",
+      "arm": "codex-sol",
+      "wallMs": 241160,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered redaction-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 241.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-7"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 42265,
+      "sha256": "e4e1d37488dad824da1a2d9725b74f3a1692ea13f6587e0d1e033c3fc82372cd",
+      "arm": "codex-terra",
+      "wallMs": 134275,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 10,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered redaction-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 134.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-7",
+              "action-10"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

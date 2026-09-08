@@ -1,0 +1,530 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "context-packet",
+  "arm": "deepseek-local-27b",
+  "wallMs": 600007,
+  "outcome": "OUTPUT_ONLY",
+  "accepted": true,
+  "completed": false,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T17:16:14.656Z",
+  "task": "# Context packet: build a bounded evidence packer\n\nImplement `context-packet.js`, using Node.js builtins only. A factory needs to\nchoose complete context sections without silently losing required evidence.\nThis is a deterministic byte-budget packer, not a tokenizer or a claim about\noptimal model context. Export synchronous `packContext(sections, maxBytes)`.\n\nValidate the entire input before packing, even when the budget is zero or a\nsection would be omitted. `maxBytes` is a nonnegative safe integer. `sections`\nis a dense array of non-null, non-array objects; missing array slots are invalid.\nEach object has required fields:\n\n```\n{id: NONEMPTY_STRING, text: STRING, priority: NONNEGATIVE_SAFE_INTEGER,\n required: BOOLEAN}\n```\n\nIDs are unique exact strings, including case. Spaces, Unicode, newlines, NUL\nand names such as `__proto__` are valid IDs. Unknown object fields are ignored.\nDo not coerce values. Invalid input throws an Error. Do not mutate inputs.\n\nThe exact serialized frame for one section is:\n\n```\n'### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n'\n```\n\nIts cost is `Buffer.byteLength(frame, 'utf8')`, including the framing and both\nnewlines. Frames are indivisible. Do not shorten text, normalize newlines,\ninvent references, or substitute character count for UTF-8 byte count.\n\n1. Include all required sections first, in their original input order. Ignore\n   their priority when ordering them. If their combined cost exceeds maxBytes,\n   throw an Error instead of returning a partial required set.\n2. Visit optional sections by descending priority, breaking ties by original\n   input order. Include a section if its entire frame fits the remaining\n   budget. Otherwise skip it and continue trying later sections.\n3. Output sections in that inclusion order. Report omitted optional IDs in\n   original input order, not priority order.\n\nReturn exactly:\n\n```\n{text: CONCATENATED_FRAMES, bytes: UTF8_BYTE_COUNT,\n included: [ID_IN_OUTPUT_ORDER], omitted: [ID_IN_INPUT_ORDER]}\n```\n\nAn empty input returns `{text:'',bytes:0,included:[],omitted:[]}` for any valid\nbudget. Exact fits are allowed. Neither the source text nor the returned\nframing is trimmed.\n\nCLI: `node context-packet.js INPUT_JSON_FILE`. The UTF-8 JSON file contains\n`{sections, maxBytes}`; extra fields are ignored. Exactly one argument is\nrequired. Success prints exactly one result JSON plus newline, exits 0 and\nhas no stderr. Invalid arguments, unreadable files, invalid JSON or API input,\nand insufficient required-section budget exit 2, with nonempty stderr and no\nstdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification runs in a read-only workspace: any test fixtures\nmust be created beneath `os.tmpdir()` and removed afterward. Run `npm test`\nbefore finishing. Hidden acceptance uses this same contract with other values.\n",
+  "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+  "source": "deepseek-native-session",
+  "actions": [
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && cat /workspace/package.json 2>/dev/null; node --version",
+        "description": "List workspace and show package.json"
+      },
+      "output": "total 8\ndrwxrwxr-x 1 node node  66 Sep  8 17:16 .\ndrwxr-xr-x 1 root root  36 Sep  8 17:16 ..\n-rw-rw-r-- 1 node node 173 Sep  8 17:16 context-packet.js\n-rw-rw-r-- 1 node node 116 Sep  8 17:16 package.json\ndrwxrwxr-x 1 node node  28 Sep  8 17:16 test\n{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\nv22.19.0\n",
+      "atMs": 121852.0,
+      "endedMs": 121886.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/context-packet.js"
+      },
+      "output": "<path>/workspace/context-packet.js</path>\n<type>file</type>\n<content>\n1: // Build the public API and CLI described in the supplied work order.\n2: export function packContext(sections,maxBytes){\n3:   throw new Error('packContext is not implemented');\n4: }\n\n(End of file - total 4 lines)\n</content>",
+      "atMs": 131692.0,
+      "endedMs": 131710.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace/test",
+        "description": "List test directory contents"
+      },
+      "output": "total 4\ndrwxrwxr-x 1 node node   28 Sep  8 17:16 .\ndrwxrwxr-x 1 node node   66 Sep  8 17:16 ..\n-rw-rw-r-- 1 node node 1374 Sep  8 17:16 public.test.js\n",
+      "atMs": 131710.0,
+      "endedMs": 131722.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/test/public.test.js"
+      },
+      "output": "<path>/workspace/test/public.test.js</path>\n<type>file</type>\n<content>\n1: import test from 'node:test';\n2: import assert from 'node:assert/strict';\n3: import {packContext} from '../context-packet.js';\n4: const section=(id,text,priority=0,required=false)=>({id,text,priority,required});\n5: test('required evidence is included before optional priority',()=>{\n6:   assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n7:     text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n8: });\n9: test('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n10:   const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n11:   assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n12:     text:frame,bytes,included:['\u96ea'],omitted:['large']});\n13: });\n14: test('empty selection and required overflow',()=>{\n15:   assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n16:   assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n17: });\n18: test('validate omitted entries too and leave input unchanged',()=>{\n19:   assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n20:   assert.throws(()=>packContext(new Array(1),0),Error);\n21:   const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n22:   assert.deepEqual(packContext(input,100).included,['b','a']);\n23:   assert.equal(JSON.stringify(input),before);\n24: });\n\n(End of file - total 24 lines)\n</content>",
+      "atMs": 132880.0,
+      "endedMs": 132889.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -30",
+        "description": "Run baseline npm test"
+      },
+      "output": "    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nnot ok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.330923\n  type: 'test'\n  location: '/workspace/test/public.test.js:18:1'\n  failureType: 'testCodeFailure'\n  error: 'packContext is not implemented'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    packContext (file:///workspace/context-packet.js:3:9)\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:22:20)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n    Test.postRun (node:internal/test_runner/test:1173:19)\n    Test.run (node:internal/test_runner/test:1101:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 0\n# fail 4\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 44.627651\n",
+      "atMs": 239552.0,
+      "endedMs": 240690.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/context-packet.js",
+        "content": "// context-packet.js \u2014 bounded evidence packer (Node.js builtins only).\n//\n// Exports the synchronous packContext(sections, maxBytes) API and a CLI:\n//   node context-packet.js INPUT_JSON_FILE\n//\n// The CLI reads a UTF-8 JSON file containing {sections, maxBytes} (extra\n// fields ignored), prints exactly one result JSON line on success, and exits\n// 2 with a diagnostic on stderr (and no stdout) for any invalid input.\n\nimport {readFileSync, realpathSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\n\nconst isNonNegativeSafeInteger = (value) =>\n  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;\n\n// Exact serialized frame for one section; indivisible.\nconst frameFor = (section) =>\n  '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n\n// Validate the entire input before any packing happens. Never mutates input.\nfunction assertValidInput(sections, maxBytes) {\n  if (!isNonNegativeSafeInteger(maxBytes)) {\n    throw new Error('maxBytes must be a nonnegative safe integer');\n  }\n  if (!Array.isArray(sections)) {\n    throw new Error('sections must be an array');\n  }\n  const seen = new Set();\n  for (let i = 0; i < sections.length; i++) {\n    if (!(i in sections)) {\n      throw new Error(`sections must be a dense array; missing slot at index ${i}`);\n    }\n    const section = sections[i];\n    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n      throw new Error(`sections[${i}] must be a non-null, non-array object`);\n    }\n    if (typeof section.id !== 'string' || section.id.length === 0) {\n      throw new Error(`sections[${i}].id must be a nonempty string`);\n    }\n    if (typeof section.text !== 'string') {\n      throw new Error(`sections[${i}].text must be a string`);\n    }\n    if (!isNonNegativeSafeInteger(section.priority)) {\n      throw new Error(`sections[${i}].priority must be a nonnegative safe integer`);\n    }\n    if (typeof section.required !== 'boolean') {\n      throw new Error(`sections[${i}].required must be a boolean`);\n    }\n    if (seen.has(section.id)) {\n      throw new Error(`duplicate section id: ${JSON.stringify(section.id)}`);\n    }\n    seen.add(section.id);\n  }\n}\n\nexport function packContext(sections, maxBytes) {\n  // Full validation first, even when the budget is zero or a section would be\n  // omitted by the budget.\n  assertValidInput(sections, maxBytes);\n\n  const items = new Array(sections.length);\n  for (let i = 0; i < sections.length; i++) {\n    const section = sections[i];\n    const frame = frameFor(section);\n    items[i] = {\n      index: i,\n      id: section.id,\n      priority: section.priority,\n      required: section.required,\n      frame,\n      cost: Buffer.byteLength(frame, 'utf8'),\n    };\n  }\n\n  // 1. All required sections first, in original input order (priority\n  //    ignored). Throw rather than return a partial required set.\n  const includedItems = [];\n  let remaining = maxBytes;\n  for (const item of items) {\n    if (!item.required) continue;\n    if (item.cost > remaining) {\n      throw new Error('required sections exceed the maxBytes budget');\n    }\n    remaining -= item.cost;\n    includedItems.push(item);\n  }\n\n  // 2. Optional sections by descending priority, ties by original input\n  //    order. Include when the whole frame fits; otherwise skip and keep\n  //    trying later sections.\n  const optional = items.filter((item) => !item.required);\n  optional.sort((a, b) => b.priority - a.priority || a.index - b.index);\n  const includedIds = new Set(includedItems.map((item) => item.id));\n  for (const item of optional) {\n    if (item.cost <= remaining) {\n      remaining -= item.cost;\n      includedItems.push(item);\n      includedIds.add(item.id);\n    }\n  }\n\n  // 3. Output in inclusion order; omitted optional IDs in original input\n  //    order.\n  const parts = new Array(includedItems.length);\n  let bytes = 0;\n  for (let i = 0; i < includedItems.length; i++) {\n    parts[i] = includedItems[i].frame;\n    bytes += includedItems[i].cost;\n  }\n  const omitted = [];\n  for (const item of items) {\n    if (!item.required && !includedIds.has(item.id)) omitted.push(item.id);\n  }\n\n  return {\n    text: parts.join(''),\n    bytes,\n    included: includedItems.map((item) => item.id),\n    omitted,\n  };\n}\n\n// --- CLI (runs only when executed directly, never on import) ---\n\nfunction fail(message) {\n  process.stderr.write(`context-packet: ${message}\\n`);\n  process.exitCode = 2;\n}\n\nfunction runCli(argv) {\n  if (argv.length !== 1) {\n    fail('exactly one argument is required: INPUT_JSON_FILE');\n    return;\n  }\n  const file = argv[0];\n\n  let raw;\n  try {\n    raw = readFileSync(file, 'utf8');\n  } catch (err) {\n    fail(`cannot read ${file}: ${err.message}`);\n    return;\n  }\n\n  let doc;\n  try {\n    doc = JSON.parse(raw);\n  } catch (err) {\n    fail(`invalid JSON in ${file}: ${err.message}`);\n    return;\n  }\n  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {\n    fail(`input JSON must be an object with \"sections\" and \"maxBytes\"`);\n    return;\n  }\n\n  try {\n    const result = packContext(doc.sections, doc.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n  } catch (err) {\n    fail(err.message);\n  }\n}\n\nconst isDirectRun = (() => {\n  try {\n    return (\n      process.argv[1] !== undefined &&\n      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))\n    );\n  } catch {\n    return false;\n  }\n})();\n\nif (isDirectRun) {\n  runCli(process.argv.slice(2));\n}\n"
+      },
+      "output": "<path>/workspace/context-packet.js</path>\n<type>file</type>\n<content>\nUpdated file\n</content>",
+      "atMs": 262341.0,
+      "endedMs": 262361.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join} from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\nimport {packContext} from '../context-packet.js';\n\nconst CLI = fileURLToPath(new URL('../context-packet.js', import.meta.url));\nconst section = (id, text, priority = 0, required = false) => ({id, text, priority, required});\nconst frame = (id, text) => `### ${JSON.stringify(id)}\\n${text}\\n`;\nconst cost = (id, text) => Buffer.byteLength(frame(id, text), 'utf8');\nconst throws = (fn) => assert.throws(fn, Error);\n\ntest('return value has exactly the documented shape', () => {\n  const result = packContext([section('a', 'x')], 100);\n  assert.deepEqual(Object.keys(result), ['text', 'bytes', 'included', 'omitted']);\n});\n\ntest('exact frame format and UTF-8 byte costs', () => {\n  const sections = [section('\u96ea', '\u00e9\\u{1F600}\\u0000', 0)];\n  const result = packContext(sections, 1000);\n  assert.equal(result.text, frame('\u96ea', '\u00e9\\u{1F600}\\u0000'));\n  assert.equal(result.bytes, Buffer.byteLength(frame('\u96ea', '\u00e9\\u{1F600}\\u0000'), 'utf8'));\n  assert.deepEqual(result.included, ['\u96ea']);\n  assert.deepEqual(result.omitted, []);\n});\n\ntest('empty input returns empty result for any valid budget', () => {\n  for (const maxBytes of [0, 1, Number.MAX_SAFE_INTEGER]) {\n    assert.deepEqual(packContext([], maxBytes), {text: '', bytes: 0, included: [], omitted: []});\n  }\n});\n\ntest('required sections come first, in input order, ignoring priority', () => {\n  const sections = [\n    section('req-low', 'a', 1, true),\n    section('opt-high', 'b', 99),\n    section('req-high', 'c', 90, true),\n    section('opt-low', 'd', 2),\n  ];\n  const result = packContext(sections, 1000);\n  assert.deepEqual(result.included, ['req-low', 'req-high', 'opt-high', 'opt-low']);\n  assert.deepEqual(result.omitted, []);\n  assert.equal(\n    result.text,\n    frame('req-low', 'a') + frame('req-high', 'c') + frame('opt-high', 'b') + frame('opt-low', 'd'),\n  );\n});\n\ntest('required overflow throws; exact required fit is allowed', () => {\n  const total = cost('r1', 'x') + cost('r2', 'y');\n  assert.deepEqual(\n    packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total),\n    {text: frame('r1', 'x') + frame('r2', 'y'), bytes: total, included: ['r1', 'r2'], omitted: []},\n  );\n  throws(() => packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total - 1));\n  throws(() => packContext([section('r1', 'x', 0, true)], 0));\n  // Validation runs before packing: invalid section AND overflow -> validation error.\n  throws(() => packContext([section('', 'x', 0, true), section('r', 'y', 0, true)], 0));\n});\n\ntest('optional: descending priority, ties by input order, skip instead of stop', () => {\n  const big = section('big', 'z'.repeat(50), 10);\n  const mid = section('mid', 'm', 5);\n  const low = section('low', 'l', 5);\n  const small = section('small', 's', 1);\n  const sections = [big, low, mid, small];\n  const budget = cost('mid', 'm') + cost('low', 'l') + cost('small', 's');\n  const result = packContext(sections, budget);\n  assert.deepEqual(result.included, ['mid', 'low', 'small']);\n  assert.deepEqual(result.omitted, ['big']); // original input order, not priority order\n  assert.equal(result.text, frame('mid', 'm') + frame('low', 'l') + frame('small', 's'));\n  assert.equal(result.bytes, budget);\n  assert.equal(result.bytes, Buffer.byteLength(result.text, 'utf8'));\n});\n\ntest('exact optional fits are included and the remainder keeps flowing', () => {\n  const a = section('a', 'x', 3);\n  const b = section('b', 'y', 2);\n  const c = section('c', 'z', 1);\n  const budget = cost('a', 'x') + cost('b', 'y') + cost('c', 'z');\n  const result = packContext([c, a, b], budget);\n  assert.deepEqual(result.included, ['a', 'b', 'c']);\n  assert.deepEqual(result.omitted, []);\n});\n\ntest('zero budget omits all optionals and keeps empty frames out', () => {\n  const result = packContext([section('a', 'x', 5), section('b', 'y', 1)], 0);\n  assert.deepEqual(result, {text: '', bytes: 0, included: [], omitted: ['a', 'b']});\n});\n\ntest('unknown object fields are ignored; no input mutation', () => {\n  const noisy = {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7};\n  const result = packContext([noisy], 100);\n  assert.deepEqual(result.included, ['a']);\n  assert.equal(noisy.text, 't');\n  assert.deepEqual(noisy, {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7});\n  const input = [section('b', 'b', 1), section('a', 'a', 1)];\n  const before = JSON.stringify(input);\n  packContext(input, 100);\n  assert.equal(JSON.stringify(input), before);\n});\n\ntest('validation: maxBytes', () => {\n  const bad = [-1, -0.5, 0.5, NaN, Infinity, -Infinity, '0', '5', true, false, null, undefined, {},\n    Number.MAX_SAFE_INTEGER + 1, Number.MIN_SAFE_INTEGER];\n  for (const value of bad) throws(() => packContext([], value));\n  // valid extremes\n  assert.deepEqual(packContext([], 0), {text: '', bytes: 0, included: [], omitted: []});\n  assert.deepEqual(packContext([], Number.MAX_SAFE_INTEGER), {text: '', bytes: 0, included: [], omitted: []});\n});\n\ntest('validation: sections container', () => {\n  for (const value of [null, undefined, 5, 's', true, {}, new Set(), new Map()]) {\n    throws(() => packContext(value, 10));\n  }\n  const holeStart = new Array(1); // [hole]\n  const holeMiddle = [section('a', 'x'), undefined, section('b', 'x')].map((s) => s);\n  const sparseEnd = [];\n  sparseEnd[2] = section('a', 'x');\n  const denseWithUndefined = [section('a', 'x'), undefined];\n  for (const value of [holeStart, holeMiddle, sparseEnd, denseWithUndefined]) {\n    throws(() => packContext(value, 10));\n  }\n});\n\ntest('validation: section entry type and fields', () => {\n  for (const entry of [null, 5, 's', true, undefined, [], new Map()]) {\n    throws(() => packContext([entry], 10));\n  }\n  throws(() => packContext([{}], 10));\n  throws(() => packContext([section('', 'x')], 10)); // empty id\n  for (const id of [0, 1.5, null, undefined, [], {}, true]) {\n    throws(() => packContext([section(id, 'x')], 10));\n  }\n  for (const text of [0, null, undefined, [], true]) {\n    throws(() => packContext([section('a', text)], 10));\n  }\n  assert.doesNotThrow(() => packContext([section('a', '')], 10)); // empty text is fine\n  for (const priority of [-1, 0.5, NaN, Infinity, '0', null, undefined, Number.MAX_SAFE_INTEGER + 1]) {\n    throws(() => packContext([section('a', 'x', priority)], 10));\n  }\n  for (const required of [0, 1, 'true', 'false', null, undefined]) {\n    throws(() => packContext([section('a', 'x', 0, required)], 10));\n  }\n  assert.doesNotThrow(() => packContext([section('a', 'x', Number.MAX_SAFE_INTEGER, false)], 10));\n});\n\ntest('validation: duplicate and exotic IDs', () => {\n  throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n  throws(() => packContext([section('A', 'x', 0), section('a', 'y', 0)], 1000).included.length === 1 || Promise.resolve(), null);\n  // Case-sensitive IDs are distinct and both valid.\n  assert.deepEqual(packContext([section('A', 'x'), section('a', 'y')], 1000).included, ['A', 'a']);\n  // Weird-but-valid IDs: spaces, unicode, newlines, NUL, __proto__.\n  const exotic = [' spaced id ', 'uni\\u00e9\\u96ea', 'line1\\nline2', '\\u0000', '__proto__', 'constructor', 'hasOwnProperty'];\n  const ids = new Set(exotic);\n  assert.equal(ids.size, exotic.length);\n  const result = packContext(exotic.map((id) => section(id, 't')), 10000);\n  assert.deepEqual(result.included, exotic);\n  for (const id of exotic) assert.ok(result.text.includes(`### ${JSON.stringify(id)}\\n`));\n});\n\ntest('importing the module did not run the CLI', () => {\n  assert.ok(process.exitCode === null || process.exitCode === 0);\n});\n\ntest('CLI behavior', (t) => {\n  const dir = mkdtempSync(join(tmpdir(), 'context-packet-'));\n  t.after(() => rmSync(dir, {recursive: true, force: true}));\n  const write = (name, content) => {\n    const file = join(dir, name);\n    writeFileSync(file, content, 'utf8');\n    return file;\n  };\n  const run = (args) => {\n    const r = spawnSync(process.execPath, [CLI, ...args], {encoding: 'utf8'});\n    return {code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? ''};\n  };\n  const failExpect = (r) => {\n    assert.equal(r.code, 2);\n    assert.equal(r.stdout, '');\n    assert.ok(r.stderr.length > 0);\n  };\n\n  const doc = {\n    sections: [section('big', 'z'.repeat(50), 10), section('a', 'x', 3), section('b', 'y', 2), section('r', 'keep', 0, true)],\n    maxBytes: 300,\n    ignoredExtraField: {nested: true},\n  };\n  const expected = packContext(doc.sections, doc.maxBytes);\n\n  // success: one JSON line + newline, exit 0, no stderr, extra fields ignored\n  const ok = run([write('ok.json', JSON.stringify(doc))]);\n  assert.equal(ok.code, 0);\n  assert.equal(ok.stderr, '');\n  assert.equal(ok.stdout, JSON.stringify(expected) + '\\n');\n  assert.deepEqual(JSON.parse(ok.stdout), expected);\n\n  // Unicode survives the round trip.\n  const uniDoc = {sections: [section('\u96ea', '\u00e9'), section('uni req', '\u4f60\u597d', 0, true)], maxBytes: 500};\n  const uni = run([write('uni.json', JSON.stringify(uniDoc))]);\n  assert.equal(uni.code, 0);\n  assert.deepEqual(JSON.parse(uni.stdout), packContext(uniDoc.sections, uniDoc.maxBytes));\n\n  // arg-count and file failures\n  failExpect(run([]));\n  failExpect(run(['a.json', 'b.json']));\n  failExpect(run([join(dir, 'missing.json')]));\n\n  // unreadable file: a directory is not readable as a file\n  failExpect(run([dir]));\n\n  // invalid JSON\n  failExpect(run([write('bad-json.json', '{nope')]));\n  failExpect(run([write('empty.json', '')]));\n\n  // invalid API input\n  failExpect(run([write('dup.json', JSON.stringify({sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100})))]));\n  failExpect(run([write('sparse.json', JSON.stringify({sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100})))]));\n  failExpect(run([write('noid.json', JSON.stringify({sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100})))]));\n  failExpect(run([write('badprio.json', JSON.stringify({sections: [section('a', 'x', -1)], maxBytes: 100})))]));\n  failExpect(run([write('badreq.json', JSON.stringify({sections: [section('a', 'x', 0, 'yes')], maxBytes: 100})))]));\n  failExpect(run([write('badmax.json', JSON.stringify({sections: [], maxBytes: -5})))]));\n  failExpect(run([write('nomax.json', JSON.stringify({sections: []})))]));\n  failExpect(run([write('nosec.json', JSON.stringify({maxBytes: 10})))]));\n\n  // top-level document not an object\n  failExpect(run([write('arr.json', JSON.stringify([]))]));\n  failExpect(run([write('null.json', 'null')]));\n  failExpect(run([write('str.json', '\"hello\"')]));\n\n  // required overflow\n  const overflow = {sections: [section('r1', 'x', 0, true), section('r2', 'y', 0, true)], maxBytes: 10};\n  failExpect(run([write('overflow.json', JSON.stringify(overflow))]));\n\n  // success on an exact fit\n  const exact = {sections: [section('r', 'x', 0, true)], maxBytes: cost('r', 'x')};\n  const exactRun = run([write('exact.json', JSON.stringify(exact))]);\n  assert.equal(exactRun.code, 0);\n  assert.deepEqual(JSON.parse(exactRun.stdout), {text: frame('r', 'x'), bytes: cost('r', 'x'), included: ['r'], omitted: []});\n});\n"
+      },
+      "output": "<path>/workspace/test/context-packet.test.js</path>\n<type>file</type>\n<content>\nCreated file\n</content>",
+      "atMs": 308952.0,
+      "endedMs": 308976.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n  throws(() => packContext([section('A', 'x', 0), section('a', 'y', 0)], 1000).included.length === 1 || Promise.resolve(), null);\n  // Case-sensitive IDs are distinct and both valid.",
+        "new_string": "  throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n  // Case-sensitive IDs are distinct and both valid."
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 315654.0,
+      "endedMs": 315675.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -40",
+        "description": "Run npm test with new implementation"
+      },
+      "output": "  location: '/workspace/test/context-packet.test.js:1:1'\n  failureType: 'testCodeFailure'\n  exitCode: 1\n  signal: ~\n  error: 'test failed'\n  code: 'ERR_TEST_FAILURE'\n  ...\n# Subtest: required evidence is included before optional priority\nok 2 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.015618\n  type: 'test'\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 3 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.679006\n  type: 'test'\n  ...\n# Subtest: empty selection and required overflow\nok 4 - empty selection and required overflow\n  ---\n  duration_ms: 0.420103\n  type: 'test'\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 5 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.214151\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 4\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 63.4653\n",
+      "atMs": 319902.0,
+      "endedMs": 320080.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --test test/context-packet.test.js 2>&1 | head -60",
+        "description": "Run my test file directly for full error output"
+      },
+      "output": "TAP version 13\n# file:///workspace/test/context-packet.test.js:219\n#   failExpect(run([write('dup.json', JSON.stringify({sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100})))]));\n#                                                                                                                       ^\n# SyntaxError: Unexpected token ')'\n#     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)\n#     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:107:18)\n#     at \\#translate (node:internal/modules/esm/loader:540:12)\n#     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:587:27)\n#     at async ModuleJob._link (node:internal/modules/esm/module_job:162:19)\n# Node.js v22.19.0\n# Subtest: test/context-packet.test.js\nnot ok 1 - test/context-packet.test.js\n  ---\n  duration_ms: 21.015782\n  type: 'test'\n  location: '/workspace/test/context-packet.test.js:1:1'\n  failureType: 'testCodeFailure'\n  exitCode: 1\n  signal: ~\n  error: 'test failed'\n  code: 'ERR_TEST_FAILURE'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 26.241395\n",
+      "atMs": 322555.0,
+      "endedMs": 322623.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  failExpect(run([write('dup.json', JSON.stringify({sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100})))]));",
+        "new_string": "  failExpect(run([write('dup.json', JSON.stringify({sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100}))))];"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 328126.0,
+      "endedMs": 328151.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  failExpect(run([write('dup.json', JSON.stringify({sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100}))))];",
+        "new_string": "  const dupDoc = {sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100};\n  failExpect(run([write('dup.json', JSON.stringify(dupDoc))]));"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 421806.0,
+      "endedMs": 421822.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "offset": 215,
+        "limit": 30
+      },
+      "output": "<path>/workspace/test/context-packet.test.js</path>\n<type>file</type>\n<content>\n215:   failExpect(run([write('bad-json.json', '{nope')]));\n216:   failExpect(run([write('empty.json', '')]));\n217: \n218:   // invalid API input\n219:   const dupDoc = {sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100};\n220:   failExpect(run([write('dup.json', JSON.stringify(dupDoc))]));\n221:   failExpect(run([write('sparse.json', JSON.stringify({sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100})))]));\n222:   failExpect(run([write('noid.json', JSON.stringify({sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100})))]));\n223:   failExpect(run([write('badprio.json', JSON.stringify({sections: [section('a', 'x', -1)], maxBytes: 100})))]));\n224:   failExpect(run([write('badreq.json', JSON.stringify({sections: [section('a', 'x', 0, 'yes')], maxBytes: 100})))]));\n225:   failExpect(run([write('badmax.json', JSON.stringify({sections: [], maxBytes: -5})))]));\n226:   failExpect(run([write('nomax.json', JSON.stringify({sections: []})))]));\n227:   failExpect(run([write('nosec.json', JSON.stringify({maxBytes: 10})))]));\n228: \n229:   // top-level document not an object\n230:   failExpect(run([write('arr.json', JSON.stringify([]))]));\n231:   failExpect(run([write('null.json', 'null')]));\n232:   failExpect(run([write('str.json', '\"hello\"')]));\n233: \n234:   // required overflow\n235:   const overflow = {sections: [section('r1', 'x', 0, true), section('r2', 'y', 0, true)], maxBytes: 10};\n236:   failExpect(run([write('overflow.json', JSON.stringify(overflow))]));\n237: \n238:   // success on an exact fit\n239:   const exact = {sections: [section('r', 'x', 0, true)], maxBytes: cost('r', 'x')};\n240:   const exactRun = run([write('exact.json', JSON.stringify(exact))]);\n241:   assert.equal(exactRun.code, 0);\n242:   assert.deepEqual(JSON.parse(exactRun.stdout), {text: frame('r', 'x'), bytes: cost('r', 'x'), included: ['r'], omitted: []});\n243: });\n\n(End of file - total 243 lines)\n</content>",
+      "atMs": 431196.0,
+      "endedMs": 431213.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  failExpect(run([write('sparse.json', JSON.stringify({sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100})))]));\n  failExpect(run([write('noid.json', JSON.stringify({sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100})))]));\n  failExpect(run([write('badprio.json', JSON.stringify({sections: [section('a', 'x', -1)], maxBytes: 100})))]));\n  failExpect(run([write('badreq.json', JSON.stringify({sections: [section('a', 'x', 0, 'yes')], maxBytes: 100})))]));\n  failExpect(run([write('badmax.json', JSON.stringify({sections: [], maxBytes: -5})))]));\n  failExpect(run([write('nomax.json', JSON.stringify({sections: []})))]));\n  failExpect(run([write('nosec.json', JSON.stringify({maxBytes: 10})))]));",
+        "new_string": "  const sparseDoc = {sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100};\n  failExpect(run([write('sparse.json', JSON.stringify(sparseDoc))]));\n  const noIdDoc = {sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100};\n  failExpect(run([write('noid.json', JSON.stringify(noIdDoc))]));\n  const badPrioDoc = {sections: [section('a', 'x', -1)], maxBytes: 100};\n  failExpect(run([write('badprio.json', JSON.stringify(badPrioDoc))]));\n  const badReqDoc = {sections: [section('a', 'x', 0, 'yes')], maxBytes: 100};\n  failExpect(run([write('badreq.json', JSON.stringify(badReqDoc))]));\n  const badMaxDoc = {sections: [], maxBytes: -5};\n  failExpect(run([write('badmax.json', JSON.stringify(badMaxDoc))]));\n  const noMaxDoc = {sections: []};\n  failExpect(run([write('nomax.json', JSON.stringify(noMaxDoc))]));\n  const noSecDoc = {maxBytes: 10};\n  failExpect(run([write('nosec.json', JSON.stringify(noSecDoc))]));"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 439628.0,
+      "endedMs": 439643.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --check context-packet.js && node --check test/context-packet.test.js && npm test 2>&1 | tail -25",
+        "description": "Syntax-check both files and run npm test"
+      },
+      "output": "  ---\n  duration_ms: 0.709815\n  type: 'test'\n  ...\n# Subtest: empty selection and required overflow\nok 18 - empty selection and required overflow\n  ---\n  duration_ms: 0.429433\n  type: 'test'\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 19 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.217631\n  type: 'test'\n  ...\n1..19\n# tests 19\n# suites 0\n# pass 16\n# fail 3\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 499.842236\n",
+      "atMs": 449435.0,
+      "endedMs": 450066.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --test 2>&1 | grep -B2 -A25 \"^not ok\" | head -100",
+        "description": "Show failing test details"
+      },
+      "output": "  ...\n# Subtest: optional: descending priority, ties by input order, skip instead of stop\nnot ok 6 - optional: descending priority, ties by input order, skip instead of stop\n  ---\n  duration_ms: 0.771837\n  type: 'test'\n  location: '/workspace/test/context-packet.test.js:64:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n    +   'low',\n        'mid',\n    -   'low',\n        'small'\n      ]\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0: 'mid'\n    1: 'low'\n    2: 'small'\n  actual:\n    0: 'low'\n    1: 'mid'\n--\n  ...\n# Subtest: validation: section entry type and fields\nnot ok 12 - validation: section entry type and fields\n  ---\n  duration_ms: 0.906887\n  type: 'test'\n  location: '/workspace/test/context-packet.test.js:129:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception (Error).'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  stack: |-\n    throws (file:///workspace/test/context-packet.test.js:14:31)\n    TestContext.<anonymous> (file:///workspace/test/context-packet.test.js:143:5)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n    Test.postRun (node:internal/test_runner/test:1173:19)\n    Test.run (node:internal/test_runner/test:1101:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n# Subtest: validation: duplicate and exotic IDs\nok 13 - validation: duplicate and exotic IDs\n  ---\n  duration_ms: 0.203741\n  type: 'test'\n  ...\n# Subtest: importing the module did not run the CLI\nnot ok 14 - importing the module did not run the CLI\n  ---\n  duration_ms: 3.907542\n  type: 'test'\n  location: '/workspace/test/context-packet.test.js:164:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert.ok(process.exitCode === null || process.exitCode === 0)\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/context-packet.test.js:165:10)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n    Test.postRun (node:internal/test_runner/test:1173:19)\n    Test.run (node:internal/test_runner/test:1101:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n# Subtest: CLI behavior\n",
+      "atMs": 451935.0,
+      "endedMs": 452469.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "offset": 129,
+        "limit": 35
+      },
+      "output": "<path>/workspace/test/context-packet.test.js</path>\n<type>file</type>\n<content>\n129: test('validation: section entry type and fields', () => {\n130:   for (const entry of [null, 5, 's', true, undefined, [], new Map()]) {\n131:     throws(() => packContext([entry], 10));\n132:   }\n133:   throws(() => packContext([{}], 10));\n134:   throws(() => packContext([section('', 'x')], 10)); // empty id\n135:   for (const id of [0, 1.5, null, undefined, [], {}, true]) {\n136:     throws(() => packContext([section(id, 'x')], 10));\n137:   }\n138:   for (const text of [0, null, undefined, [], true]) {\n139:     throws(() => packContext([section('a', text)], 10));\n140:   }\n141:   assert.doesNotThrow(() => packContext([section('a', '')], 10)); // empty text is fine\n142:   for (const priority of [-1, 0.5, NaN, Infinity, '0', null, undefined, Number.MAX_SAFE_INTEGER + 1]) {\n143:     throws(() => packContext([section('a', 'x', priority)], 10));\n144:   }\n145:   for (const required of [0, 1, 'true', 'false', null, undefined]) {\n146:     throws(() => packContext([section('a', 'x', 0, required)], 10));\n147:   }\n148:   assert.doesNotThrow(() => packContext([section('a', 'x', Number.MAX_SAFE_INTEGER, false)], 10));\n149: });\n150: \n151: test('validation: duplicate and exotic IDs', () => {\n152:   throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n153:   // Case-sensitive IDs are distinct and both valid.\n154:   assert.deepEqual(packContext([section('A', 'x'), section('a', 'y')], 1000).included, ['A', 'a']);\n155:   // Weird-but-valid IDs: spaces, unicode, newlines, NUL, __proto__.\n156:   const exotic = [' spaced id ', 'uni\\u00e9\\u96ea', 'line1\\nline2', '\\u0000', '__proto__', 'constructor', 'hasOwnProperty'];\n157:   const ids = new Set(exotic);\n158:   assert.equal(ids.size, exotic.length);\n159:   const result = packContext(exotic.map((id) => section(id, 't')), 10000);\n160:   assert.deepEqual(result.included, exotic);\n161:   for (const id of exotic) assert.ok(result.text.includes(`### ${JSON.stringify(id)}\\n`));\n162: });\n163: \n\n(Showing lines 129-163 of 250. Use offset=164 to continue.)\n</content>",
+      "atMs": 483399.0,
+      "endedMs": 483417.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node -e \"\nimport('./context-packet.js').then(({packContext}) => {\n  const vals = [-1, 0.5, NaN, Infinity, '0', null, undefined, Number.MAX_SAFE_INTEGER + 1];\n  for (const p of vals) {\n    try {\n      const r = packContext([{id:'a', text:'x', priority:p, required:false}], 10);\n      console.log('NO THROW for', JSON.stringify(p), '->', JSON.stringify(r.included));\n    } catch (e) { console.log('throws for', JSON.stringify(p), ':', e.message); }\n  }\n});\n\"",
+        "description": "Test which invalid priority values throw"
+      },
+      "output": "throws for -1 : sections[0].priority must be a nonnegative safe integer\nthrows for 0.5 : sections[0].priority must be a nonnegative safe integer\nthrows for null : sections[0].priority must be a nonnegative safe integer\nthrows for null : sections[0].priority must be a nonnegative safe integer\nthrows for \"0\" : sections[0].priority must be a nonnegative safe integer\nthrows for null : sections[0].priority must be a nonnegative safe integer\nthrows for undefined : sections[0].priority must be a nonnegative safe integer\nthrows for 9007199254740992 : sections[0].priority must be a nonnegative safe integer\n",
+      "atMs": 501948.0,
+      "endedMs": 501988.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  const sections = [big, low, mid, small];\n  const budget = cost('mid', 'm') + cost('low', 'l') + cost('small', 's');\n  const result = packContext(sections, budget);\n  assert.deepEqual(result.included, ['mid', 'low', 'small']);\n  assert.deepEqual(result.omitted, ['big']); // original input order, not priority order\n  assert.equal(result.text, frame('mid', 'm') + frame('low', 'l') + frame('small', 's'));",
+        "new_string": "  const sections = [big, low, mid, small];\n  const budget = cost('mid', 'm') + cost('low', 'l') + cost('small', 's');\n  const result = packContext(sections, budget);\n  // priority 5 tie between low (index 1) and mid (index 2) breaks by input order.\n  assert.deepEqual(result.included, ['low', 'mid', 'small']);\n  assert.deepEqual(result.omitted, ['big']); // original input order, not priority order\n  assert.equal(result.text, frame('low', 'l') + frame('mid', 'm') + frame('small', 's'));"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 538684.0,
+      "endedMs": 538709.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-19"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  for (const priority of [-1, 0.5, NaN, Infinity, '0', null, undefined, Number.MAX_SAFE_INTEGER + 1]) {\n    throws(() => packContext([section('a', 'x', priority)], 10));\n  }\n  for (const required of [0, 1, 'true', 'false', null, undefined]) {\n    throws(() => packContext([section('a', 'x', 0, required)], 10));\n  }",
+        "new_string": "  for (const priority of [-1, 0.5, NaN, Infinity, '0', null, Number.MAX_SAFE_INTEGER + 1]) {\n    throws(() => packContext([section('a', 'x', priority)], 10));\n  }\n  // An explicit undefined (no default) is also invalid.\n  throws(() => packContext([{id: 'a', text: 'x', priority: undefined, required: false}], 10));\n  for (const required of [0, 1, 'true', 'false', null]) {\n    throws(() => packContext([section('a', 'x', 0, required)], 10));\n  }\n  throws(() => packContext([{id: 'a', text: 'x', priority: 0, required: undefined}], 10));"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 538709.0,
+      "endedMs": 538724.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-20"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "test('importing the module did not run the CLI', () => {\n  assert.ok(process.exitCode === null || process.exitCode === 0);\n});",
+        "new_string": "const exitCodeAtImport = process.exitCode;\n\ntest('importing the module does not run the CLI', () => {\n  // At the point this file's imports were evaluated, the module must not have\n  // run the CLI (which would set process.exitCode to 2).\n  assert.ok(exitCodeAtImport === null || exitCodeAtImport === 0);\n  // Subprocess check: importing the module alone produces no output at all.\n  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(CLI)})`], {encoding: 'utf8'});\n  assert.equal(r.status, 0);\n  assert.equal(r.stdout, '');\n  assert.equal(r.stderr, '');\n});"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 538724.0,
+      "endedMs": 538739.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-21"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -15",
+        "description": "Run npm test again"
+      },
+      "output": "# Subtest: validate omitted entries too and leave input unchanged\nok 19 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.212272\n  type: 'test'\n  ...\n1..19\n# tests 19\n# suites 0\n# pass 18\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 496.45055\n",
+      "atMs": 544104.0,
+      "endedMs": 544705.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-22"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -A20 \"^not ok\"",
+        "description": "Show remaining failing test"
+      },
+      "output": "not ok 14 - importing the module does not run the CLI\n  ---\n  duration_ms: 4.130062\n  type: 'test'\n  location: '/workspace/test/context-packet.test.js:170:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert.ok(exitCodeAtImport === null || exitCodeAtImport === 0)\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/context-packet.test.js:173:10)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n",
+      "atMs": 546439.0,
+      "endedMs": 547065.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-23"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && printf 'import process from \"node:process\";\\nconsole.error(\"exitCode at module top:\", process.exitCode, \"argv:\", process.argv);\\n' > /tmp/probe.test.js && node --test /tmp/probe.test.js 2>&1 | grep \"exitCode at\" ; node --test 2>&1 | grep -A3 \"exitCode at\" | head",
+        "description": "Probe process.exitCode at import time under node --test"
+      },
+      "output": "# exitCode at module top: undefined argv: [ '/usr/local/bin/node', '/tmp/probe.test.js' ]\n",
+      "atMs": 551813.0,
+      "endedMs": 552390.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-24"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "file_path": "/workspace/test/context-packet.test.js",
+        "old_string": "  // At the point this file's imports were evaluated, the module must not have\n  // run the CLI (which would set process.exitCode to 2).\n  assert.ok(exitCodeAtImport === null || exitCodeAtImport === 0);",
+        "new_string": "  // At the point this file's imports were evaluated, the module must not have\n  // run the CLI (which would set process.exitCode to 2). The runner may\n  // pre-seed it to undefined/0, so only a 2 would be incriminating.\n  assert.notEqual(exitCodeAtImport, 2);"
+      },
+      "output": "The file /workspace/test/context-packet.test.js has been updated successfully.",
+      "atMs": 559865.0,
+      "endedMs": 559890.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-25"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -10 && rm -f /tmp/probe.test.js",
+        "description": "Run full npm test and remove probe file"
+      },
+      "output": "  ...\n1..19\n# tests 19\n# suites 0\n# pass 19\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 506.350182\n",
+      "atMs": 578855.0,
+      "endedMs": 579477.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-26"
+    }
+  ],
+  "stations": [],
+  "events": [
+    {
+      "type": "compaction/start",
+      "atMs": 579487.0
+    }
+  ],
+  "finalResponse": "Now let me run the full suite plus manual CLI edge checks (symlinked invocation, relative paths, exact stdout/stderr/exit-code behavior):\n\n",
+  "finalResponseKind": "last-message",
+  "files": [
+    {
+      "path": "context-packet.js",
+      "state": "changed",
+      "beforeSha256": "dd5730e6268aa45f6b813d210203429cfd25ecce5e8fc4180424b787a7cf06d3",
+      "afterSha256": "0c15d873f0ce0003e7b829bdf2b5a2de8c8a6b9ced296c10ca3442fdaa60a667",
+      "before": "// Build the public API and CLI described in the supplied work order.\nexport function packContext(sections,maxBytes){\n  throw new Error('packContext is not implemented');\n}\n",
+      "after": "// context-packet.js \u2014 bounded evidence packer (Node.js builtins only).\n//\n// Exports the synchronous packContext(sections, maxBytes) API and a CLI:\n//   node context-packet.js INPUT_JSON_FILE\n//\n// The CLI reads a UTF-8 JSON file containing {sections, maxBytes} (extra\n// fields ignored), prints exactly one result JSON line on success, and exits\n// 2 with a diagnostic on stderr (and no stdout) for any invalid input.\n\nimport {readFileSync, realpathSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\n\nconst isNonNegativeSafeInteger = (value) =>\n  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;\n\n// Exact serialized frame for one section; indivisible.\nconst frameFor = (section) =>\n  '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n\n// Validate the entire input before any packing happens. Never mutates input.\nfunction assertValidInput(sections, maxBytes) {\n  if (!isNonNegativeSafeInteger(maxBytes)) {\n    throw new Error('maxBytes must be a nonnegative safe integer');\n  }\n  if (!Array.isArray(sections)) {\n    throw new Error('sections must be an array');\n  }\n  const seen = new Set();\n  for (let i = 0; i < sections.length; i++) {\n    if (!(i in sections)) {\n      throw new Error(`sections must be a dense array; missing slot at index ${i}`);\n    }\n    const section = sections[i];\n    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n      throw new Error(`sections[${i}] must be a non-null, non-array object`);\n    }\n    if (typeof section.id !== 'string' || section.id.length === 0) {\n      throw new Error(`sections[${i}].id must be a nonempty string`);\n    }\n    if (typeof section.text !== 'string') {\n      throw new Error(`sections[${i}].text must be a string`);\n    }\n    if (!isNonNegativeSafeInteger(section.priority)) {\n      throw new Error(`sections[${i}].priority must be a nonnegative safe integer`);\n    }\n    if (typeof section.required !== 'boolean') {\n      throw new Error(`sections[${i}].required must be a boolean`);\n    }\n    if (seen.has(section.id)) {\n      throw new Error(`duplicate section id: ${JSON.stringify(section.id)}`);\n    }\n    seen.add(section.id);\n  }\n}\n\nexport function packContext(sections, maxBytes) {\n  // Full validation first, even when the budget is zero or a section would be\n  // omitted by the budget.\n  assertValidInput(sections, maxBytes);\n\n  const items = new Array(sections.length);\n  for (let i = 0; i < sections.length; i++) {\n    const section = sections[i];\n    const frame = frameFor(section);\n    items[i] = {\n      index: i,\n      id: section.id,\n      priority: section.priority,\n      required: section.required,\n      frame,\n      cost: Buffer.byteLength(frame, 'utf8'),\n    };\n  }\n\n  // 1. All required sections first, in original input order (priority\n  //    ignored). Throw rather than return a partial required set.\n  const includedItems = [];\n  let remaining = maxBytes;\n  for (const item of items) {\n    if (!item.required) continue;\n    if (item.cost > remaining) {\n      throw new Error('required sections exceed the maxBytes budget');\n    }\n    remaining -= item.cost;\n    includedItems.push(item);\n  }\n\n  // 2. Optional sections by descending priority, ties by original input\n  //    order. Include when the whole frame fits; otherwise skip and keep\n  //    trying later sections.\n  const optional = items.filter((item) => !item.required);\n  optional.sort((a, b) => b.priority - a.priority || a.index - b.index);\n  const includedIds = new Set(includedItems.map((item) => item.id));\n  for (const item of optional) {\n    if (item.cost <= remaining) {\n      remaining -= item.cost;\n      includedItems.push(item);\n      includedIds.add(item.id);\n    }\n  }\n\n  // 3. Output in inclusion order; omitted optional IDs in original input\n  //    order.\n  const parts = new Array(includedItems.length);\n  let bytes = 0;\n  for (let i = 0; i < includedItems.length; i++) {\n    parts[i] = includedItems[i].frame;\n    bytes += includedItems[i].cost;\n  }\n  const omitted = [];\n  for (const item of items) {\n    if (!item.required && !includedIds.has(item.id)) omitted.push(item.id);\n  }\n\n  return {\n    text: parts.join(''),\n    bytes,\n    included: includedItems.map((item) => item.id),\n    omitted,\n  };\n}\n\n// --- CLI (runs only when executed directly, never on import) ---\n\nfunction fail(message) {\n  process.stderr.write(`context-packet: ${message}\\n`);\n  process.exitCode = 2;\n}\n\nfunction runCli(argv) {\n  if (argv.length !== 1) {\n    fail('exactly one argument is required: INPUT_JSON_FILE');\n    return;\n  }\n  const file = argv[0];\n\n  let raw;\n  try {\n    raw = readFileSync(file, 'utf8');\n  } catch (err) {\n    fail(`cannot read ${file}: ${err.message}`);\n    return;\n  }\n\n  let doc;\n  try {\n    doc = JSON.parse(raw);\n  } catch (err) {\n    fail(`invalid JSON in ${file}: ${err.message}`);\n    return;\n  }\n  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {\n    fail(`input JSON must be an object with \"sections\" and \"maxBytes\"`);\n    return;\n  }\n\n  try {\n    const result = packContext(doc.sections, doc.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n  } catch (err) {\n    fail(err.message);\n  }\n}\n\nconst isDirectRun = (() => {\n  try {\n    return (\n      process.argv[1] !== undefined &&\n      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))\n    );\n  } catch {\n    return false;\n  }\n})();\n\nif (isDirectRun) {\n  runCli(process.argv.slice(2));\n}\n",
+      "displaySha256": "0c15d873f0ce0003e7b829bdf2b5a2de8c8a6b9ced296c10ca3442fdaa60a667",
+      "diff": "--- starter/context-packet.js\n+++ delivered/context-packet.js\n@@ -1,4 +1,178 @@\n-// Build the public API and CLI described in the supplied work order.\n-export function packContext(sections,maxBytes){\n-  throw new Error('packContext is not implemented');\n+// context-packet.js \u2014 bounded evidence packer (Node.js builtins only).\n+//\n+// Exports the synchronous packContext(sections, maxBytes) API and a CLI:\n+//   node context-packet.js INPUT_JSON_FILE\n+//\n+// The CLI reads a UTF-8 JSON file containing {sections, maxBytes} (extra\n+// fields ignored), prints exactly one result JSON line on success, and exits\n+// 2 with a diagnostic on stderr (and no stdout) for any invalid input.\n+\n+import {readFileSync, realpathSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n+\n+const isNonNegativeSafeInteger = (value) =>\n+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;\n+\n+// Exact serialized frame for one section; indivisible.\n+const frameFor = (section) =>\n+  '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n+\n+// Validate the entire input before any packing happens. Never mutates input.\n+function assertValidInput(sections, maxBytes) {\n+  if (!isNonNegativeSafeInteger(maxBytes)) {\n+    throw new Error('maxBytes must be a nonnegative safe integer');\n+  }\n+  if (!Array.isArray(sections)) {\n+    throw new Error('sections must be an array');\n+  }\n+  const seen = new Set();\n+  for (let i = 0; i < sections.length; i++) {\n+    if (!(i in sections)) {\n+      throw new Error(`sections must be a dense array; missing slot at index ${i}`);\n+    }\n+    const section = sections[i];\n+    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n+      throw new Error(`sections[${i}] must be a non-null, non-array object`);\n+    }\n+    if (typeof section.id !== 'string' || section.id.length === 0) {\n+      throw new Error(`sections[${i}].id must be a nonempty string`);\n+    }\n+    if (typeof section.text !== 'string') {\n+      throw new Error(`sections[${i}].text must be a string`);\n+    }\n+    if (!isNonNegativeSafeInteger(section.priority)) {\n+      throw new Error(`sections[${i}].priority must be a nonnegative safe integer`);\n+    }\n+    if (typeof section.required !== 'boolean') {\n+      throw new Error(`sections[${i}].required must be a boolean`);\n+    }\n+    if (seen.has(section.id)) {\n+      throw new Error(`duplicate section id: ${JSON.stringify(section.id)}`);\n+    }\n+    seen.add(section.id);\n+  }\n }\n+\n+export function packContext(sections, maxBytes) {\n+  // Full validation first, even when the budget is zero or a section would be\n+  // omitted by the budget.\n+  assertValidInput(sections, maxBytes);\n+\n+  const items = new Array(sections.length);\n+  for (let i = 0; i < sections.length; i++) {\n+    const section = sections[i];\n+    const frame = frameFor(section);\n+    items[i] = {\n+      index: i,\n+      id: section.id,\n+      priority: section.priority,\n+      required: section.required,\n+      frame,\n+      cost: Buffer.byteLength(frame, 'utf8'),\n+    };\n+  }\n+\n+  // 1. All required sections first, in original input order (priority\n+  //    ignored). Throw rather than return a partial required set.\n+  const includedItems = [];\n+  let remaining = maxBytes;\n+  for (const item of items) {\n+    if (!item.required) continue;\n+    if (item.cost > remaining) {\n+      throw new Error('required sections exceed the maxBytes budget');\n+    }\n+    remaining -= item.cost;\n+    includedItems.push(item);\n+  }\n+\n+  // 2. Optional sections by descending priority, ties by original input\n+  //    order. Include when the whole frame fits; otherwise skip and keep\n+  //    trying later sections.\n+  const optional = items.filter((item) => !item.required);\n+  optional.sort((a, b) => b.priority - a.priority || a.index - b.index);\n+  const includedIds = new Set(includedItems.map((item) => item.id));\n+  for (const item of optional) {\n+    if (item.cost <= remaining) {\n+      remaining -= item.cost;\n+      includedItems.push(item);\n+      includedIds.add(item.id);\n+    }\n+  }\n+\n+  // 3. Output in inclusion order; omitted optional IDs in original input\n+  //    order.\n+  const parts = new Array(includedItems.length);\n+  let bytes = 0;\n+  for (let i = 0; i < includedItems.length; i++) {\n+    parts[i] = includedItems[i].frame;\n+    bytes += includedItems[i].cost;\n+  }\n+  const omitted = [];\n+  for (const item of items) {\n+    if (!item.required && !includedIds.has(item.id)) omitted.push(item.id);\n+  }\n+\n+  return {\n+    text: parts.join(''),\n+    bytes,\n+    included: includedItems.map((item) => item.id),\n+    omitted,\n+  };\n+}\n+\n+// --- CLI (runs only when executed directly, never on import) ---\n+\n+function fail(message) {\n+  process.stderr.write(`context-packet: ${message}\\n`);\n+  process.exitCode = 2;\n+}\n+\n+function runCli(argv) {\n+  if (argv.length !== 1) {\n+    fail('exactly one argument is required: INPUT_JSON_FILE');\n+    return;\n+  }\n+  const file = argv[0];\n+\n+  let raw;\n+  try {\n+    raw = readFileSync(file, 'utf8');\n+  } catch (err) {\n+    fail(`cannot read ${file}: ${err.message}`);\n+    return;\n+  }\n+\n+  let doc;\n+  try {\n+    doc = JSON.parse(raw);\n+  } catch (err) {\n+    fail(`invalid JSON in ${file}: ${err.message}`);\n+    return;\n+  }\n+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {\n+    fail(`input JSON must be an object with \"sections\" and \"maxBytes\"`);\n+    return;\n+  }\n+\n+  try {\n+    const result = packContext(doc.sections, doc.maxBytes);\n+    process.stdout.write(JSON.stringify(result) + '\\n');\n+  } catch (err) {\n+    fail(err.message);\n+  }\n+}\n+\n+const isDirectRun = (() => {\n+  try {\n+    return (\n+      process.argv[1] !== undefined &&\n+      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))\n+    );\n+  } catch {\n+    return false;\n+  }\n+})();\n+\n+if (isDirectRun) {\n+  runCli(process.argv.slice(2));\n+}\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "afterSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "before": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "diff": ""
+    },
+    {
+      "path": "test/context-packet.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "78fa7220173c68929728354348e670e6e5d078e4ea4a906c7b653c832b994484",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join} from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\nimport {packContext} from '../context-packet.js';\n\nconst CLI = fileURLToPath(new URL('../context-packet.js', import.meta.url));\nconst section = (id, text, priority = 0, required = false) => ({id, text, priority, required});\nconst frame = (id, text) => `### ${JSON.stringify(id)}\\n${text}\\n`;\nconst cost = (id, text) => Buffer.byteLength(frame(id, text), 'utf8');\nconst throws = (fn) => assert.throws(fn, Error);\n\ntest('return value has exactly the documented shape', () => {\n  const result = packContext([section('a', 'x')], 100);\n  assert.deepEqual(Object.keys(result), ['text', 'bytes', 'included', 'omitted']);\n});\n\ntest('exact frame format and UTF-8 byte costs', () => {\n  const sections = [section('\u96ea', '\u00e9\\u{1F600}\\u0000', 0)];\n  const result = packContext(sections, 1000);\n  assert.equal(result.text, frame('\u96ea', '\u00e9\\u{1F600}\\u0000'));\n  assert.equal(result.bytes, Buffer.byteLength(frame('\u96ea', '\u00e9\\u{1F600}\\u0000'), 'utf8'));\n  assert.deepEqual(result.included, ['\u96ea']);\n  assert.deepEqual(result.omitted, []);\n});\n\ntest('empty input returns empty result for any valid budget', () => {\n  for (const maxBytes of [0, 1, Number.MAX_SAFE_INTEGER]) {\n    assert.deepEqual(packContext([], maxBytes), {text: '', bytes: 0, included: [], omitted: []});\n  }\n});\n\ntest('required sections come first, in input order, ignoring priority', () => {\n  const sections = [\n    section('req-low', 'a', 1, true),\n    section('opt-high', 'b', 99),\n    section('req-high', 'c', 90, true),\n    section('opt-low', 'd', 2),\n  ];\n  const result = packContext(sections, 1000);\n  assert.deepEqual(result.included, ['req-low', 'req-high', 'opt-high', 'opt-low']);\n  assert.deepEqual(result.omitted, []);\n  assert.equal(\n    result.text,\n    frame('req-low', 'a') + frame('req-high', 'c') + frame('opt-high', 'b') + frame('opt-low', 'd'),\n  );\n});\n\ntest('required overflow throws; exact required fit is allowed', () => {\n  const total = cost('r1', 'x') + cost('r2', 'y');\n  assert.deepEqual(\n    packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total),\n    {text: frame('r1', 'x') + frame('r2', 'y'), bytes: total, included: ['r1', 'r2'], omitted: []},\n  );\n  throws(() => packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total - 1));\n  throws(() => packContext([section('r1', 'x', 0, true)], 0));\n  // Validation runs before packing: invalid section AND overflow -> validation error.\n  throws(() => packContext([section('', 'x', 0, true), section('r', 'y', 0, true)], 0));\n});\n\ntest('optional: descending priority, ties by input order, skip instead of stop', () => {\n  const big = section('big', 'z'.repeat(50), 10);\n  const mid = section('mid', 'm', 5);\n  const low = section('low', 'l', 5);\n  const small = section('small', 's', 1);\n  const sections = [big, low, mid, small];\n  const budget = cost('mid', 'm') + cost('low', 'l') + cost('small', 's');\n  const result = packContext(sections, budget);\n  // priority 5 tie between low (index 1) and mid (index 2) breaks by input order.\n  assert.deepEqual(result.included, ['low', 'mid', 'small']);\n  assert.deepEqual(result.omitted, ['big']); // original input order, not priority order\n  assert.equal(result.text, frame('low', 'l') + frame('mid', 'm') + frame('small', 's'));\n  assert.equal(result.bytes, budget);\n  assert.equal(result.bytes, Buffer.byteLength(result.text, 'utf8'));\n});\n\ntest('exact optional fits are included and the remainder keeps flowing', () => {\n  const a = section('a', 'x', 3);\n  const b = section('b', 'y', 2);\n  const c = section('c', 'z', 1);\n  const budget = cost('a', 'x') + cost('b', 'y') + cost('c', 'z');\n  const result = packContext([c, a, b], budget);\n  assert.deepEqual(result.included, ['a', 'b', 'c']);\n  assert.deepEqual(result.omitted, []);\n});\n\ntest('zero budget omits all optionals and keeps empty frames out', () => {\n  const result = packContext([section('a', 'x', 5), section('b', 'y', 1)], 0);\n  assert.deepEqual(result, {text: '', bytes: 0, included: [], omitted: ['a', 'b']});\n});\n\ntest('unknown object fields are ignored; no input mutation', () => {\n  const noisy = {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7};\n  const result = packContext([noisy], 100);\n  assert.deepEqual(result.included, ['a']);\n  assert.equal(noisy.text, 't');\n  assert.deepEqual(noisy, {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7});\n  const input = [section('b', 'b', 1), section('a', 'a', 1)];\n  const before = JSON.stringify(input);\n  packContext(input, 100);\n  assert.equal(JSON.stringify(input), before);\n});\n\ntest('validation: maxBytes', () => {\n  const bad = [-1, -0.5, 0.5, NaN, Infinity, -Infinity, '0', '5', true, false, null, undefined, {},\n    Number.MAX_SAFE_INTEGER + 1, Number.MIN_SAFE_INTEGER];\n  for (const value of bad) throws(() => packContext([], value));\n  // valid extremes\n  assert.deepEqual(packContext([], 0), {text: '', bytes: 0, included: [], omitted: []});\n  assert.deepEqual(packContext([], Number.MAX_SAFE_INTEGER), {text: '', bytes: 0, included: [], omitted: []});\n});\n\ntest('validation: sections container', () => {\n  for (const value of [null, undefined, 5, 's', true, {}, new Set(), new Map()]) {\n    throws(() => packContext(value, 10));\n  }\n  const holeStart = new Array(1); // [hole]\n  const holeMiddle = [section('a', 'x'), undefined, section('b', 'x')].map((s) => s);\n  const sparseEnd = [];\n  sparseEnd[2] = section('a', 'x');\n  const denseWithUndefined = [section('a', 'x'), undefined];\n  for (const value of [holeStart, holeMiddle, sparseEnd, denseWithUndefined]) {\n    throws(() => packContext(value, 10));\n  }\n});\n\ntest('validation: section entry type and fields', () => {\n  for (const entry of [null, 5, 's', true, undefined, [], new Map()]) {\n    throws(() => packContext([entry], 10));\n  }\n  throws(() => packContext([{}], 10));\n  throws(() => packContext([section('', 'x')], 10)); // empty id\n  for (const id of [0, 1.5, null, undefined, [], {}, true]) {\n    throws(() => packContext([section(id, 'x')], 10));\n  }\n  for (const text of [0, null, undefined, [], true]) {\n    throws(() => packContext([section('a', text)], 10));\n  }\n  assert.doesNotThrow(() => packContext([section('a', '')], 10)); // empty text is fine\n  for (const priority of [-1, 0.5, NaN, Infinity, '0', null, Number.MAX_SAFE_INTEGER + 1]) {\n    throws(() => packContext([section('a', 'x', priority)], 10));\n  }\n  // An explicit undefined (no default) is also invalid.\n  throws(() => packContext([{id: 'a', text: 'x', priority: undefined, required: false}], 10));\n  for (const required of [0, 1, 'true', 'false', null]) {\n    throws(() => packContext([section('a', 'x', 0, required)], 10));\n  }\n  throws(() => packContext([{id: 'a', text: 'x', priority: 0, required: undefined}], 10));\n  assert.doesNotThrow(() => packContext([section('a', 'x', Number.MAX_SAFE_INTEGER, false)], 10));\n});\n\ntest('validation: duplicate and exotic IDs', () => {\n  throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n  // Case-sensitive IDs are distinct and both valid.\n  assert.deepEqual(packContext([section('A', 'x'), section('a', 'y')], 1000).included, ['A', 'a']);\n  // Weird-but-valid IDs: spaces, unicode, newlines, NUL, __proto__.\n  const exotic = [' spaced id ', 'uni\\u00e9\\u96ea', 'line1\\nline2', '\\u0000', '__proto__', 'constructor', 'hasOwnProperty'];\n  const ids = new Set(exotic);\n  assert.equal(ids.size, exotic.length);\n  const result = packContext(exotic.map((id) => section(id, 't')), 10000);\n  assert.deepEqual(result.included, exotic);\n  for (const id of exotic) assert.ok(result.text.includes(`### ${JSON.stringify(id)}\\n`));\n});\n\nconst exitCodeAtImport = process.exitCode;\n\ntest('importing the module does not run the CLI', () => {\n  // At the point this file's imports were evaluated, the module must not have\n  // run the CLI (which would set process.exitCode to 2). The runner may\n  // pre-seed it to undefined/0, so only a 2 would be incriminating.\n  assert.notEqual(exitCodeAtImport, 2);\n  // Subprocess check: importing the module alone produces no output at all.\n  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(CLI)})`], {encoding: 'utf8'});\n  assert.equal(r.status, 0);\n  assert.equal(r.stdout, '');\n  assert.equal(r.stderr, '');\n});\n\ntest('CLI behavior', (t) => {\n  const dir = mkdtempSync(join(tmpdir(), 'context-packet-'));\n  t.after(() => rmSync(dir, {recursive: true, force: true}));\n  const write = (name, content) => {\n    const file = join(dir, name);\n    writeFileSync(file, content, 'utf8');\n    return file;\n  };\n  const run = (args) => {\n    const r = spawnSync(process.execPath, [CLI, ...args], {encoding: 'utf8'});\n    return {code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? ''};\n  };\n  const failExpect = (r) => {\n    assert.equal(r.code, 2);\n    assert.equal(r.stdout, '');\n    assert.ok(r.stderr.length > 0);\n  };\n\n  const doc = {\n    sections: [section('big', 'z'.repeat(50), 10), section('a', 'x', 3), section('b', 'y', 2), section('r', 'keep', 0, true)],\n    maxBytes: 300,\n    ignoredExtraField: {nested: true},\n  };\n  const expected = packContext(doc.sections, doc.maxBytes);\n\n  // success: one JSON line + newline, exit 0, no stderr, extra fields ignored\n  const ok = run([write('ok.json', JSON.stringify(doc))]);\n  assert.equal(ok.code, 0);\n  assert.equal(ok.stderr, '');\n  assert.equal(ok.stdout, JSON.stringify(expected) + '\\n');\n  assert.deepEqual(JSON.parse(ok.stdout), expected);\n\n  // Unicode survives the round trip.\n  const uniDoc = {sections: [section('\u96ea', '\u00e9'), section('uni req', '\u4f60\u597d', 0, true)], maxBytes: 500};\n  const uni = run([write('uni.json', JSON.stringify(uniDoc))]);\n  assert.equal(uni.code, 0);\n  assert.deepEqual(JSON.parse(uni.stdout), packContext(uniDoc.sections, uniDoc.maxBytes));\n\n  // arg-count and file failures\n  failExpect(run([]));\n  failExpect(run(['a.json', 'b.json']));\n  failExpect(run([join(dir, 'missing.json')]));\n\n  // unreadable file: a directory is not readable as a file\n  failExpect(run([dir]));\n\n  // invalid JSON\n  failExpect(run([write('bad-json.json', '{nope')]));\n  failExpect(run([write('empty.json', '')]));\n\n  // invalid API input\n  const dupDoc = {sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100};\n  failExpect(run([write('dup.json', JSON.stringify(dupDoc))]));\n  const sparseDoc = {sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100};\n  failExpect(run([write('sparse.json', JSON.stringify(sparseDoc))]));\n  const noIdDoc = {sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100};\n  failExpect(run([write('noid.json', JSON.stringify(noIdDoc))]));\n  const badPrioDoc = {sections: [section('a', 'x', -1)], maxBytes: 100};\n  failExpect(run([write('badprio.json', JSON.stringify(badPrioDoc))]));\n  const badReqDoc = {sections: [section('a', 'x', 0, 'yes')], maxBytes: 100};\n  failExpect(run([write('badreq.json', JSON.stringify(badReqDoc))]));\n  const badMaxDoc = {sections: [], maxBytes: -5};\n  failExpect(run([write('badmax.json', JSON.stringify(badMaxDoc))]));\n  const noMaxDoc = {sections: []};\n  failExpect(run([write('nomax.json', JSON.stringify(noMaxDoc))]));\n  const noSecDoc = {maxBytes: 10};\n  failExpect(run([write('nosec.json', JSON.stringify(noSecDoc))]));\n\n  // top-level document not an object\n  failExpect(run([write('arr.json', JSON.stringify([]))]));\n  failExpect(run([write('null.json', 'null')]));\n  failExpect(run([write('str.json', '\"hello\"')]));\n\n  // required overflow\n  const overflow = {sections: [section('r1', 'x', 0, true), section('r2', 'y', 0, true)], maxBytes: 10};\n  failExpect(run([write('overflow.json', JSON.stringify(overflow))]));\n\n  // success on an exact fit\n  const exact = {sections: [section('r', 'x', 0, true)], maxBytes: cost('r', 'x')};\n  const exactRun = run([write('exact.json', JSON.stringify(exact))]);\n  assert.equal(exactRun.code, 0);\n  assert.deepEqual(JSON.parse(exactRun.stdout), {text: frame('r', 'x'), bytes: cost('r', 'x'), included: ['r'], omitted: []});\n});\n",
+      "displaySha256": "78fa7220173c68929728354348e670e6e5d078e4ea4a906c7b653c832b994484",
+      "diff": "--- starter/test/context-packet.test.js\n+++ delivered/test/context-packet.test.js\n@@ -0,0 +1,264 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\n+import {tmpdir} from 'node:os';\n+import {join} from 'node:path';\n+import {spawnSync} from 'node:child_process';\n+import {fileURLToPath} from 'node:url';\n+import {packContext} from '../context-packet.js';\n+\n+const CLI = fileURLToPath(new URL('../context-packet.js', import.meta.url));\n+const section = (id, text, priority = 0, required = false) => ({id, text, priority, required});\n+const frame = (id, text) => `### ${JSON.stringify(id)}\\n${text}\\n`;\n+const cost = (id, text) => Buffer.byteLength(frame(id, text), 'utf8');\n+const throws = (fn) => assert.throws(fn, Error);\n+\n+test('return value has exactly the documented shape', () => {\n+  const result = packContext([section('a', 'x')], 100);\n+  assert.deepEqual(Object.keys(result), ['text', 'bytes', 'included', 'omitted']);\n+});\n+\n+test('exact frame format and UTF-8 byte costs', () => {\n+  const sections = [section('\u96ea', '\u00e9\\u{1F600}\\u0000', 0)];\n+  const result = packContext(sections, 1000);\n+  assert.equal(result.text, frame('\u96ea', '\u00e9\\u{1F600}\\u0000'));\n+  assert.equal(result.bytes, Buffer.byteLength(frame('\u96ea', '\u00e9\\u{1F600}\\u0000'), 'utf8'));\n+  assert.deepEqual(result.included, ['\u96ea']);\n+  assert.deepEqual(result.omitted, []);\n+});\n+\n+test('empty input returns empty result for any valid budget', () => {\n+  for (const maxBytes of [0, 1, Number.MAX_SAFE_INTEGER]) {\n+    assert.deepEqual(packContext([], maxBytes), {text: '', bytes: 0, included: [], omitted: []});\n+  }\n+});\n+\n+test('required sections come first, in input order, ignoring priority', () => {\n+  const sections = [\n+    section('req-low', 'a', 1, true),\n+    section('opt-high', 'b', 99),\n+    section('req-high', 'c', 90, true),\n+    section('opt-low', 'd', 2),\n+  ];\n+  const result = packContext(sections, 1000);\n+  assert.deepEqual(result.included, ['req-low', 'req-high', 'opt-high', 'opt-low']);\n+  assert.deepEqual(result.omitted, []);\n+  assert.equal(\n+    result.text,\n+    frame('req-low', 'a') + frame('req-high', 'c') + frame('opt-high', 'b') + frame('opt-low', 'd'),\n+  );\n+});\n+\n+test('required overflow throws; exact required fit is allowed', () => {\n+  const total = cost('r1', 'x') + cost('r2', 'y');\n+  assert.deepEqual(\n+    packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total),\n+    {text: frame('r1', 'x') + frame('r2', 'y'), bytes: total, included: ['r1', 'r2'], omitted: []},\n+  );\n+  throws(() => packContext([section('r1', 'x', 0, true), section('r2', 'y', 0, true)], total - 1));\n+  throws(() => packContext([section('r1', 'x', 0, true)], 0));\n+  // Validation runs before packing: invalid section AND overflow -> validation error.\n+  throws(() => packContext([section('', 'x', 0, true), section('r', 'y', 0, true)], 0));\n+});\n+\n+test('optional: descending priority, ties by input order, skip instead of stop', () => {\n+  const big = section('big', 'z'.repeat(50), 10);\n+  const mid = section('mid', 'm', 5);\n+  const low = section('low', 'l', 5);\n+  const small = section('small', 's', 1);\n+  const sections = [big, low, mid, small];\n+  const budget = cost('mid', 'm') + cost('low', 'l') + cost('small', 's');\n+  const result = packContext(sections, budget);\n+  // priority 5 tie between low (index 1) and mid (index 2) breaks by input order.\n+  assert.deepEqual(result.included, ['low', 'mid', 'small']);\n+  assert.deepEqual(result.omitted, ['big']); // original input order, not priority order\n+  assert.equal(result.text, frame('low', 'l') + frame('mid', 'm') + frame('small', 's'));\n+  assert.equal(result.bytes, budget);\n+  assert.equal(result.bytes, Buffer.byteLength(result.text, 'utf8'));\n+});\n+\n+test('exact optional fits are included and the remainder keeps flowing', () => {\n+  const a = section('a', 'x', 3);\n+  const b = section('b', 'y', 2);\n+  const c = section('c', 'z', 1);\n+  const budget = cost('a', 'x') + cost('b', 'y') + cost('c', 'z');\n+  const result = packContext([c, a, b], budget);\n+  assert.deepEqual(result.included, ['a', 'b', 'c']);\n+  assert.deepEqual(result.omitted, []);\n+});\n+\n+test('zero budget omits all optionals and keeps empty frames out', () => {\n+  const result = packContext([section('a', 'x', 5), section('b', 'y', 1)], 0);\n+  assert.deepEqual(result, {text: '', bytes: 0, included: [], omitted: ['a', 'b']});\n+});\n+\n+test('unknown object fields are ignored; no input mutation', () => {\n+  const noisy = {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7};\n+  const result = packContext([noisy], 100);\n+  assert.deepEqual(result.included, ['a']);\n+  assert.equal(noisy.text, 't');\n+  assert.deepEqual(noisy, {id: 'a', text: 't', priority: 0, required: false, junk: [1, {x: 2}], extra: 7});\n+  const input = [section('b', 'b', 1), section('a', 'a', 1)];\n+  const before = JSON.stringify(input);\n+  packContext(input, 100);\n+  assert.equal(JSON.stringify(input), before);\n+});\n+\n+test('validation: maxBytes', () => {\n+  const bad = [-1, -0.5, 0.5, NaN, Infinity, -Infinity, '0', '5', true, false, null, undefined, {},\n+    Number.MAX_SAFE_INTEGER + 1, Number.MIN_SAFE_INTEGER];\n+  for (const value of bad) throws(() => packContext([], value));\n+  // valid extremes\n+  assert.deepEqual(packContext([], 0), {text: '', bytes: 0, included: [], omitted: []});\n+  assert.deepEqual(packContext([], Number.MAX_SAFE_INTEGER), {text: '', bytes: 0, included: [], omitted: []});\n+});\n+\n+test('validation: sections container', () => {\n+  for (const value of [null, undefined, 5, 's', true, {}, new Set(), new Map()]) {\n+    throws(() => packContext(value, 10));\n+  }\n+  const holeStart = new Array(1); // [hole]\n+  const holeMiddle = [section('a', 'x'), undefined, section('b', 'x')].map((s) => s);\n+  const sparseEnd = [];\n+  sparseEnd[2] = section('a', 'x');\n+  const denseWithUndefined = [section('a', 'x'), undefined];\n+  for (const value of [holeStart, holeMiddle, sparseEnd, denseWithUndefined]) {\n+    throws(() => packContext(value, 10));\n+  }\n+});\n+\n+test('validation: section entry type and fields', () => {\n+  for (const entry of [null, 5, 's', true, undefined, [], new Map()]) {\n+    throws(() => packContext([entry], 10));\n+  }\n+  throws(() => packContext([{}], 10));\n+  throws(() => packContext([section('', 'x')], 10)); // empty id\n+  for (const id of [0, 1.5, null, undefined, [], {}, true]) {\n+    throws(() => packContext([section(id, 'x')], 10));\n+  }\n+  for (const text of [0, null, undefined, [], true]) {\n+    throws(() => packContext([section('a', text)], 10));\n+  }\n+  assert.doesNotThrow(() => packContext([section('a', '')], 10)); // empty text is fine\n+  for (const priority of [-1, 0.5, NaN, Infinity, '0', null, Number.MAX_SAFE_INTEGER + 1]) {\n+    throws(() => packContext([section('a', 'x', priority)], 10));\n+  }\n+  // An explicit undefined (no default) is also invalid.\n+  throws(() => packContext([{id: 'a', text: 'x', priority: undefined, required: false}], 10));\n+  for (const required of [0, 1, 'true', 'false', null]) {\n+    throws(() => packContext([section('a', 'x', 0, required)], 10));\n+  }\n+  throws(() => packContext([{id: 'a', text: 'x', priority: 0, required: undefined}], 10));\n+  assert.doesNotThrow(() => packContext([section('a', 'x', Number.MAX_SAFE_INTEGER, false)], 10));\n+});\n+\n+test('validation: duplicate and exotic IDs', () => {\n+  throws(() => packContext([section('a', 'x'), section('a', 'y')], 1000));\n+  // Case-sensitive IDs are distinct and both valid.\n+  assert.deepEqual(packContext([section('A', 'x'), section('a', 'y')], 1000).included, ['A', 'a']);\n+  // Weird-but-valid IDs: spaces, unicode, newlines, NUL, __proto__.\n+  const exotic = [' spaced id ', 'uni\\u00e9\\u96ea', 'line1\\nline2', '\\u0000', '__proto__', 'constructor', 'hasOwnProperty'];\n+  const ids = new Set(exotic);\n+  assert.equal(ids.size, exotic.length);\n+  const result = packContext(exotic.map((id) => section(id, 't')), 10000);\n+  assert.deepEqual(result.included, exotic);\n+  for (const id of exotic) assert.ok(result.text.includes(`### ${JSON.stringify(id)}\\n`));\n+});\n+\n+const exitCodeAtImport = process.exitCode;\n+\n+test('importing the module does not run the CLI', () => {\n+  // At the point this file's imports were evaluated, the module must not have\n+  // run the CLI (which would set process.exitCode to 2). The runner may\n+  // pre-seed it to undefined/0, so only a 2 would be incriminating.\n+  assert.notEqual(exitCodeAtImport, 2);\n+  // Subprocess check: importing the module alone produces no output at all.\n+  const r = spawnSync(process.execPath, ['-e', `import(${JSON.stringify(CLI)})`], {encoding: 'utf8'});\n+  assert.equal(r.status, 0);\n+  assert.equal(r.stdout, '');\n+  assert.equal(r.stderr, '');\n+});\n+\n+test('CLI behavior', (t) => {\n+  const dir = mkdtempSync(join(tmpdir(), 'context-packet-'));\n+  t.after(() => rmSync(dir, {recursive: true, force: true}));\n+  const write = (name, content) => {\n+    const file = join(dir, name);\n+    writeFileSync(file, content, 'utf8');\n+    return file;\n+  };\n+  const run = (args) => {\n+    const r = spawnSync(process.execPath, [CLI, ...args], {encoding: 'utf8'});\n+    return {code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? ''};\n+  };\n+  const failExpect = (r) => {\n+    assert.equal(r.code, 2);\n+    assert.equal(r.stdout, '');\n+    assert.ok(r.stderr.length > 0);\n+  };\n+\n+  const doc = {\n+    sections: [section('big', 'z'.repeat(50), 10), section('a', 'x', 3), section('b', 'y', 2), section('r', 'keep', 0, true)],\n+    maxBytes: 300,\n+    ignoredExtraField: {nested: true},\n+  };\n+  const expected = packContext(doc.sections, doc.maxBytes);\n+\n+  // success: one JSON line + newline, exit 0, no stderr, extra fields ignored\n+  const ok = run([write('ok.json', JSON.stringify(doc))]);\n+  assert.equal(ok.code, 0);\n+  assert.equal(ok.stderr, '');\n+  assert.equal(ok.stdout, JSON.stringify(expected) + '\\n');\n+  assert.deepEqual(JSON.parse(ok.stdout), expected);\n+\n+  // Unicode survives the round trip.\n+  const uniDoc = {sections: [section('\u96ea', '\u00e9'), section('uni req', '\u4f60\u597d', 0, true)], maxBytes: 500};\n+  const uni = run([write('uni.json', JSON.stringify(uniDoc))]);\n+  assert.equal(uni.code, 0);\n+  assert.deepEqual(JSON.parse(uni.stdout), packContext(uniDoc.sections, uniDoc.maxBytes));\n+\n+  // arg-count and file failures\n+  failExpect(run([]));\n+  failExpect(run(['a.json', 'b.json']));\n+  failExpect(run([join(dir, 'missing.json')]));\n+\n+  // unreadable file: a directory is not readable as a file\n+  failExpect(run([dir]));\n+\n+  // invalid JSON\n+  failExpect(run([write('bad-json.json', '{nope')]));\n+  failExpect(run([write('empty.json', '')]));\n+\n+  // invalid API input\n+  const dupDoc = {sections: [section('a', 'x'), section('a', 'y')], maxBytes: 100};\n+  failExpect(run([write('dup.json', JSON.stringify(dupDoc))]));\n+  const sparseDoc = {sections: [section('a', 'x'), null, section('b', 'x')], maxBytes: 100};\n+  failExpect(run([write('sparse.json', JSON.stringify(sparseDoc))]));\n+  const noIdDoc = {sections: [{text: 'x', priority: 0, required: false}], maxBytes: 100};\n+  failExpect(run([write('noid.json', JSON.stringify(noIdDoc))]));\n+  const badPrioDoc = {sections: [section('a', 'x', -1)], maxBytes: 100};\n+  failExpect(run([write('badprio.json', JSON.stringify(badPrioDoc))]));\n+  const badReqDoc = {sections: [section('a', 'x', 0, 'yes')], maxBytes: 100};\n+  failExpect(run([write('badreq.json', JSON.stringify(badReqDoc))]));\n+  const badMaxDoc = {sections: [], maxBytes: -5};\n+  failExpect(run([write('badmax.json', JSON.stringify(badMaxDoc))]));\n+  const noMaxDoc = {sections: []};\n+  failExpect(run([write('nomax.json', JSON.stringify(noMaxDoc))]));\n+  const noSecDoc = {maxBytes: 10};\n+  failExpect(run([write('nosec.json', JSON.stringify(noSecDoc))]));\n+\n+  // top-level document not an object\n+  failExpect(run([write('arr.json', JSON.stringify([]))]));\n+  failExpect(run([write('null.json', 'null')]));\n+  failExpect(run([write('str.json', '\"hello\"')]));\n+\n+  // required overflow\n+  const overflow = {sections: [section('r1', 'x', 0, true), section('r2', 'y', 0, true)], maxBytes: 10};\n+  failExpect(run([write('overflow.json', JSON.stringify(overflow))]));\n+\n+  // success on an exact fit\n+  const exact = {sections: [section('r', 'x', 0, true)], maxBytes: cost('r', 'x')};\n+  const exactRun = run([write('exact.json', JSON.stringify(exact))]);\n+  assert.equal(exactRun.code, 0);\n+  assert.deepEqual(JSON.parse(exactRun.stdout), {text: frame('r', 'x'), bytes: cost('r', 'x'), included: ['r'], omitted: []});\n+});\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "afterSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n    text:frame,bytes,included:['\u96ea'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n    text:frame,bytes,included:['\u96ea'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "displaySha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: return value has exactly the documented shape\nok 1 - return value has exactly the documented shape\n  ---\n  duration_ms: 1.432961\n  ...\n# Subtest: exact frame format and UTF-8 byte costs\nok 2 - exact frame format and UTF-8 byte costs\n  ---\n  duration_ms: 0.170612\n  ...\n# Subtest: empty input returns empty result for any valid budget\nok 3 - empty input returns empty result for any valid budget\n  ---\n  duration_ms: 0.156761\n  ...\n# Subtest: required sections come first, in input order, ignoring priority\nok 4 - required sections come first, in input order, ignoring priority\n  ---\n  duration_ms: 0.185792\n  ...\n# Subtest: required overflow throws; exact required fit is allowed\nok 5 - required overflow throws; exact required fit is allowed\n  ---\n  duration_ms: 0.420913\n  ...\n# Subtest: optional: descending priority, ties by input order, skip instead of stop\nok 6 - optional: descending priority, ties by input order, skip instead of stop\n  ---\n  duration_ms: 0.244432\n  ...\n# Subtest: exact optional fits are included and the remainder keeps flowing\nok 7 - exact optional fits are included and the remainder keeps flowing\n  ---\n  duration_ms: 0.169771\n  ...\n# Subtest: zero budget omits all optionals and keeps empty frames out\nok 8 - zero budget omits all optionals and keeps empty frames out\n  ---\n  duration_ms: 0.142421\n  ...\n# Subtest: unknown object fields are ignored; no input mutation\nok 9 - unknown object fields are ignored; no input mutation\n  ---\n  duration_ms: 0.276242\n  ...\n# Subtest: validation: maxBytes\nok 10 - validation: maxBytes\n  ---\n  duration_ms: 0.744546\n  ...\n# Subtest: validation: sections container\nok 11 - validation: sections container\n  ---\n  duration_ms: 0.220462\n  ...\n# Subtest: validation: section entry type and fields\nok 12 - validation: section entry type and fields\n  ---\n  duration_ms: 0.521194\n  ...\n# Subtest: validation: duplicate and exotic IDs\nok 13 - validation: duplicate and exotic IDs\n  ---\n  duration_ms: 0.286543\n  ...\n# Subtest: importing the module does not run the CLI\nok 14 - importing the module does not run the CLI\n  ---\n  duration_ms: 23.584215\n  ...\n# Subtest: CLI behavior\nok 15 - CLI behavior\n  ---\n  duration_ms: 464.687706\n  ...\n# Subtest: required evidence is included before optional priority\nok 16 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.381241\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 17 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.179141\n  ...\n# Subtest: empty selection and required overflow\nok 18 - empty selection and required overflow\n  ---\n  duration_ms: 0.770156\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 19 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.230482\n  ...\n1..19\n# tests 19\n# suites 0\n# pass 19\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 540.043568\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"context-packet\",\"pass\":true,\"groups\":[{\"name\":\"required-sections-and-reservation\",\"pass\":true},{\"name\":\"utf8-framing-and-exact-budget\",\"pass\":true},{\"name\":\"optional-priority-skip-and-stable-ties\",\"pass\":true},{\"name\":\"validation-opaque-identities-and-immutability\",\"pass\":true},{\"name\":\"cli-json-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "8fddb6e8f3b88069c230d5af37f0e7395a5aebf59e4d98efd05f750734a9016e"
+    },
+    {
+      "kind": "deepseek-native-session",
+      "sha256": "cae6c7921153bc1aba7781e0a9804c091f1cebfdd3379655f492e9e0d4247bce"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "16c70ac28311e1e0a942a3ffe2fdb95f82913db15556fba02206a0e5318d975b"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "c60d5af38884fb3d732e9b51b1b32a8896dc2fb5a0541a678a1e7d87e2ec1004"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 26,
+    "withResults": 26,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "The code passed. The run kept going.",
+    "paragraphs": [
+      {
+        "text": "DeepSeek built a working packer, then spent further actions repairing syntax and expectations in its added test suite. Its final test run passed all 19 tests.",
+        "actions": [
+          "action-7",
+          "action-10",
+          "action-19",
+          "action-25",
+          "action-26"
+        ]
+      },
+      {
+        "text": "The native session began compaction at 579.5 seconds. The ten-minute limit arrived without a clean finish. Independent acceptance passed all five groups; the recorded outcome is OUTPUT_ONLY.",
+        "actions": [
+          "action-26"
+        ]
+      }
+    ]
+  }
+}

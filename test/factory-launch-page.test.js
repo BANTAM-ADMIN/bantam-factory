@@ -163,7 +163,7 @@ test('single workshop comparison scopes four actual corners without legacy task,
   assert.match(prose,/1 WORK ORDER\b/);assert.match(prose,/2\/4\s*attempts passed and completed/);
   assert.match(prose,/Artifacts accepted:\s*3\/4/);
   assert.match(prose,/3 local configurations/);assert.match(prose,/1 frontier reference/);
-  assert.match(prose,/No held-out-task claim is made/);
+  assert.match(prose,/selected development work orders/);
   assert.match(share,/1 work order · 4 systems · 4\/4 attempts recorded/);
   assert.match(share,/3\/4 artifacts accepted/);
   for(const label of ['BANTAM FACTORY · local','OpenCode','Hermes','Codex · Astra'])assert.ok(share.includes(label),label);

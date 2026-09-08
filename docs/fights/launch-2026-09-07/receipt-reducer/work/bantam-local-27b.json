@@ -1,0 +1,642 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "receipt-reducer",
+  "arm": "bantam-local-27b",
+  "wallMs": 112487,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T02:51:04.128Z",
+  "task": "# Receipt reducer: build a small run-log report tool\n\nImplement `receipt-report.js` using Node.js builtins only. Export the synchronous\nfunction `reduceEvents(text)` and support `node receipt-report.js LOGFILE`.\n\nThe input is a UTF-8 JSONL string. Ignore whitespace-only lines; CRLF and a\nmissing final newline are allowed. Each nonblank line must parse as a non-null\nnon-array object with these fields:\n\n- `id` and `job`: nonempty strings (preserve their characters; do not trim).\n- `attempt`: a positive safe integer, starting at 1; gaps are allowed.\n- `seq`: a nonnegative safe integer.\n- `type`: exactly `started`, `succeeded`, or `failed`.\n\nOther fields are ignored, including for duplicate comparison. Reject invalid\nJSON or any invalid required field with an Error. Do not coerce types.\n\nEvents may arrive in any order. Deduplicate by `id` before reducing. Repeated\nIDs with identical five required fields are ignored and counted in `duplicates`\n(every extra copy counts). A repeated ID with any different required field is\nan error. Different events may share `seq`. For each `(job, attempt)` there must\nbe exactly one `started` event and at most one terminal (`succeeded` or `failed`)\nevent. A terminal's `seq` must be strictly greater than its start's `seq`.\nOrphan terminals, repeated starts with different IDs, repeated terminals with\ndifferent IDs, and contradictory terminals are errors. Different attempts are\nindependent; their sequence ranges may overlap.\n\nReturn exactly:\n\n```\n{\n  jobs: [{job, attempts: [{attempt, status, startedSeq, finishedSeq}]}],\n  duplicates: NUMBER\n}\n```\n\nJobs are sorted by JavaScript string `<`/`>` order (UTF-16 code units, not locale\ncollation); attempts are sorted numerically. Status is `running` for start-only\nattempts, otherwise the terminal type. `finishedSeq` is null for running\nattempts. Empty input returns `{jobs: [], duplicates: 0}`. IDs such as\n`__proto__` and jobs containing whitespace or Unicode are ordinary strings.\n\nThe CLI takes exactly one file argument, prints only the report as JSON followed\nby a newline on stdout, and exits 0 on success. Invalid arguments, unreadable\ninput, or invalid events produce a nonempty stderr message, no stdout, and exit\n2. Importing the module must not run the CLI. Do not add third-party dependencies\nor modify `package.json` or existing public tests. You may add tests. Run\n`npm test` before finishing. The same starter and contract go to every arm;\nindependent acceptance is separate from your tests.\n",
+  "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+  "source": "factory-turns-and-verification",
+  "actions": [
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "read_file",
+            "p": "receipt-report.js"
+          },
+          {
+            "a": "list_dir",
+            "p": "test"
+          }
+        ]
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n\u2014 end of file (2 lines); nothing beyond line 2, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"receipt-report.js\"}\nreceipt-report.js (5 lines, showing 1-5):\n1\t// Implement the public work order in task.md. Builtins only.\n2\texport function reduceEvents(text) {\n3\t  throw new Error('not implemented');\n4\t}\n5\t\n\u2014 end of file (5 lines); nothing beyond line 5, do not re-read this range.\n\n# 3 {\"a\":\"list_dir\",\"p\":\"test\"}\ntest:\nreceipt-report.test.js",
+      "atMs": 3804.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 0,
+      "id": "action-1"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "test/receipt-report.test.js"
+      },
+      "output": "test/receipt-report.test.js (24 lines, showing 1-24):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport { reduceEvents } from '../receipt-report.js';\n4\tconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\n5\ttest('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\n6\ttest('unordered completion and an independent running attempt', () => {\n7\t  assert.deepEqual(reduceEvents(jsonl([\n8\t    {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n9\t    {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n10\t    {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n11\t  ])), {jobs:[{job:'build', attempts:[\n12\t    {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n13\t    {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n14\t  ]}], duplicates:0});\n15\t});\n16\ttest('retransmission is counted', () => {\n17\t  const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n18\t  assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n19\t});\n20\ttest('orphan and malformed events fail', () => {\n21\t  assert.throws(() => reduceEvents('{bad'));\n22\t  assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n23\t});\n24\t\n\u2014 end of file (24 lines); nothing beyond line 24, do not re-read this range.",
+      "atMs": 4746.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 1,
+      "id": "action-2"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "receipt-report.js",
+        "content": "// Receipt reducer: build a small run-log report tool. Builtins only.\n\nconst TYPES = new Set(['started', 'succeeded', 'failed']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isNonemptyString(value) {\n  return typeof value === 'string' && value.length > 0;\n}\n\nfunction isSafeInt(value, min) {\n  return Number.isSafeInteger(value) && value >= min;\n}\n\nfunction requiredFields(event) {\n  return {\n    id: event.id,\n    job: event.job,\n    attempt: event.attempt,\n    seq: event.seq,\n    type: event.type,\n  };\n}\n\nfunction sameRequiredFields(a, b) {\n  return (\n    a.id === b.id &&\n    a.job === b.job &&\n    a.attempt === b.attempt &&\n    a.seq === b.seq &&\n    a.type === b.type\n  );\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a string');\n  }\n\n  const seen = new Map(); // id -> required fields\n  let duplicates = 0;\n\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  for (const line of lines) {\n    if (line.trim() === '') continue;\n\n    let event;\n    try {\n      event = JSON.parse(line);\n    } catch {\n      fail('invalid JSON line');\n    }\n    if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n      fail('each line must be a JSON object');\n    }\n\n    const { id, job, attempt, seq, type } = event;\n    if (!isNonemptyString(id)) fail('id must be a nonempty string');\n    if (!isNonemptyString(job)) fail('job must be a nonempty string');\n    if (!isSafeInt(attempt, 1)) fail('attempt must be a positive safe integer');\n    if (!isSafeInt(seq, 0)) fail('seq must be a nonnegative safe integer');\n    if (typeof type !== 'string' || !TYPES.has(type)) fail('type must be started, succeeded, or failed');\n\n    const fields = requiredFields(event);\n    const existing = seen.get(id);\n    if (existing === undefined) {\n      seen.set(id, fields);\n    } else if (sameRequiredFields(existing, fields)) {\n      duplicates += 1;\n    } else {\n      fail('conflicting duplicate id');\n    }\n  }\n\n  const events = [...seen.values()];\n\n  // Map (job, attempt) -> { start, terminal }\n  const groups = new Map();\n  const groupKey = (job, attempt) => job + '\\u0000' + attempt;\n\n  for (const event of events) {\n    const key = groupKey(event.job, event.attempt);\n    let group = groups.get(key);\n    if (group === undefined) {\n      group = { job: event.job, attempt: event.attempt, start: null, terminal: null };\n      groups.set(key, group);\n    }\n\n    if (event.type === 'started') {\n      if (group.start !== null) {\n        fail('repeated start for (job, attempt) with different id');\n      }\n      group.start = event;\n    } else {\n      if (group.terminal !== null) {\n        fail('contradictory terminals for (job, attempt)');\n      }\n      group.terminal = event;\n    }\n  }\n\n  const jobs = new Map();\n  for (const group of groups.values()) {\n    if (group.start === null) {\n      fail('orphan terminal event');\n    }\n    if (group.terminal !== null && group.terminal.seq <= group.start.seq) {\n      fail('terminal seq must be strictly greater than start seq');\n    }\n\n    let jobEntry = jobs.get(group.job);\n    if (jobEntry === undefined) {\n      jobEntry = { job: group.job, attempts: [] };\n      jobs.set(group.job, jobEntry);\n    }\n    jobEntry.attempts.push({\n      attempt: group.attempt,\n      status: group.terminal === null ? 'running' : group.terminal.type,\n      startedSeq: group.start.seq,\n      finishedSeq: group.terminal === null ? null : group.terminal.seq,\n    });\n  }\n\n  const jobList = [...jobs.values()];\n  jobList.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  for (const job of jobList) {\n    job.attempts.sort((a, b) => a.attempt - b.attempt);\n  }\n\n  return { jobs: jobList, duplicates };\n}\n\nfunction isMainModule() {\n  if (typeof process === 'undefined' || !process.argv || !process.argv[1]) return false;\n  try {\n    const entry = new URL(import.meta.url).pathname;\n    return process.argv[1] === entry;\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  if (args.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    process.exit(2);\n  }\n  let text;\n  try {\n    text = (await import('node:fs')).readFileSync(args[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`cannot read ${args[0]}: ${err.message}\\n`);\n    process.exit(2);\n  }\n  try {\n    const report = reduceEvents(text);\n    process.stdout.write(JSON.stringify(report) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write(`invalid events: ${err.message}\\n`);\n    process.exit(2);\n  }\n}\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 1 executable statement(s) by AST comparison; 6 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: fail (AFTER L5), isNonemptyString (AFTER L9), isSafeInt (AFTER L13), requiredFields (AFTER L17).\n- BEFORE receipt-report.js:3 in reduceEvents: \"throw new Error('not implemented');\"\n  STAGED AFTER receipt-report.js:37 (retained function).\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:d442cfa19230fc39f5966f0ede78cf124579fa200a389c21775626d7fe18710f.",
+      "atMs": 18861.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 2,
+      "id": "action-3"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "receipt-report.js",
+        "content": "// Receipt reducer: build a small run-log report tool. Builtins only.\n\nconst TYPES = new Set(['started', 'succeeded', 'failed']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isNonemptyString(value) {\n  return typeof value === 'string' && value.length > 0;\n}\n\nfunction isSafeInt(value, min) {\n  return Number.isSafeInteger(value) && value >= min;\n}\n\nfunction requiredFields(event) {\n  return {\n    id: event.id,\n    job: event.job,\n    attempt: event.attempt,\n    seq: event.seq,\n    type: event.type,\n  };\n}\n\nfunction sameRequiredFields(a, b) {\n  return (\n    a.id === b.id &&\n    a.job === b.job &&\n    a.attempt === b.attempt &&\n    a.seq === b.seq &&\n    a.type === b.type\n  );\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a string');\n  }\n\n  const seen = new Map(); // id -> required fields\n  let duplicates = 0;\n\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  for (const line of lines) {\n    if (line.trim() === '') continue;\n\n    let event;\n    try {\n      event = JSON.parse(line);\n    } catch {\n      fail('invalid JSON line');\n    }\n    if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n      fail('each line must be a JSON object');\n    }\n\n    const { id, job, attempt, seq, type } = event;\n    if (!isNonemptyString(id)) fail('id must be a nonempty string');\n    if (!isNonemptyString(job)) fail('job must be a nonempty string');\n    if (!isSafeInt(attempt, 1)) fail('attempt must be a positive safe integer');\n    if (!isSafeInt(seq, 0)) fail('seq must be a nonnegative safe integer');\n    if (typeof type !== 'string' || !TYPES.has(type)) fail('type must be started, succeeded, or failed');\n\n    const fields = requiredFields(event);\n    const existing = seen.get(id);\n    if (existing === undefined) {\n      seen.set(id, fields);\n    } else if (sameRequiredFields(existing, fields)) {\n      duplicates += 1;\n    } else {\n      fail('conflicting duplicate id');\n    }\n  }\n\n  const events = [...seen.values()];\n\n  // Map (job, attempt) -> { start, terminal }\n  const groups = new Map();\n  const groupKey = (job, attempt) => job + '\\u0000' + attempt;\n\n  for (const event of events) {\n    const key = groupKey(event.job, event.attempt);\n    let group = groups.get(key);\n    if (group === undefined) {\n      group = { job: event.job, attempt: event.attempt, start: null, terminal: null };\n      groups.set(key, group);\n    }\n\n    if (event.type === 'started') {\n      if (group.start !== null) {\n        fail('repeated start for (job, attempt) with different id');\n      }\n      group.start = event;\n    } else {\n      if (group.terminal !== null) {\n        fail('contradictory terminals for (job, attempt)');\n      }\n      group.terminal = event;\n    }\n  }\n\n  const jobs = new Map();\n  for (const group of groups.values()) {\n    if (group.start === null) {\n      fail('orphan terminal event');\n    }\n    if (group.terminal !== null && group.terminal.seq <= group.start.seq) {\n      fail('terminal seq must be strictly greater than start seq');\n    }\n\n    let jobEntry = jobs.get(group.job);\n    if (jobEntry === undefined) {\n      jobEntry = { job: group.job, attempts: [] };\n      jobs.set(group.job, jobEntry);\n    }\n    jobEntry.attempts.push({\n      attempt: group.attempt,\n      status: group.terminal === null ? 'running' : group.terminal.type,\n      startedSeq: group.start.seq,\n      finishedSeq: group.terminal === null ? null : group.terminal.seq,\n    });\n  }\n\n  const jobList = [...jobs.values()];\n  jobList.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  for (const job of jobList) {\n    job.attempts.sort((a, b) => a.attempt - b.attempt);\n  }\n\n  return { jobs: jobList, duplicates };\n}\n\nimport { readFileSync } from 'node:fs';\n\nfunction isMainModule() {\n  if (typeof process === 'undefined' || !process.argv || !process.argv[1]) return false;\n  try {\n    const entry = new URL(import.meta.url).pathname;\n    return process.argv[1] === entry;\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  if (args.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    process.exit(2);\n  }\n  let text;\n  try {\n    text = readFileSync(args[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`cannot read ${args[0]}: ${err.message}\\n`);\n    process.exit(2);\n  }\n  try {\n    const report = reduceEvents(text);\n    process.stdout.write(JSON.stringify(report) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write(`invalid events: ${err.message}\\n`);\n    process.exit(2);\n  }\n}\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 1 executable statement(s) by AST comparison; 6 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: fail (AFTER L5), isNonemptyString (AFTER L9), isSafeInt (AFTER L13), requiredFields (AFTER L17).\n- BEFORE receipt-report.js:3 in reduceEvents: \"throw new Error('not implemented');\"\n  STAGED AFTER receipt-report.js:37 (retained function).\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:754829235eb7d3798f8e17647523fc83b983a132d05529feaed71985f84054f7.",
+      "atMs": 32099.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 3,
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "receipt-report.js",
+        "content": "// Receipt reducer: build a small run-log report tool. Builtins only.\n\nconst TYPES = new Set(['started', 'succeeded', 'failed']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isNonemptyString(value) {\n  return typeof value === 'string' && value.length > 0;\n}\n\nfunction isSafeInt(value, min) {\n  return Number.isSafeInteger(value) && value >= min;\n}\n\nfunction requiredFields(event) {\n  return {\n    id: event.id,\n    job: event.job,\n    attempt: event.attempt,\n    seq: event.seq,\n    type: event.type,\n  };\n}\n\nfunction sameRequiredFields(a, b) {\n  return (\n    a.id === b.id &&\n    a.job === b.job &&\n    a.attempt === b.attempt &&\n    a.seq === b.seq &&\n    a.type === b.type\n  );\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a string');\n  }\n\n  const seen = new Map(); // id -> required fields\n  let duplicates = 0;\n\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  for (const line of lines) {\n    if (line.trim() === '') continue;\n\n    let event;\n    try {\n      event = JSON.parse(line);\n    } catch {\n      fail('invalid JSON line');\n    }\n    if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n      fail('each line must be a JSON object');\n    }\n\n    const { id, job, attempt, seq, type } = event;\n    if (!isNonemptyString(id)) fail('id must be a nonempty string');\n    if (!isNonemptyString(job)) fail('job must be a nonempty string');\n    if (!isSafeInt(attempt, 1)) fail('attempt must be a positive safe integer');\n    if (!isSafeInt(seq, 0)) fail('seq must be a nonnegative safe integer');\n    if (typeof type !== 'string' || !TYPES.has(type)) fail('type must be started, succeeded, or failed');\n\n    const fields = requiredFields(event);\n    const existing = seen.get(id);\n    if (existing === undefined) {\n      seen.set(id, fields);\n    } else if (sameRequiredFields(existing, fields)) {\n      duplicates += 1;\n    } else {\n      fail('conflicting duplicate id');\n    }\n  }\n\n  const events = [...seen.values()];\n\n  // Map (job, attempt) -> { start, terminal }\n  const groups = new Map();\n  const groupKey = (job, attempt) => job + '\\u0000' + attempt;\n\n  for (const event of events) {\n    const key = groupKey(event.job, event.attempt);\n    let group = groups.get(key);\n    if (group === undefined) {\n      group = { job: event.job, attempt: event.attempt, start: null, terminal: null };\n      groups.set(key, group);\n    }\n\n    if (event.type === 'started') {\n      if (group.start !== null) {\n        fail('repeated start for (job, attempt) with different id');\n      }\n      group.start = event;\n    } else {\n      if (group.terminal !== null) {\n        fail('contradictory terminals for (job, attempt)');\n      }\n      group.terminal = event;\n    }\n  }\n\n  const jobs = new Map();\n  for (const group of groups.values()) {\n    if (group.start === null) {\n      fail('orphan terminal event');\n    }\n    if (group.terminal !== null && group.terminal.seq <= group.start.seq) {\n      fail('terminal seq must be strictly greater than start seq');\n    }\n\n    let jobEntry = jobs.get(group.job);\n    if (jobEntry === undefined) {\n      jobEntry = { job: group.job, attempts: [] };\n      jobs.set(group.job, jobEntry);\n    }\n    jobEntry.attempts.push({\n      attempt: group.attempt,\n      status: group.terminal === null ? 'running' : group.terminal.type,\n      startedSeq: group.start.seq,\n      finishedSeq: group.terminal === null ? null : group.terminal.seq,\n    });\n  }\n\n  const jobList = [...jobs.values()];\n  jobList.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  for (const job of jobList) {\n    job.attempts.sort((a, b) => a.attempt - b.attempt);\n  }\n\n  return { jobs: jobList, duplicates };\n}\n\nimport { readFileSync } from 'node:fs';\n\nfunction isMainModule() {\n  if (typeof process === 'undefined' || !process.argv || !process.argv[1]) return false;\n  try {\n    const entry = new URL(import.meta.url).pathname;\n    return process.argv[1] === entry;\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  if (args.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    process.exit(2);\n  }\n  let text;\n  try {\n    text = readFileSync(args[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`cannot read ${args[0]}: ${err.message}\\n`);\n    process.exit(2);\n  }\n  try {\n    const report = reduceEvents(text);\n    process.stdout.write(JSON.stringify(report) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write(`invalid events: ${err.message}\\n`);\n    process.exit(2);\n  }\n}\n"
+      },
+      "output": "wrote 4602 bytes to receipt-report.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `event` is also referenced in: test/receipt-report.test.js\n  `reduceEvents` is also referenced in: test/receipt-report.test.js",
+      "atMs": 45112.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 4,
+      "id": "action-5"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "output": "VERDICT: all 4 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty input\nok 1 - empty input\n  ---\n  duration_ms: 1.29539\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 2 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.241702\n  ...\n# Subtest: retransmission is counted\nok 3 - retransmission is counted\n  ---\n  duration_ms: 0.219222\n  ...\n# Subtest: orphan and malformed events fail\nok 4 - orphan and malformed events fail\n  ---\n  duration_ms: 0.757866\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.640965",
+      "atMs": 45640.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 5,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 1,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 1 needs fresh focused execution, then the configured project check. Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not. Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away."
+      },
+      "id": "action-6"
+    },
+    {
+      "name": "supervisor-review",
+      "category": "other",
+      "request": {
+        "focus": "collection-preconditions",
+        "generation": 1
+      },
+      "output": {
+        "status": "report",
+        "advisory": true,
+        "findings": [
+          {
+            "entrypoint": "reduceEvents",
+            "requirement": "Reject invalid JSON or any invalid required field with an Error.",
+            "location": "receipt-report.js / reduceEvents",
+            "fixture": "reduceEvents('null')",
+            "expected": "Throws an Error.",
+            "predicted": "Returns { jobs: [], duplicates: 0 }.",
+            "contrast": {
+              "observable": "Return value or thrown exception",
+              "expectedJson": "{\"kind\":\"throw\",\"message\":\"each line must be a JSON object\"}",
+              "predictedJson": "{\"kind\":\"return\",\"value\":{\"jobs\":[],\"duplicates\":0}}"
+            }
+          }
+        ],
+        "note": "",
+        "report": "1. reduceEvents \u2014 receipt-report.js / reduceEvents\nPublic requirement: Reject invalid JSON or any invalid required field with an Error.\nProposed fixture/assertion (NOT executed): reduceEvents('null')\nExpected: Throws an Error.\nPredicted from source: Returns { jobs: [], duplicates: 0 }.",
+        "quality": {
+          "status": "bounded",
+          "deferred": [],
+          "noteIncomplete": false,
+          "candidateVerified": false,
+          "scope": "source-hypothesis-with-declared-observable-contrast"
+        }
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "turn": 5,
+      "id": "action-7"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node -e \"import('./receipt-report.js').then(m=>{try{m.reduceEvents('null');console.log('NO-THROW null');}catch(e){console.log('THROW null:',e.message);} try{m.reduceEvents('[1,2]');console.log('NO-THROW arr');}catch(e){console.log('THROW arr:',e.message);} try{m.reduceEvents('{\\\"id\\\":1,\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW id1');}catch(e){console.log('THROW id1:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1.5,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW att1.5');}catch(e){console.log('THROW att1.5:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":'+(Number.MAX_SAFE_INTEGER+1)+',\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW bigseq');}catch(e){console.log('THROW bigseq:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"succeeded\\\"}');console.log('NO-THROW eqseq');}catch(e){console.log('THROW eqseq:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":2,\\\"type\\\":\\\"succeeded\\\"}\\n{\\\"id\\\":\\\"c\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":3,\\\"type\\\":\\\"failed\\\"}');console.log('NO-THROW twoTerm');}catch(e){console.log('THROW twoTerm:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":1,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW twoStart');}catch(e){console.log('THROW twoStart:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\",\\\"meta\\\":1}');console.log('dup ok',JSON.stringify(m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\",\\\"meta\\\":1}')));}catch(e){console.log('THROW dup:',e.message);}})\""
+      },
+      "output": "$ node -e \"import('./receipt-report.js').then(m=>{try{m.reduceEvents('null');console.log('NO-THROW null');}catch(e){console.log('THROW null:',e.message);} try{m.reduceEvents('[1,2]');console.log('NO-THROW arr');}catch(e){console.log('THROW arr:',e.message);} try{m.reduceEvents('{\\\"id\\\":1,\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW id1');}catch(e){console.log('THROW id1:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1.5,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW att1.5');}catch(e){console.log('THROW att1.5:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":'+(Number.MAX_SAFE_INTEGER+1)+',\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW bigseq');}catch(e){console.log('THROW bigseq:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"succeeded\\\"}');console.log('NO-THROW eqseq');}catch(e){console.log('THROW eqseq:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":2,\\\"type\\\":\\\"succeeded\\\"}\\n{\\\"id\\\":\\\"c\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":3,\\\"type\\\":\\\"failed\\\"}');console.log('NO-THROW twoTerm');}catch(e){console.log('THROW twoTerm:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"b\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":1,\\\"type\\\":\\\"started\\\"}');console.log('NO-THROW twoStart');}catch(e){console.log('THROW twoStart:',e.message);} try{m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\",\\\"meta\\\":1}');console.log('dup ok',JSON.stringify(m.reduceEvents('{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\"}\\n{\\\"id\\\":\\\"a\\\",\\\"job\\\":\\\"x\\\",\\\"attempt\\\":1,\\\"seq\\\":0,\\\"type\\\":\\\"started\\\",\\\"meta\\\":1}')));}catch(e){console.log('THROW dup:',e.message);}})\"\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nTHROW null: each line must be a JSON object\nTHROW arr: each line must be a JSON object\nTHROW id1: id must be a nonempty string\nTHROW att1.5: attempt must be a positive safe integer\nTHROW bigseq: seq must be a nonnegative safe integer\nTHROW eqseq: terminal seq must be strictly greater than start seq\nTHROW twoTerm: contradictory terminals for (job, attempt)\nTHROW twoStart: repeated start for (job, attempt) with different id\ndup ok {\"jobs\":[{\"job\":\"x\",\"attempts\":[{\"attempt\":1,\"status\":\"running\",\"startedSeq\":0,\"finishedSeq\":null}]}],\"duplicates\":1}",
+      "atMs": 62512.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 6,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 1,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 1 still needs focused proof. Execution: turn 7 ran and exited 0. Focused-proof admission: NOT ADMITTED. The inline check has no recognized node:assert binding/call. A custom assert helper or if/exit check is not admitted by this bounded recognizer. Next: use a permitted file-edit action (e.g. write_file) to create a new workspace check script, e.g. check-contract.mjs. Import the real production API and assert public-contract expectations with node:assert/strict. Temporary fixture DATA goes under os.tmpdir(); the check SCRIPT stays in the workspace. In a separate permitted shell action run only node check-contract.mjs (substitute its actual relative path): no cd, bash -c, setup, echo, filters or cleanup. Keep the check; printed pass messages are not proof. Start with one discriminating fixture/assertion and execute it before expanding coverage. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-8"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "check-contract.mjs",
+        "content": "import assert from 'node:assert/strict';\nimport { reduceEvents } from './receipt-report.js';\n\n// null / array / non-object lines must throw\nassert.throws(() => reduceEvents('null'), Error);\nassert.throws(() => reduceEvents('[1,2]'), Error);\nassert.throws(() => reduceEvents('42'), Error);\nassert.throws(() => reduceEvents('\"str\"'), Error);\n\n// invalid required fields must throw\nassert.throws(() => reduceEvents('{\"id\":1,\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":0,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1.5,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":-1,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":1.5,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":' + (Number.MAX_SAFE_INTEGER + 1) + ',\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"done\"}'), Error);\n\n// CRLF and missing final newline\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\r\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}'),\n  { jobs: [{ job: 'x', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 5 }] }], duplicates: 0 });\n\n// __proto__ id and unicode job\nassert.deepEqual(reduceEvents('{\"id\":\"__proto__\",\"job\":\"j\\u00e9\\u0020x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n  { jobs: [{ job: 'j\\u00e9\\u0020x', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n\n// duplicate with extra fields counts\nassert.equal(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\",\"meta\":1}').duplicates, 1);\n\n// conflicting duplicate id throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":2,\"seq\":0,\"type\":\"started\"}'), Error);\n\n// terminal seq equal to start seq throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"succeeded\"}'), Error);\n\n// two terminals for same (job,attempt) throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":2,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":1,\"seq\":3,\"type\":\"failed\"}'), Error);\n\n// two starts for same (job,attempt) throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}'), Error);\n\n// orphan terminal throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}'), Error);\n\n// different attempts independent, overlapping seqs\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":10,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":2,\"seq\":5,\"type\":\"started\"}\\n{\"id\":\"d\",\"job\":\"x\",\"attempt\":2,\"seq\":6,\"type\":\"failed\"}'),\n  { jobs: [{ job: 'x', attempts: [\n    { attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 10 },\n    { attempt: 2, status: 'failed', startedSeq: 5, finishedSeq: 6 },\n  ] }], duplicates: 0 });\n\n// job sort order (UTF-16 code units)\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"B\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"a\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"c\",\"job\":\"A\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n  { jobs: [{ job: 'A', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n           { job: 'B', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n           { job: 'a', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n\nconsole.log('all contract checks passed');\n"
+      },
+      "output": "wrote 4316 bytes to check-contract.mjs\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `report` is also referenced in: receipt-report.js, test/receipt-report.test.js\n  `lines` is also referenced in: receipt-report.js\n  `fields` is also referenced in: receipt-report.js\n[peer] `reduceEvents` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `sameRequiredFields` (receipt-report.js:37):\n  );\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a string');\n  }\n\u2014 `isMainModule` (receipt-report.js:161):\n    process.exit(2);\n  }\n  try {\n    const report = reduceEvents(text);\n    process.stdout.write(JSON.stringify(report) + '\\n');\n    process.exit(0);\n  } catch (err) {",
+      "atMs": 80285.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 7,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 2,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 2 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 da330465f6e720ccc65eb894f16bacd466f704e0fd9dfeb1ce03a477b5f34886). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-9"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs"
+      },
+      "output": "$ node check-contract.mjs\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nall contract checks passed\n\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: npm test. Result: PASS.\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty input\nok 1 - empty input\n  ---\n  duration_ms: 1.251809\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 2 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.236852\n  ...\n# Subtest: retransmission is counted\nok 3 - retransmission is counted\n  ---\n  duration_ms: 0.208292\n  ...\n# Subtest: orphan and malformed events fail\nok 4 - orphan and malformed events fail\n  ---\n  duration_ms: 0.767246\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.590655\n\n[auto-verify] The focused and configured project receipts are now complete on generation 2. Focused command: \"node check-contract.mjs\". No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.",
+      "atMs": 81322.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 8,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 2,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 2). Focused command: \"node check-contract.mjs\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-10"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "total": 4
+        },
+        "failingTests": [],
+        "outputSha256": "fe6f0b9c7ee904bb0042d95068058d79d127631892feba8a1bb2a7432257cbbe"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 8,
+      "id": "action-11"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "printf '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}\\n' > /tmp/log.jsonl && node receipt-report.js /tmp/log.jsonl; echo \"exit=$?\"; echo \"---no-args---\"; node receipt-report.js; echo \"exit=$?\"; echo \"---two-args---\"; node receipt-report.js a b; echo \"exit=$?\"; echo \"---missing-file---\"; node receipt-report.js /tmp/does-not-exist-xyz.jsonl; echo \"exit=$?\"; echo \"---bad-events---\"; printf '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}\\n' > /tmp/bad.jsonl; node receipt-report.js /tmp/bad.jsonl; echo \"exit=$?\""
+      },
+      "output": "$ printf '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}\\n' > /tmp/log.jsonl && node receipt-report.js /tmp/log.jsonl; echo \"exit=$?\"; echo \"---no-args---\"; node receipt-report.js; echo \"exit=$?\"; echo \"---two-args---\"; node receipt-report.js a b; echo \"exit=$?\"; echo \"---missing-file---\"; node receipt-report.js /tmp/does-not-exist-xyz.jsonl; echo \"exit=$?\"; echo \"---bad-events---\"; printf '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}\\n' > /tmp/bad.jsonl; node receipt-report.js /tmp/bad.jsonl; echo \"exit=$?\"\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n{\"jobs\":[{\"job\":\"x\",\"attempts\":[{\"attempt\":1,\"status\":\"succeeded\",\"startedSeq\":0,\"finishedSeq\":5}]}],\"duplicates\":0}\nexit=0\n---no-args---\nexit=2\n---two-args---\nexit=2\n---missing-file---\nexit=2\n---bad-events---\nexit=2\n\n[stderr]\nusage: node receipt-report.js LOGFILE\nusage: node receipt-report.js LOGFILE\ncannot read /tmp/does-not-exist-xyz.jsonl: ENOENT: no such file or directory, open '/tmp/does-not-exist-xyz.jsonl'\ninvalid events: orphan terminal event\n\n[verification uncertainty] outer shell success may mask an inner runner failure: compound shell syntax can mask an earlier failure. This is not a passing check. Run the executable check directly, without output filters or shell control that can mask its exit status.",
+      "atMs": 88022.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 9,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 2,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 2 still needs focused proof. Execution: turn 10 ran and exited 0. Focused-proof admission: NOT ADMITTED. The launcher is compound or its status is opaque; an outer zero does not establish the required direct assertion result. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 da330465f6e720ccc65eb894f16bacd466f704e0fd9dfeb1ce03a477b5f34886). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-12"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "check-cli.mjs",
+        "content": "import assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { writeFileSync, unlinkSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\n\nconst file = join(tmpdir(), 'cli-check.jsonl');\nwriteFileSync(file, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}\\n');\n\n// success: exit 0, stdout is JSON + newline, no stderr\nlet r = spawnSync('node', ['receipt-report.js', file], { encoding: 'utf8' });\nassert.equal(r.status, 0, 'success exit 0');\nassert.equal(r.stdout, '{\"jobs\":[{\"job\":\"x\",\"attempts\":[{\"attempt\":1,\"status\":\"succeeded\",\"startedSeq\":0,\"finishedSeq\":5}]}],\"duplicates\":0}\\n', 'stdout exact');\nassert.equal(r.stderr, '', 'no stderr on success');\n\n// no args: exit 2, nonempty stderr, no stdout\nr = spawnSync('node', ['receipt-report.js'], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'no-args exit 2');\nassert.ok(r.stderr.length > 0, 'no-args stderr nonempty');\nassert.equal(r.stdout, '', 'no-args no stdout');\n\n// two args: exit 2\nr = spawnSync('node', ['receipt-report.js', 'a', 'b'], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'two-args exit 2');\nassert.ok(r.stderr.length > 0, 'two-args stderr nonempty');\nassert.equal(r.stdout, '', 'two-args no stdout');\n\n// missing file: exit 2\nr = spawnSync('node', ['receipt-report.js', join(tmpdir(), 'does-not-exist-xyz.jsonl')], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'missing-file exit 2');\nassert.ok(r.stderr.length > 0, 'missing-file stderr nonempty');\nassert.equal(r.stdout, '', 'missing-file no stdout');\n\n// invalid events: exit 2\nconst badFile = join(tmpdir(), 'cli-bad.jsonl');\nwriteFileSync(badFile, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}\\n');\nr = spawnSync('node', ['receipt-report.js', badFile], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'bad-events exit 2');\nassert.ok(r.stderr.length > 0, 'bad-events stderr nonempty');\nassert.equal(r.stdout, '', 'bad-events no stdout');\nunlinkSync(badFile);\nunlinkSync(file);\n\nconsole.log('all CLI checks passed');\n"
+      },
+      "output": "wrote 2106 bytes to check-cli.mjs\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `jsonl` is also referenced in: test/receipt-report.test.js\n  `duplicates` is also referenced in: receipt-report.js, test/receipt-report.test.js, check-contract.mjs\n  `events` is also referenced in: receipt-report.js, test/receipt-report.test.js\n[peer] `report` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `isMainModule` (receipt-report.js:150):\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  if (args.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    process.exit(2);\n  }\n  let text;\n[scope] Verification invalidated: workspace generation 2 -> 3; changed \"check-cli.mjs\". Earlier PASS receipts describe generation 2, not this tree. Deleting a check script also changes the verified workspace. Finish necessary cleanup BEFORE the final focused check and configured project check; keep intended checks. Obtain fresh receipts before DONE.",
+      "atMs": 98321.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 10,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 3,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 3 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 da330465f6e720ccc65eb894f16bacd466f704e0fd9dfeb1ce03a477b5f34886). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-13"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs"
+      },
+      "output": "$ node check-contract.mjs\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nall contract checks passed\n\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: npm test. Result: PASS.\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty input\nok 1 - empty input\n  ---\n  duration_ms: 1.312019\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 2 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.236012\n  ...\n# Subtest: retransmission is counted\nok 3 - retransmission is counted\n  ---\n  duration_ms: 0.218301\n  ...\n# Subtest: orphan and malformed events fail\nok 4 - orphan and malformed events fail\n  ---\n  duration_ms: 0.756916\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.754957\n\n[auto-verify] The focused and configured project receipts are now complete on generation 3. Focused command: \"node check-contract.mjs\". No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.",
+      "atMs": 99200.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 11,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 3,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 3). Focused command: \"node check-contract.mjs\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-14"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "total": 4
+        },
+        "failingTests": [],
+        "outputSha256": "e625cc1579e464f7919801a0e2c9ad2d0b91c260529d15ac6518ef617b2ddac1"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 11,
+      "id": "action-15"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-cli.mjs"
+      },
+      "output": "$ node check-cli.mjs\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nall CLI checks passed",
+      "atMs": 103177.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 12,
+      "supervisor": {
+        "phase": "project",
+        "generation": 3,
+        "text": "CONTRACT AUDIT PHASE: focused proof is current (generation 3); only configured project verification remains. Next: run \"npm test\" directly. Do not repeat the focused check, delete its script, or emit DONE yet."
+      },
+      "id": "action-16"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "output": "VERDICT: all 4 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty input\nok 1 - empty input\n  ---\n  duration_ms: 1.285889\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 2 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.233471\n  ...\n# Subtest: retransmission is counted\nok 3 - retransmission is counted\n  ---\n  duration_ms: 0.201391\n  ...\n# Subtest: orphan and malformed events fail\nok 4 - orphan and malformed events fail\n  ---\n  duration_ms: 0.750425\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 44.830034",
+      "atMs": 104309.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 13,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 3,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 3). Focused command: \"node check-cli.mjs\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-17"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "a": "done",
+        "summary": "Implemented `receipt-report.js` with the synchronous `reduceEvents(text)` export and CLI entry point using Node.js builtins only. All 4 existing tests pass, plus focused contract checks (`check-contract.mjs`) and CLI behavior checks (`check-cli.mjs`) covering: invalid JSON/non-object lines, all required-field validation (nonempty strings, positive/nonnegative safe integers, exact type values), CRLF and missing-final-newline handling, deduplication with extra-field tolerance, conflicting duplicate IDs, orphan terminals, repeated starts, contradictory terminals, terminal-seq-must-exceed-start-seq, independent attempts with overlapping seqs, UTF-16 code-unit job sort order, `__proto__` IDs, Unicode jobs, and CLI exit codes (0 on success, 2 on bad args/missing file/invalid events with nonempty stderr and no stdout)."
+      },
+      "output": "",
+      "atMs": 112019.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 14,
+      "id": "action-18"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 291.0,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 303.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 315.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 327.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 340.0,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 112099.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 112107.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 112115.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 112122.0,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 112130.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 112137.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 112145.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 112153.0,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Implemented `receipt-report.js` with the synchronous `reduceEvents(text)` export and CLI entry point using Node.js builtins only. All 4 existing tests pass, plus focused contract checks (`check-contract.mjs`) and CLI behavior checks (`check-cli.mjs`) covering: invalid JSON/non-object lines, all required-field validation (nonempty strings, positive/nonnegative safe integers, exact type values), CRLF and missing-final-newline handling, deduplication with extra-field tolerance, conflicting duplicate IDs, orphan terminals, repeated starts, contradictory terminals, terminal-seq-must-exceed-start-seq, independent attempts with overlapping seqs, UTF-16 code-unit job sort order, `__proto__` IDs, Unicode jobs, and CLI exit codes (0 on success, 2 on bad args/missing file/invalid events with nonempty stderr and no stdout).",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "check-cli.mjs",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "6d96936f93680b0b412c542bc55be41e2b9a6754081429d1439cd2c6f70d0278",
+      "before": null,
+      "after": "import assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { writeFileSync, unlinkSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\n\nconst file = join(tmpdir(), 'cli-check.jsonl');\nwriteFileSync(file, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}\\n');\n\n// success: exit 0, stdout is JSON + newline, no stderr\nlet r = spawnSync('node', ['receipt-report.js', file], { encoding: 'utf8' });\nassert.equal(r.status, 0, 'success exit 0');\nassert.equal(r.stdout, '{\"jobs\":[{\"job\":\"x\",\"attempts\":[{\"attempt\":1,\"status\":\"succeeded\",\"startedSeq\":0,\"finishedSeq\":5}]}],\"duplicates\":0}\\n', 'stdout exact');\nassert.equal(r.stderr, '', 'no stderr on success');\n\n// no args: exit 2, nonempty stderr, no stdout\nr = spawnSync('node', ['receipt-report.js'], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'no-args exit 2');\nassert.ok(r.stderr.length > 0, 'no-args stderr nonempty');\nassert.equal(r.stdout, '', 'no-args no stdout');\n\n// two args: exit 2\nr = spawnSync('node', ['receipt-report.js', 'a', 'b'], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'two-args exit 2');\nassert.ok(r.stderr.length > 0, 'two-args stderr nonempty');\nassert.equal(r.stdout, '', 'two-args no stdout');\n\n// missing file: exit 2\nr = spawnSync('node', ['receipt-report.js', join(tmpdir(), 'does-not-exist-xyz.jsonl')], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'missing-file exit 2');\nassert.ok(r.stderr.length > 0, 'missing-file stderr nonempty');\nassert.equal(r.stdout, '', 'missing-file no stdout');\n\n// invalid events: exit 2\nconst badFile = join(tmpdir(), 'cli-bad.jsonl');\nwriteFileSync(badFile, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}\\n');\nr = spawnSync('node', ['receipt-report.js', badFile], { encoding: 'utf8' });\nassert.equal(r.status, 2, 'bad-events exit 2');\nassert.ok(r.stderr.length > 0, 'bad-events stderr nonempty');\nassert.equal(r.stdout, '', 'bad-events no stdout');\nunlinkSync(badFile);\nunlinkSync(file);\n\nconsole.log('all CLI checks passed');\n",
+      "displaySha256": "6d96936f93680b0b412c542bc55be41e2b9a6754081429d1439cd2c6f70d0278",
+      "diff": "--- starter/check-cli.mjs\n+++ delivered/check-cli.mjs\n@@ -0,0 +1,44 @@\n+import assert from 'node:assert/strict';\n+import { spawnSync } from 'node:child_process';\n+import { writeFileSync, unlinkSync } from 'node:fs';\n+import { tmpdir } from 'node:os';\n+import { join } from 'node:path';\n+\n+const file = join(tmpdir(), 'cli-check.jsonl');\n+writeFileSync(file, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}\\n');\n+\n+// success: exit 0, stdout is JSON + newline, no stderr\n+let r = spawnSync('node', ['receipt-report.js', file], { encoding: 'utf8' });\n+assert.equal(r.status, 0, 'success exit 0');\n+assert.equal(r.stdout, '{\"jobs\":[{\"job\":\"x\",\"attempts\":[{\"attempt\":1,\"status\":\"succeeded\",\"startedSeq\":0,\"finishedSeq\":5}]}],\"duplicates\":0}\\n', 'stdout exact');\n+assert.equal(r.stderr, '', 'no stderr on success');\n+\n+// no args: exit 2, nonempty stderr, no stdout\n+r = spawnSync('node', ['receipt-report.js'], { encoding: 'utf8' });\n+assert.equal(r.status, 2, 'no-args exit 2');\n+assert.ok(r.stderr.length > 0, 'no-args stderr nonempty');\n+assert.equal(r.stdout, '', 'no-args no stdout');\n+\n+// two args: exit 2\n+r = spawnSync('node', ['receipt-report.js', 'a', 'b'], { encoding: 'utf8' });\n+assert.equal(r.status, 2, 'two-args exit 2');\n+assert.ok(r.stderr.length > 0, 'two-args stderr nonempty');\n+assert.equal(r.stdout, '', 'two-args no stdout');\n+\n+// missing file: exit 2\n+r = spawnSync('node', ['receipt-report.js', join(tmpdir(), 'does-not-exist-xyz.jsonl')], { encoding: 'utf8' });\n+assert.equal(r.status, 2, 'missing-file exit 2');\n+assert.ok(r.stderr.length > 0, 'missing-file stderr nonempty');\n+assert.equal(r.stdout, '', 'missing-file no stdout');\n+\n+// invalid events: exit 2\n+const badFile = join(tmpdir(), 'cli-bad.jsonl');\n+writeFileSync(badFile, '{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}\\n');\n+r = spawnSync('node', ['receipt-report.js', badFile], { encoding: 'utf8' });\n+assert.equal(r.status, 2, 'bad-events exit 2');\n+assert.ok(r.stderr.length > 0, 'bad-events stderr nonempty');\n+assert.equal(r.stdout, '', 'bad-events no stdout');\n+unlinkSync(badFile);\n+unlinkSync(file);\n+\n+console.log('all CLI checks passed');\n"
+    },
+    {
+      "path": "check-contract.mjs",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "da330465f6e720ccc65eb894f16bacd466f704e0fd9dfeb1ce03a477b5f34886",
+      "before": null,
+      "after": "import assert from 'node:assert/strict';\nimport { reduceEvents } from './receipt-report.js';\n\n// null / array / non-object lines must throw\nassert.throws(() => reduceEvents('null'), Error);\nassert.throws(() => reduceEvents('[1,2]'), Error);\nassert.throws(() => reduceEvents('42'), Error);\nassert.throws(() => reduceEvents('\"str\"'), Error);\n\n// invalid required fields must throw\nassert.throws(() => reduceEvents('{\"id\":1,\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":0,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1.5,\"seq\":0,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":-1,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":1.5,\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":' + (Number.MAX_SAFE_INTEGER + 1) + ',\"type\":\"started\"}'), Error);\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"done\"}'), Error);\n\n// CRLF and missing final newline\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\r\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}'),\n  { jobs: [{ job: 'x', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 5 }] }], duplicates: 0 });\n\n// __proto__ id and unicode job\nassert.deepEqual(reduceEvents('{\"id\":\"__proto__\",\"job\":\"j\\u00e9\\u0020x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n  { jobs: [{ job: 'j\\u00e9\\u0020x', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n\n// duplicate with extra fields counts\nassert.equal(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\",\"meta\":1}').duplicates, 1);\n\n// conflicting duplicate id throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":2,\"seq\":0,\"type\":\"started\"}'), Error);\n\n// terminal seq equal to start seq throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"succeeded\"}'), Error);\n\n// two terminals for same (job,attempt) throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":2,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":1,\"seq\":3,\"type\":\"failed\"}'), Error);\n\n// two starts for same (job,attempt) throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}'), Error);\n\n// orphan terminal throws\nassert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}'), Error);\n\n// different attempts independent, overlapping seqs\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":10,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":2,\"seq\":5,\"type\":\"started\"}\\n{\"id\":\"d\",\"job\":\"x\",\"attempt\":2,\"seq\":6,\"type\":\"failed\"}'),\n  { jobs: [{ job: 'x', attempts: [\n    { attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 10 },\n    { attempt: 2, status: 'failed', startedSeq: 5, finishedSeq: 6 },\n  ] }], duplicates: 0 });\n\n// job sort order (UTF-16 code units)\nassert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"B\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"a\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"c\",\"job\":\"A\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n  { jobs: [{ job: 'A', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n           { job: 'B', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n           { job: 'a', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n\nconsole.log('all contract checks passed');\n",
+      "displaySha256": "da330465f6e720ccc65eb894f16bacd466f704e0fd9dfeb1ce03a477b5f34886",
+      "diff": "--- starter/check-contract.mjs\n+++ delivered/check-contract.mjs\n@@ -0,0 +1,60 @@\n+import assert from 'node:assert/strict';\n+import { reduceEvents } from './receipt-report.js';\n+\n+// null / array / non-object lines must throw\n+assert.throws(() => reduceEvents('null'), Error);\n+assert.throws(() => reduceEvents('[1,2]'), Error);\n+assert.throws(() => reduceEvents('42'), Error);\n+assert.throws(() => reduceEvents('\"str\"'), Error);\n+\n+// invalid required fields must throw\n+assert.throws(() => reduceEvents('{\"id\":1,\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":0,\"seq\":0,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1.5,\"seq\":0,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":-1,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":1.5,\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":' + (Number.MAX_SAFE_INTEGER + 1) + ',\"type\":\"started\"}'), Error);\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"done\"}'), Error);\n+\n+// CRLF and missing final newline\n+assert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\r\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"succeeded\"}'),\n+  { jobs: [{ job: 'x', attempts: [{ attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 5 }] }], duplicates: 0 });\n+\n+// __proto__ id and unicode job\n+assert.deepEqual(reduceEvents('{\"id\":\"__proto__\",\"job\":\"j\\u00e9\\u0020x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n+  { jobs: [{ job: 'j\\u00e9\\u0020x', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n+\n+// duplicate with extra fields counts\n+assert.equal(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\",\"meta\":1}').duplicates, 1);\n+\n+// conflicting duplicate id throws\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"a\",\"job\":\"x\",\"attempt\":2,\"seq\":0,\"type\":\"started\"}'), Error);\n+\n+// terminal seq equal to start seq throws\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"succeeded\"}'), Error);\n+\n+// two terminals for same (job,attempt) throws\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":2,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":1,\"seq\":3,\"type\":\"failed\"}'), Error);\n+\n+// two starts for same (job,attempt) throws\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":1,\"type\":\"started\"}'), Error);\n+\n+// orphan terminal throws\n+assert.throws(() => reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":5,\"type\":\"failed\"}'), Error);\n+\n+// different attempts independent, overlapping seqs\n+assert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"x\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"x\",\"attempt\":1,\"seq\":10,\"type\":\"succeeded\"}\\n{\"id\":\"c\",\"job\":\"x\",\"attempt\":2,\"seq\":5,\"type\":\"started\"}\\n{\"id\":\"d\",\"job\":\"x\",\"attempt\":2,\"seq\":6,\"type\":\"failed\"}'),\n+  { jobs: [{ job: 'x', attempts: [\n+    { attempt: 1, status: 'succeeded', startedSeq: 0, finishedSeq: 10 },\n+    { attempt: 2, status: 'failed', startedSeq: 5, finishedSeq: 6 },\n+  ] }], duplicates: 0 });\n+\n+// job sort order (UTF-16 code units)\n+assert.deepEqual(reduceEvents('{\"id\":\"a\",\"job\":\"B\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"b\",\"job\":\"a\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}\\n{\"id\":\"c\",\"job\":\"A\",\"attempt\":1,\"seq\":0,\"type\":\"started\"}'),\n+  { jobs: [{ job: 'A', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n+           { job: 'B', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] },\n+           { job: 'a', attempts: [{ attempt: 1, status: 'running', startedSeq: 0, finishedSeq: null }] }], duplicates: 0 });\n+\n+console.log('all contract checks passed');\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "afterSha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "before": "{\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-receipt-reducer\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "437084aa5b1b7dfbe8ec12b5ad7e3ad2809f908859a361b43f38f516bb679948",
+      "diff": ""
+    },
+    {
+      "path": "receipt-report.js",
+      "state": "changed",
+      "beforeSha256": "da6a822887f12982b665843bf181f61615af52895a3a7d42aa37ad5aac345ecc",
+      "afterSha256": "eacc0af34b4b660686405f81407c7e68a62abf47e9dd4d010a88303bb52ae2ea",
+      "before": "// Implement the public work order in task.md. Builtins only.\nexport function reduceEvents(text) {\n  throw new Error('not implemented');\n}\n",
+      "after": "// Receipt reducer: build a small run-log report tool. Builtins only.\n\nconst TYPES = new Set(['started', 'succeeded', 'failed']);\n\nfunction fail(message) {\n  throw new Error(message);\n}\n\nfunction isNonemptyString(value) {\n  return typeof value === 'string' && value.length > 0;\n}\n\nfunction isSafeInt(value, min) {\n  return Number.isSafeInteger(value) && value >= min;\n}\n\nfunction requiredFields(event) {\n  return {\n    id: event.id,\n    job: event.job,\n    attempt: event.attempt,\n    seq: event.seq,\n    type: event.type,\n  };\n}\n\nfunction sameRequiredFields(a, b) {\n  return (\n    a.id === b.id &&\n    a.job === b.job &&\n    a.attempt === b.attempt &&\n    a.seq === b.seq &&\n    a.type === b.type\n  );\n}\n\nexport function reduceEvents(text) {\n  if (typeof text !== 'string') {\n    fail('input must be a string');\n  }\n\n  const seen = new Map(); // id -> required fields\n  let duplicates = 0;\n\n  const lines = text.split(/\\r\\n|\\n|\\r/);\n  for (const line of lines) {\n    if (line.trim() === '') continue;\n\n    let event;\n    try {\n      event = JSON.parse(line);\n    } catch {\n      fail('invalid JSON line');\n    }\n    if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n      fail('each line must be a JSON object');\n    }\n\n    const { id, job, attempt, seq, type } = event;\n    if (!isNonemptyString(id)) fail('id must be a nonempty string');\n    if (!isNonemptyString(job)) fail('job must be a nonempty string');\n    if (!isSafeInt(attempt, 1)) fail('attempt must be a positive safe integer');\n    if (!isSafeInt(seq, 0)) fail('seq must be a nonnegative safe integer');\n    if (typeof type !== 'string' || !TYPES.has(type)) fail('type must be started, succeeded, or failed');\n\n    const fields = requiredFields(event);\n    const existing = seen.get(id);\n    if (existing === undefined) {\n      seen.set(id, fields);\n    } else if (sameRequiredFields(existing, fields)) {\n      duplicates += 1;\n    } else {\n      fail('conflicting duplicate id');\n    }\n  }\n\n  const events = [...seen.values()];\n\n  // Map (job, attempt) -> { start, terminal }\n  const groups = new Map();\n  const groupKey = (job, attempt) => job + '\\u0000' + attempt;\n\n  for (const event of events) {\n    const key = groupKey(event.job, event.attempt);\n    let group = groups.get(key);\n    if (group === undefined) {\n      group = { job: event.job, attempt: event.attempt, start: null, terminal: null };\n      groups.set(key, group);\n    }\n\n    if (event.type === 'started') {\n      if (group.start !== null) {\n        fail('repeated start for (job, attempt) with different id');\n      }\n      group.start = event;\n    } else {\n      if (group.terminal !== null) {\n        fail('contradictory terminals for (job, attempt)');\n      }\n      group.terminal = event;\n    }\n  }\n\n  const jobs = new Map();\n  for (const group of groups.values()) {\n    if (group.start === null) {\n      fail('orphan terminal event');\n    }\n    if (group.terminal !== null && group.terminal.seq <= group.start.seq) {\n      fail('terminal seq must be strictly greater than start seq');\n    }\n\n    let jobEntry = jobs.get(group.job);\n    if (jobEntry === undefined) {\n      jobEntry = { job: group.job, attempts: [] };\n      jobs.set(group.job, jobEntry);\n    }\n    jobEntry.attempts.push({\n      attempt: group.attempt,\n      status: group.terminal === null ? 'running' : group.terminal.type,\n      startedSeq: group.start.seq,\n      finishedSeq: group.terminal === null ? null : group.terminal.seq,\n    });\n  }\n\n  const jobList = [...jobs.values()];\n  jobList.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n  for (const job of jobList) {\n    job.attempts.sort((a, b) => a.attempt - b.attempt);\n  }\n\n  return { jobs: jobList, duplicates };\n}\n\nimport { readFileSync } from 'node:fs';\n\nfunction isMainModule() {\n  if (typeof process === 'undefined' || !process.argv || !process.argv[1]) return false;\n  try {\n    const entry = new URL(import.meta.url).pathname;\n    return process.argv[1] === entry;\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  if (args.length !== 1) {\n    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n    process.exit(2);\n  }\n  let text;\n  try {\n    text = readFileSync(args[0], 'utf8');\n  } catch (err) {\n    process.stderr.write(`cannot read ${args[0]}: ${err.message}\\n`);\n    process.exit(2);\n  }\n  try {\n    const report = reduceEvents(text);\n    process.stdout.write(JSON.stringify(report) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write(`invalid events: ${err.message}\\n`);\n    process.exit(2);\n  }\n}\n",
+      "displaySha256": "eacc0af34b4b660686405f81407c7e68a62abf47e9dd4d010a88303bb52ae2ea",
+      "diff": "--- starter/receipt-report.js\n+++ delivered/receipt-report.js\n@@ -1,4 +1,168 @@\n-// Implement the public work order in task.md. Builtins only.\n+// Receipt reducer: build a small run-log report tool. Builtins only.\n+\n+const TYPES = new Set(['started', 'succeeded', 'failed']);\n+\n+function fail(message) {\n+  throw new Error(message);\n+}\n+\n+function isNonemptyString(value) {\n+  return typeof value === 'string' && value.length > 0;\n+}\n+\n+function isSafeInt(value, min) {\n+  return Number.isSafeInteger(value) && value >= min;\n+}\n+\n+function requiredFields(event) {\n+  return {\n+    id: event.id,\n+    job: event.job,\n+    attempt: event.attempt,\n+    seq: event.seq,\n+    type: event.type,\n+  };\n+}\n+\n+function sameRequiredFields(a, b) {\n+  return (\n+    a.id === b.id &&\n+    a.job === b.job &&\n+    a.attempt === b.attempt &&\n+    a.seq === b.seq &&\n+    a.type === b.type\n+  );\n+}\n+\n export function reduceEvents(text) {\n-  throw new Error('not implemented');\n+  if (typeof text !== 'string') {\n+    fail('input must be a string');\n+  }\n+\n+  const seen = new Map(); // id -> required fields\n+  let duplicates = 0;\n+\n+  const lines = text.split(/\\r\\n|\\n|\\r/);\n+  for (const line of lines) {\n+    if (line.trim() === '') continue;\n+\n+    let event;\n+    try {\n+      event = JSON.parse(line);\n+    } catch {\n+      fail('invalid JSON line');\n+    }\n+    if (event === null || typeof event !== 'object' || Array.isArray(event)) {\n+      fail('each line must be a JSON object');\n+    }\n+\n+    const { id, job, attempt, seq, type } = event;\n+    if (!isNonemptyString(id)) fail('id must be a nonempty string');\n+    if (!isNonemptyString(job)) fail('job must be a nonempty string');\n+    if (!isSafeInt(attempt, 1)) fail('attempt must be a positive safe integer');\n+    if (!isSafeInt(seq, 0)) fail('seq must be a nonnegative safe integer');\n+    if (typeof type !== 'string' || !TYPES.has(type)) fail('type must be started, succeeded, or failed');\n+\n+    const fields = requiredFields(event);\n+    const existing = seen.get(id);\n+    if (existing === undefined) {\n+      seen.set(id, fields);\n+    } else if (sameRequiredFields(existing, fields)) {\n+      duplicates += 1;\n+    } else {\n+      fail('conflicting duplicate id');\n+    }\n+  }\n+\n+  const events = [...seen.values()];\n+\n+  // Map (job, attempt) -> { start, terminal }\n+  const groups = new Map();\n+  const groupKey = (job, attempt) => job + '\\u0000' + attempt;\n+\n+  for (const event of events) {\n+    const key = groupKey(event.job, event.attempt);\n+    let group = groups.get(key);\n+    if (group === undefined) {\n+      group = { job: event.job, attempt: event.attempt, start: null, terminal: null };\n+      groups.set(key, group);\n+    }\n+\n+    if (event.type === 'started') {\n+      if (group.start !== null) {\n+        fail('repeated start for (job, attempt) with different id');\n+      }\n+      group.start = event;\n+    } else {\n+      if (group.terminal !== null) {\n+        fail('contradictory terminals for (job, attempt)');\n+      }\n+      group.terminal = event;\n+    }\n+  }\n+\n+  const jobs = new Map();\n+  for (const group of groups.values()) {\n+    if (group.start === null) {\n+      fail('orphan terminal event');\n+    }\n+    if (group.terminal !== null && group.terminal.seq <= group.start.seq) {\n+      fail('terminal seq must be strictly greater than start seq');\n+    }\n+\n+    let jobEntry = jobs.get(group.job);\n+    if (jobEntry === undefined) {\n+      jobEntry = { job: group.job, attempts: [] };\n+      jobs.set(group.job, jobEntry);\n+    }\n+    jobEntry.attempts.push({\n+      attempt: group.attempt,\n+      status: group.terminal === null ? 'running' : group.terminal.type,\n+      startedSeq: group.start.seq,\n+      finishedSeq: group.terminal === null ? null : group.terminal.seq,\n+    });\n+  }\n+\n+  const jobList = [...jobs.values()];\n+  jobList.sort((a, b) => (a.job < b.job ? -1 : a.job > b.job ? 1 : 0));\n+  for (const job of jobList) {\n+    job.attempts.sort((a, b) => a.attempt - b.attempt);\n+  }\n+\n+  return { jobs: jobList, duplicates };\n }\n+\n+import { readFileSync } from 'node:fs';\n+\n+function isMainModule() {\n+  if (typeof process === 'undefined' || !process.argv || !process.argv[1]) return false;\n+  try {\n+    const entry = new URL(import.meta.url).pathname;\n+    return process.argv[1] === entry;\n+  } catch {\n+    return false;\n+  }\n+}\n+\n+if (isMainModule()) {\n+  const args = process.argv.slice(2);\n+  if (args.length !== 1) {\n+    process.stderr.write('usage: node receipt-report.js LOGFILE\\n');\n+    process.exit(2);\n+  }\n+  let text;\n+  try {\n+    text = readFileSync(args[0], 'utf8');\n+  } catch (err) {\n+    process.stderr.write(`cannot read ${args[0]}: ${err.message}\\n`);\n+    process.exit(2);\n+  }\n+  try {\n+    const report = reduceEvents(text);\n+    process.stdout.write(JSON.stringify(report) + '\\n');\n+    process.exit(0);\n+  } catch (err) {\n+    process.stderr.write(`invalid events: ${err.message}\\n`);\n+    process.exit(2);\n+  }\n+}\n"
+    },
+    {
+      "path": "test/receipt-report.test.js",
+      "state": "unchanged",
+      "beforeSha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "afterSha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { reduceEvents } from '../receipt-report.js';\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\ntest('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\ntest('unordered completion and an independent running attempt', () => {\n  assert.deepEqual(reduceEvents(jsonl([\n    {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n    {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n    {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n  ])), {jobs:[{job:'build', attempts:[\n    {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n    {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n  ]}], duplicates:0});\n});\ntest('retransmission is counted', () => {\n  const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n  assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n});\ntest('orphan and malformed events fail', () => {\n  assert.throws(() => reduceEvents('{bad'));\n  assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { reduceEvents } from '../receipt-report.js';\nconst jsonl = events => events.map(event => JSON.stringify(event)).join('\\n');\ntest('empty input', () => assert.deepEqual(reduceEvents('\\r\\n  \\n'), {jobs: [], duplicates: 0}));\ntest('unordered completion and an independent running attempt', () => {\n  assert.deepEqual(reduceEvents(jsonl([\n    {id:'done', job:'build', attempt:1, seq:9, type:'succeeded'},\n    {id:'again', job:'build', attempt:2, seq:8, type:'started'},\n    {id:'start', job:'build', attempt:1, seq:2, type:'started'},\n  ])), {jobs:[{job:'build', attempts:[\n    {attempt:1,status:'succeeded',startedSeq:2,finishedSeq:9},\n    {attempt:2,status:'running',startedSeq:8,finishedSeq:null},\n  ]}], duplicates:0});\n});\ntest('retransmission is counted', () => {\n  const event = {id:'s',job:'x',attempt:1,seq:0,type:'started'};\n  assert.equal(reduceEvents(jsonl([event,{...event,metadata:'ignored'}])).duplicates, 1);\n});\ntest('orphan and malformed events fail', () => {\n  assert.throws(() => reduceEvents('{bad'));\n  assert.throws(() => reduceEvents(jsonl([{id:'f',job:'x',attempt:1,seq:5,type:'failed'}])));\n});\n",
+      "displaySha256": "96551555a5c8fff4534f4c0913db365372dc26e8f49698c7e1b7fcd9650b8211",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: empty input\nok 1 - empty input\n  ---\n  duration_ms: 1.267909\n  ...\n# Subtest: unordered completion and an independent running attempt\nok 2 - unordered completion and an independent running attempt\n  ---\n  duration_ms: 0.236911\n  ...\n# Subtest: retransmission is counted\nok 3 - retransmission is counted\n  ---\n  duration_ms: 0.215402\n  ...\n# Subtest: orphan and malformed events fail\nok 4 - orphan and malformed events fail\n  ---\n  duration_ms: 0.738845\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.242793\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"receipt-reducer\",\"pass\":true,\"groups\":[{\"name\":\"ordering-and-independent-attempts\",\"pass\":true},{\"name\":\"deduplication-and-opaque-identities\",\"pass\":true},{\"name\":\"invalid-fields-are-not-coerced\",\"pass\":true},{\"name\":\"invalid-lifecycles-are-rejected\",\"pass\":true},{\"name\":\"cli-report-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "989cd7eedadbd80977a36cf5f3eb6a47426b3313d9bee64224512abbeb8dafad"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "23a56b6103b1c41e956c7e611ec10c68aafe4a16220d9426f692b4aecb102b6f"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "7162f931857887f2b2d9cd6349c6eeb2dbcfae693ed1ff1e5ce1e763e2d503c7"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "13daaaf09486f43c54fd3083b2a71445ec293ff68b4251d4f012ef521c8ed72c"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "094610adc8f292f00e900450ad77c46266d083d6490fb2f1f331a5ad8e1be8aa"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 18,
+    "withResults": 18,
+    "normalizedPathOccurrences": 7,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "A job history you can actually trust.",
+    "paragraphs": [
+      {
+        "text": "The factory built the event reducer, challenged invalid-input handling and required executable API and CLI checks. The worker left both checks with the delivered tool.",
+        "actions": [
+          "action-6",
+          "action-7",
+          "action-9",
+          "action-10",
+          "action-13",
+          "action-16"
+        ]
+      },
+      {
+        "text": "Final project tests and all five independent groups passed. The factory released the completed work after 112.5 seconds.",
+        "actions": [
+          "action-17",
+          "action-18"
+        ]
+      }
+    ]
+  }
+}

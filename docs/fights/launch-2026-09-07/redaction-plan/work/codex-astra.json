@@ -1,0 +1,206 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "redaction-plan",
+  "arm": "codex-astra",
+  "wallMs": 116972,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T04:32:14.879Z",
+  "task": "# Build an auditable literal-redaction planner\n\nImplement `planRedactions(text, rules)` in `redaction-plan.js`, exported as an\nES module, and its CLI. This is a deterministic literal replacement tool, not\na secret detector or a guarantee that arbitrary private information is removed.\n\n`text` must be a string. `rules` must be a dense array of non-null, non-array\nobjects, each with a unique nonempty string `id`, nonempty string `literal`,\nand string `replacement` (which may be empty). Extra fields are ignored.\nValidate every rule before doing any matching, even when text is empty.\nIDs are opaque strings, including names such as `__proto__`.\n\nFind all exact, case-sensitive literal occurrences in the ORIGINAL text,\nincluding overlapping occurrences of a literal. Do not treat literals as\nregular expressions. Offsets are zero-based JavaScript UTF-16 code-unit indices,\nas used by `String.slice`, not UTF-8 byte indices.\n\nSelect nonoverlapping edits in this order: earliest start first; at the same\nstart, longest matched literal first; with equal length, earlier rule-array\nposition first. After selecting an edit, reject matches starting before its\nend. Touching edits are allowed. Only original-text matches are considered:\nnever reprocess replacement text. Preserve all unselected source characters.\n\nReturn exactly `{text, edits, originalBytes, redactedBytes}`. `text` is the\nresult. Each edit is exactly `{start,end,id}`, ordered by source position, where\nend is exclusive. Byte counts use `Buffer.byteLength(value,'utf8')`. Do not\nmutate either input; frozen inputs must work. Invalid inputs throw an Error.\n\nExample: text `ababa`, rules `[{id:'long',literal:'aba',replacement:'X'},\n{id:'short',literal:'ba',replacement:'Y'}]` produces text `XY` and edits\n`[{start:0,end:3,id:'long'},{start:3,end:5,id:'short'}]`.\n\nCLI: `node redaction-plan.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{text,rules}`; extra fields are ignored.\nSuccess prints exactly the API result as one JSON value followed by newline,\nexits 0, and writes no stderr. Invalid arguments/files/JSON/API input exit 2,\nwith nonempty stderr and no stdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*redact*' -g '*test*'\",\"max_output_tokens\":4000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"4bb480\",\"wall_time_seconds\":0.00000245,\"exit_code\":0,\"original_token_count\":51,\"output\":\"/workspace\\ntest/public.test.js\\nredaction-plan.js\\npackage.json\\n\"}"
+        }
+      ],
+      "atMs": 8397.0,
+      "endedMs": 8455.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"ls -la && cat package.json redaction-plan.js test/public.test.js\",\"max_output_tokens\":6000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"8cf028\",\"wall_time_seconds\":0.00000206,\"exit_code\":0,\"original_token_count\":262,\"output\":\"total 8\\ndrwxrwxr-x 1 bantam bantam  66 Sep  8 04:32 .\\ndrwxr-xr-x 1 root   root     4 Sep  8 04:32 ..\\n-rw-rw-r-- 1 bantam bantam 116 Sep  8 04:32 package.json\\n-rw-rw-r-- 1 bantam bantam  90 Sep  8 04:32 redaction-plan.js\\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 04:32 test\\n{\\\"name\\\":\\\"factory-redaction-plan\\\",\\\"version\\\":\\\"1.0.0\\\",\\\"private\\\":true,\\\"type\\\":\\\"module\\\",\\\"scripts\\\":{\\\"test\\\":\\\"node --test\\\"}}\\nexport function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\\nimport test from 'node:test';\\nimport assert from 'node:assert/strict';\\nimport {planRedactions} from '../redaction-plan.js';\\ntest('literal replacement has an original-position receipt',()=>{\\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\\n});\\ntest('longest same-start match wins',()=>{\\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\\n});\\n\"}"
+        }
+      ],
+      "atMs": 12236.0,
+      "endedMs": 12282.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: /workspace/redaction-plan.js\\n@@\\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\\n+import { readFileSync, realpathSync } from 'node:fs';\\n+import { fileURLToPath } from 'node:url';\\n+\\n+export function planRedactions(text, rules) {\\n+  if (typeof text !== 'string' || !Array.isArray(rules)) {\\n+    throw new Error('Expected a string text and an array of rules');\\n+  }\\n+\\n+  // Validate and snapshot every rule before looking for any occurrences.\\n+  const validated = [];\\n+  const ids = new Set();\\n+  for (let index = 0; index < rules.length; index++) {\\n+    if (!Object.hasOwn(rules, index)) {\\n+      throw new Error('Rules must be a dense array');\\n+    }\\n+    const rule = rules[index];\\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\\n+      throw new Error(`Invalid rule at index ${index}`);\\n+    }\\n+    const { id, literal, replacement } = rule;\\n+    if (typeof id !== 'string' || id.length === 0 || ids.has(id) ||\\n+        typeof literal !== 'string' || literal.length === 0 ||\\n+        typeof replacement !== 'string') {\\n+      throw new Error(`Invalid rule fields at index ${index}`);\\n+    }\\n+    ids.add(id);\\n+    validated.push({ id, literal, replacement });\\n+  }\\n+\\n+  const matches = [];\\n+  for (let index = 0; index < validated.length; index++) {\\n+    const { literal } = validated[index];\\n+    let start = text.indexOf(literal);\\n+    while (start !== -1) {\\n+      matches.push({ start, end: start + literal.length, index });\\n+      // Advance one UTF-16 code unit so overlapping occurrences are included.\\n+      start = text.indexOf(literal, start + 1);\\n+    }\\n+  }\\n+  matches.sort((a, b) => a.start - b.start || b.end - a.end || a.index - b.index);\\n+\\n+  const edits = [];\\n+  const parts = [];\\n+  let cursor = 0;\\n+  for (const { start, end, index } of matches) {\\n+    if (start < cursor) continue;\\n+    const { id, replacement } = validated[index];\\n+    parts.push(text.slice(cursor, start), replacement);\\n+    edits.push({ start, end, id });\\n+    cursor = end;\\n+  }\\n+  parts.push(text.slice(cursor));\\n+  const result = parts.join('');\\n+  return {\\n+    text: result,\\n+    edits,\\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\\n+    redactedBytes: Buffer.byteLength(result, 'utf8'),\\n+  };\\n+}\\n+\\n+function isMain() {\\n+  if (!process.argv[1]) return false;\\n+  try {\\n+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);\\n+  } catch {\\n+    return false;\\n+  }\\n+}\\n+\\n+if (isMain()) {\\n+  try {\\n+    if (process.argv.length !== 3) {\\n+      throw new Error('Usage: node redaction-plan.js INPUT_JSON_FILE');\\n+    }\\n+    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\\n+      throw new Error('Input JSON must be an object containing text and rules');\\n+    }\\n+    const result = planRedactions(input.text, input.rules);\\n+    process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+  } catch (error) {\\n+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n*** End Patch\"));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 51924.0,
+      "endedMs": 51989.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Add File: /workspace/test/regression.test.js\\n+import test from 'node:test';\\n+import assert from 'node:assert/strict';\\n+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\\n+import { tmpdir } from 'node:os';\\n+import { join } from 'node:path';\\n+import { fileURLToPath } from 'node:url';\\n+import { spawnSync } from 'node:child_process';\\n+import { planRedactions } from '../redaction-plan.js';\\n+\\n+const rule = (id, literal, replacement = '') => ({ id, literal, replacement });\\n+\\n+test('overlaps, touching edits, and same-length ties use source ordering', () => {\\n+  assert.deepEqual(planRedactions('ababa', [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')]), {\\n+    text: 'XY', edits: [{ start: 0, end: 3, id: 'long' }, { start: 3, end: 5, id: 'short' }],\\n+    originalBytes: 5, redactedBytes: 2,\\n+  });\\n+  assert.deepEqual(planRedactions('aaaaa', [rule('first', 'aa', 'X'), rule('second', 'aa', 'Y')]).edits,\\n+    [{ start: 0, end: 2, id: 'first' }, { start: 2, end: 4, id: 'first' }]);\\n+  assert.equal(planRedactions('abc', [rule('later', 'bc', 'Y'), rule('early', 'a', 'X')]).text, 'XY');\\n+});\\n+\\n+test('literals and replacements are exact and replacements are not rescanned', () => {\\n+  assert.equal(planRedactions('A a.b aXb', [rule('dot', 'a.b', '$&a'), rule('a', 'a', 'Z')]).text,\\n+    'A $&a ZXb');\\n+});\\n+\\n+test('UTF-16 offsets and UTF-8 byte counts include surrogate edge cases', () => {\\n+  assert.deepEqual(planRedactions('\u00e9\ud83d\ude00z', [rule('emoji', '\ud83d\ude00', '\u754c')]), {\\n+    text: '\u00e9\u754cz', edits: [{ start: 1, end: 3, id: 'emoji' }], originalBytes: 7, redactedBytes: 6,\\n+  });\\n+  const result = planRedactions('\ud83d\ude00', [rule('half', '\\\\ud83d')]);\\n+  assert.deepEqual(result, {\\n+    text: '\\\\ude00', edits: [{ start: 0, end: 1, id: 'half' }], originalBytes: 4, redactedBytes: 3,\\n+  });\\n+});\\n+\\n+test('frozen rules, opaque IDs, and ignored extra fields work', () => {\\n+  const rules = Object.freeze([\\n+    Object.freeze({ ...rule('__proto__', 'a', 'b'), extra: true }),\\n+    Object.freeze(rule('constructor', 'b', 'c')),\\n+  ]);\\n+  assert.deepEqual(planRedactions('ab', rules), {\\n+    text: 'bc', edits: [{ start: 0, end: 1, id: '__proto__' }, { start: 1, end: 2, id: 'constructor' }],\\n+    originalBytes: 2, redactedBytes: 2,\\n+  });\\n+  assert.equal(rules[0].replacement, 'b');\\n+});\\n+\\n+test('invalid inputs are rejected even with empty text', () => {\\n+  for (const text of [null, undefined, 0, {}, [], new String('a')]) {\\n+    assert.throws(() => planRedactions(text, []), Error);\\n+  }\\n+  const invalid = [null, {}, 'rules', [null], [[]], [1], [undefined], new Array(1),\\n+    [rule('', 'a')], [rule('x', '')], [rule(1, 'a')], [rule('x', 1)],\\n+    [{ id: 'x', literal: 'a' }], [rule('x', 'a', null)],\\n+    [rule('__proto__', 'a'), rule('__proto__', 'b')],\\n+    [rule('valid', 'a'), rule('bad', '')]];\\n+  for (const rules of invalid) assert.throws(() => planRedactions('', rules), Error);\\n+  assert.deepEqual(planRedactions('', []), { text: '', edits: [], originalBytes: 0, redactedBytes: 0 });\\n+});\\n+\\n+const cli = fileURLToPath(new URL('../redaction-plan.js', import.meta.url));\\n+test('CLI has exact success output and clean error behavior', () => {\\n+  const directory = mkdtempSync(join(tmpdir(), 'redaction-plan-'));\\n+  const file = join(directory, 'input.json');\\n+  const run = (args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\\n+  const fails = (args) => {\\n+    const result = run(args);\\n+    assert.equal(result.status, 2);\\n+    assert.equal(result.stdout, '');\\n+    assert.ok(result.stderr.length > 0);\\n+  };\\n+  try {\\n+    const input = { text: 'ababa', rules: [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')], extra: 1 };\\n+    writeFileSync(file, JSON.stringify(input));\\n+    const result = run([file]);\\n+    assert.equal(result.status, 0);\\n+    assert.equal(result.stderr, '');\\n+    assert.equal(result.stdout, JSON.stringify(planRedactions(input.text, input.rules)) + '\\\\n');\\n+    fails([]);\\n+    fails([file, file]);\\n+    fails([join(directory, 'missing.json')]);\\n+    fails([directory]);\\n+    for (const content of ['{', 'null', '[]', '42', '{}', '{\\\"text\\\":\\\"\\\",\\\"rules\\\":[null]}']) {\\n+      writeFileSync(file, content);\\n+      fails([file]);\\n+    }\\n+  } finally {\\n+    rmSync(directory, { recursive: true, force: true });\\n+  }\\n+});\\n+\\n+test('importing the module does not execute the CLI', () => {\\n+  const result = spawnSync(process.execPath,\\n+    ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../redaction-plan.js', import.meta.url).href)})`],\\n+    { encoding: 'utf8' });\\n+  assert.equal(result.status, 0);\\n+  assert.equal(result.stdout, '');\\n+  assert.equal(result.stderr, '');\\n+});\\n*** End Patch\"));\ntext(await tools.exec_command({cmd:\"npm test\",\"max_output_tokens\":3000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.5 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"676bfd\",\"wall_time_seconds\":0.361896775,\"exit_code\":0,\"original_token_count\":464,\"output\":\"\\n> factory-redaction-plan@1.0.0 test\\n> node --test\\n\\nTAP version 13\\n# Subtest: literal replacement has an original-position receipt\\nok 1 - literal replacement has an original-position receipt\\n  ---\\n  duration_ms: 1.331558\\n  ...\\n# Subtest: longest same-start match wins\\nok 2 - longest same-start match wins\\n  ---\\n  duration_ms: 0.14516\\n  ...\\n# Subtest: overlaps, touching edits, and same-length ties use source ordering\\nok 3 - overlaps, touching edits, and same-length ties use source ordering\\n  ---\\n  duration_ms: 1.441258\\n  ...\\n# Subtest: literals and replacements are exact and replacements are not rescanned\\nok 4 - literals and replacements are exact and replacements are not rescanned\\n  ---\\n  duration_ms: 0.130941\\n  ...\\n# Subtest: UTF-16 offsets and UTF-8 byte counts include surrogate edge cases\\nok 5 - UTF-16 offsets and UTF-8 byte counts include surrogate edge cases\\n  ---\\n  duration_ms: 0.239941\\n  ...\\n# Subtest: frozen rules, opaque IDs, and ignored extra fields work\\nok 6 - frozen rules, opaque IDs, and ignored extra fields work\\n  ---\\n  duration_ms: 0.223521\\n  ...\\n# Subtest: invalid inputs are rejected even with empty text\\nok 7 - invalid inputs are rejected even with empty text\\n  ---\\n  duration_ms: 0.441533\\n  ...\\n# Subtest: CLI has exact success output and clean error behavior\\nok 8 - CLI has exact success output and clean error behavior\\n  ---\\n  duration_ms: 232.670641\\n  ...\\n# Subtest: importing the module does not execute the CLI\\nok 9 - importing the module does not execute the CLI\\n  ---\\n  duration_ms: 19.942841\\n  ...\\n1..9\\n# tests 9\\n# suites 0\\n# pass 9\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n# todo 0\\n# duration_ms 298.441229\\nnpm notice\\nnpm notice New minor version of npm available! 11.5.2 -> 11.19.1\\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1\\nnpm notice To update run: npm install -g npm@11.19.1\\nnpm notice\\n\"}"
+        }
+      ],
+      "atMs": 109894.0,
+      "endedMs": 110422.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "afterSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "before": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "diff": ""
+    },
+    {
+      "path": "redaction-plan.js",
+      "state": "changed",
+      "beforeSha256": "900b6d09006497db276b37cf36eda6320cb138933887746f90fdaa38f63182da",
+      "afterSha256": "2d18c8a8e62cf5a052aa5274f2aefaf417741d3057e50f7d20bbb06242ef26d5",
+      "before": "export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n",
+      "after": "import { readFileSync, realpathSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\n\nexport function planRedactions(text, rules) {\n  if (typeof text !== 'string' || !Array.isArray(rules)) {\n    throw new Error('Expected a string text and an array of rules');\n  }\n\n  // Validate and snapshot every rule before looking for any occurrences.\n  const validated = [];\n  const ids = new Set();\n  for (let index = 0; index < rules.length; index++) {\n    if (!Object.hasOwn(rules, index)) {\n      throw new Error('Rules must be a dense array');\n    }\n    const rule = rules[index];\n    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n      throw new Error(`Invalid rule at index ${index}`);\n    }\n    const { id, literal, replacement } = rule;\n    if (typeof id !== 'string' || id.length === 0 || ids.has(id) ||\n        typeof literal !== 'string' || literal.length === 0 ||\n        typeof replacement !== 'string') {\n      throw new Error(`Invalid rule fields at index ${index}`);\n    }\n    ids.add(id);\n    validated.push({ id, literal, replacement });\n  }\n\n  const matches = [];\n  for (let index = 0; index < validated.length; index++) {\n    const { literal } = validated[index];\n    let start = text.indexOf(literal);\n    while (start !== -1) {\n      matches.push({ start, end: start + literal.length, index });\n      // Advance one UTF-16 code unit so overlapping occurrences are included.\n      start = text.indexOf(literal, start + 1);\n    }\n  }\n  matches.sort((a, b) => a.start - b.start || b.end - a.end || a.index - b.index);\n\n  const edits = [];\n  const parts = [];\n  let cursor = 0;\n  for (const { start, end, index } of matches) {\n    if (start < cursor) continue;\n    const { id, replacement } = validated[index];\n    parts.push(text.slice(cursor, start), replacement);\n    edits.push({ start, end, id });\n    cursor = end;\n  }\n  parts.push(text.slice(cursor));\n  const result = parts.join('');\n  return {\n    text: result,\n    edits,\n    originalBytes: Buffer.byteLength(text, 'utf8'),\n    redactedBytes: Buffer.byteLength(result, 'utf8'),\n  };\n}\n\nfunction isMain() {\n  if (!process.argv[1]) return false;\n  try {\n    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);\n  } catch {\n    return false;\n  }\n}\n\nif (isMain()) {\n  try {\n    if (process.argv.length !== 3) {\n      throw new Error('Usage: node redaction-plan.js INPUT_JSON_FILE');\n    }\n    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n      throw new Error('Input JSON must be an object containing text and rules');\n    }\n    const result = planRedactions(input.text, input.rules);\n    process.stdout.write(`${JSON.stringify(result)}\\n`);\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "2d18c8a8e62cf5a052aa5274f2aefaf417741d3057e50f7d20bbb06242ef26d5",
+      "diff": "--- starter/redaction-plan.js\n+++ delivered/redaction-plan.js\n@@ -1 +1,86 @@\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n+import { readFileSync, realpathSync } from 'node:fs';\n+import { fileURLToPath } from 'node:url';\n+\n+export function planRedactions(text, rules) {\n+  if (typeof text !== 'string' || !Array.isArray(rules)) {\n+    throw new Error('Expected a string text and an array of rules');\n+  }\n+\n+  // Validate and snapshot every rule before looking for any occurrences.\n+  const validated = [];\n+  const ids = new Set();\n+  for (let index = 0; index < rules.length; index++) {\n+    if (!Object.hasOwn(rules, index)) {\n+      throw new Error('Rules must be a dense array');\n+    }\n+    const rule = rules[index];\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n+      throw new Error(`Invalid rule at index ${index}`);\n+    }\n+    const { id, literal, replacement } = rule;\n+    if (typeof id !== 'string' || id.length === 0 || ids.has(id) ||\n+        typeof literal !== 'string' || literal.length === 0 ||\n+        typeof replacement !== 'string') {\n+      throw new Error(`Invalid rule fields at index ${index}`);\n+    }\n+    ids.add(id);\n+    validated.push({ id, literal, replacement });\n+  }\n+\n+  const matches = [];\n+  for (let index = 0; index < validated.length; index++) {\n+    const { literal } = validated[index];\n+    let start = text.indexOf(literal);\n+    while (start !== -1) {\n+      matches.push({ start, end: start + literal.length, index });\n+      // Advance one UTF-16 code unit so overlapping occurrences are included.\n+      start = text.indexOf(literal, start + 1);\n+    }\n+  }\n+  matches.sort((a, b) => a.start - b.start || b.end - a.end || a.index - b.index);\n+\n+  const edits = [];\n+  const parts = [];\n+  let cursor = 0;\n+  for (const { start, end, index } of matches) {\n+    if (start < cursor) continue;\n+    const { id, replacement } = validated[index];\n+    parts.push(text.slice(cursor, start), replacement);\n+    edits.push({ start, end, id });\n+    cursor = end;\n+  }\n+  parts.push(text.slice(cursor));\n+  const result = parts.join('');\n+  return {\n+    text: result,\n+    edits,\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\n+    redactedBytes: Buffer.byteLength(result, 'utf8'),\n+  };\n+}\n+\n+function isMain() {\n+  if (!process.argv[1]) return false;\n+  try {\n+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);\n+  } catch {\n+    return false;\n+  }\n+}\n+\n+if (isMain()) {\n+  try {\n+    if (process.argv.length !== 3) {\n+      throw new Error('Usage: node redaction-plan.js INPUT_JSON_FILE');\n+    }\n+    const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n+    if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n+      throw new Error('Input JSON must be an object containing text and rules');\n+    }\n+    const result = planRedactions(input.text, input.rules);\n+    process.stdout.write(`${JSON.stringify(result)}\\n`);\n+  } catch (error) {\n+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "afterSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "displaySha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "diff": ""
+    },
+    {
+      "path": "test/regression.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "9b493c61a1802d779fe491831dee660b1c5d272da6828310cb7dc8aa6ff511e8",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { spawnSync } from 'node:child_process';\nimport { planRedactions } from '../redaction-plan.js';\n\nconst rule = (id, literal, replacement = '') => ({ id, literal, replacement });\n\ntest('overlaps, touching edits, and same-length ties use source ordering', () => {\n  assert.deepEqual(planRedactions('ababa', [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')]), {\n    text: 'XY', edits: [{ start: 0, end: 3, id: 'long' }, { start: 3, end: 5, id: 'short' }],\n    originalBytes: 5, redactedBytes: 2,\n  });\n  assert.deepEqual(planRedactions('aaaaa', [rule('first', 'aa', 'X'), rule('second', 'aa', 'Y')]).edits,\n    [{ start: 0, end: 2, id: 'first' }, { start: 2, end: 4, id: 'first' }]);\n  assert.equal(planRedactions('abc', [rule('later', 'bc', 'Y'), rule('early', 'a', 'X')]).text, 'XY');\n});\n\ntest('literals and replacements are exact and replacements are not rescanned', () => {\n  assert.equal(planRedactions('A a.b aXb', [rule('dot', 'a.b', '$&a'), rule('a', 'a', 'Z')]).text,\n    'A $&a ZXb');\n});\n\ntest('UTF-16 offsets and UTF-8 byte counts include surrogate edge cases', () => {\n  assert.deepEqual(planRedactions('\u00e9\ud83d\ude00z', [rule('emoji', '\ud83d\ude00', '\u754c')]), {\n    text: '\u00e9\u754cz', edits: [{ start: 1, end: 3, id: 'emoji' }], originalBytes: 7, redactedBytes: 6,\n  });\n  const result = planRedactions('\ud83d\ude00', [rule('half', '\\ud83d')]);\n  assert.deepEqual(result, {\n    text: '\\ude00', edits: [{ start: 0, end: 1, id: 'half' }], originalBytes: 4, redactedBytes: 3,\n  });\n});\n\ntest('frozen rules, opaque IDs, and ignored extra fields work', () => {\n  const rules = Object.freeze([\n    Object.freeze({ ...rule('__proto__', 'a', 'b'), extra: true }),\n    Object.freeze(rule('constructor', 'b', 'c')),\n  ]);\n  assert.deepEqual(planRedactions('ab', rules), {\n    text: 'bc', edits: [{ start: 0, end: 1, id: '__proto__' }, { start: 1, end: 2, id: 'constructor' }],\n    originalBytes: 2, redactedBytes: 2,\n  });\n  assert.equal(rules[0].replacement, 'b');\n});\n\ntest('invalid inputs are rejected even with empty text', () => {\n  for (const text of [null, undefined, 0, {}, [], new String('a')]) {\n    assert.throws(() => planRedactions(text, []), Error);\n  }\n  const invalid = [null, {}, 'rules', [null], [[]], [1], [undefined], new Array(1),\n    [rule('', 'a')], [rule('x', '')], [rule(1, 'a')], [rule('x', 1)],\n    [{ id: 'x', literal: 'a' }], [rule('x', 'a', null)],\n    [rule('__proto__', 'a'), rule('__proto__', 'b')],\n    [rule('valid', 'a'), rule('bad', '')]];\n  for (const rules of invalid) assert.throws(() => planRedactions('', rules), Error);\n  assert.deepEqual(planRedactions('', []), { text: '', edits: [], originalBytes: 0, redactedBytes: 0 });\n});\n\nconst cli = fileURLToPath(new URL('../redaction-plan.js', import.meta.url));\ntest('CLI has exact success output and clean error behavior', () => {\n  const directory = mkdtempSync(join(tmpdir(), 'redaction-plan-'));\n  const file = join(directory, 'input.json');\n  const run = (args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n  const fails = (args) => {\n    const result = run(args);\n    assert.equal(result.status, 2);\n    assert.equal(result.stdout, '');\n    assert.ok(result.stderr.length > 0);\n  };\n  try {\n    const input = { text: 'ababa', rules: [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')], extra: 1 };\n    writeFileSync(file, JSON.stringify(input));\n    const result = run([file]);\n    assert.equal(result.status, 0);\n    assert.equal(result.stderr, '');\n    assert.equal(result.stdout, JSON.stringify(planRedactions(input.text, input.rules)) + '\\n');\n    fails([]);\n    fails([file, file]);\n    fails([join(directory, 'missing.json')]);\n    fails([directory]);\n    for (const content of ['{', 'null', '[]', '42', '{}', '{\"text\":\"\",\"rules\":[null]}']) {\n      writeFileSync(file, content);\n      fails([file]);\n    }\n  } finally {\n    rmSync(directory, { recursive: true, force: true });\n  }\n});\n\ntest('importing the module does not execute the CLI', () => {\n  const result = spawnSync(process.execPath,\n    ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../redaction-plan.js', import.meta.url).href)})`],\n    { encoding: 'utf8' });\n  assert.equal(result.status, 0);\n  assert.equal(result.stdout, '');\n  assert.equal(result.stderr, '');\n});\n",
+      "displaySha256": "9b493c61a1802d779fe491831dee660b1c5d272da6828310cb7dc8aa6ff511e8",
+      "diff": "--- starter/test/regression.test.js\n+++ delivered/test/regression.test.js\n@@ -0,0 +1,100 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\n+import { tmpdir } from 'node:os';\n+import { join } from 'node:path';\n+import { fileURLToPath } from 'node:url';\n+import { spawnSync } from 'node:child_process';\n+import { planRedactions } from '../redaction-plan.js';\n+\n+const rule = (id, literal, replacement = '') => ({ id, literal, replacement });\n+\n+test('overlaps, touching edits, and same-length ties use source ordering', () => {\n+  assert.deepEqual(planRedactions('ababa', [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')]), {\n+    text: 'XY', edits: [{ start: 0, end: 3, id: 'long' }, { start: 3, end: 5, id: 'short' }],\n+    originalBytes: 5, redactedBytes: 2,\n+  });\n+  assert.deepEqual(planRedactions('aaaaa', [rule('first', 'aa', 'X'), rule('second', 'aa', 'Y')]).edits,\n+    [{ start: 0, end: 2, id: 'first' }, { start: 2, end: 4, id: 'first' }]);\n+  assert.equal(planRedactions('abc', [rule('later', 'bc', 'Y'), rule('early', 'a', 'X')]).text, 'XY');\n+});\n+\n+test('literals and replacements are exact and replacements are not rescanned', () => {\n+  assert.equal(planRedactions('A a.b aXb', [rule('dot', 'a.b', '$&a'), rule('a', 'a', 'Z')]).text,\n+    'A $&a ZXb');\n+});\n+\n+test('UTF-16 offsets and UTF-8 byte counts include surrogate edge cases', () => {\n+  assert.deepEqual(planRedactions('\u00e9\ud83d\ude00z', [rule('emoji', '\ud83d\ude00', '\u754c')]), {\n+    text: '\u00e9\u754cz', edits: [{ start: 1, end: 3, id: 'emoji' }], originalBytes: 7, redactedBytes: 6,\n+  });\n+  const result = planRedactions('\ud83d\ude00', [rule('half', '\\ud83d')]);\n+  assert.deepEqual(result, {\n+    text: '\\ude00', edits: [{ start: 0, end: 1, id: 'half' }], originalBytes: 4, redactedBytes: 3,\n+  });\n+});\n+\n+test('frozen rules, opaque IDs, and ignored extra fields work', () => {\n+  const rules = Object.freeze([\n+    Object.freeze({ ...rule('__proto__', 'a', 'b'), extra: true }),\n+    Object.freeze(rule('constructor', 'b', 'c')),\n+  ]);\n+  assert.deepEqual(planRedactions('ab', rules), {\n+    text: 'bc', edits: [{ start: 0, end: 1, id: '__proto__' }, { start: 1, end: 2, id: 'constructor' }],\n+    originalBytes: 2, redactedBytes: 2,\n+  });\n+  assert.equal(rules[0].replacement, 'b');\n+});\n+\n+test('invalid inputs are rejected even with empty text', () => {\n+  for (const text of [null, undefined, 0, {}, [], new String('a')]) {\n+    assert.throws(() => planRedactions(text, []), Error);\n+  }\n+  const invalid = [null, {}, 'rules', [null], [[]], [1], [undefined], new Array(1),\n+    [rule('', 'a')], [rule('x', '')], [rule(1, 'a')], [rule('x', 1)],\n+    [{ id: 'x', literal: 'a' }], [rule('x', 'a', null)],\n+    [rule('__proto__', 'a'), rule('__proto__', 'b')],\n+    [rule('valid', 'a'), rule('bad', '')]];\n+  for (const rules of invalid) assert.throws(() => planRedactions('', rules), Error);\n+  assert.deepEqual(planRedactions('', []), { text: '', edits: [], originalBytes: 0, redactedBytes: 0 });\n+});\n+\n+const cli = fileURLToPath(new URL('../redaction-plan.js', import.meta.url));\n+test('CLI has exact success output and clean error behavior', () => {\n+  const directory = mkdtempSync(join(tmpdir(), 'redaction-plan-'));\n+  const file = join(directory, 'input.json');\n+  const run = (args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n+  const fails = (args) => {\n+    const result = run(args);\n+    assert.equal(result.status, 2);\n+    assert.equal(result.stdout, '');\n+    assert.ok(result.stderr.length > 0);\n+  };\n+  try {\n+    const input = { text: 'ababa', rules: [rule('long', 'aba', 'X'), rule('short', 'ba', 'Y')], extra: 1 };\n+    writeFileSync(file, JSON.stringify(input));\n+    const result = run([file]);\n+    assert.equal(result.status, 0);\n+    assert.equal(result.stderr, '');\n+    assert.equal(result.stdout, JSON.stringify(planRedactions(input.text, input.rules)) + '\\n');\n+    fails([]);\n+    fails([file, file]);\n+    fails([join(directory, 'missing.json')]);\n+    fails([directory]);\n+    for (const content of ['{', 'null', '[]', '42', '{}', '{\"text\":\"\",\"rules\":[null]}']) {\n+      writeFileSync(file, content);\n+      fails([file]);\n+    }\n+  } finally {\n+    rmSync(directory, { recursive: true, force: true });\n+  }\n+});\n+\n+test('importing the module does not execute the CLI', () => {\n+  const result = spawnSync(process.execPath,\n+    ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../redaction-plan.js', import.meta.url).href)})`],\n+    { encoding: 'utf8' });\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stdout, '');\n+  assert.equal(result.stderr, '');\n+});\n"
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: literal replacement has an original-position receipt\nok 1 - literal replacement has an original-position receipt\n  ---\n  duration_ms: 1.63591\n  ...\n# Subtest: longest same-start match wins\nok 2 - longest same-start match wins\n  ---\n  duration_ms: 0.163511\n  ...\n# Subtest: overlaps, touching edits, and same-length ties use source ordering\nok 3 - overlaps, touching edits, and same-length ties use source ordering\n  ---\n  duration_ms: 1.434719\n  ...\n# Subtest: literals and replacements are exact and replacements are not rescanned\nok 4 - literals and replacements are exact and replacements are not rescanned\n  ---\n  duration_ms: 0.138331\n  ...\n# Subtest: UTF-16 offsets and UTF-8 byte counts include surrogate edge cases\nok 5 - UTF-16 offsets and UTF-8 byte counts include surrogate edge cases\n  ---\n  duration_ms: 0.235592\n  ...\n# Subtest: frozen rules, opaque IDs, and ignored extra fields work\nok 6 - frozen rules, opaque IDs, and ignored extra fields work\n  ---\n  duration_ms: 0.221411\n  ...\n# Subtest: invalid inputs are rejected even with empty text\nok 7 - invalid inputs are rejected even with empty text\n  ---\n  duration_ms: 0.454883\n  ...\n# Subtest: CLI has exact success output and clean error behavior\nok 8 - CLI has exact success output and clean error behavior\n  ---\n  duration_ms: 234.721614\n  ...\n# Subtest: importing the module does not execute the CLI\nok 9 - importing the module does not execute the CLI\n  ---\n  duration_ms: 18.838705\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 299.073684\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"redaction-plan\",\"pass\":true,\"groups\":[{\"name\":\"literal-matching-and-edit-receipts\",\"pass\":true},{\"name\":\"overlap-priority-and-single-pass\",\"pass\":true},{\"name\":\"unicode-bytes-and-opaque-identities\",\"pass\":true},{\"name\":\"validation-and-immutability\",\"pass\":true},{\"name\":\"cli-and-error-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "dfbdfc6a0e64b03b2aacd5e36665a38342b455788d32fa34825b0d37afd876fd"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "944509148f65f52b22f87e7b51b7cb447efc9f3db83da0f1da0384af77c0eaff"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "8f5bfd86dbbd31dc1c89e8072674cd68e04079122bb99b2dad39c6b6cccf39c4"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e7209e1aa47f509defc1a504881683c20df03ff99135799cd403dd4d8f3d233c"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 4,
+    "withResults": 4,
+    "normalizedPathOccurrences": 3,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Delivered and independently accepted.",
+    "paragraphs": [
+      {
+        "text": "Delivered redaction-plan.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 117.0 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+        "actions": [
+          "action-3",
+          "action-4"
+        ]
+      }
+    ]
+  }
+}

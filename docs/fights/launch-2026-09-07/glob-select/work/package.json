@@ -1,0 +1,75 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "glob-select",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 120402,
+      "sha256": "9dee8227f235dd6795e67220bd1ecc62ddbd415c7d471e9f31e7048cdcc5b094",
+      "arm": "bantam-local-27b",
+      "wallMs": 264143,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 21,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+      "explanation": {
+        "title": "Pattern matching, with the decisions attached.",
+        "paragraphs": [
+          {
+            "text": "The factory built the file selector and passed the supplied tests. It then required a focused assertion file; the worker corrected its added checks until they ran successfully.",
+            "actions": [
+              "action-6",
+              "action-9",
+              "action-10",
+              "action-17",
+              "action-18",
+              "action-19"
+            ]
+          },
+          {
+            "text": "The delivered selector passed all five independent groups, including globstar boundaries, character classes and rule order. The project was verified again before completion at 264.1 seconds.",
+            "actions": [
+              "action-20",
+              "action-21"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 48794,
+      "sha256": "a23cd4e78a2243d585ebc8be45bee6d1da52f45580f811155d3b7cef39e88c4a",
+      "arm": "codex-astra",
+      "wallMs": 155782,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "fb5e03070627a61bd02321c5e0cae267c5d4877ba774c047e48da27870a66a8d",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered glob-select.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 155.8 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

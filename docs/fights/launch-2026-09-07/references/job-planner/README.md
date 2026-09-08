@@ -18,7 +18,9 @@ to its roster.
 For context, BANTAM FACTORY's local 27B attempt on this work order passed 5/5 in
 193.2 s and native Codex Astra in 118.4 s, recorded in a separate comparison
 that was running on the same machine during these attempts. Different models
-and run windows: individual observations, not a ranking.
+and run windows:.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
 <summary>Token receipts, run conditions & provenance</summary>

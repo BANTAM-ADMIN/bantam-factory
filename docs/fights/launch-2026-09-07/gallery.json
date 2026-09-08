@@ -10,10 +10,13 @@
       "number": "01",
       "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
       "recorded": true,
-      "sourceSha256": "9a71920d4802e24fe6fc5cf014e46f50bc3b8d718a56ed53c1bd2936a0cb3d68",
+      "sourceSha256": "559cb271b867bf5ba93eddc724dbdd647af61350a4c75eda7b3743ce9e3ce7f9",
+      "reviewedDemo": true,
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -21,7 +24,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -45,6 +47,7 @@
         },
         {
           "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
           "arm": "opencode",
           "outcome": "OUTPUT_ONLY",
           "passed": false,
@@ -52,7 +55,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -76,6 +78,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -83,6 +86,68 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "OUTPUT_ONLY",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 39085,
+              "milliseconds": 543964.854,
+              "measuredRequests": 24,
+              "totalRequests": 25
+            },
+            "prefill": {
+              "tokens": 34026,
+              "milliseconds": 25456.894,
+              "measuredRequests": 24,
+              "totalRequests": 25
+            },
+            "evidenceSha256": "5f7685497c86949ca1aae978297118cba1bd5933ed469fd585fbdf3b86bf0337",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 512194,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 33735,
+              "milliseconds": 478847.43199999986,
+              "measuredRequests": 18,
+              "totalRequests": 19
+            },
+            "prefill": {
+              "tokens": 25785,
+              "milliseconds": 17030.232999999997,
+              "measuredRequests": 18,
+              "totalRequests": 19
+            },
+            "evidenceSha256": "97d09c2f4912313b3086e1b147ecbc00765172d7416ca921e0bd999290067f04",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -93,10 +158,12 @@
       "number": "02",
       "description": "Check every preimage, then apply a set of compatible edits as one transaction.",
       "recorded": true,
-      "sourceSha256": "c911fee793c2a70beeed6f74889e584b49daacd1b525faaaa447940fb94bef16",
+      "sourceSha256": "59ea4ed66add7f6c43bdcf2d59238cde8417d03589d1fbfb1c5365e6c4478805",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -107,6 +174,7 @@
         },
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -114,7 +182,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -138,6 +205,7 @@
         },
         {
           "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
           "arm": "opencode",
           "outcome": "PASS",
           "passed": true,
@@ -145,7 +213,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -166,6 +233,68 @@
             "quantization": "Q4_K_P",
             "contextTokens": 72192
           }
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "OUTPUT_ONLY",
+          "passed": false,
+          "wallMs": 600005,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 36102,
+              "milliseconds": 538077.4950000001,
+              "measuredRequests": 13,
+              "totalRequests": 14
+            },
+            "prefill": {
+              "tokens": 13152,
+              "milliseconds": 10743.025999999998,
+              "measuredRequests": 13,
+              "totalRequests": 14
+            },
+            "evidenceSha256": "33ed533580b53105c810e0155187631a61a4c98d5cf6ca320e006f507c66f51d",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600005,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 35681,
+              "milliseconds": 531193.566,
+              "measuredRequests": 13,
+              "totalRequests": 14
+            },
+            "prefill": {
+              "tokens": 12488,
+              "milliseconds": 9836.556,
+              "measuredRequests": 13,
+              "totalRequests": 14
+            },
+            "evidenceSha256": "b170b0281e377012c6502e667de789b0c96e98b8ca61fd618dae11836fbea859",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -176,10 +305,12 @@
       "number": "03",
       "description": "Recover complete events across arbitrary byte chunks, with explicit stream termination.",
       "recorded": true,
-      "sourceSha256": "98659aefb9e84a10921e4977b11182a8d105a614aad7231e18d52fea6cbb13bb",
+      "sourceSha256": "e21cd0a6d7d1d2032c0dad024884d5cae299985202de96ae235df81bef33a5a1",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
           "arm": "opencode",
           "outcome": "TIMEOUT",
           "passed": false,
@@ -187,7 +318,6 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -211,6 +341,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -221,6 +352,7 @@
         },
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -228,7 +360,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -249,6 +380,68 @@
             "quantization": "Q4_K_P",
             "contextTokens": 72192
           }
+        },
+        {
+          "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
+          "arm": "deepseek-local-27b",
+          "outcome": "FAIL",
+          "passed": false,
+          "wallMs": 551985,
+          "groupsPassed": 0,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 32924,
+              "milliseconds": 543701.178,
+              "measuredRequests": 3,
+              "totalRequests": 3
+            },
+            "prefill": {
+              "tokens": 10010,
+              "milliseconds": 4998.174999999999,
+              "measuredRequests": 3,
+              "totalRequests": 3
+            },
+            "evidenceSha256": "40e4b6de7828df5b5944e69812e86b519991f8ebade9d2d4b2be1f5715e747ee",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
+        },
+        {
+          "label": "Hermes",
+          "model": "Qwen 27B · same local model",
+          "arm": "hermes",
+          "outcome": "TIMEOUT",
+          "passed": false,
+          "wallMs": 600007,
+          "groupsPassed": 0,
+          "groupsTotal": 5,
+          "accountingComplete": false,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 23914,
+              "milliseconds": 395274.401,
+              "measuredRequests": 8,
+              "totalRequests": 9
+            },
+            "prefill": {
+              "tokens": 5273,
+              "milliseconds": 4980.752,
+              "measuredRequests": 8,
+              "totalRequests": 9
+            },
+            "evidenceSha256": "0986339a6c3eedd704a2ecbfb787b46b33c48685c41acbc27df5c376a6effe12",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -259,10 +452,12 @@
       "number": "01",
       "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
       "recorded": true,
-      "sourceSha256": "6b861ee37a6895457257acabb3265e20650b5123b190b0bf6fbaae7481ed9ad2",
+      "sourceSha256": "5b9320f3387614e841c7d2f6336cb2acc6c47430a9975cf1d2adfb4e1700248c",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -270,7 +465,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -294,6 +488,7 @@
         },
         {
           "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
           "arm": "deepseek-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -301,7 +496,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -325,6 +519,7 @@
         },
         {
           "label": "Hermes",
+          "model": "Qwen 27B · same local model",
           "arm": "hermes",
           "outcome": "PASS",
           "passed": true,
@@ -332,7 +527,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -356,6 +550,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -366,6 +561,7 @@
         },
         {
           "label": "Codex · Sol",
+          "model": "GPT-5.6 Sol · native CLI",
           "arm": "codex-sol",
           "outcome": "PASS",
           "passed": true,
@@ -376,6 +572,7 @@
         },
         {
           "label": "Codex · Terra",
+          "model": "GPT-5.6 Terra · native CLI",
           "arm": "codex-terra",
           "outcome": "PASS",
           "passed": true,
@@ -383,6 +580,37 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 480073,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 30930,
+              "milliseconds": 437648.13899999997,
+              "measuredRequests": 18,
+              "totalRequests": 18
+            },
+            "prefill": {
+              "tokens": 66161,
+              "milliseconds": 33786.066000000006,
+              "measuredRequests": 18,
+              "totalRequests": 18
+            },
+            "evidenceSha256": "6a051443902a2a28178c1a3729254fb15cd2842fe8ec31d7f7bc519139b6a6fd",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -393,10 +621,12 @@
       "number": "02",
       "description": "Bind a snapshot to real files. Detect what changed, and validate what did not.",
       "recorded": true,
-      "sourceSha256": "ef543f88a1d925ff02d9a5de986acb2865b203d00b5ff2804c291222761be471",
+      "sourceSha256": "32bacac84ace03708d11b61101e3b8c6b318aecb8e313787e980d61b8d0ca963",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "Hermes",
+          "model": "Qwen 27B · same local model",
           "arm": "hermes",
           "outcome": "PASS",
           "passed": true,
@@ -404,7 +634,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -428,6 +657,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -438,6 +668,7 @@
         },
         {
           "label": "Codex · Sol",
+          "model": "GPT-5.6 Sol · native CLI",
           "arm": "codex-sol",
           "outcome": "FAIL",
           "passed": false,
@@ -448,6 +679,7 @@
         },
         {
           "label": "Codex · Terra",
+          "model": "GPT-5.6 Terra · native CLI",
           "arm": "codex-terra",
           "outcome": "PASS",
           "passed": true,
@@ -458,6 +690,7 @@
         },
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -465,7 +698,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -489,6 +721,7 @@
         },
         {
           "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
           "arm": "deepseek-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -496,7 +729,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -517,6 +749,37 @@
             "quantization": "Q4_K_P",
             "contextTokens": 72192
           }
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 403218,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 25282,
+              "milliseconds": 373452.86900000006,
+              "measuredRequests": 14,
+              "totalRequests": 14
+            },
+            "prefill": {
+              "tokens": 41025,
+              "milliseconds": 21180.256999999998,
+              "measuredRequests": 14,
+              "totalRequests": 14
+            },
+            "evidenceSha256": "9aa9204e12a0e52a28e35854e27c064ad1b5e193c8e4094c2fa835c8cddc320d",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -527,10 +790,12 @@
       "number": "03",
       "description": "Order dependent work deterministically. Propagate failure without losing the plan.",
       "recorded": true,
-      "sourceSha256": "011a94e8abb92d3ef4ab78c9e93e908130ea25829d253d0de34ee3f989de43a2",
+      "sourceSha256": "8357c39f01c0f1d1a96982fc61ad0e7d24bcfa918475e0ec41feb2e108f22ac6",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -538,7 +803,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -562,6 +826,7 @@
         },
         {
           "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
           "arm": "deepseek-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -569,7 +834,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -593,6 +857,7 @@
         },
         {
           "label": "Hermes",
+          "model": "Qwen 27B · same local model",
           "arm": "hermes",
           "outcome": "TIMEOUT",
           "passed": false,
@@ -600,7 +865,6 @@
           "groupsPassed": 2,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -624,6 +888,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -634,6 +899,7 @@
         },
         {
           "label": "Codex · Sol",
+          "model": "GPT-5.6 Sol · native CLI",
           "arm": "codex-sol",
           "outcome": "PASS",
           "passed": true,
@@ -644,6 +910,7 @@
         },
         {
           "label": "Codex · Terra",
+          "model": "GPT-5.6 Terra · native CLI",
           "arm": "codex-terra",
           "outcome": "PASS",
           "passed": true,
@@ -651,6 +918,37 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true
+        },
+        {
+          "label": "OpenCode",
+          "model": "Qwen 27B · same local model",
+          "arm": "opencode",
+          "outcome": "PASS",
+          "passed": true,
+          "wallMs": 324088,
+          "groupsPassed": 5,
+          "groupsTotal": 5,
+          "accountingComplete": true,
+          "performance": {
+            "source": "saved-server-timings",
+            "generation": {
+              "tokens": 20854,
+              "milliseconds": 303587.603,
+              "measuredRequests": 16,
+              "totalRequests": 16
+            },
+            "prefill": {
+              "tokens": 18459,
+              "milliseconds": 13390.247000000001,
+              "measuredRequests": 16,
+              "totalRequests": 16
+            },
+            "evidenceSha256": "a90b7d32d607e5e495bc566bd88f2ab0b0a66169ef5e905962532cd4efa7bf02",
+            "hardware": "rtx-4090-24gb",
+            "hardwareBasis": "operator-confirmed",
+            "quantization": "Q4_K_P",
+            "contextTokens": 72192
+          }
         }
       ]
     },
@@ -662,9 +960,11 @@
       "description": "Remove selected literals deterministically, with an exact edit receipt and byte accounting.",
       "recorded": true,
       "sourceSha256": "06d72a11ce426a936df574fbb17733b92d7abbda130725f8dea3e6656aae7dda",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -672,7 +972,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -696,6 +995,7 @@
         },
         {
           "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
           "arm": "deepseek-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -703,7 +1003,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -727,6 +1026,7 @@
         },
         {
           "label": "Hermes",
+          "model": "Qwen 27B · same local model",
           "arm": "hermes",
           "outcome": "TIMEOUT",
           "passed": false,
@@ -734,7 +1034,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -758,6 +1057,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -768,6 +1068,7 @@
         },
         {
           "label": "Codex · Sol",
+          "model": "GPT-5.6 Sol · native CLI",
           "arm": "codex-sol",
           "outcome": "PASS",
           "passed": true,
@@ -778,6 +1079,7 @@
         },
         {
           "label": "Codex · Terra",
+          "model": "GPT-5.6 Terra · native CLI",
           "arm": "codex-terra",
           "outcome": "PASS",
           "passed": true,
@@ -796,9 +1098,11 @@
       "description": "Respect backoff, server retry hints and a hard remaining-time budget without overflow.",
       "recorded": true,
       "sourceSha256": "4612f47f9e3b49ea2fd73cbc7ae6539ea20b27f2847353414a0338352d27d71d",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -806,7 +1110,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -830,6 +1133,7 @@
         },
         {
           "label": "DeepSeek Harness",
+          "model": "Qwen 27B · same local model",
           "arm": "deepseek-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -837,7 +1141,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -861,6 +1164,7 @@
         },
         {
           "label": "Hermes",
+          "model": "Qwen 27B · same local model",
           "arm": "hermes",
           "outcome": "PASS",
           "passed": true,
@@ -868,7 +1172,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -892,6 +1195,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -902,6 +1206,7 @@
         },
         {
           "label": "Codex · Sol",
+          "model": "GPT-5.6 Sol · native CLI",
           "arm": "codex-sol",
           "outcome": "PASS",
           "passed": true,
@@ -912,6 +1217,7 @@
         },
         {
           "label": "Codex · Terra",
+          "model": "GPT-5.6 Terra · native CLI",
           "arm": "codex-terra",
           "outcome": "PASS",
           "passed": true,
@@ -930,9 +1236,11 @@
       "description": "Match paths against glob patterns, last pattern deciding, with a receipt per path.",
       "recorded": true,
       "sourceSha256": "f2599528714ae11fd11cd580d552e9be95a3ed3f1c14fefd458125c1f77caa9d",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -940,7 +1248,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -964,6 +1271,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -982,9 +1290,11 @@
       "description": "Decide whether a path stays inside a workspace root, without trusting a shared prefix.",
       "recorded": true,
       "sourceSha256": "78ea1a3d6a4de71cd9440dfd4cb41fdfa8a6c77f94c464b0fbe8ea30998eaeef",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -992,7 +1302,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1016,6 +1325,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -1034,9 +1344,11 @@
       "description": "Order versions by real precedence and admit prereleases into a range only when invited.",
       "recorded": true,
       "sourceSha256": "8be9b292b46c61a52f6154dd2036643211d1b07bec353c28176677ee3a0dd28d",
+      "reviewedWork": true,
       "rows": [
         {
           "label": "BANTAM · local",
+          "model": "Qwen 27B · same local model",
           "arm": "bantam-local-27b",
           "outcome": "PASS",
           "passed": true,
@@ -1044,7 +1356,6 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
-          "model": "Qwen 27B · same local model",
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1068,6 +1379,7 @@
         },
         {
           "label": "Codex · Astra",
+          "model": "GPT-6 Astra · native CLI",
           "arm": "codex-astra",
           "outcome": "PASS",
           "passed": true,
@@ -1089,9 +1401,11 @@
         "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
         "recorded": true,
         "sourceSha256": "c9305d7d3e68a58ccb82e256ef44234ac2115ea3d20aea8196827aa5e7f80df0",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1102,6 +1416,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1112,6 +1427,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,
@@ -1130,9 +1446,11 @@
         "description": "Check every preimage, then apply a set of compatible edits as one transaction.",
         "recorded": true,
         "sourceSha256": "68b0f06a7d89bee831ba56c84cd823eebdcbcacac24805459c3c1fc3e09aca41",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1143,6 +1461,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1153,6 +1472,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,
@@ -1171,9 +1491,11 @@
         "description": "Recover complete events across arbitrary byte chunks, with explicit stream termination.",
         "recorded": true,
         "sourceSha256": "caf0f09f63a7d16c1a6218414bb78780378f267b855fa6c2e6cf7826b57e9807",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1184,6 +1506,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1194,6 +1517,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,
@@ -1212,9 +1536,11 @@
         "description": "Turn a noisy stream of events into a trustworthy account of what happened.",
         "recorded": true,
         "sourceSha256": "06653d555c7b3e7abfbe6044ad7a18e48bebb8b15ace71766d964fee179490d3",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1225,6 +1551,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1235,6 +1562,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,
@@ -1253,9 +1581,11 @@
         "description": "Bind a snapshot to real files. Detect what changed, and validate what did not.",
         "recorded": true,
         "sourceSha256": "55ad5d1f6b49415740e9018c8aadc3478f85bafafdbbb7647ede903d53b187a9",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1266,6 +1596,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1276,6 +1607,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,
@@ -1294,9 +1626,11 @@
         "description": "Order dependent work deterministically. Propagate failure without losing the plan.",
         "recorded": true,
         "sourceSha256": "77b60e49b4b6609f95b03ba63cbe46433f730eb80691a851d89b754ed0a64030",
+        "reviewedWork": true,
         "rows": [
           {
             "label": "Claude · Sonnet",
+            "model": "Claude Sonnet · native CLI alias",
             "arm": "claude-sonnet",
             "outcome": "PASS",
             "passed": true,
@@ -1307,6 +1641,7 @@
           },
           {
             "label": "Claude · Opus",
+            "model": "Claude Opus · native CLI alias",
             "arm": "claude-opus",
             "outcome": "PASS",
             "passed": true,
@@ -1317,6 +1652,7 @@
           },
           {
             "label": "Claude · Fable",
+            "model": "Claude Fable · native CLI alias",
             "arm": "claude-fable",
             "outcome": "PASS",
             "passed": true,

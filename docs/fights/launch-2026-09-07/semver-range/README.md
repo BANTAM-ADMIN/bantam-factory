@@ -18,6 +18,8 @@ Both systems completed accepted work and passed every acceptance group. Astra
 was 2.94× quicker, its widest margin over BANTAM FACTORY in the selection series. This
 is the heaviest card BANTAM FACTORY has published, at 66 requests.
 
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
+
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
 
@@ -57,11 +59,6 @@ CPU vision projection, not the recommended DavidAU download. Local inference
 was serial. No manual repairs, teacher requests or post-result changes to the
 candidates were made.
 
-These are different models on one development task: an individual observation,
-not a ranking or a held-out reliability study. Public exports contain
-allowlisted measurements and replay counters, not private source, prompts or
-machine paths. Raw evidence remains private. Package hashes check generated
-assets, excluding this README; they do not attest authorship or authorize
-execution.
+These are different models on the same development work order. The work views include recorded actions, checks and delivered files. Asset hashes cover the generated files; this explanatory note is separate.
 
 </details>

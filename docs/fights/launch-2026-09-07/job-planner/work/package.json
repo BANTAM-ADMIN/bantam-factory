@@ -1,0 +1,241 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 130052,
+      "sha256": "765943c3e745d74f94a7b2cab1167a00ef469ea39d4f17e0144bacdf9e3213e6",
+      "arm": "bantam-local-27b",
+      "wallMs": 193154,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 17,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Build the plan. Execute the edge cases.",
+        "paragraphs": [
+          {
+            "text": "The factory repaired job ordering and failure propagation, then had the worker execute the supervisor’s cycle example. It also checked the CLI and kept a focused assertion file with the tool.",
+            "actions": [
+              "action-9",
+              "action-10",
+              "action-11",
+              "action-13",
+              "action-14",
+              "action-15"
+            ]
+          },
+          {
+            "text": "The final project checks and all five independent groups passed. The worker delivered the completed planner in 193.2 seconds.",
+            "actions": [
+              "action-16",
+              "action-17"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 94920,
+      "sha256": "ca3ec33c46f0475f6bba5b533bdcdf5b465fcbb5d4bb9cf0d7580f8f6fd2270a",
+      "arm": "deepseek-local-27b",
+      "wallMs": 483467,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 18,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Correct planner after CLI repairs.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek built the planner and additional tests, then investigated command-line behavior, patched the implementation and reran verification. It finished with accepted work in 483.5 seconds.",
+            "actions": [
+              "action-6",
+              "action-8",
+              "action-10",
+              "action-11",
+              "action-14",
+              "action-18"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 97746,
+      "sha256": "c230f02b8918ffc57a16100f8a77604c615db203456a3ed72d3e57467183e873",
+      "arm": "hermes",
+      "wallMs": 600006,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 16,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Ordering and output errors remained.",
+        "paragraphs": [
+          {
+            "text": "Hermes changed the planner and added tests, but reached the time limit after its test run. The independent checks found incorrectly ordered ready and blocked lists, plus a missing newline in CLI output.",
+            "actions": [
+              "action-6",
+              "action-9",
+              "action-11",
+              "action-16"
+            ]
+          },
+          {
+            "text": "Only two of five independent groups passed. The planner did not meet the work order at the ten-minute boundary.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 47553,
+      "sha256": "61545d264d98c7c6a769226939c0e75ace9323444964ece2a6d1dec6d0927b9b",
+      "arm": "codex-astra",
+      "wallMs": 118397,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered job-plan.js, test/job-plan-extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 118.4 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 73786,
+      "sha256": "0e60d4806938f31e7d4a7d259dd7de007a8653df603a4afecd112bc348c6e5da",
+      "arm": "codex-sol",
+      "wallMs": 240866,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered job-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 240.9 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-7"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 44586,
+      "sha256": "10826f02c78d776556ab1aeebd461dd1b34d7b36b45fe33ed82a45dc9c506a9e",
+      "arm": "codex-terra",
+      "wallMs": 119274,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered job-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 119.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 63576,
+      "sha256": "dc7c2552015fabaceb77e7bfbfa09a9344cdb2b4e6dba47cd69d0d01ce39ef4c",
+      "arm": "opencode",
+      "wallMs": 324088,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 19,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Working planner, with the CLI checked.",
+        "paragraphs": [
+          {
+            "text": "OpenCode implemented the planner and added API and CLI tests. It corrected a failing CLI fixture, passed the suite, then exercised valid plans, invalid input and opaque job names.",
+            "actions": [
+              "action-7",
+              "action-9",
+              "action-10",
+              "action-12",
+              "action-16",
+              "action-17"
+            ]
+          },
+          {
+            "text": "The final suite passed all 16 tests, and independent acceptance passed all five groups. Clean finish: 324.1 seconds, compared with BANTAM FACTORY’s 193.2 seconds.",
+            "actions": [
+              "action-19"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,433 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "patch-transaction",
+  "arm": "opencode",
+  "wallMs": 559000,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T02:17:33.262Z",
+  "task": "# Patch transaction: extend the fixed edit helper\n\nThe supplied module already exports working synchronous `applyEdit(source,\nedit)`. Preserve it. Add synchronous `applyTransaction(source, edits)` plus a\nCLI. Node.js builtins only. This is a pure string-edit planner: do not modify\nfiles or execute a patch as code. It can later support a factory's guarded\nediting workflow, but this assignment is not a production integration.\n\n`source` must be a string. An edit is a non-null, non-array object:\n\n```\n{start: NONNEGATIVE_SAFE_INTEGER, end: NONNEGATIVE_SAFE_INTEGER,\n before: STRING, after: STRING}\n```\n\nOffsets are JavaScript UTF-16 string indexes, exactly as used by `slice`, not\nUTF-8 byte positions or line numbers. Require `0 <= start <= end <=\nsource.length` and `source.slice(start,end) === before`. Unknown object fields\nare ignored; do not coerce values. Invalid arguments or mismatched preimages\nthrow an Error. The existing `applyEdit` returns the edited string:\n\n```\nsource.slice(0,start) + after + source.slice(end)\n```\n\n`applyTransaction` accepts an array of edits, possibly empty. Validate every\nedit against the original source before applying anything. Every edit uses\noriginal-source coordinates, not coordinates shifted by earlier replacements.\nDo not mutate the input array or objects. Reject conflicts as follows:\n\n- Two nonempty ranges conflict if their half-open intervals overlap. Adjacent\n  nonempty ranges are allowed, e.g. [0,2) and [2,4).\n- An insertion has `start === end` and therefore `before === ''`. It conflicts\n  with another insertion at the same position, even if either inserts ''.\n- An insertion conflicts with a nonempty range if its position is anywhere\n  between that range's start and end, including either endpoint. Insertions\n  at distinct positions outside all edited ranges are allowed.\n\nThese rules deliberately reject ambiguous insertion/replacement boundaries.\nOn a conflict, throw an Error; do not return partial output. Otherwise apply\nall edits simultaneously and return exactly:\n\n```\n{text: RESULT_STRING, applied: NUMBER_OF_EDITS}\n```\n\nThe result is independent of the order of edits in the input. Preserve all\nuntouched code units, CR/LF sequences, whitespace and final-newline presence.\nAn empty transaction returns `{text: source, applied: 0}` but still validates\nthat source is a string. Empty source permits one insertion at position zero.\nNo-op edits are valid and count toward `applied` subject to the same rules.\n\nCLI: `node patch-transaction.js INPUT_JSON_FILE`. The UTF-8 JSON file contains\n`{source, edits}`; extra fields are ignored. Exactly one argument is required.\nSuccess prints one result JSON followed by newline, exits 0 and has no stderr.\nInvalid arguments, unreadable files, invalid JSON or invalid transactions exit\n2, with nonempty stderr and no stdout. Importing must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification uses a read-only candidate workspace: put any\nfixture files in `os.tmpdir()` and clean them up. Run `npm test` before\nfinishing. Hidden acceptance tests the published contract with other values.\n",
+  "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+  "source": "opencode-native-database",
+  "actions": [
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace"
+      },
+      "output": "total 8\ndrwxrwxr-x 1 bantam bantam  72 Sep  8 02:17 .\ndrwxr-xr-x 1 root   root    54 Sep  8 02:17 ..\n-rw-rw-r-- 1 bantam bantam 119 Sep  8 02:17 package.json\n-rw-rw-r-- 1 bantam bantam 847 Sep  8 02:17 patch-transaction.js\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 02:17 test\n",
+      "atMs": 13637.0,
+      "endedMs": 13647.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "glob",
+      "category": "inspect",
+      "request": {
+        "pattern": "**/*.js"
+      },
+      "output": "/workspace/test/public.test.js\n/workspace/patch-transaction.js",
+      "atMs": 13880.0,
+      "endedMs": 13892.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/patch-transaction.js"
+      },
+      "output": "<path>/workspace/patch-transaction.js</path>\n<type>file</type>\n<content>\n1: // The existing single-edit API works. Preserve it while extending this module.\n2: function checkEdit(source,edit){\n3:   if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n4:     ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n5:     ||edit.start<0||edit.start>edit.end||edit.end>source.length\n6:     ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n7:   if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n8: }\n9: export function applyEdit(source,edit){\n10:   checkEdit(source,edit);\n11:   return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n12: }\n13: export function applyTransaction(source,edits){\n14:   throw Error('applyTransaction is not implemented');\n15: }\n16: // Add the JSON-file CLI described by the work order without import side effects.\n\n(End of file - total 16 lines)\n</content>",
+      "atMs": 14628.0,
+      "endedMs": 14638.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/test/public.test.js"
+      },
+      "output": "<path>/workspace/test/public.test.js</path>\n<type>file</type>\n<content>\n1: import test from 'node:test';\n2: import assert from 'node:assert/strict';\n3: import {applyEdit,applyTransaction} from '../patch-transaction.js';\n4: const edit=(start,end,before,after)=>({start,end,before,after});\n5: test('preserve existing single-edit behavior',()=>{\n6:   assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n7:   assert.throws(()=>applyEdit('abc',edit(1,2,'wrong','x')),Error);\n8: });\n9: test('all coordinates refer to the original text',()=>{\n10:   const edits=[edit(0,1,'a','LONG'),edit(3,5,'de','X')];\n11:   assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n12:   assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n13: });\n14: test('adjacent replacements allowed; insertion touching a range rejected',()=>{\n15:   assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n16:   assert.throws(()=>applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,2,'','y')]),Error);\n17: });\n18: test('empty transaction, empty source insertion, and validation',()=>{\n19:   assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n20:   assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n21:   assert.throws(()=>applyTransaction(null,[]),Error);\n22: });\n\n(End of file - total 22 lines)\n</content>",
+      "atMs": 14916.0,
+      "endedMs": 14925.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/package.json"
+      },
+      "output": "<path>/workspace/package.json</path>\n<type>file</type>\n<content>\n1: {\"name\":\"factory-patch-transaction\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n(End of file - total 1 lines)\n</content>",
+      "atMs": 15172.0,
+      "endedMs": 15177.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "node --version && ls -la /workspace/test"
+      },
+      "output": "v20.19.4\ntotal 4\ndrwxrwxr-x 1 bantam bantam   28 Sep  8 02:17 .\ndrwxrwxr-x 1 bantam bantam   72 Sep  8 02:17 ..\n-rw-rw-r-- 1 bantam bantam 1266 Sep  8 02:17 public.test.js\n",
+      "atMs": 323895.0,
+      "endedMs": 323898.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/patch-transaction.js",
+        "content": "// The existing single-edit API works. Preserve it while extending this module.\nfunction checkEdit(source,edit){\n  if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n     ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n     ||edit.start<0||edit.start>edit.end||edit.end>source.length\n     ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n  if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n}\nexport function applyEdit(source,edit){\n  checkEdit(source,edit);\n  return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n}\nexport function applyTransaction(source,edits){\n  if(typeof source!=='string')throw Error('invalid source');\n  if(!Array.isArray(edits))throw Error('invalid edits');\n\n  // Validate every edit against the original source before applying anything.\n  for(const edit of edits)checkEdit(source,edit);\n\n  const n=edits.length;\n\n  // Partition edits into nonempty ranges and insertions (start === end).\n  const ranges=[];\n  const insertions=[];\n  for(const e of edits){\n    if(e.start<e.end)ranges.push({start:e.start,end:e.end});\n    else insertions.push(e.start);\n  }\n\n  // Conflict: two nonempty ranges whose half-open intervals overlap.\n  // Sort by start (then end) and track the running max end.\n  ranges.sort((a,b)=>a.start-b.start||a.end-b.end);\n  let maxEnd=-1;\n  for(const r of ranges){\n    if(r.start<maxEnd)throw Error('conflicting edits');\n    if(r.end>maxEnd)maxEnd=r.end;\n  }\n\n  // Conflict: two insertions at the same position.\n  const seenPos=new Set();\n  for(const p of insertions){\n    if(seenPos.has(p))throw Error('conflicting edits');\n    seenPos.add(p);\n  }\n\n  // Conflict: an insertion at p where some range [s,e) has s <= p <= e.\n  // ranges is sorted by start; build a prefix max-end for binary search.\n  const rStart=ranges.map(r=>r.start);\n  const prefixMaxEnd=[];\n  for(let i=0;i<ranges.length;i++){\n    const e=ranges[i].end;\n    prefixMaxEnd.push(i===0?e:Math.max(prefixMaxEnd[i-1],e));\n  }\n  for(const p of insertions){\n    let lo=0,hi=rStart.length-1,idx=-1;\n    while(lo<=hi){\n      const mid=(lo+hi)>>1;\n      if(rStart[mid]<=p){idx=mid;lo=mid+1;}\n      else hi=mid-1;\n    }\n    if(idx>=0&&prefixMaxEnd[idx]>=p)throw Error('conflicting edits');\n  }\n\n  // Apply all edits simultaneously. Every event uses original-source\n  // coordinates, so ordering them by position makes the result independent of\n  // the input order and preserves every untouched code unit exactly.\n  const events=edits.map(e=>({start:e.start,end:e.end,after:e.after}));\n  events.sort((a,b)=>a.start-b.start);\n  let out='';\n  let pos=0;\n  for(const ev of events){\n    out+=source.slice(pos,ev.start)+ev.after;\n    pos=ev.end;\n  }\n  out+=source.slice(pos,source.length);\n  return {text:out,applied:n};\n}\n\nimport {readFileSync,realpathSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nfunction isMainModule(){\n  const entry=process.argv[1];\n  if(!entry)return false;\n  let entryPath;\n  try{entryPath=realpathSync(resolve(entry));}\n  catch{try{entryPath=resolve(entry);}catch{return false;}}\n  let selfPath;\n  try{selfPath=fileURLToPath(import.meta.url);}catch{return false;}\n  let selfReal;\n  try{selfReal=realpathSync(selfPath);}catch{selfReal=selfPath;}\n  return entryPath===selfReal;\n}\n\nfunction runCli(){\n  const fail=(msg)=>{\n    process.stderr.write(msg+'\\n');\n    process.exitCode=2;\n  };\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    fail('usage: node patch-transaction.js INPUT_JSON_FILE');\n    return;\n  }\n  const file=args[0];\n  let raw;\n  try{raw=readFileSync(file,'utf8');}\n  catch{fail('cannot read input file');return;}\n  let data;\n  try{data=JSON.parse(raw);}\n  catch{fail('invalid JSON');return;}\n  const obj=data&&typeof data==='object'?data:{};\n  let result;\n  try{\n    result=applyTransaction(obj.source,obj.edits);\n  }catch(err){\n    fail('invalid transaction: '+(err&&err.message?err.message:String(err)));\n    return;\n  }\n  process.stdout.write(JSON.stringify(result)+'\\n');\n  process.exitCode=0;\n}\n\nif(isMainModule())runCli();\n"
+      },
+      "output": "Wrote file successfully.",
+      "atMs": 340550.0,
+      "endedMs": 340557.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/patch-transaction.js",
+        "oldString": "// The existing single-edit API works. Preserve it while extending this module.\nfunction checkEdit(source,edit){",
+        "newString": "import {readFileSync,realpathSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {fileURLToPath} from 'node:url';\n// The existing single-edit API works. Preserve it while extending this module.\nfunction checkEdit(source,edit){"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 345534.0,
+      "endedMs": 345536.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/patch-transaction.js",
+        "oldString": "import {readFileSync,realpathSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nfunction isMainModule(){",
+        "newString": "function isMainModule(){"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 347439.0,
+      "endedMs": 347441.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/patch-transaction.js"
+      },
+      "output": "<path>/workspace/patch-transaction.js</path>\n<type>file</type>\n<content>\n1: import {readFileSync,realpathSync} from 'node:fs';\n2: import {resolve} from 'node:path';\n3: import {fileURLToPath} from 'node:url';\n4: // The existing single-edit API works. Preserve it while extending this module.\n5: function checkEdit(source,edit){\n6:   if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n7:      ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n8:      ||edit.start<0||edit.start>edit.end||edit.end>source.length\n9:      ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n10:   if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n11: }\n12: export function applyEdit(source,edit){\n13:   checkEdit(source,edit);\n14:   return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n15: }\n16: export function applyTransaction(source,edits){\n17:   if(typeof source!=='string')throw Error('invalid source');\n18:   if(!Array.isArray(edits))throw Error('invalid edits');\n19: \n20:   // Validate every edit against the original source before applying anything.\n21:   for(const edit of edits)checkEdit(source,edit);\n22: \n23:   const n=edits.length;\n24: \n25:   // Partition edits into nonempty ranges and insertions (start === end).\n26:   const ranges=[];\n27:   const insertions=[];\n28:   for(const e of edits){\n29:     if(e.start<e.end)ranges.push({start:e.start,end:e.end});\n30:     else insertions.push(e.start);\n31:   }\n32: \n33:   // Conflict: two nonempty ranges whose half-open intervals overlap.\n34:   // Sort by start (then end) and track the running max end.\n35:   ranges.sort((a,b)=>a.start-b.start||a.end-b.end);\n36:   let maxEnd=-1;\n37:   for(const r of ranges){\n38:     if(r.start<maxEnd)throw Error('conflicting edits');\n39:     if(r.end>maxEnd)maxEnd=r.end;\n40:   }\n41: \n42:   // Conflict: two insertions at the same position.\n43:   const seenPos=new Set();\n44:   for(const p of insertions){\n45:     if(seenPos.has(p))throw Error('conflicting edits');\n46:     seenPos.add(p);\n47:   }\n48: \n49:   // Conflict: an insertion at p where some range [s,e) has s <= p <= e.\n50:   // ranges is sorted by start; build a prefix max-end for binary search.\n51:   const rStart=ranges.map(r=>r.start);\n52:   const prefixMaxEnd=[];\n53:   for(let i=0;i<ranges.length;i++){\n54:     const e=ranges[i].end;\n55:     prefixMaxEnd.push(i===0?e:Math.max(prefixMaxEnd[i-1],e));\n56:   }\n57:   for(const p of insertions){\n58:     let lo=0,hi=rStart.length-1,idx=-1;\n59:     while(lo<=hi){\n60:       const mid=(lo+hi)>>1;\n61:       if(rStart[mid]<=p){idx=mid;lo=mid+1;}\n62:       else hi=mid-1;\n63:     }\n64:     if(idx>=0&&prefixMaxEnd[idx]>=p)throw Error('conflicting edits');\n65:   }\n66: \n67:   // Apply all edits simultaneously. Every event uses original-source\n68:   // coordinates, so ordering them by position makes the result independent of\n69:   // the input order and preserves every untouched code unit exactly.\n70:   const events=edits.map(e=>({start:e.start,end:e.end,after:e.after}));\n71:   events.sort((a,b)=>a.start-b.start);\n72:   let out='';\n73:   let pos=0;\n74:   for(const ev of events){\n75:     out+=source.slice(pos,ev.start)+ev.after;\n76:     pos=ev.end;\n77:   }\n78:   out+=source.slice(pos,source.length);\n79:   return {text:out,applied:n};\n80: }\n81: \n82: function isMainModule(){\n83:   const entry=process.argv[1];\n84:   if(!entry)return false;\n85:   let entryPath;\n86:   try{entryPath=realpathSync(resolve(entry));}\n87:   catch{try{entryPath=resolve(entry);}catch{return false;}}\n88:   let selfPath;\n89:   try{selfPath=fileURLToPath(import.meta.url);}catch{return false;}\n90:   let selfReal;\n91:   try{selfReal=realpathSync(selfPath);}catch{selfReal=selfPath;}\n92:   return entryPath===selfReal;\n93: }\n94: \n95: function runCli(){\n96:   const fail=(msg)=>{\n97:     process.stderr.write(msg+'\\n');\n98:     process.exitCode=2;\n99:   };\n100:   const args=process.argv.slice(2);\n101:   if(args.length!==1){\n102:     fail('usage: node patch-transaction.js INPUT_JSON_FILE');\n103:     return;\n104:   }\n105:   const file=args[0];\n106:   let raw;\n107:   try{raw=readFileSync(file,'utf8');}\n108:   catch{fail('cannot read input file');return;}\n109:   let data;\n110:   try{data=JSON.parse(raw);}\n111:   catch{fail('invalid JSON');return;}\n112:   const obj=data&&typeof data==='object'?data:{};\n113:   let result;\n114:   try{\n115:     result=applyTransaction(obj.source,obj.edits);\n116:   }catch(err){\n117:     fail('invalid transaction: '+(err&&err.message?err.message:String(err)));\n118:     return;\n119:   }\n120:   process.stdout.write(JSON.stringify(result)+'\\n');\n121:   process.exitCode=0;\n122: }\n123: \n124: if(isMainModule())runCli();\n\n(End of file - total 124 lines)\n</content>",
+      "atMs": 349109.0,
+      "endedMs": 349130.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/transaction.test.js",
+        "content": "import test,{beforeAll,afterAll} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {mkdtempSync,writeFileSync,rmSync,existsSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join} from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\nimport {applyEdit,applyTransaction} from '../patch-transaction.js';\n\nconst modulePath=fileURLToPath(new URL('../patch-transaction.js',import.meta.url));\nconst edit=(start,end,before,after)=>({start,end,before,after});\n\nlet dir;\nbeforeAll(()=>{\n  dir=mkdtempSync(join(tmpdir(),'patch-txn-'));\n});\nafterAll(()=>{\n  if(dir&&existsSync(dir))rmSync(dir,{recursive:true,force:true});\n});\n\nfunction runCli(args){\n  return spawnSync(process.execPath,[modulePath,...args],{encoding:'utf8'});\n}\nfunction writeJson(name,value){\n  const p=join(dir,name);\n  writeFileSync(p,JSON.stringify(value),'utf8');\n  return p;\n}\nfunction writeRaw(name,text){\n  const p=join(dir,name);\n  writeFileSync(p,text,'utf8');\n  return p;\n}\n\ntest('existing applyEdit still works',()=>{\n  assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n});\n\ntest('applies all edits using original coordinates',()=>{\n  const edits=[edit(3,5,'de','X'),edit(0,1,'a','LONG')];\n  assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n});\n\ntest('adjacent and disjoint ranges are fine',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[edit(0,1,'a','A'),edit(4,6,'ef','E')]),{text:'AbcdE',applied:2});\n});\n\ntest('insertions at distinct positions outside ranges are fine',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(1,3,'bc','X'),edit(0,0,'','P'),edit(4,4,'','Q')]),{text:'PaXdQ',applied:3});\n});\n\ntest('multiple insertions in the same gap are fine',()=>{\n  assert.deepEqual(applyTransaction('abc',[edit(0,0,'','a'),edit(3,3,'','c'),edit(1,1,'','b')]),{text:'aabbc',applied:3});\n});\n\ntest('overlapping ranges conflict',()=>{\n  assert.throws(()=>applyTransaction('abcdef',[edit(0,3,'abc','X'),edit(2,5,'cde','Y')]),Error);\n});\n\ntest('identical ranges conflict',()=>{\n  assert.throws(()=>applyTransaction('ab',[edit(0,2,'ab','X'),edit(0,2,'ab','Y')]),Error);\n});\n\ntest('insertion touching a range endpoint conflicts',()=>{\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(1,1,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(3,3,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(2,2,'','Y')]),Error);\n});\n\ntest('two insertions at the same position conflict',()=>{\n  assert.throws(()=>applyTransaction('ab',[edit(0,0,'','X'),edit(0,0,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('ab',[edit(0,0,'',''),edit(0,0,'','')]),Error);\n});\n\ntest('empty transaction returns source unchanged',()=>{\n  assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n});\n\ntest('empty source allows one insertion at zero',()=>{\n  assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n  assert.throws(()=>applyTransaction('',[edit(0,0,'','a'),edit(0,0,'','b')]),Error);\n  assert.throws(()=>applyTransaction('',[edit(1,1,'','a')]),Error);\n});\n\ntest('no-op edits are valid and counted',()=>{\n  assert.deepEqual(applyTransaction('abc',[edit(1,2,'b','b'),edit(0,0,'','')]),{text:'abc',applied:2});\n});\n\ntest('preserves CR/LF and final newline',()=>{\n  const source='a\\r\\nb\\n';\n  assert.deepEqual(applyTransaction(source,[edit(1,3,'\\r\\n','/')]),{text:'a/b\\n',applied:1});\n});\n\ntest('unicode code units are preserved',()=>{\n  // '\u00e9' is a single code unit here; surrogate pairs are two code units.\n  const source='a\\u{1F600}b'; // a, \ud83d\ude00 (two code units), b => length 4\n  assert.equal(source.length,4);\n  assert.deepEqual(applyTransaction(source,[edit(0,1,'a','Z')]),{text:'Z\\u{1F600}b',applied:1});\n});\n\ntest('does not mutate the input array or edit objects',()=>{\n  const e1=edit(0,1,'a','X');\n  const e2=edit(3,5,'de','Y');\n  const edits=[e1,e2];\n  const snapshot=JSON.stringify(edits);\n  applyTransaction('abcdef',edits);\n  assert.equal(JSON.stringify(edits),snapshot);\n  assert.equal(edits.length,2);\n  assert.equal(e1.start,0);\n  assert.equal(e1.before,'a');\n  assert.equal(e2.after,'Y');\n});\n\ntest('invalid arguments throw',()=>{\n  assert.throws(()=>applyTransaction(123,[edit(0,1,'x','y')]),Error);\n  assert.throws(()=>applyTransaction(null,[]),Error);\n  assert.throws(()=>applyTransaction('abc',null),Error);\n  assert.throws(()=>applyTransaction('abc','nope'),Error);\n  assert.throws(()=>applyTransaction('abc',[null]),Error);\n  assert.throws(()=>applyTransaction('abc',['x']),Error);\n  assert.throws(()=>applyTransaction('abc',[{start:0,end:1}]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(1.5,2,'b','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(-1,0,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(0,4,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(2,1,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'a','x',false)]),Error);\n  // preimage mismatch\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'z','x')]),Error);\n});\n\ntest('CLI: success prints one JSON line, exit 0, no stderr',()=>{\n  const p=writeJson('ok.json',{source:'abcdef',edits:[edit(0,1,'a','LONG'),edit(3,5,'de','X')]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stderr,'');\n  assert.equal(r.stdout,JSON.stringify({text:'LONGbcXf',applied:2})+'\\n');\n});\n\ntest('CLI: extra fields are ignored',()=>{\n  const p=writeJson('extra.json',{source:'abc',edits:[],extra:'ignored',nested:{a:1},edits2:[1]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stderr,'');\n  assert.equal(r.stdout,JSON.stringify({text:'abc',applied:0})+'\\n');\n});\n\ntest('CLI: empty transaction succeeds',()=>{\n  const p=writeJson('empty.json',{source:'tail\\r\\n',edits:[]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stdout,JSON.stringify({text:'tail\\r\\n',applied:0})+'\\n');\n});\n\ntest('CLI: zero arguments exits 2 with stderr, no stdout',()=>{\n  const r=runCli([]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: two arguments exits 2 with stderr, no stdout',()=>{\n  const r=runCli(['a','b']);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: unreadable file exits 2 with stderr, no stdout',()=>{\n  const r=runCli([join(dir,'no-such-file.json')]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: invalid JSON exits 2 with stderr, no stdout',()=>{\n  const p=writeRaw('bad.json','{ this is not json');\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: invalid transaction exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('inv.json',{source:'abc',edits:[{start:5,end:6,before:'',after:''}]});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: conflicting transaction exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('conf.json',{source:'abcd',edits:[edit(0,2,'ab','x'),edit(1,3,'bc','y')]});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: missing edits field exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('noedits.json',{source:'abc'});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: non-object JSON top-level exits 2',()=>{\n  const p=writeRaw('scalar.json','\"just a string\"');\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n"
+      },
+      "output": "Wrote file successfully.",
+      "atMs": 404548.0,
+      "endedMs": 404554.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test",
+        "workdir": "/workspace"
+      },
+      "output": "\n> factory-patch-transaction@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: preserve existing single-edit behavior\nok 1 - preserve existing single-edit behavior\n  ---\n  duration_ms: 1.058236\n  ...\n# Subtest: all coordinates refer to the original text\nok 2 - all coordinates refer to the original text\n  ---\n  duration_ms: 0.746214\n  ...\n# Subtest: adjacent replacements allowed; insertion touching a range rejected\nok 3 - adjacent replacements allowed; insertion touching a range rejected\n  ---\n  duration_ms: 0.181331\n  ...\n# Subtest: empty transaction, empty source insertion, and validation\nok 4 - empty transaction, empty source insertion, and validation\n  ---\n  duration_ms: 0.15841\n  ...\n# file:///workspace/test/transaction.test.js:1\n# import test,{beforeAll,afterAll} from 'node:test';\n#                        ^^^^^^^^\n# SyntaxError: The requested module 'node:test' does not provide an export named 'afterAll'\n#     at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)\n#     at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)\n#     at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)\n# Node.js v20.19.4\n# Subtest: /workspace/test/transaction.test.js\nnot ok 2 - /workspace/test/transaction.test.js\n  ---\n  duration_ms: 27.992986\n  location: '/workspace/test/transaction.test.js:1:1'\n  failureType: 'testCodeFailure'\n  exitCode: 1\n  signal: ~\n  error: 'test failed'\n  code: 'ERR_TEST_FAILURE'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 4\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45.871252\n",
+      "atMs": 489493.0,
+      "endedMs": 489505.0,
+      "exitCode": 1,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/transaction.test.js",
+        "oldString": "import test,{beforeAll,afterAll} from 'node:test';",
+        "newString": "import test,{before,after} from 'node:test';"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 495548.0,
+      "endedMs": 495550.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/transaction.test.js",
+        "oldString": "beforeAll(()=>{\n  dir=mkdtempSync(join(tmpdir(),'patch-txn-'));\n});\nafterAll(()=>{\n  if(dir&&existsSync(dir))rmSync(dir,{recursive:true,force:true});\n});",
+        "newString": "before(()=>{\n  dir=mkdtempSync(join(tmpdir(),'patch-txn-'));\n});\nafter(()=>{\n  if(dir&&existsSync(dir))rmSync(dir,{recursive:true,force:true});\n});"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 497730.0,
+      "endedMs": 497732.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test",
+        "workdir": "/workspace"
+      },
+      "output": "\n> factory-patch-transaction@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: preserve existing single-edit behavior\nok 1 - preserve existing single-edit behavior\n  ---\n  duration_ms: 1.099736\n  ...\n# Subtest: all coordinates refer to the original text\nok 2 - all coordinates refer to the original text\n  ---\n  duration_ms: 0.607493\n  ...\n# Subtest: adjacent replacements allowed; insertion touching a range rejected\nok 3 - adjacent replacements allowed; insertion touching a range rejected\n  ---\n  duration_ms: 0.173971\n  ...\n# Subtest: empty transaction, empty source insertion, and validation\nok 4 - empty transaction, empty source insertion, and validation\n  ---\n  duration_ms: 0.165871\n  ...\n# Subtest: existing applyEdit still works\nok 5 - existing applyEdit still works\n  ---\n  duration_ms: 0.694634\n  ...\n# Subtest: applies all edits using original coordinates\nok 6 - applies all edits using original coordinates\n  ---\n  duration_ms: 0.633094\n  ...\n# Subtest: adjacent and disjoint ranges are fine\nok 7 - adjacent and disjoint ranges are fine\n  ---\n  duration_ms: 0.168631\n  ...\n# Subtest: insertions at distinct positions outside ranges are fine\nok 8 - insertions at distinct positions outside ranges are fine\n  ---\n  duration_ms: 0.207092\n  ...\n# Subtest: multiple insertions in the same gap are fine\nnot ok 9 - multiple insertions in the same gap are fine\n  ---\n  duration_ms: 1.59136\n  location: '/workspace/test/transaction.test.js:54:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      {\n        applied: 3,\n    +   text: 'aabbcc'\n    -   text: 'aabbc'\n      }\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    text: 'aabbc'\n    applied: 3\n  actual:\n    text: 'aabbcc'\n    applied: 3\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/transaction.test.js:55:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: overlapping ranges conflict\nok 10 - overlapping ranges conflict\n  ---\n  duration_ms: 0.311702\n  ...\n# Subtest: identical ranges conflict\nok 11 - identical ranges conflict\n  ---\n  duration_ms: 0.158271\n  ...\n# Subtest: insertion touching a range endpoint conflicts\nok 12 - insertion touching a range endpoint conflicts\n  ---\n  duration_ms: 0.189601\n  ...\n# Subtest: two insertions at the same position conflict\nok 13 - two insertions at the same position conflict\n  ---\n  duration_ms: 0.234342\n  ...\n# Subtest: empty transaction returns source unchanged\nok 14 - empty transaction returns source unchanged\n  ---\n  duration_ms: 0.713214\n  ...\n# Subtest: empty source allows one insertion at zero\nok 15 - empty source allows one insertion at zero\n  ---\n  duration_ms: 0.169311\n  ...\n# Subtest: no-op edits are valid and counted\nok 16 - no-op edits are valid and counted\n  ---\n  duration_ms: 13.847793\n  ...\n# Subtest: preserves CR/LF and final newline\nok 17 - preserves CR/LF and final newline\n  ---\n  duration_ms: 0.213041\n  ...\n# Subtest: unicode code units are preserved\nok 18 - unicode code units are preserved\n  ---\n  duration_ms: 0.269351\n  ...\n# Subtest: does not mutate the input array or edit objects\nok 19 - does not mutate the input array or edit objects\n  ---\n  duration_ms: 0.303712\n  ...\n# Subtest: invalid arguments throw\nnot ok 20 - invalid arguments throw\n  ---\n  duration_ms: 0.382353\n  location: '/workspace/test/transaction.test.js:116:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception (Error).'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/transaction.test.js:128:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: CLI: success prints one JSON line, exit 0, no stderr\nok 21 - CLI: success prints one JSON line, exit 0, no stderr\n  ---\n  duration_ms: 24.262435\n  ...\n# Subtest: CLI: extra fields are ignored\nok 22 - CLI: extra fields are ignored\n  ---\n  duration_ms: 22.924567\n  ...\n# Subtest: CLI: empty transaction succeeds\nok 23 - CLI: empty transaction succeeds\n  ---\n  duration_ms: 22.711776\n  ...\n# Subtest: CLI: zero arguments exits 2 with stderr, no stdout\nok 24 - CLI: zero arguments exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.6476\n  ...\n# Subtest: CLI: two arguments exits 2 with stderr, no stdout\nok 25 - CLI: two arguments exits 2 with stderr, no stdout\n  ---\n  duration_ms: 22.184783\n  ...\n# Subtest: CLI: unreadable file exits 2 with stderr, no stdout\nok 26 - CLI: unreadable file exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.999371\n  ...\n# Subtest: CLI: invalid JSON exits 2 with stderr, no stdout\nok 27 - CLI: invalid JSON exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.76298\n  ...\n# Subtest: CLI: invalid transaction exits 2 with stderr, no stdout\nok 28 - CLI: invalid transaction exits 2 with stderr, no stdout\n  ---\n  duration_ms: 20.836885\n  ...\n# Subtest: CLI: conflicting transaction exits 2 with stderr, no stdout\nok 29 - CLI: conflicting transaction exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.608529\n  ...\n# Subtest: CLI: missing edits field exits 2 with stderr, no stdout\nok 30 - CLI: missing edits field exits 2 with stderr, no stdout\n  ---\n  duration_ms: 20.600953\n  ...\n# Subtest: CLI: non-object JSON top-level exits 2\nok 31 - CLI: non-object JSON top-level exits 2\n  ---\n  duration_ms: 22.924586\n  ...\n1..31\n# tests 31\n# suites 0\n# pass 29\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 320.563465\n",
+      "atMs": 499141.0,
+      "endedMs": 499151.0,
+      "exitCode": 1,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/transaction.test.js",
+        "oldString": "  assert.deepEqual(applyTransaction('abc',[edit(0,0,'','a'),edit(3,3,'','c'),edit(1,1,'','b')]),{text:'aabbc',applied:3});",
+        "newString": "  assert.deepEqual(applyTransaction('abc',[edit(0,0,'','a'),edit(3,3,'','c'),edit(1,1,'','b')]),{text:'aabbcc',applied:3});"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 517388.0,
+      "endedMs": 517414.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/transaction.test.js",
+        "oldString": "  assert.throws(()=>applyTransaction('abc',[edit(2,1,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'a','x',false)]),Error);\n  // preimage mismatch\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'z','x')]),Error);\n});",
+        "newString": "  assert.throws(()=>applyTransaction('abc',[edit(2,1,'','x')]),Error);\n  // preimage mismatch\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'z','x')]),Error);\n});\n\ntest('unknown fields are ignored (no coercion)',()=>{\n  const e={start:0,end:1,before:'a',after:'X',extra:'ignored',id:42,nested:{}};\n  assert.deepEqual(applyTransaction('abc',[e]),{text:'Xbc',applied:1});\n  assert.equal(e.extra,'ignored');\n});"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 521947.0,
+      "endedMs": 521950.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | tail -20",
+        "workdir": "/workspace"
+      },
+      "output": "  ...\n# Subtest: CLI: missing edits field exits 2 with stderr, no stdout\nok 31 - CLI: missing edits field exits 2 with stderr, no stdout\n  ---\n  duration_ms: 24.82895\n  ...\n# Subtest: CLI: non-object JSON top-level exits 2\nok 32 - CLI: non-object JSON top-level exits 2\n  ---\n  duration_ms: 22.857498\n  ...\n1..32\n# tests 32\n# suites 0\n# pass 32\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 302.821127\n",
+      "atMs": 523564.0,
+      "endedMs": 523567.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cd /tmp && printf '{\"source\":\"hello\",\"edits\":[{\"start\":0,\"end\":1,\"before\":\"h\",\"after\":\"H\"}]}' > /tmp/t.json && node /workspace/patch-transaction.js /tmp/t.json; echo \"exit=$?\"; node ./patch-transaction.js /tmp/t.json; echo \"exit=$?\"; node -e \"await import('./patch-transaction.js'); console.log('imported ok, exitCode=', process.exitCode)\" --input-type=module; rm -f /tmp/t.json",
+        "workdir": "/workspace"
+      },
+      "output": "{\"text\":\"Hello\",\"applied\":1}\nexit=0\nnode:internal/modules/cjs/loader:1215\n  throw err;\n  ^\n\nError: Cannot find module '/tmp/patch-transaction.js'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)\n    at Module._load (node:internal/modules/cjs/loader:1043:27)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)\n    at node:internal/main/run_main_module:28:49 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v20.19.4\nexit=1\nnode:internal/modules/esm/resolve:283\n    throw new ERR_MODULE_NOT_FOUND(\n          ^\n\nError [ERR_MODULE_NOT_FOUND]: Cannot find module '/tmp/patch-transaction.js' imported from /tmp/[eval1]\n    at finalizeResolution (node:internal/modules/esm/resolve:283:11)\n    at moduleResolve (node:internal/modules/esm/resolve:952:10)\n    at defaultResolve (node:internal/modules/esm/resolve:1188:11)\n    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:642:12)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:591:25)\n    at ModuleLoader.resolve (node:internal/modules/esm/loader:574:38)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:236:38)\n    at ModuleLoader.import (node:internal/modules/esm/loader:539:34)\n    at defaultImportModuleDynamicallyForModule (node:internal/modules/esm/utils:221:31)\n    at importModuleDynamicallyCallback (node:internal/modules/esm/utils:260:12) {\n  code: 'ERR_MODULE_NOT_FOUND',\n  url: 'file:///tmp/patch-transaction.js'\n}\n\nNode.js v20.19.4\n",
+      "atMs": 534039.0,
+      "endedMs": 534042.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-19"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "printf '{\"source\":\"hello\",\"edits\":[{\"start\":0,\"end\":1,\"before\":\"h\",\"after\":\"H\"}]}' > /tmp/t.json && echo \"-- relative path from workspace --\" && node ./patch-transaction.js /tmp/t.json; echo \"exit=$?\"; echo \"-- import side-effect check (should print nothing to stderr, exitCode undefined) --\" && node --input-type=module -e \"await import('/workspace/patch-transaction.js'); console.log('imported ok, exitCode=', process.exitCode)\"; rm -f /tmp/t.json",
+        "workdir": "/workspace"
+      },
+      "output": "-- relative path from workspace --\n{\"text\":\"Hello\",\"applied\":1}\nexit=0\n-- import side-effect check (should print nothing to stderr, exitCode undefined) --\nimported ok, exitCode= undefined\n",
+      "atMs": 540927.0,
+      "endedMs": 540937.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-20"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "57362d0f1c2620c9549fedb48c11f6c79258fc5e07aaf8a8dee2b5733417939e",
+      "afterSha256": "57362d0f1c2620c9549fedb48c11f6c79258fc5e07aaf8a8dee2b5733417939e",
+      "before": "{\"name\":\"factory-patch-transaction\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-patch-transaction\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "57362d0f1c2620c9549fedb48c11f6c79258fc5e07aaf8a8dee2b5733417939e",
+      "diff": ""
+    },
+    {
+      "path": "patch-transaction.js",
+      "state": "changed",
+      "beforeSha256": "feeb795eea1ea1b58fdbbe74eb61c5bfe43bfe4f3fffd7a93fb7338ef7b78679",
+      "afterSha256": "50153ac3b67b1be94d93c2dbd0f2f32ad912769a3e5377cbc5c4fea19ad81edb",
+      "before": "// The existing single-edit API works. Preserve it while extending this module.\nfunction checkEdit(source,edit){\n  if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n    ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n    ||edit.start<0||edit.start>edit.end||edit.end>source.length\n    ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n  if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n}\nexport function applyEdit(source,edit){\n  checkEdit(source,edit);\n  return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n}\nexport function applyTransaction(source,edits){\n  throw Error('applyTransaction is not implemented');\n}\n// Add the JSON-file CLI described by the work order without import side effects.\n",
+      "after": "import {readFileSync,realpathSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {fileURLToPath} from 'node:url';\n// The existing single-edit API works. Preserve it while extending this module.\nfunction checkEdit(source,edit){\n  if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n     ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n     ||edit.start<0||edit.start>edit.end||edit.end>source.length\n     ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n  if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n}\nexport function applyEdit(source,edit){\n  checkEdit(source,edit);\n  return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n}\nexport function applyTransaction(source,edits){\n  if(typeof source!=='string')throw Error('invalid source');\n  if(!Array.isArray(edits))throw Error('invalid edits');\n\n  // Validate every edit against the original source before applying anything.\n  for(const edit of edits)checkEdit(source,edit);\n\n  const n=edits.length;\n\n  // Partition edits into nonempty ranges and insertions (start === end).\n  const ranges=[];\n  const insertions=[];\n  for(const e of edits){\n    if(e.start<e.end)ranges.push({start:e.start,end:e.end});\n    else insertions.push(e.start);\n  }\n\n  // Conflict: two nonempty ranges whose half-open intervals overlap.\n  // Sort by start (then end) and track the running max end.\n  ranges.sort((a,b)=>a.start-b.start||a.end-b.end);\n  let maxEnd=-1;\n  for(const r of ranges){\n    if(r.start<maxEnd)throw Error('conflicting edits');\n    if(r.end>maxEnd)maxEnd=r.end;\n  }\n\n  // Conflict: two insertions at the same position.\n  const seenPos=new Set();\n  for(const p of insertions){\n    if(seenPos.has(p))throw Error('conflicting edits');\n    seenPos.add(p);\n  }\n\n  // Conflict: an insertion at p where some range [s,e) has s <= p <= e.\n  // ranges is sorted by start; build a prefix max-end for binary search.\n  const rStart=ranges.map(r=>r.start);\n  const prefixMaxEnd=[];\n  for(let i=0;i<ranges.length;i++){\n    const e=ranges[i].end;\n    prefixMaxEnd.push(i===0?e:Math.max(prefixMaxEnd[i-1],e));\n  }\n  for(const p of insertions){\n    let lo=0,hi=rStart.length-1,idx=-1;\n    while(lo<=hi){\n      const mid=(lo+hi)>>1;\n      if(rStart[mid]<=p){idx=mid;lo=mid+1;}\n      else hi=mid-1;\n    }\n    if(idx>=0&&prefixMaxEnd[idx]>=p)throw Error('conflicting edits');\n  }\n\n  // Apply all edits simultaneously. Every event uses original-source\n  // coordinates, so ordering them by position makes the result independent of\n  // the input order and preserves every untouched code unit exactly.\n  const events=edits.map(e=>({start:e.start,end:e.end,after:e.after}));\n  events.sort((a,b)=>a.start-b.start);\n  let out='';\n  let pos=0;\n  for(const ev of events){\n    out+=source.slice(pos,ev.start)+ev.after;\n    pos=ev.end;\n  }\n  out+=source.slice(pos,source.length);\n  return {text:out,applied:n};\n}\n\nfunction isMainModule(){\n  const entry=process.argv[1];\n  if(!entry)return false;\n  let entryPath;\n  try{entryPath=realpathSync(resolve(entry));}\n  catch{try{entryPath=resolve(entry);}catch{return false;}}\n  let selfPath;\n  try{selfPath=fileURLToPath(import.meta.url);}catch{return false;}\n  let selfReal;\n  try{selfReal=realpathSync(selfPath);}catch{selfReal=selfPath;}\n  return entryPath===selfReal;\n}\n\nfunction runCli(){\n  const fail=(msg)=>{\n    process.stderr.write(msg+'\\n');\n    process.exitCode=2;\n  };\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    fail('usage: node patch-transaction.js INPUT_JSON_FILE');\n    return;\n  }\n  const file=args[0];\n  let raw;\n  try{raw=readFileSync(file,'utf8');}\n  catch{fail('cannot read input file');return;}\n  let data;\n  try{data=JSON.parse(raw);}\n  catch{fail('invalid JSON');return;}\n  const obj=data&&typeof data==='object'?data:{};\n  let result;\n  try{\n    result=applyTransaction(obj.source,obj.edits);\n  }catch(err){\n    fail('invalid transaction: '+(err&&err.message?err.message:String(err)));\n    return;\n  }\n  process.stdout.write(JSON.stringify(result)+'\\n');\n  process.exitCode=0;\n}\n\nif(isMainModule())runCli();\n",
+      "displaySha256": "50153ac3b67b1be94d93c2dbd0f2f32ad912769a3e5377cbc5c4fea19ad81edb",
+      "diff": "--- starter/patch-transaction.js\n+++ delivered/patch-transaction.js\n@@ -1,9 +1,12 @@\n+import {readFileSync,realpathSync} from 'node:fs';\n+import {resolve} from 'node:path';\n+import {fileURLToPath} from 'node:url';\n // The existing single-edit API works. Preserve it while extending this module.\n function checkEdit(source,edit){\n   if(typeof source!=='string'||edit===null||typeof edit!=='object'||Array.isArray(edit)\n-    ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n-    ||edit.start<0||edit.start>edit.end||edit.end>source.length\n-    ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n+     ||!Number.isSafeInteger(edit.start)||!Number.isSafeInteger(edit.end)\n+     ||edit.start<0||edit.start>edit.end||edit.end>source.length\n+     ||typeof edit.before!=='string'||typeof edit.after!=='string')throw Error('invalid edit');\n   if(source.slice(edit.start,edit.end)!==edit.before)throw Error('preimage mismatch');\n }\n export function applyEdit(source,edit){\n@@ -11,6 +14,111 @@\n   return source.slice(0,edit.start)+edit.after+source.slice(edit.end);\n }\n export function applyTransaction(source,edits){\n-  throw Error('applyTransaction is not implemented');\n+  if(typeof source!=='string')throw Error('invalid source');\n+  if(!Array.isArray(edits))throw Error('invalid edits');\n+\n+  // Validate every edit against the original source before applying anything.\n+  for(const edit of edits)checkEdit(source,edit);\n+\n+  const n=edits.length;\n+\n+  // Partition edits into nonempty ranges and insertions (start === end).\n+  const ranges=[];\n+  const insertions=[];\n+  for(const e of edits){\n+    if(e.start<e.end)ranges.push({start:e.start,end:e.end});\n+    else insertions.push(e.start);\n+  }\n+\n+  // Conflict: two nonempty ranges whose half-open intervals overlap.\n+  // Sort by start (then end) and track the running max end.\n+  ranges.sort((a,b)=>a.start-b.start||a.end-b.end);\n+  let maxEnd=-1;\n+  for(const r of ranges){\n+    if(r.start<maxEnd)throw Error('conflicting edits');\n+    if(r.end>maxEnd)maxEnd=r.end;\n+  }\n+\n+  // Conflict: two insertions at the same position.\n+  const seenPos=new Set();\n+  for(const p of insertions){\n+    if(seenPos.has(p))throw Error('conflicting edits');\n+    seenPos.add(p);\n+  }\n+\n+  // Conflict: an insertion at p where some range [s,e) has s <= p <= e.\n+  // ranges is sorted by start; build a prefix max-end for binary search.\n+  const rStart=ranges.map(r=>r.start);\n+  const prefixMaxEnd=[];\n+  for(let i=0;i<ranges.length;i++){\n+    const e=ranges[i].end;\n+    prefixMaxEnd.push(i===0?e:Math.max(prefixMaxEnd[i-1],e));\n+  }\n+  for(const p of insertions){\n+    let lo=0,hi=rStart.length-1,idx=-1;\n+    while(lo<=hi){\n+      const mid=(lo+hi)>>1;\n+      if(rStart[mid]<=p){idx=mid;lo=mid+1;}\n+      else hi=mid-1;\n+    }\n+    if(idx>=0&&prefixMaxEnd[idx]>=p)throw Error('conflicting edits');\n+  }\n+\n+  // Apply all edits simultaneously. Every event uses original-source\n+  // coordinates, so ordering them by position makes the result independent of\n+  // the input order and preserves every untouched code unit exactly.\n+  const events=edits.map(e=>({start:e.start,end:e.end,after:e.after}));\n+  events.sort((a,b)=>a.start-b.start);\n+  let out='';\n+  let pos=0;\n+  for(const ev of events){\n+    out+=source.slice(pos,ev.start)+ev.after;\n+    pos=ev.end;\n+  }\n+  out+=source.slice(pos,source.length);\n+  return {text:out,applied:n};\n }\n-// Add the JSON-file CLI described by the work order without import side effects.\n+\n+function isMainModule(){\n+  const entry=process.argv[1];\n+  if(!entry)return false;\n+  let entryPath;\n+  try{entryPath=realpathSync(resolve(entry));}\n+  catch{try{entryPath=resolve(entry);}catch{return false;}}\n+  let selfPath;\n+  try{selfPath=fileURLToPath(import.meta.url);}catch{return false;}\n+  let selfReal;\n+  try{selfReal=realpathSync(selfPath);}catch{selfReal=selfPath;}\n+  return entryPath===selfReal;\n+}\n+\n+function runCli(){\n+  const fail=(msg)=>{\n+    process.stderr.write(msg+'\\n');\n+    process.exitCode=2;\n+  };\n+  const args=process.argv.slice(2);\n+  if(args.length!==1){\n+    fail('usage: node patch-transaction.js INPUT_JSON_FILE');\n+    return;\n+  }\n+  const file=args[0];\n+  let raw;\n+  try{raw=readFileSync(file,'utf8');}\n+  catch{fail('cannot read input file');return;}\n+  let data;\n+  try{data=JSON.parse(raw);}\n+  catch{fail('invalid JSON');return;}\n+  const obj=data&&typeof data==='object'?data:{};\n+  let result;\n+  try{\n+    result=applyTransaction(obj.source,obj.edits);\n+  }catch(err){\n+    fail('invalid transaction: '+(err&&err.message?err.message:String(err)));\n+    return;\n+  }\n+  process.stdout.write(JSON.stringify(result)+'\\n');\n+  process.exitCode=0;\n+}\n+\n+if(isMainModule())runCli();\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "7e11b9cfebba6910a27c62af759fa9042595be52bced375de4f7d1d6a62b5f19",
+      "afterSha256": "7e11b9cfebba6910a27c62af759fa9042595be52bced375de4f7d1d6a62b5f19",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {applyEdit,applyTransaction} from '../patch-transaction.js';\nconst edit=(start,end,before,after)=>({start,end,before,after});\ntest('preserve existing single-edit behavior',()=>{\n  assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n  assert.throws(()=>applyEdit('abc',edit(1,2,'wrong','x')),Error);\n});\ntest('all coordinates refer to the original text',()=>{\n  const edits=[edit(0,1,'a','LONG'),edit(3,5,'de','X')];\n  assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n});\ntest('adjacent replacements allowed; insertion touching a range rejected',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n  assert.throws(()=>applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,2,'','y')]),Error);\n});\ntest('empty transaction, empty source insertion, and validation',()=>{\n  assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n  assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n  assert.throws(()=>applyTransaction(null,[]),Error);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {applyEdit,applyTransaction} from '../patch-transaction.js';\nconst edit=(start,end,before,after)=>({start,end,before,after});\ntest('preserve existing single-edit behavior',()=>{\n  assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n  assert.throws(()=>applyEdit('abc',edit(1,2,'wrong','x')),Error);\n});\ntest('all coordinates refer to the original text',()=>{\n  const edits=[edit(0,1,'a','LONG'),edit(3,5,'de','X')];\n  assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n});\ntest('adjacent replacements allowed; insertion touching a range rejected',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n  assert.throws(()=>applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,2,'','y')]),Error);\n});\ntest('empty transaction, empty source insertion, and validation',()=>{\n  assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n  assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n  assert.throws(()=>applyTransaction(null,[]),Error);\n});\n",
+      "displaySha256": "7e11b9cfebba6910a27c62af759fa9042595be52bced375de4f7d1d6a62b5f19",
+      "diff": ""
+    },
+    {
+      "path": "test/transaction.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "7aae7ec91c3edcc0266806e613c2c339a267ecd13c12cecc73f2a4e09bfa07c5",
+      "before": null,
+      "after": "import test,{before,after} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {mkdtempSync,writeFileSync,rmSync,existsSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join} from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\nimport {applyEdit,applyTransaction} from '../patch-transaction.js';\n\nconst modulePath=fileURLToPath(new URL('../patch-transaction.js',import.meta.url));\nconst edit=(start,end,before,after)=>({start,end,before,after});\n\nlet dir;\nbefore(()=>{\n  dir=mkdtempSync(join(tmpdir(),'patch-txn-'));\n});\nafter(()=>{\n  if(dir&&existsSync(dir))rmSync(dir,{recursive:true,force:true});\n});\n\nfunction runCli(args){\n  return spawnSync(process.execPath,[modulePath,...args],{encoding:'utf8'});\n}\nfunction writeJson(name,value){\n  const p=join(dir,name);\n  writeFileSync(p,JSON.stringify(value),'utf8');\n  return p;\n}\nfunction writeRaw(name,text){\n  const p=join(dir,name);\n  writeFileSync(p,text,'utf8');\n  return p;\n}\n\ntest('existing applyEdit still works',()=>{\n  assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n});\n\ntest('applies all edits using original coordinates',()=>{\n  const edits=[edit(3,5,'de','X'),edit(0,1,'a','LONG')];\n  assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n});\n\ntest('adjacent and disjoint ranges are fine',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n  assert.deepEqual(applyTransaction('abcdef',[edit(0,1,'a','A'),edit(4,6,'ef','E')]),{text:'AbcdE',applied:2});\n});\n\ntest('insertions at distinct positions outside ranges are fine',()=>{\n  assert.deepEqual(applyTransaction('abcd',[edit(1,3,'bc','X'),edit(0,0,'','P'),edit(4,4,'','Q')]),{text:'PaXdQ',applied:3});\n});\n\ntest('multiple insertions in the same gap are fine',()=>{\n  assert.deepEqual(applyTransaction('abc',[edit(0,0,'','a'),edit(3,3,'','c'),edit(1,1,'','b')]),{text:'aabbcc',applied:3});\n});\n\ntest('overlapping ranges conflict',()=>{\n  assert.throws(()=>applyTransaction('abcdef',[edit(0,3,'abc','X'),edit(2,5,'cde','Y')]),Error);\n});\n\ntest('identical ranges conflict',()=>{\n  assert.throws(()=>applyTransaction('ab',[edit(0,2,'ab','X'),edit(0,2,'ab','Y')]),Error);\n});\n\ntest('insertion touching a range endpoint conflicts',()=>{\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(1,1,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(3,3,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(2,2,'','Y')]),Error);\n});\n\ntest('two insertions at the same position conflict',()=>{\n  assert.throws(()=>applyTransaction('ab',[edit(0,0,'','X'),edit(0,0,'','Y')]),Error);\n  assert.throws(()=>applyTransaction('ab',[edit(0,0,'',''),edit(0,0,'','')]),Error);\n});\n\ntest('empty transaction returns source unchanged',()=>{\n  assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n});\n\ntest('empty source allows one insertion at zero',()=>{\n  assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n  assert.throws(()=>applyTransaction('',[edit(0,0,'','a'),edit(0,0,'','b')]),Error);\n  assert.throws(()=>applyTransaction('',[edit(1,1,'','a')]),Error);\n});\n\ntest('no-op edits are valid and counted',()=>{\n  assert.deepEqual(applyTransaction('abc',[edit(1,2,'b','b'),edit(0,0,'','')]),{text:'abc',applied:2});\n});\n\ntest('preserves CR/LF and final newline',()=>{\n  const source='a\\r\\nb\\n';\n  assert.deepEqual(applyTransaction(source,[edit(1,3,'\\r\\n','/')]),{text:'a/b\\n',applied:1});\n});\n\ntest('unicode code units are preserved',()=>{\n  // '\u00e9' is a single code unit here; surrogate pairs are two code units.\n  const source='a\\u{1F600}b'; // a, \ud83d\ude00 (two code units), b => length 4\n  assert.equal(source.length,4);\n  assert.deepEqual(applyTransaction(source,[edit(0,1,'a','Z')]),{text:'Z\\u{1F600}b',applied:1});\n});\n\ntest('does not mutate the input array or edit objects',()=>{\n  const e1=edit(0,1,'a','X');\n  const e2=edit(3,5,'de','Y');\n  const edits=[e1,e2];\n  const snapshot=JSON.stringify(edits);\n  applyTransaction('abcdef',edits);\n  assert.equal(JSON.stringify(edits),snapshot);\n  assert.equal(edits.length,2);\n  assert.equal(e1.start,0);\n  assert.equal(e1.before,'a');\n  assert.equal(e2.after,'Y');\n});\n\ntest('invalid arguments throw',()=>{\n  assert.throws(()=>applyTransaction(123,[edit(0,1,'x','y')]),Error);\n  assert.throws(()=>applyTransaction(null,[]),Error);\n  assert.throws(()=>applyTransaction('abc',null),Error);\n  assert.throws(()=>applyTransaction('abc','nope'),Error);\n  assert.throws(()=>applyTransaction('abc',[null]),Error);\n  assert.throws(()=>applyTransaction('abc',['x']),Error);\n  assert.throws(()=>applyTransaction('abc',[{start:0,end:1}]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(1.5,2,'b','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(-1,0,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(0,4,'','x')]),Error);\n  assert.throws(()=>applyTransaction('abc',[edit(2,1,'','x')]),Error);\n  // preimage mismatch\n  assert.throws(()=>applyTransaction('abc',[edit(0,1,'z','x')]),Error);\n});\n\ntest('unknown fields are ignored (no coercion)',()=>{\n  const e={start:0,end:1,before:'a',after:'X',extra:'ignored',id:42,nested:{}};\n  assert.deepEqual(applyTransaction('abc',[e]),{text:'Xbc',applied:1});\n  assert.equal(e.extra,'ignored');\n});\n\ntest('CLI: success prints one JSON line, exit 0, no stderr',()=>{\n  const p=writeJson('ok.json',{source:'abcdef',edits:[edit(0,1,'a','LONG'),edit(3,5,'de','X')]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stderr,'');\n  assert.equal(r.stdout,JSON.stringify({text:'LONGbcXf',applied:2})+'\\n');\n});\n\ntest('CLI: extra fields are ignored',()=>{\n  const p=writeJson('extra.json',{source:'abc',edits:[],extra:'ignored',nested:{a:1},edits2:[1]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stderr,'');\n  assert.equal(r.stdout,JSON.stringify({text:'abc',applied:0})+'\\n');\n});\n\ntest('CLI: empty transaction succeeds',()=>{\n  const p=writeJson('empty.json',{source:'tail\\r\\n',edits:[]});\n  const r=runCli([p]);\n  assert.equal(r.status,0);\n  assert.equal(r.stdout,JSON.stringify({text:'tail\\r\\n',applied:0})+'\\n');\n});\n\ntest('CLI: zero arguments exits 2 with stderr, no stdout',()=>{\n  const r=runCli([]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: two arguments exits 2 with stderr, no stdout',()=>{\n  const r=runCli(['a','b']);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: unreadable file exits 2 with stderr, no stdout',()=>{\n  const r=runCli([join(dir,'no-such-file.json')]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: invalid JSON exits 2 with stderr, no stdout',()=>{\n  const p=writeRaw('bad.json','{ this is not json');\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: invalid transaction exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('inv.json',{source:'abc',edits:[{start:5,end:6,before:'',after:''}]});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: conflicting transaction exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('conf.json',{source:'abcd',edits:[edit(0,2,'ab','x'),edit(1,3,'bc','y')]});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: missing edits field exits 2 with stderr, no stdout',()=>{\n  const p=writeJson('noedits.json',{source:'abc'});\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n\ntest('CLI: non-object JSON top-level exits 2',()=>{\n  const p=writeRaw('scalar.json','\"just a string\"');\n  const r=runCli([p]);\n  assert.equal(r.status,2);\n  assert.ok(r.stderr.length>0);\n  assert.equal(r.stdout,'');\n});\n",
+      "displaySha256": "7aae7ec91c3edcc0266806e613c2c339a267ecd13c12cecc73f2a4e09bfa07c5",
+      "diff": "--- starter/test/transaction.test.js\n+++ delivered/test/transaction.test.js\n@@ -0,0 +1,220 @@\n+import test,{before,after} from 'node:test';\n+import assert from 'node:assert/strict';\n+import {mkdtempSync,writeFileSync,rmSync,existsSync} from 'node:fs';\n+import {tmpdir} from 'node:os';\n+import {join} from 'node:path';\n+import {spawnSync} from 'node:child_process';\n+import {fileURLToPath} from 'node:url';\n+import {applyEdit,applyTransaction} from '../patch-transaction.js';\n+\n+const modulePath=fileURLToPath(new URL('../patch-transaction.js',import.meta.url));\n+const edit=(start,end,before,after)=>({start,end,before,after});\n+\n+let dir;\n+before(()=>{\n+  dir=mkdtempSync(join(tmpdir(),'patch-txn-'));\n+});\n+after(()=>{\n+  if(dir&&existsSync(dir))rmSync(dir,{recursive:true,force:true});\n+});\n+\n+function runCli(args){\n+  return spawnSync(process.execPath,[modulePath,...args],{encoding:'utf8'});\n+}\n+function writeJson(name,value){\n+  const p=join(dir,name);\n+  writeFileSync(p,JSON.stringify(value),'utf8');\n+  return p;\n+}\n+function writeRaw(name,text){\n+  const p=join(dir,name);\n+  writeFileSync(p,text,'utf8');\n+  return p;\n+}\n+\n+test('existing applyEdit still works',()=>{\n+  assert.equal(applyEdit('abc',edit(1,2,'b','LONG')),'aLONGc');\n+});\n+\n+test('applies all edits using original coordinates',()=>{\n+  const edits=[edit(3,5,'de','X'),edit(0,1,'a','LONG')];\n+  assert.deepEqual(applyTransaction('abcdef',edits),{text:'LONGbcXf',applied:2});\n+  assert.deepEqual(applyTransaction('abcdef',[...edits].reverse()),{text:'LONGbcXf',applied:2});\n+});\n+\n+test('adjacent and disjoint ranges are fine',()=>{\n+  assert.deepEqual(applyTransaction('abcd',[edit(0,2,'ab','x'),edit(2,4,'cd','y')]),{text:'xy',applied:2});\n+  assert.deepEqual(applyTransaction('abcdef',[edit(0,1,'a','A'),edit(4,6,'ef','E')]),{text:'AbcdE',applied:2});\n+});\n+\n+test('insertions at distinct positions outside ranges are fine',()=>{\n+  assert.deepEqual(applyTransaction('abcd',[edit(1,3,'bc','X'),edit(0,0,'','P'),edit(4,4,'','Q')]),{text:'PaXdQ',applied:3});\n+});\n+\n+test('multiple insertions in the same gap are fine',()=>{\n+  assert.deepEqual(applyTransaction('abc',[edit(0,0,'','a'),edit(3,3,'','c'),edit(1,1,'','b')]),{text:'aabbcc',applied:3});\n+});\n+\n+test('overlapping ranges conflict',()=>{\n+  assert.throws(()=>applyTransaction('abcdef',[edit(0,3,'abc','X'),edit(2,5,'cde','Y')]),Error);\n+});\n+\n+test('identical ranges conflict',()=>{\n+  assert.throws(()=>applyTransaction('ab',[edit(0,2,'ab','X'),edit(0,2,'ab','Y')]),Error);\n+});\n+\n+test('insertion touching a range endpoint conflicts',()=>{\n+  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(1,1,'','Y')]),Error);\n+  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(3,3,'','Y')]),Error);\n+  assert.throws(()=>applyTransaction('abcd',[edit(1,3,'bc','X'),edit(2,2,'','Y')]),Error);\n+});\n+\n+test('two insertions at the same position conflict',()=>{\n+  assert.throws(()=>applyTransaction('ab',[edit(0,0,'','X'),edit(0,0,'','Y')]),Error);\n+  assert.throws(()=>applyTransaction('ab',[edit(0,0,'',''),edit(0,0,'','')]),Error);\n+});\n+\n+test('empty transaction returns source unchanged',()=>{\n+  assert.deepEqual(applyTransaction('tail\\r\\n',[]),{text:'tail\\r\\n',applied:0});\n+});\n+\n+test('empty source allows one insertion at zero',()=>{\n+  assert.deepEqual(applyTransaction('',[edit(0,0,'','new')]),{text:'new',applied:1});\n+  assert.throws(()=>applyTransaction('',[edit(0,0,'','a'),edit(0,0,'','b')]),Error);\n+  assert.throws(()=>applyTransaction('',[edit(1,1,'','a')]),Error);\n+});\n+\n+test('no-op edits are valid and counted',()=>{\n+  assert.deepEqual(applyTransaction('abc',[edit(1,2,'b','b'),edit(0,0,'','')]),{text:'abc',applied:2});\n+});\n+\n+test('preserves CR/LF and final newline',()=>{\n+  const source='a\\r\\nb\\n';\n+  assert.deepEqual(applyTransaction(source,[edit(1,3,'\\r\\n','/')]),{text:'a/b\\n',applied:1});\n+});\n+\n+test('unicode code units are preserved',()=>{\n+  // '\u00e9' is a single code unit here; surrogate pairs are two code units.\n+  const source='a\\u{1F600}b'; // a, \ud83d\ude00 (two code units), b => length 4\n+  assert.equal(source.length,4);\n+  assert.deepEqual(applyTransaction(source,[edit(0,1,'a','Z')]),{text:'Z\\u{1F600}b',applied:1});\n+});\n+\n+test('does not mutate the input array or edit objects',()=>{\n+  const e1=edit(0,1,'a','X');\n+  const e2=edit(3,5,'de','Y');\n+  const edits=[e1,e2];\n+  const snapshot=JSON.stringify(edits);\n+  applyTransaction('abcdef',edits);\n+  assert.equal(JSON.stringify(edits),snapshot);\n+  assert.equal(edits.length,2);\n+  assert.equal(e1.start,0);\n+  assert.equal(e1.before,'a');\n+  assert.equal(e2.after,'Y');\n+});\n+\n+test('invalid arguments throw',()=>{\n+  assert.throws(()=>applyTransaction(123,[edit(0,1,'x','y')]),Error);\n+  assert.throws(()=>applyTransaction(null,[]),Error);\n+  assert.throws(()=>applyTransaction('abc',null),Error);\n+  assert.throws(()=>applyTransaction('abc','nope'),Error);\n+  assert.throws(()=>applyTransaction('abc',[null]),Error);\n+  assert.throws(()=>applyTransaction('abc',['x']),Error);\n+  assert.throws(()=>applyTransaction('abc',[{start:0,end:1}]),Error);\n+  assert.throws(()=>applyTransaction('abc',[edit(1.5,2,'b','x')]),Error);\n+  assert.throws(()=>applyTransaction('abc',[edit(-1,0,'','x')]),Error);\n+  assert.throws(()=>applyTransaction('abc',[edit(0,4,'','x')]),Error);\n+  assert.throws(()=>applyTransaction('abc',[edit(2,1,'','x')]),Error);\n+  // preimage mismatch\n+  assert.throws(()=>applyTransaction('abc',[edit(0,1,'z','x')]),Error);\n+});\n+\n+test('unknown fields are ignored (no coercion)',()=>{\n+  const e={start:0,end:1,before:'a',after:'X',extra:'ignored',id:42,nested:{}};\n+  assert.deepEqual(applyTransaction('abc',[e]),{text:'Xbc',applied:1});\n+  assert.equal(e.extra,'ignored');\n+});\n+\n+test('CLI: success prints one JSON line, exit 0, no stderr',()=>{\n+  const p=writeJson('ok.json',{source:'abcdef',edits:[edit(0,1,'a','LONG'),edit(3,5,'de','X')]});\n+  const r=runCli([p]);\n+  assert.equal(r.status,0);\n+  assert.equal(r.stderr,'');\n+  assert.equal(r.stdout,JSON.stringify({text:'LONGbcXf',applied:2})+'\\n');\n+});\n+\n+test('CLI: extra fields are ignored',()=>{\n+  const p=writeJson('extra.json',{source:'abc',edits:[],extra:'ignored',nested:{a:1},edits2:[1]});\n+  const r=runCli([p]);\n+  assert.equal(r.status,0);\n+  assert.equal(r.stderr,'');\n+  assert.equal(r.stdout,JSON.stringify({text:'abc',applied:0})+'\\n');\n+});\n+\n+test('CLI: empty transaction succeeds',()=>{\n+  const p=writeJson('empty.json',{source:'tail\\r\\n',edits:[]});\n+  const r=runCli([p]);\n+  assert.equal(r.status,0);\n+  assert.equal(r.stdout,JSON.stringify({text:'tail\\r\\n',applied:0})+'\\n');\n+});\n+\n+test('CLI: zero arguments exits 2 with stderr, no stdout',()=>{\n+  const r=runCli([]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: two arguments exits 2 with stderr, no stdout',()=>{\n+  const r=runCli(['a','b']);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: unreadable file exits 2 with stderr, no stdout',()=>{\n+  const r=runCli([join(dir,'no-such-file.json')]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: invalid JSON exits 2 with stderr, no stdout',()=>{\n+  const p=writeRaw('bad.json','{ this is not json');\n+  const r=runCli([p]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: invalid transaction exits 2 with stderr, no stdout',()=>{\n+  const p=writeJson('inv.json',{source:'abc',edits:[{start:5,end:6,before:'',after:''}]});\n+  const r=runCli([p]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: conflicting transaction exits 2 with stderr, no stdout',()=>{\n+  const p=writeJson('conf.json',{source:'abcd',edits:[edit(0,2,'ab','x'),edit(1,3,'bc','y')]});\n+  const r=runCli([p]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: missing edits field exits 2 with stderr, no stdout',()=>{\n+  const p=writeJson('noedits.json',{source:'abc'});\n+  const r=runCli([p]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n+\n+test('CLI: non-object JSON top-level exits 2',()=>{\n+  const p=writeRaw('scalar.json','\"just a string\"');\n+  const r=runCli([p]);\n+  assert.equal(r.status,2);\n+  assert.ok(r.stderr.length>0);\n+  assert.equal(r.stdout,'');\n+});\n"
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-patch-transaction@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: preserve existing single-edit behavior\nok 1 - preserve existing single-edit behavior\n  ---\n  duration_ms: 1.071467\n  ...\n# Subtest: all coordinates refer to the original text\nok 2 - all coordinates refer to the original text\n  ---\n  duration_ms: 0.609114\n  ...\n# Subtest: adjacent replacements allowed; insertion touching a range rejected\nok 3 - adjacent replacements allowed; insertion touching a range rejected\n  ---\n  duration_ms: 0.642694\n  ...\n# Subtest: empty transaction, empty source insertion, and validation\nok 4 - empty transaction, empty source insertion, and validation\n  ---\n  duration_ms: 0.161841\n  ...\n# Subtest: existing applyEdit still works\nok 5 - existing applyEdit still works\n  ---\n  duration_ms: 0.634244\n  ...\n# Subtest: applies all edits using original coordinates\nok 6 - applies all edits using original coordinates\n  ---\n  duration_ms: 0.615523\n  ...\n# Subtest: adjacent and disjoint ranges are fine\nok 7 - adjacent and disjoint ranges are fine\n  ---\n  duration_ms: 0.163551\n  ...\n# Subtest: insertions at distinct positions outside ranges are fine\nok 8 - insertions at distinct positions outside ranges are fine\n  ---\n  duration_ms: 0.196911\n  ...\n# Subtest: multiple insertions in the same gap are fine\nok 9 - multiple insertions in the same gap are fine\n  ---\n  duration_ms: 0.152971\n  ...\n# Subtest: overlapping ranges conflict\nok 10 - overlapping ranges conflict\n  ---\n  duration_ms: 0.305031\n  ...\n# Subtest: identical ranges conflict\nok 11 - identical ranges conflict\n  ---\n  duration_ms: 0.601993\n  ...\n# Subtest: insertion touching a range endpoint conflicts\nok 12 - insertion touching a range endpoint conflicts\n  ---\n  duration_ms: 0.179561\n  ...\n# Subtest: two insertions at the same position conflict\nok 13 - two insertions at the same position conflict\n  ---\n  duration_ms: 0.221951\n  ...\n# Subtest: empty transaction returns source unchanged\nok 14 - empty transaction returns source unchanged\n  ---\n  duration_ms: 0.12893\n  ...\n# Subtest: empty source allows one insertion at zero\nok 15 - empty source allows one insertion at zero\n  ---\n  duration_ms: 0.16047\n  ...\n# Subtest: no-op edits are valid and counted\nok 16 - no-op edits are valid and counted\n  ---\n  duration_ms: 0.160761\n  ...\n# Subtest: preserves CR/LF and final newline\nok 17 - preserves CR/LF and final newline\n  ---\n  duration_ms: 0.156051\n  ...\n# Subtest: unicode code units are preserved\nok 18 - unicode code units are preserved\n  ---\n  duration_ms: 0.210111\n  ...\n# Subtest: does not mutate the input array or edit objects\nok 19 - does not mutate the input array or edit objects\n  ---\n  duration_ms: 0.241482\n  ...\n# Subtest: invalid arguments throw\nok 20 - invalid arguments throw\n  ---\n  duration_ms: 0.295032\n  ...\n# Subtest: unknown fields are ignored (no coercion)\nok 21 - unknown fields are ignored (no coercion)\n  ---\n  duration_ms: 0.121171\n  ...\n# Subtest: CLI: success prints one JSON line, exit 0, no stderr\nok 22 - CLI: success prints one JSON line, exit 0, no stderr\n  ---\n  duration_ms: 23.067331\n  ...\n# Subtest: CLI: extra fields are ignored\nok 23 - CLI: extra fields are ignored\n  ---\n  duration_ms: 22.81142\n  ...\n# Subtest: CLI: empty transaction succeeds\nok 24 - CLI: empty transaction succeeds\n  ---\n  duration_ms: 22.603059\n  ...\n# Subtest: CLI: zero arguments exits 2 with stderr, no stdout\nok 25 - CLI: zero arguments exits 2 with stderr, no stdout\n  ---\n  duration_ms: 22.610428\n  ...\n# Subtest: CLI: two arguments exits 2 with stderr, no stdout\nok 26 - CLI: two arguments exits 2 with stderr, no stdout\n  ---\n  duration_ms: 22.543158\n  ...\n# Subtest: CLI: unreadable file exits 2 with stderr, no stdout\nok 27 - CLI: unreadable file exits 2 with stderr, no stdout\n  ---\n  duration_ms: 22.336687\n  ...\n# Subtest: CLI: invalid JSON exits 2 with stderr, no stdout\nok 28 - CLI: invalid JSON exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.990195\n  ...\n# Subtest: CLI: invalid transaction exits 2 with stderr, no stdout\nok 29 - CLI: invalid transaction exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.998424\n  ...\n# Subtest: CLI: conflicting transaction exits 2 with stderr, no stdout\nok 30 - CLI: conflicting transaction exits 2 with stderr, no stdout\n  ---\n  duration_ms: 22.659749\n  ...\n# Subtest: CLI: missing edits field exits 2 with stderr, no stdout\nok 31 - CLI: missing edits field exits 2 with stderr, no stdout\n  ---\n  duration_ms: 21.164219\n  ...\n# Subtest: CLI: non-object JSON top-level exits 2\nok 32 - CLI: non-object JSON top-level exits 2\n  ---\n  duration_ms: 22.851939\n  ...\n1..32\n# tests 32\n# suites 0\n# pass 32\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 306.475707\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"patch-transaction\",\"pass\":true,\"groups\":[{\"name\":\"preserve-single-edit-api\",\"pass\":true},{\"name\":\"original-coordinates-and-order-independence\",\"pass\":true},{\"name\":\"conflicts-and-atomic-preconditions\",\"pass\":true},{\"name\":\"validation-unicode-and-immutability\",\"pass\":true},{\"name\":\"cli-transaction-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "95d4892a13b72f588347b61c80bdf928d70db0616d66a8c7ef310d4cd31799c2"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "088a8f5a6bb0d68984bc5a0613a6b073b135ebf56971940c51350e6c9833ee63"
+    },
+    {
+      "kind": "native-database-wal",
+      "sha256": "a1d526b72d9fac510158b6833cc22b50bb7a69c567684ddc6d96985d00cc2611"
+    },
+    {
+      "kind": "native-database-shm",
+      "sha256": "566a70d2a90bdaa94462da3669eb8f6b355a7fa8f81519b0efd47daf84d3e9ae"
+    },
+    {
+      "kind": "native-cli-output",
+      "sha256": "7c58e9731ed87430f0eeca91eb390f15c30fc0cbe88affb8b120d47631489dd7"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "5bfbad21898a9c420d4b9d55bc30501aa24eb7578c348fe4e9cbe4ba41cd1e05"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "ca183e7af6ce239ff5e696b4d6bc5a569f98d7f8311f2897ae868a5312832635"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 20,
+    "withResults": 20,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Passed after repairing its added tests.",
+    "paragraphs": [
+      {
+        "text": "OpenCode implemented the transaction API, added tests and worked through two failing test runs. After correcting the added expectations, it passed the suite and exercised the CLI. It finished cleanly in 559.0 seconds.",
+        "actions": [
+          "action-7",
+          "action-12",
+          "action-15",
+          "action-16",
+          "action-18",
+          "action-20"
+        ]
+      }
+    ]
+  }
+}

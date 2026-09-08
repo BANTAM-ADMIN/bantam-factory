@@ -1,0 +1,429 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "job-planner",
+  "arm": "opencode",
+  "wallMs": 324088,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T18:29:14.135Z",
+  "task": "# Job planner: repair deterministic dependency planning\n\nThe supplied `job-plan.js` has a simple but flawed implementation. Repair it\nand complete its CLI using only Node.js builtins. Export synchronous\n`planJobs(spec)`, where `spec` is an array of job objects, each with:\n\n- `id`: nonempty string; preserve whitespace and Unicode exactly.\n- `deps`: array of unique nonempty string IDs. Every referenced ID must exist.\n- `state`: exactly `pending`, `succeeded`, or `failed`.\n\nDuplicate IDs, missing references, duplicate dependencies, malformed required\nfields, and any directed dependency cycle throw an Error. A self-dependency is\na cycle. Check cycles over the entire graph, including completed/failed jobs.\nUnknown object fields are ignored. Do not coerce values or mutate the input.\nEmpty input is valid. `__proto__` and `constructor` are ordinary IDs.\n\nReturn exactly `{order: [ID], ready: [ID], blocked: [{id, causes: [ID]}]}`.\n\nFirst compute a deterministic topological ordering of the ENTIRE graph using\nKahn's algorithm: repeatedly remove the JavaScript `<`/`>` lexically smallest\ncurrently zero-indegree ID, updating its children before choosing again. This\nis code-unit string ordering, not locale collation, input order, depth-first\npostorder, or sorting whole waves of nodes. `order` is that full ordering\nfiltered to pending jobs that are not blocked. Do not simply topologically sort\nthe induced pending-only graph.\n\nA pending job is `blocked` if it has any failed job as a direct or transitive\ndependency. Each blocked entry's `causes` lists ALL such failed ancestor IDs,\nuniquely sorted using the same string order. Traverse dependency paths even\nthrough succeeded or failed intermediate jobs: an intermediate state does not\nerase ancestry. `blocked` itself is sorted by id. Failed and succeeded jobs\nnever appear in `order` or `blocked`.\n\n`ready` contains exactly the unblocked pending jobs whose direct dependencies\nare all currently `succeeded`, sorted by id. It describes the input states,\nnot a simulated future after executing `order`. Jobs with no dependencies are\nready. No job is executed or state mutated by this tool.\n\nCLI: `node job-plan.js SPECFILE` reads UTF-8 JSON and prints only the plan as\nJSON followed by newline on stdout, with exit 0 and no stderr. It takes exactly\none file argument. Invalid arguments, unreadable input, invalid JSON, or invalid\ngraphs produce nonempty stderr, no stdout, and exit 2. Importing the module\nmust not run the CLI. Do not add third-party dependencies or modify\n`package.json` or existing public tests. You may add tests. Run `npm test` before\nfinishing. Every arm receives this same fixed starter and complete contract.\n",
+  "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+  "source": "opencode-native-database",
+  "actions": [
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace"
+      },
+      "output": "total 8\ndrwxrwxr-x 1 bantam bantam  54 Sep  8 18:29 .\ndrwxr-xr-x 1 root   root    54 Sep  8 18:29 ..\n-rw-rw-r-- 1 bantam bantam 775 Sep  8 18:29 job-plan.js\n-rw-rw-r-- 1 bantam bantam  95 Sep  8 18:29 package.json\ndrwxrwxr-x 1 bantam bantam  32 Sep  8 18:29 test\n",
+      "atMs": 8247.0,
+      "endedMs": 8260.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/job-plan.js"
+      },
+      "output": "<path>/workspace/job-plan.js</path>\n<type>file</type>\n<content>\n1: // Known-flawed starter, identical for every contender. Repair using task.md.\n2: export function planJobs(spec) {\n3:   const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n4:   const order = [], visited = new Set();\n5:   function visit(id) {\n6:     if (visited.has(id)) return;\n7:     visited.add(id);\n8:     for (const dep of jobs[id].deps) visit(dep);\n9:     if (jobs[id].state === 'pending') order.push(id);\n10:   }\n11:   for (const job of spec) visit(job.id);\n12:   return {\n13:     order,\n14:     ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n15:     blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n16:       .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n17:   };\n18: }\n\n(End of file - total 18 lines)\n</content>",
+      "atMs": 9002.0,
+      "endedMs": 9012.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/package.json"
+      },
+      "output": "<path>/workspace/package.json</path>\n<type>file</type>\n<content>\n1: {\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n(End of file - total 1 lines)\n</content>",
+      "atMs": 9230.0,
+      "endedMs": 9239.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace/test"
+      },
+      "output": "total 4\ndrwxrwxr-x 1 bantam bantam   32 Sep  8 18:29 .\ndrwxrwxr-x 1 bantam bantam   54 Sep  8 18:29 ..\n-rw-rw-r-- 1 bantam bantam 1116 Sep  8 18:29 job-plan.test.js\n",
+      "atMs": 9472.0,
+      "endedMs": 9475.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "read",
+      "category": "inspect",
+      "request": {
+        "filePath": "/workspace/test/job-plan.test.js"
+      },
+      "output": "<path>/workspace/test/job-plan.test.js</path>\n<type>file</type>\n<content>\n1: import test from 'node:test';\n2: import assert from 'node:assert/strict';\n3: import { planJobs } from '../job-plan.js';\n4: const job = (id,deps=[],state='pending') => ({id,deps,state});\n5: test('empty and a basic chain', () => {\n6:   assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n7:   assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n8: });\n9: test('the smallest newly available job precedes other queued jobs', () => {\n10:   assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n11: });\n12: test('failure is transitive and successful dependencies permit readiness', () => {\n13:   assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n14:     order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n15:   });\n16: });\n17: test('cycles and unknown dependencies are errors', () => {\n18:   assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n19:   assert.throws(() => planJobs([job('a',['absent'])]));\n20: });\n\n(End of file - total 20 lines)\n</content>",
+      "atMs": 10350.0,
+      "endedMs": 10358.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "node --version && npm --version",
+        "workdir": "/workspace"
+      },
+      "output": "v20.19.4\n11.5.2\n",
+      "atMs": 233286.0,
+      "endedMs": 233290.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/job-plan.js",
+        "content": "import { readFileSync, realpathSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\n\nconst STATES = new Set(['pending', 'succeeded', 'failed']);\n\nfunction requireNonemptyString(value) {\n  if (typeof value !== 'string' || value.length === 0) {\n    throw new Error('expected a nonempty string');\n  }\n  return value;\n}\n\nexport function planJobs(spec) {\n  if (!Array.isArray(spec)) {\n    throw new Error('spec must be an array of job objects');\n  }\n  const jobs = new Map();\n  for (const entry of spec) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw new Error('each job must be a plain object');\n    }\n    const id = requireNonemptyString(entry.id);\n    if (jobs.has(id)) {\n      throw new Error(`duplicate job id: ${id}`);\n    }\n    const deps = entry.deps;\n    if (!Array.isArray(deps)) {\n      throw new Error(`job \"${id}\": deps must be an array`);\n    }\n    const seenDeps = new Set();\n    for (const dep of deps) {\n      const depId = requireNonemptyString(dep);\n      if (seenDeps.has(depId)) {\n        throw new Error(`job \"${id}\": duplicate dependency: ${depId}`);\n      }\n      seenDeps.add(depId);\n    }\n    const state = entry.state;\n    if (typeof state !== 'string' || !STATES.has(state)) {\n      throw new Error(`job \"${id}\": state must be \"pending\", \"succeeded\", or \"failed\"`);\n    }\n    jobs.set(id, { id, deps, state });\n  }\n  for (const [id, job] of jobs) {\n    for (const dep of job.deps) {\n      if (!jobs.has(dep)) {\n        throw new Error(`job \"${id}\": unknown dependency: ${dep}`);\n      }\n    }\n  }\n\n  const indegree = new Map();\n  const children = new Map();\n  for (const [id, job] of jobs) {\n    indegree.set(id, job.deps.length);\n    for (const dep of job.deps) {\n      const list = children.get(dep) ?? [];\n      list.push(id);\n      children.set(dep, list);\n    }\n  }\n\n  const zero = new Set();\n  for (const [id, degree] of indegree) {\n    if (degree === 0) zero.add(id);\n  }\n  const topo = [];\n  while (zero.size > 0) {\n    let next = null;\n    for (const id of zero) {\n      if (next === null || id < next) next = id;\n    }\n    zero.delete(next);\n    topo.push(next);\n    for (const child of children.get(next) ?? []) {\n      const degree = indegree.get(child) - 1;\n      indegree.set(child, degree);\n      if (degree === 0) zero.add(child);\n    }\n  }\n  if (topo.length !== jobs.size) {\n    throw new Error('dependency cycle detected');\n  }\n\n  const ancestors = new Map();\n  for (const id of topo) {\n    const set = new Set();\n    for (const dep of jobs.get(id).deps) {\n      set.add(dep);\n      for (const ancestor of ancestors.get(dep)) set.add(ancestor);\n    }\n    ancestors.set(id, set);\n  }\n\n  const blocked = [];\n  for (const [id, job] of jobs) {\n    if (job.state !== 'pending') continue;\n    const causes = [];\n    for (const ancestor of ancestors.get(id)) {\n      if (jobs.get(ancestor).state === 'failed') causes.push(ancestor);\n    }\n    if (causes.length > 0) {\n      causes.sort();\n      blocked.push({ id, causes });\n    }\n  }\n  blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));\n  const blockedIds = new Set(blocked.map((entry) => entry.id));\n\n  const order = topo.filter((id) => {\n    const job = jobs.get(id);\n    return job.state === 'pending' && !blockedIds.has(id);\n  });\n\n  const ready = [];\n  for (const [id, job] of jobs) {\n    if (job.state !== 'pending' || blockedIds.has(id)) continue;\n    if (job.deps.every((dep) => jobs.get(dep).state === 'succeeded')) {\n      ready.push(id);\n    }\n  }\n  ready.sort();\n\n  return { order, ready, blocked };\n}\n\nfunction isMainModule() {\n  const entry = process.argv[1];\n  if (!entry) return false;\n  try {\n    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  try {\n    if (args.length !== 1) {\n      throw new Error('usage: node job-plan.js SPECFILE');\n    }\n    const spec = JSON.parse(readFileSync(args[0], 'utf8'));\n    process.stdout.write(`${JSON.stringify(planJobs(spec))}\\n`);\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+      },
+      "output": "Wrote file successfully.",
+      "atMs": 256222.0,
+      "endedMs": 256232.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\n\nconst job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n\ntest('duplicate ids, duplicate deps, and malformed fields throw', () => {\n  assert.throws(() => planJobs([job('a'), job('a')]));\n  assert.throws(() => planJobs([job('a', ['b', 'b'])]));\n  assert.throws(() => planJobs([job('a', ['a'])]));\n  assert.throws(() => planJobs([job('a', [], 'bogus')]));\n  assert.throws(() => planJobs([job('a', 'nope')]));\n  assert.throws(() => planJobs([{ id: 'a', state: 'pending' }]));\n  assert.throws(() => planJobs([{ deps: [], state: 'pending' }]));\n  assert.throws(() => planJobs([job('', [])]));\n  assert.throws(() => planJobs([job('a', [''])]));\n  assert.throws(() => planJobs([job(42, [])]));\n  assert.throws(() => planJobs([job('a', [5])]));\n  assert.throws(() => planJobs([null]));\n  assert.throws(() => planJobs([[]]));\n  assert.throws(() => planJobs(null));\n  assert.throws(() => planJobs('nope'));\n});\n\ntest('cycles are detected over the entire graph, including completed jobs', () => {\n  assert.throws(() => planJobs([job('a', ['b'], 'succeeded'), job('b', ['a'], 'succeeded')]));\n  assert.throws(() => planJobs([job('a', ['b'], 'failed'), job('b', ['a'], 'failed')]));\n  assert.throws(() =>\n    planJobs([\n      job('a', ['b'], 'succeeded'),\n      job('b', ['c'], 'failed'),\n      job('c', ['a'], 'succeeded'),\n      job('d'),\n    ]),\n  );\n});\n\ntest('__proto__ and constructor are ordinary ids', () => {\n  const spec = [job('__proto__'), job('constructor', ['__proto__'])];\n  assert.deepEqual(planJobs(spec), {\n    order: ['__proto__', 'constructor'],\n    ready: ['__proto__'],\n    blocked: [],\n  });\n  assert.equal(Object.getPrototypeOf(spec[0]), Object.prototype);\n});\n\ntest('input is not mutated and unknown fields are ignored', () => {\n  const spec = [job('b', [], 'pending'), job('a', ['b'], 'pending')];\n  spec[0].extra = 'ignore me';\n  spec[1].nested = { deeply: true };\n  const copy = structuredClone(spec);\n  const plan = planJobs(spec);\n  assert.deepEqual(spec, copy);\n  assert.deepEqual(plan, { order: ['b', 'a'], ready: ['b'], blocked: [] });\n  assert.deepEqual(Object.keys(plan), ['order', 'ready', 'blocked']);\n});\n\ntest('order follows the full graph topology, not the pending-only graph', () => {\n  assert.deepEqual(\n    planJobs([job('a', ['z']), job('b'), job('z', [], 'succeeded')]),\n    { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] },\n  );\n});\n\ntest('failed ancestry is transitive through succeeded and failed jobs', () => {\n  assert.deepEqual(\n    planJobs([\n      job('f1', [], 'failed'),\n      job('s', ['f1'], 'succeeded'),\n      job('p', ['s']),\n      job('f2', ['f1']),\n      job('f3', ['f2']),\n    ]),\n    {\n      order: [],\n      ready: [],\n      blocked: [\n        { id: 'f2', causes: ['f1'] },\n        { id: 'f3', causes: ['f1'] },\n        { id: 'p', causes: ['f1'] },\n      ],\n    },\n  );\n});\n\ntest('causes are unique and sorted, blocked sorted by id', () => {\n  assert.deepEqual(\n    planJobs([\n      job('f2', [], 'failed'),\n      job('f1', [], 'failed'),\n      job('p', ['f2', 'f1']),\n      job('q', ['p']),\n    ]),\n    {\n      order: [],\n      ready: [],\n      blocked: [\n        { id: 'p', causes: ['f1', 'f2'] },\n        { id: 'q', causes: ['f1', 'f2'] },\n      ],\n    },\n  );\n});\n\ntest('ids preserve whitespace and unicode; ordering is by code units', () => {\n  assert.deepEqual(\n    planJobs([job('a b'), job(' b', ['a b']), job('z'), job('\u00dc')]),\n    {\n      order: ['a b', ' b', 'z', '\u00dc'],\n      ready: ['a b', 'z', '\u00dc'],\n      blocked: [],\n    },\n  );\n});\n\ntest('blocked pending jobs stay out of order and ready; ready ignores pending deps', () => {\n  assert.deepEqual(\n    planJobs([\n      job('boom', [], 'failed'),\n      job('waiter', ['boom']),\n      job('later', ['waiter']),\n      job('solo'),\n    ]),\n    {\n      order: ['solo'],\n      ready: ['solo'],\n      blocked: [\n        { id: 'later', causes: ['boom'] },\n        { id: 'waiter', causes: ['boom'] },\n      ],\n    },\n  );\n});\n",
+        "filePath": "/workspace/test/plan-extra.test.js"
+      },
+      "output": "Wrote file successfully.",
+      "atMs": 273793.0,
+      "endedMs": 273801.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "write",
+      "category": "edit",
+      "request": {
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { mkdtempSync, writeFileSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { planJobs } from '../job-plan.js';\n\nconst cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n\nfunction run(args) {\n  return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n}\n\ntest('importing the module does not run the CLI', async () => {\n  const mod = await import('../job-plan.js');\n  assert.equal(typeof mod.planJobs, 'function');\n  assert.deepEqual(planJobs([]), { order: [], ready: [], blocked: [] });\n});\n\ntest('cli prints only the plan as JSON plus newline and exits 0', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const file = join(dir, 'spec.json');\n  writeFileSync(file, JSON.stringify([{ id: 'b' }, { id: 'a', deps: ['b'], state: 'pending' }]));\n  const result = run([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  const expected = JSON.stringify({ order: ['b', 'a'], ready: ['b'], blocked: [] });\n  assert.equal(result.stdout, `${expected}\\n`);\n  assert.deepEqual(JSON.parse(result.stdout), { order: ['b', 'a'], ready: ['b'], blocked: [] });\n});\n\ntest('cli exits 2 with nonempty stderr and no stdout on invalid input', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const invalidJson = join(dir, 'invalid.json');\n  writeFileSync(invalidJson, '{nope');\n  const notArray = join(dir, 'not-array.json');\n  writeFileSync(notArray, JSON.stringify({ id: 'a' }));\n  const cycle = join(dir, 'cycle.json');\n  writeFileSync(\n    cycle,\n    JSON.stringify([\n      { id: 'a', deps: ['b'], state: 'pending' },\n      { id: 'b', deps: ['a'], state: 'pending' },\n    ]),\n  );\n  const missing = join(dir, 'missing.json');\n  for (const args of [[], [invalidJson, 'extra'], [invalidJson], [notArray], [cycle], [missing]]) {\n    const result = run(args);\n    assert.equal(result.status, 2, `args=${JSON.stringify(args)}`);\n    assert.equal(result.stdout, '');\n    assert.ok(result.stderr.length > 0, `stderr empty for args=${JSON.stringify(args)}`);\n  }\n});\n",
+        "filePath": "/workspace/test/cli.test.js"
+      },
+      "output": "Wrote file successfully.",
+      "atMs": 282552.0,
+      "endedMs": 282561.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test",
+        "workdir": "/workspace"
+      },
+      "output": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: importing the module does not run the CLI\nok 1 - importing the module does not run the CLI\n  ---\n  duration_ms: 1.505031\n  ...\n# Subtest: cli prints only the plan as JSON plus newline and exits 0\nnot ok 2 - cli prints only the plan as JSON plus newline and exits 0\n  ---\n  duration_ms: 24.189127\n  location: '/workspace/test/cli.test.js:22:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    2 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 2\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/cli.test.js:27:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: cli exits 2 with nonempty stderr and no stdout on invalid input\nok 3 - cli exits 2 with nonempty stderr and no stdout on invalid input\n  ---\n  duration_ms: 126.157509\n  ...\n# Subtest: empty and a basic chain\nok 4 - empty and a basic chain\n  ---\n  duration_ms: 1.44877\n  ...\n# Subtest: the smallest newly available job precedes other queued jobs\nok 5 - the smallest newly available job precedes other queued jobs\n  ---\n  duration_ms: 0.192801\n  ...\n# Subtest: failure is transitive and successful dependencies permit readiness\nok 6 - failure is transitive and successful dependencies permit readiness\n  ---\n  duration_ms: 0.332702\n  ...\n# Subtest: cycles and unknown dependencies are errors\nok 7 - cycles and unknown dependencies are errors\n  ---\n  duration_ms: 0.785095\n  ...\n# Subtest: duplicate ids, duplicate deps, and malformed fields throw\nok 8 - duplicate ids, duplicate deps, and malformed fields throw\n  ---\n  duration_ms: 1.306129\n  ...\n# Subtest: cycles are detected over the entire graph, including completed jobs\nok 9 - cycles are detected over the entire graph, including completed jobs\n  ---\n  duration_ms: 0.802736\n  ...\n# Subtest: __proto__ and constructor are ordinary ids\nok 10 - __proto__ and constructor are ordinary ids\n  ---\n  duration_ms: 0.527044\n  ...\n# Subtest: input is not mutated and unknown fields are ignored\nok 11 - input is not mutated and unknown fields are ignored\n  ---\n  duration_ms: 0.211611\n  ...\n# Subtest: order follows the full graph topology, not the pending-only graph\nok 12 - order follows the full graph topology, not the pending-only graph\n  ---\n  duration_ms: 0.202321\n  ...\n# Subtest: failed ancestry is transitive through succeeded and failed jobs\nok 13 - failed ancestry is transitive through succeeded and failed jobs\n  ---\n  duration_ms: 0.231672\n  ...\n# Subtest: causes are unique and sorted, blocked sorted by id\nok 14 - causes are unique and sorted, blocked sorted by id\n  ---\n  duration_ms: 0.355483\n  ...\n# Subtest: ids preserve whitespace and unicode; ordering is by code units\nok 15 - ids preserve whitespace and unicode; ordering is by code units\n  ---\n  duration_ms: 0.197971\n  ...\n# Subtest: blocked pending jobs stay out of order and ready; ready ignores pending deps\nok 16 - blocked pending jobs stay out of order and ready; ready ignores pending deps\n  ---\n  duration_ms: 0.255141\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 15\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 192.432026\n",
+      "atMs": 286238.0,
+      "endedMs": 286248.0,
+      "exitCode": 1,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "printf '[{\"id\":\"b\"},{\"id\":\"a\",\"deps\":[\"b\"],\"state\":\"pending\"}]' > /tmp/spec.json && node /workspace/job-plan.js /tmp/spec.json; echo \"exit=$?\"; node /workspace/job-plan.js /tmp/spec.json 2>&1 >/dev/null",
+        "workdir": "/workspace"
+      },
+      "output": "job \"b\": deps must be an array\nexit=2\njob \"b\": deps must be an array\n",
+      "atMs": 288767.0,
+      "endedMs": 288770.0,
+      "exitCode": 2,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "edit",
+      "category": "edit",
+      "request": {
+        "filePath": "/workspace/test/cli.test.js",
+        "oldString": "  writeFileSync(file, JSON.stringify([{ id: 'b' }, { id: 'a', deps: ['b'], state: 'pending' }]));",
+        "newString": "  writeFileSync(file, JSON.stringify([{ id: 'b', deps: [], state: 'pending' }, { id: 'a', deps: ['b'], state: 'pending' }]));"
+      },
+      "output": "Edit applied successfully.",
+      "atMs": 292123.0,
+      "endedMs": 292125.0,
+      "exitCode": null,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | tail -8",
+        "workdir": "/workspace"
+      },
+      "output": "# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.479849\n",
+      "atMs": 295475.0,
+      "endedMs": 295478.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "node /workspace/job-plan.js /tmp/spec.json | od -c | tail -3; node /workspace/job-plan.js /tmp/spec.json >/dev/null 2>/tmp/err.txt; echo \"exit=$? stderr_bytes=$(wc -c < /tmp/err.txt)\"; node /workspace/job-plan.js 2>/dev/null; echo \"no-args exit=$?\"; node /workspace/job-plan.js a b 2>/dev/null; echo \"two-args exit=$?\"",
+        "workdir": "/workspace"
+      },
+      "output": "job \"b\": deps must be an array\n0000000\nexit=2 stderr_bytes=31\nno-args exit=2\ntwo-args exit=2\n",
+      "atMs": 299672.0,
+      "endedMs": 299674.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "node -e \"import('/workspace/job-plan.js').then(async m => { console.log('import ok, keys:', Object.keys(m)); const r = await Promise.resolve(); })\" 2>/tmp/imp_err.txt; echo \"exit=$? stderr_bytes=$(wc -c < /tmp/imp_err.txt)\"; git -C /workspace status 2>/dev/null || ls /workspace"
+      },
+      "output": "import ok, keys: [ 'planJobs' ]\nexit=0 stderr_bytes=0\njob-plan.js\npackage.json\ntest\n",
+      "atMs": 300891.0,
+      "endedMs": 300893.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "printf '[{\"id\":\"b\",\"deps\":[],\"state\":\"pending\"},{\"id\":\"a\",\"deps\":[\"b\"],\"state\":\"pending\"}]' > /tmp/spec.json && node /workspace/job-plan.js /tmp/spec.json > /tmp/out.txt 2>/tmp/err.txt; echo \"exit=$?\"; cat /tmp/out.txt; od -c /tmp/out.txt | tail -2; echo \"stderr_bytes=$(wc -c < /tmp/err.txt)\"",
+        "workdir": "/workspace"
+      },
+      "output": "exit=0\n{\"order\":[\"b\",\"a\"],\"ready\":[\"b\"],\"blocked\":[]}\n0000040   ,   \"   b   l   o   c   k   e   d   \"   :   [   ]   }  \\n\n0000057\nstderr_bytes=0\n",
+      "atMs": 305514.0,
+      "endedMs": 305516.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "node -e \"const s=[{id:'__proto__',deps:[],state:'pending'},{id:'constructor',deps:['__proto__'],state:'pending'},{id:'toString',deps:['__proto__'],state:'pending'}];require('fs').writeFileSync('/tmp/proto.json',JSON.stringify(s))\" && node /workspace/job-plan.js /tmp/proto.json; echo \"exit=$?\"",
+        "workdir": "/workspace"
+      },
+      "output": "{\"order\":[\"__proto__\",\"constructor\",\"toString\"],\"ready\":[\"__proto__\"],\"blocked\":[]}\nexit=0\n",
+      "atMs": 308250.0,
+      "endedMs": 308253.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "cat /workspace/package.json && md5sum /workspace/test/job-plan.test.js"
+      },
+      "output": "{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n73923e1c677f8df7f60dcd4036efb12d  /workspace/test/job-plan.test.js\n",
+      "atMs": 308607.0,
+      "endedMs": 308609.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "bash",
+      "category": "command",
+      "request": {
+        "command": "npm test 2>&1 | grep -E \"^# (tests|pass|fail)\"",
+        "workdir": "/workspace"
+      },
+      "output": "# tests 16\n# pass 16\n# fail 0\n",
+      "atMs": 311325.0,
+      "endedMs": 311328.0,
+      "exitCode": 0,
+      "state": "completed",
+      "source": "native-tool",
+      "id": "action-19"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "job-plan.js",
+      "state": "changed",
+      "beforeSha256": "ed381e455c483d87557ddf9c10e7d90ffe6a3389a10bcb747eb7c829acec00bb",
+      "afterSha256": "0872a5f9d4e7122df73de48f005b1e66bc54fda42f00792bc50472c0f6395e99",
+      "before": "// Known-flawed starter, identical for every contender. Repair using task.md.\nexport function planJobs(spec) {\n  const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n  const order = [], visited = new Set();\n  function visit(id) {\n    if (visited.has(id)) return;\n    visited.add(id);\n    for (const dep of jobs[id].deps) visit(dep);\n    if (jobs[id].state === 'pending') order.push(id);\n  }\n  for (const job of spec) visit(job.id);\n  return {\n    order,\n    ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n    blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n      .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n  };\n}\n",
+      "after": "import { readFileSync, realpathSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\n\nconst STATES = new Set(['pending', 'succeeded', 'failed']);\n\nfunction requireNonemptyString(value) {\n  if (typeof value !== 'string' || value.length === 0) {\n    throw new Error('expected a nonempty string');\n  }\n  return value;\n}\n\nexport function planJobs(spec) {\n  if (!Array.isArray(spec)) {\n    throw new Error('spec must be an array of job objects');\n  }\n  const jobs = new Map();\n  for (const entry of spec) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw new Error('each job must be a plain object');\n    }\n    const id = requireNonemptyString(entry.id);\n    if (jobs.has(id)) {\n      throw new Error(`duplicate job id: ${id}`);\n    }\n    const deps = entry.deps;\n    if (!Array.isArray(deps)) {\n      throw new Error(`job \"${id}\": deps must be an array`);\n    }\n    const seenDeps = new Set();\n    for (const dep of deps) {\n      const depId = requireNonemptyString(dep);\n      if (seenDeps.has(depId)) {\n        throw new Error(`job \"${id}\": duplicate dependency: ${depId}`);\n      }\n      seenDeps.add(depId);\n    }\n    const state = entry.state;\n    if (typeof state !== 'string' || !STATES.has(state)) {\n      throw new Error(`job \"${id}\": state must be \"pending\", \"succeeded\", or \"failed\"`);\n    }\n    jobs.set(id, { id, deps, state });\n  }\n  for (const [id, job] of jobs) {\n    for (const dep of job.deps) {\n      if (!jobs.has(dep)) {\n        throw new Error(`job \"${id}\": unknown dependency: ${dep}`);\n      }\n    }\n  }\n\n  const indegree = new Map();\n  const children = new Map();\n  for (const [id, job] of jobs) {\n    indegree.set(id, job.deps.length);\n    for (const dep of job.deps) {\n      const list = children.get(dep) ?? [];\n      list.push(id);\n      children.set(dep, list);\n    }\n  }\n\n  const zero = new Set();\n  for (const [id, degree] of indegree) {\n    if (degree === 0) zero.add(id);\n  }\n  const topo = [];\n  while (zero.size > 0) {\n    let next = null;\n    for (const id of zero) {\n      if (next === null || id < next) next = id;\n    }\n    zero.delete(next);\n    topo.push(next);\n    for (const child of children.get(next) ?? []) {\n      const degree = indegree.get(child) - 1;\n      indegree.set(child, degree);\n      if (degree === 0) zero.add(child);\n    }\n  }\n  if (topo.length !== jobs.size) {\n    throw new Error('dependency cycle detected');\n  }\n\n  const ancestors = new Map();\n  for (const id of topo) {\n    const set = new Set();\n    for (const dep of jobs.get(id).deps) {\n      set.add(dep);\n      for (const ancestor of ancestors.get(dep)) set.add(ancestor);\n    }\n    ancestors.set(id, set);\n  }\n\n  const blocked = [];\n  for (const [id, job] of jobs) {\n    if (job.state !== 'pending') continue;\n    const causes = [];\n    for (const ancestor of ancestors.get(id)) {\n      if (jobs.get(ancestor).state === 'failed') causes.push(ancestor);\n    }\n    if (causes.length > 0) {\n      causes.sort();\n      blocked.push({ id, causes });\n    }\n  }\n  blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));\n  const blockedIds = new Set(blocked.map((entry) => entry.id));\n\n  const order = topo.filter((id) => {\n    const job = jobs.get(id);\n    return job.state === 'pending' && !blockedIds.has(id);\n  });\n\n  const ready = [];\n  for (const [id, job] of jobs) {\n    if (job.state !== 'pending' || blockedIds.has(id)) continue;\n    if (job.deps.every((dep) => jobs.get(dep).state === 'succeeded')) {\n      ready.push(id);\n    }\n  }\n  ready.sort();\n\n  return { order, ready, blocked };\n}\n\nfunction isMainModule() {\n  const entry = process.argv[1];\n  if (!entry) return false;\n  try {\n    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n  } catch {\n    return false;\n  }\n}\n\nif (isMainModule()) {\n  const args = process.argv.slice(2);\n  try {\n    if (args.length !== 1) {\n      throw new Error('usage: node job-plan.js SPECFILE');\n    }\n    const spec = JSON.parse(readFileSync(args[0], 'utf8'));\n    process.stdout.write(`${JSON.stringify(planJobs(spec))}\\n`);\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "0872a5f9d4e7122df73de48f005b1e66bc54fda42f00792bc50472c0f6395e99",
+      "diff": "--- starter/job-plan.js\n+++ delivered/job-plan.js\n@@ -1,18 +1,149 @@\n-// Known-flawed starter, identical for every contender. Repair using task.md.\n+import { readFileSync, realpathSync } from 'node:fs';\n+import { fileURLToPath } from 'node:url';\n+\n+const STATES = new Set(['pending', 'succeeded', 'failed']);\n+\n+function requireNonemptyString(value) {\n+  if (typeof value !== 'string' || value.length === 0) {\n+    throw new Error('expected a nonempty string');\n+  }\n+  return value;\n+}\n+\n export function planJobs(spec) {\n-  const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n-  const order = [], visited = new Set();\n-  function visit(id) {\n-    if (visited.has(id)) return;\n-    visited.add(id);\n-    for (const dep of jobs[id].deps) visit(dep);\n-    if (jobs[id].state === 'pending') order.push(id);\n+  if (!Array.isArray(spec)) {\n+    throw new Error('spec must be an array of job objects');\n   }\n-  for (const job of spec) visit(job.id);\n-  return {\n-    order,\n-    ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n-    blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n-      .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n-  };\n+  const jobs = new Map();\n+  for (const entry of spec) {\n+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n+      throw new Error('each job must be a plain object');\n+    }\n+    const id = requireNonemptyString(entry.id);\n+    if (jobs.has(id)) {\n+      throw new Error(`duplicate job id: ${id}`);\n+    }\n+    const deps = entry.deps;\n+    if (!Array.isArray(deps)) {\n+      throw new Error(`job \"${id}\": deps must be an array`);\n+    }\n+    const seenDeps = new Set();\n+    for (const dep of deps) {\n+      const depId = requireNonemptyString(dep);\n+      if (seenDeps.has(depId)) {\n+        throw new Error(`job \"${id}\": duplicate dependency: ${depId}`);\n+      }\n+      seenDeps.add(depId);\n+    }\n+    const state = entry.state;\n+    if (typeof state !== 'string' || !STATES.has(state)) {\n+      throw new Error(`job \"${id}\": state must be \"pending\", \"succeeded\", or \"failed\"`);\n+    }\n+    jobs.set(id, { id, deps, state });\n+  }\n+  for (const [id, job] of jobs) {\n+    for (const dep of job.deps) {\n+      if (!jobs.has(dep)) {\n+        throw new Error(`job \"${id}\": unknown dependency: ${dep}`);\n+      }\n+    }\n+  }\n+\n+  const indegree = new Map();\n+  const children = new Map();\n+  for (const [id, job] of jobs) {\n+    indegree.set(id, job.deps.length);\n+    for (const dep of job.deps) {\n+      const list = children.get(dep) ?? [];\n+      list.push(id);\n+      children.set(dep, list);\n+    }\n+  }\n+\n+  const zero = new Set();\n+  for (const [id, degree] of indegree) {\n+    if (degree === 0) zero.add(id);\n+  }\n+  const topo = [];\n+  while (zero.size > 0) {\n+    let next = null;\n+    for (const id of zero) {\n+      if (next === null || id < next) next = id;\n+    }\n+    zero.delete(next);\n+    topo.push(next);\n+    for (const child of children.get(next) ?? []) {\n+      const degree = indegree.get(child) - 1;\n+      indegree.set(child, degree);\n+      if (degree === 0) zero.add(child);\n+    }\n+  }\n+  if (topo.length !== jobs.size) {\n+    throw new Error('dependency cycle detected');\n+  }\n+\n+  const ancestors = new Map();\n+  for (const id of topo) {\n+    const set = new Set();\n+    for (const dep of jobs.get(id).deps) {\n+      set.add(dep);\n+      for (const ancestor of ancestors.get(dep)) set.add(ancestor);\n+    }\n+    ancestors.set(id, set);\n+  }\n+\n+  const blocked = [];\n+  for (const [id, job] of jobs) {\n+    if (job.state !== 'pending') continue;\n+    const causes = [];\n+    for (const ancestor of ancestors.get(id)) {\n+      if (jobs.get(ancestor).state === 'failed') causes.push(ancestor);\n+    }\n+    if (causes.length > 0) {\n+      causes.sort();\n+      blocked.push({ id, causes });\n+    }\n+  }\n+  blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));\n+  const blockedIds = new Set(blocked.map((entry) => entry.id));\n+\n+  const order = topo.filter((id) => {\n+    const job = jobs.get(id);\n+    return job.state === 'pending' && !blockedIds.has(id);\n+  });\n+\n+  const ready = [];\n+  for (const [id, job] of jobs) {\n+    if (job.state !== 'pending' || blockedIds.has(id)) continue;\n+    if (job.deps.every((dep) => jobs.get(dep).state === 'succeeded')) {\n+      ready.push(id);\n+    }\n+  }\n+  ready.sort();\n+\n+  return { order, ready, blocked };\n }\n+\n+function isMainModule() {\n+  const entry = process.argv[1];\n+  if (!entry) return false;\n+  try {\n+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n+  } catch {\n+    return false;\n+  }\n+}\n+\n+if (isMainModule()) {\n+  const args = process.argv.slice(2);\n+  try {\n+    if (args.length !== 1) {\n+      throw new Error('usage: node job-plan.js SPECFILE');\n+    }\n+    const spec = JSON.parse(readFileSync(args[0], 'utf8'));\n+    process.stdout.write(`${JSON.stringify(planJobs(spec))}\\n`);\n+  } catch (error) {\n+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "afterSha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "before": "{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "diff": ""
+    },
+    {
+      "path": "test/cli.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "16def15534a5cbc39c43b16081788e95abbf0c69ec3b401feae59e7e5e4a4820",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\nimport { mkdtempSync, writeFileSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { planJobs } from '../job-plan.js';\n\nconst cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n\nfunction run(args) {\n  return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n}\n\ntest('importing the module does not run the CLI', async () => {\n  const mod = await import('../job-plan.js');\n  assert.equal(typeof mod.planJobs, 'function');\n  assert.deepEqual(planJobs([]), { order: [], ready: [], blocked: [] });\n});\n\ntest('cli prints only the plan as JSON plus newline and exits 0', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const file = join(dir, 'spec.json');\n  writeFileSync(file, JSON.stringify([{ id: 'b', deps: [], state: 'pending' }, { id: 'a', deps: ['b'], state: 'pending' }]));\n  const result = run([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  const expected = JSON.stringify({ order: ['b', 'a'], ready: ['b'], blocked: [] });\n  assert.equal(result.stdout, `${expected}\\n`);\n  assert.deepEqual(JSON.parse(result.stdout), { order: ['b', 'a'], ready: ['b'], blocked: [] });\n});\n\ntest('cli exits 2 with nonempty stderr and no stdout on invalid input', () => {\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const invalidJson = join(dir, 'invalid.json');\n  writeFileSync(invalidJson, '{nope');\n  const notArray = join(dir, 'not-array.json');\n  writeFileSync(notArray, JSON.stringify({ id: 'a' }));\n  const cycle = join(dir, 'cycle.json');\n  writeFileSync(\n    cycle,\n    JSON.stringify([\n      { id: 'a', deps: ['b'], state: 'pending' },\n      { id: 'b', deps: ['a'], state: 'pending' },\n    ]),\n  );\n  const missing = join(dir, 'missing.json');\n  for (const args of [[], [invalidJson, 'extra'], [invalidJson], [notArray], [cycle], [missing]]) {\n    const result = run(args);\n    assert.equal(result.status, 2, `args=${JSON.stringify(args)}`);\n    assert.equal(result.stdout, '');\n    assert.ok(result.stderr.length > 0, `stderr empty for args=${JSON.stringify(args)}`);\n  }\n});\n",
+      "displaySha256": "16def15534a5cbc39c43b16081788e95abbf0c69ec3b401feae59e7e5e4a4820",
+      "diff": "--- starter/test/cli.test.js\n+++ delivered/test/cli.test.js\n@@ -0,0 +1,55 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import { spawnSync } from 'node:child_process';\n+import { mkdtempSync, writeFileSync } from 'node:fs';\n+import { tmpdir } from 'node:os';\n+import { join } from 'node:path';\n+import { fileURLToPath } from 'node:url';\n+import { planJobs } from '../job-plan.js';\n+\n+const cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n+\n+function run(args) {\n+  return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n+}\n+\n+test('importing the module does not run the CLI', async () => {\n+  const mod = await import('../job-plan.js');\n+  assert.equal(typeof mod.planJobs, 'function');\n+  assert.deepEqual(planJobs([]), { order: [], ready: [], blocked: [] });\n+});\n+\n+test('cli prints only the plan as JSON plus newline and exits 0', () => {\n+  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n+  const file = join(dir, 'spec.json');\n+  writeFileSync(file, JSON.stringify([{ id: 'b', deps: [], state: 'pending' }, { id: 'a', deps: ['b'], state: 'pending' }]));\n+  const result = run([file]);\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stderr, '');\n+  const expected = JSON.stringify({ order: ['b', 'a'], ready: ['b'], blocked: [] });\n+  assert.equal(result.stdout, `${expected}\\n`);\n+  assert.deepEqual(JSON.parse(result.stdout), { order: ['b', 'a'], ready: ['b'], blocked: [] });\n+});\n+\n+test('cli exits 2 with nonempty stderr and no stdout on invalid input', () => {\n+  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n+  const invalidJson = join(dir, 'invalid.json');\n+  writeFileSync(invalidJson, '{nope');\n+  const notArray = join(dir, 'not-array.json');\n+  writeFileSync(notArray, JSON.stringify({ id: 'a' }));\n+  const cycle = join(dir, 'cycle.json');\n+  writeFileSync(\n+    cycle,\n+    JSON.stringify([\n+      { id: 'a', deps: ['b'], state: 'pending' },\n+      { id: 'b', deps: ['a'], state: 'pending' },\n+    ]),\n+  );\n+  const missing = join(dir, 'missing.json');\n+  for (const args of [[], [invalidJson, 'extra'], [invalidJson], [notArray], [cycle], [missing]]) {\n+    const result = run(args);\n+    assert.equal(result.status, 2, `args=${JSON.stringify(args)}`);\n+    assert.equal(result.stdout, '');\n+    assert.ok(result.stderr.length > 0, `stderr empty for args=${JSON.stringify(args)}`);\n+  }\n+});\n"
+    },
+    {
+      "path": "test/job-plan.test.js",
+      "state": "unchanged",
+      "beforeSha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "afterSha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\nconst job = (id,deps=[],state='pending') => ({id,deps,state});\ntest('empty and a basic chain', () => {\n  assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n  assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n});\ntest('the smallest newly available job precedes other queued jobs', () => {\n  assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n});\ntest('failure is transitive and successful dependencies permit readiness', () => {\n  assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n    order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n  });\n});\ntest('cycles and unknown dependencies are errors', () => {\n  assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n  assert.throws(() => planJobs([job('a',['absent'])]));\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\nconst job = (id,deps=[],state='pending') => ({id,deps,state});\ntest('empty and a basic chain', () => {\n  assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n  assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n});\ntest('the smallest newly available job precedes other queued jobs', () => {\n  assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n});\ntest('failure is transitive and successful dependencies permit readiness', () => {\n  assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n    order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n  });\n});\ntest('cycles and unknown dependencies are errors', () => {\n  assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n  assert.throws(() => planJobs([job('a',['absent'])]));\n});\n",
+      "displaySha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "diff": ""
+    },
+    {
+      "path": "test/plan-extra.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "d0f080572a340cd2909854329b7c38f6b654ff6b88f77cd280998fbc8d64ebae",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\n\nconst job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n\ntest('duplicate ids, duplicate deps, and malformed fields throw', () => {\n  assert.throws(() => planJobs([job('a'), job('a')]));\n  assert.throws(() => planJobs([job('a', ['b', 'b'])]));\n  assert.throws(() => planJobs([job('a', ['a'])]));\n  assert.throws(() => planJobs([job('a', [], 'bogus')]));\n  assert.throws(() => planJobs([job('a', 'nope')]));\n  assert.throws(() => planJobs([{ id: 'a', state: 'pending' }]));\n  assert.throws(() => planJobs([{ deps: [], state: 'pending' }]));\n  assert.throws(() => planJobs([job('', [])]));\n  assert.throws(() => planJobs([job('a', [''])]));\n  assert.throws(() => planJobs([job(42, [])]));\n  assert.throws(() => planJobs([job('a', [5])]));\n  assert.throws(() => planJobs([null]));\n  assert.throws(() => planJobs([[]]));\n  assert.throws(() => planJobs(null));\n  assert.throws(() => planJobs('nope'));\n});\n\ntest('cycles are detected over the entire graph, including completed jobs', () => {\n  assert.throws(() => planJobs([job('a', ['b'], 'succeeded'), job('b', ['a'], 'succeeded')]));\n  assert.throws(() => planJobs([job('a', ['b'], 'failed'), job('b', ['a'], 'failed')]));\n  assert.throws(() =>\n    planJobs([\n      job('a', ['b'], 'succeeded'),\n      job('b', ['c'], 'failed'),\n      job('c', ['a'], 'succeeded'),\n      job('d'),\n    ]),\n  );\n});\n\ntest('__proto__ and constructor are ordinary ids', () => {\n  const spec = [job('__proto__'), job('constructor', ['__proto__'])];\n  assert.deepEqual(planJobs(spec), {\n    order: ['__proto__', 'constructor'],\n    ready: ['__proto__'],\n    blocked: [],\n  });\n  assert.equal(Object.getPrototypeOf(spec[0]), Object.prototype);\n});\n\ntest('input is not mutated and unknown fields are ignored', () => {\n  const spec = [job('b', [], 'pending'), job('a', ['b'], 'pending')];\n  spec[0].extra = 'ignore me';\n  spec[1].nested = { deeply: true };\n  const copy = structuredClone(spec);\n  const plan = planJobs(spec);\n  assert.deepEqual(spec, copy);\n  assert.deepEqual(plan, { order: ['b', 'a'], ready: ['b'], blocked: [] });\n  assert.deepEqual(Object.keys(plan), ['order', 'ready', 'blocked']);\n});\n\ntest('order follows the full graph topology, not the pending-only graph', () => {\n  assert.deepEqual(\n    planJobs([job('a', ['z']), job('b'), job('z', [], 'succeeded')]),\n    { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] },\n  );\n});\n\ntest('failed ancestry is transitive through succeeded and failed jobs', () => {\n  assert.deepEqual(\n    planJobs([\n      job('f1', [], 'failed'),\n      job('s', ['f1'], 'succeeded'),\n      job('p', ['s']),\n      job('f2', ['f1']),\n      job('f3', ['f2']),\n    ]),\n    {\n      order: [],\n      ready: [],\n      blocked: [\n        { id: 'f2', causes: ['f1'] },\n        { id: 'f3', causes: ['f1'] },\n        { id: 'p', causes: ['f1'] },\n      ],\n    },\n  );\n});\n\ntest('causes are unique and sorted, blocked sorted by id', () => {\n  assert.deepEqual(\n    planJobs([\n      job('f2', [], 'failed'),\n      job('f1', [], 'failed'),\n      job('p', ['f2', 'f1']),\n      job('q', ['p']),\n    ]),\n    {\n      order: [],\n      ready: [],\n      blocked: [\n        { id: 'p', causes: ['f1', 'f2'] },\n        { id: 'q', causes: ['f1', 'f2'] },\n      ],\n    },\n  );\n});\n\ntest('ids preserve whitespace and unicode; ordering is by code units', () => {\n  assert.deepEqual(\n    planJobs([job('a b'), job(' b', ['a b']), job('z'), job('\u00dc')]),\n    {\n      order: ['a b', ' b', 'z', '\u00dc'],\n      ready: ['a b', 'z', '\u00dc'],\n      blocked: [],\n    },\n  );\n});\n\ntest('blocked pending jobs stay out of order and ready; ready ignores pending deps', () => {\n  assert.deepEqual(\n    planJobs([\n      job('boom', [], 'failed'),\n      job('waiter', ['boom']),\n      job('later', ['waiter']),\n      job('solo'),\n    ]),\n    {\n      order: ['solo'],\n      ready: ['solo'],\n      blocked: [\n        { id: 'later', causes: ['boom'] },\n        { id: 'waiter', causes: ['boom'] },\n      ],\n    },\n  );\n});\n",
+      "displaySha256": "d0f080572a340cd2909854329b7c38f6b654ff6b88f77cd280998fbc8d64ebae",
+      "diff": "--- starter/test/plan-extra.test.js\n+++ delivered/test/plan-extra.test.js\n@@ -0,0 +1,134 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import { planJobs } from '../job-plan.js';\n+\n+const job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n+\n+test('duplicate ids, duplicate deps, and malformed fields throw', () => {\n+  assert.throws(() => planJobs([job('a'), job('a')]));\n+  assert.throws(() => planJobs([job('a', ['b', 'b'])]));\n+  assert.throws(() => planJobs([job('a', ['a'])]));\n+  assert.throws(() => planJobs([job('a', [], 'bogus')]));\n+  assert.throws(() => planJobs([job('a', 'nope')]));\n+  assert.throws(() => planJobs([{ id: 'a', state: 'pending' }]));\n+  assert.throws(() => planJobs([{ deps: [], state: 'pending' }]));\n+  assert.throws(() => planJobs([job('', [])]));\n+  assert.throws(() => planJobs([job('a', [''])]));\n+  assert.throws(() => planJobs([job(42, [])]));\n+  assert.throws(() => planJobs([job('a', [5])]));\n+  assert.throws(() => planJobs([null]));\n+  assert.throws(() => planJobs([[]]));\n+  assert.throws(() => planJobs(null));\n+  assert.throws(() => planJobs('nope'));\n+});\n+\n+test('cycles are detected over the entire graph, including completed jobs', () => {\n+  assert.throws(() => planJobs([job('a', ['b'], 'succeeded'), job('b', ['a'], 'succeeded')]));\n+  assert.throws(() => planJobs([job('a', ['b'], 'failed'), job('b', ['a'], 'failed')]));\n+  assert.throws(() =>\n+    planJobs([\n+      job('a', ['b'], 'succeeded'),\n+      job('b', ['c'], 'failed'),\n+      job('c', ['a'], 'succeeded'),\n+      job('d'),\n+    ]),\n+  );\n+});\n+\n+test('__proto__ and constructor are ordinary ids', () => {\n+  const spec = [job('__proto__'), job('constructor', ['__proto__'])];\n+  assert.deepEqual(planJobs(spec), {\n+    order: ['__proto__', 'constructor'],\n+    ready: ['__proto__'],\n+    blocked: [],\n+  });\n+  assert.equal(Object.getPrototypeOf(spec[0]), Object.prototype);\n+});\n+\n+test('input is not mutated and unknown fields are ignored', () => {\n+  const spec = [job('b', [], 'pending'), job('a', ['b'], 'pending')];\n+  spec[0].extra = 'ignore me';\n+  spec[1].nested = { deeply: true };\n+  const copy = structuredClone(spec);\n+  const plan = planJobs(spec);\n+  assert.deepEqual(spec, copy);\n+  assert.deepEqual(plan, { order: ['b', 'a'], ready: ['b'], blocked: [] });\n+  assert.deepEqual(Object.keys(plan), ['order', 'ready', 'blocked']);\n+});\n+\n+test('order follows the full graph topology, not the pending-only graph', () => {\n+  assert.deepEqual(\n+    planJobs([job('a', ['z']), job('b'), job('z', [], 'succeeded')]),\n+    { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] },\n+  );\n+});\n+\n+test('failed ancestry is transitive through succeeded and failed jobs', () => {\n+  assert.deepEqual(\n+    planJobs([\n+      job('f1', [], 'failed'),\n+      job('s', ['f1'], 'succeeded'),\n+      job('p', ['s']),\n+      job('f2', ['f1']),\n+      job('f3', ['f2']),\n+    ]),\n+    {\n+      order: [],\n+      ready: [],\n+      blocked: [\n+        { id: 'f2', causes: ['f1'] },\n+        { id: 'f3', causes: ['f1'] },\n+        { id: 'p', causes: ['f1'] },\n+      ],\n+    },\n+  );\n+});\n+\n+test('causes are unique and sorted, blocked sorted by id', () => {\n+  assert.deepEqual(\n+    planJobs([\n+      job('f2', [], 'failed'),\n+      job('f1', [], 'failed'),\n+      job('p', ['f2', 'f1']),\n+      job('q', ['p']),\n+    ]),\n+    {\n+      order: [],\n+      ready: [],\n+      blocked: [\n+        { id: 'p', causes: ['f1', 'f2'] },\n+        { id: 'q', causes: ['f1', 'f2'] },\n+      ],\n+    },\n+  );\n+});\n+\n+test('ids preserve whitespace and unicode; ordering is by code units', () => {\n+  assert.deepEqual(\n+    planJobs([job('a b'), job(' b', ['a b']), job('z'), job('\u00dc')]),\n+    {\n+      order: ['a b', ' b', 'z', '\u00dc'],\n+      ready: ['a b', 'z', '\u00dc'],\n+      blocked: [],\n+    },\n+  );\n+});\n+\n+test('blocked pending jobs stay out of order and ready; ready ignores pending deps', () => {\n+  assert.deepEqual(\n+    planJobs([\n+      job('boom', [], 'failed'),\n+      job('waiter', ['boom']),\n+      job('later', ['waiter']),\n+      job('solo'),\n+    ]),\n+    {\n+      order: ['solo'],\n+      ready: ['solo'],\n+      blocked: [\n+        { id: 'later', causes: ['boom'] },\n+        { id: 'waiter', causes: ['boom'] },\n+      ],\n+    },\n+  );\n+});\n"
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: importing the module does not run the CLI\nok 1 - importing the module does not run the CLI\n  ---\n  duration_ms: 1.46616\n  ...\n# Subtest: cli prints only the plan as JSON plus newline and exits 0\nok 2 - cli prints only the plan as JSON plus newline and exits 0\n  ---\n  duration_ms: 23.611963\n  ...\n# Subtest: cli exits 2 with nonempty stderr and no stdout on invalid input\nok 3 - cli exits 2 with nonempty stderr and no stdout on invalid input\n  ---\n  duration_ms: 129.250273\n  ...\n# Subtest: empty and a basic chain\nok 4 - empty and a basic chain\n  ---\n  duration_ms: 1.401379\n  ...\n# Subtest: the smallest newly available job precedes other queued jobs\nok 5 - the smallest newly available job precedes other queued jobs\n  ---\n  duration_ms: 0.155751\n  ...\n# Subtest: failure is transitive and successful dependencies permit readiness\nok 6 - failure is transitive and successful dependencies permit readiness\n  ---\n  duration_ms: 0.233011\n  ...\n# Subtest: cycles and unknown dependencies are errors\nok 7 - cycles and unknown dependencies are errors\n  ---\n  duration_ms: 0.231112\n  ...\n# Subtest: duplicate ids, duplicate deps, and malformed fields throw\nok 8 - duplicate ids, duplicate deps, and malformed fields throw\n  ---\n  duration_ms: 1.839403\n  ...\n# Subtest: cycles are detected over the entire graph, including completed jobs\nok 9 - cycles are detected over the entire graph, including completed jobs\n  ---\n  duration_ms: 0.206401\n  ...\n# Subtest: __proto__ and constructor are ordinary ids\nok 10 - __proto__ and constructor are ordinary ids\n  ---\n  duration_ms: 0.492163\n  ...\n# Subtest: input is not mutated and unknown fields are ignored\nok 11 - input is not mutated and unknown fields are ignored\n  ---\n  duration_ms: 0.198681\n  ...\n# Subtest: order follows the full graph topology, not the pending-only graph\nok 12 - order follows the full graph topology, not the pending-only graph\n  ---\n  duration_ms: 0.164441\n  ...\n# Subtest: failed ancestry is transitive through succeeded and failed jobs\nok 13 - failed ancestry is transitive through succeeded and failed jobs\n  ---\n  duration_ms: 0.269661\n  ...\n# Subtest: causes are unique and sorted, blocked sorted by id\nok 14 - causes are unique and sorted, blocked sorted by id\n  ---\n  duration_ms: 0.352342\n  ...\n# Subtest: ids preserve whitespace and unicode; ordering is by code units\nok 15 - ids preserve whitespace and unicode; ordering is by code units\n  ---\n  duration_ms: 0.185802\n  ...\n# Subtest: blocked pending jobs stay out of order and ready; ready ignores pending deps\nok 16 - blocked pending jobs stay out of order and ready; ready ignores pending deps\n  ---\n  duration_ms: 0.254602\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 195.317649\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"job-planner\",\"pass\":true,\"groups\":[{\"name\":\"lexical-kahn-not-dfs-or-waves\",\"pass\":true},{\"name\":\"all-failed-ancestors-across-completed-nodes\",\"pass\":true},{\"name\":\"ready-is-current-not-simulated-and-identities-are-opaque\",\"pass\":true},{\"name\":\"all-graph-cycles-and-invalid-input\",\"pass\":true},{\"name\":\"cli-plan-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "14b5449f49019b2b670805d01f409d6e8d8e0e5995a361b7bfeb1dcbc5675073"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "04f291b32c3a668450b0292a0ef61825b47d76e72178a07a12acdcbd900e1b68"
+    },
+    {
+      "kind": "native-database-wal",
+      "sha256": "66daec1ae2ee8e99a674e8fb379548baa6569dc6fde06b034d7802bb38a24771"
+    },
+    {
+      "kind": "native-database-shm",
+      "sha256": "5458f15ca9275bec4a6a2f7188f68a34605ecb841e72c9448b19deaa57287191"
+    },
+    {
+      "kind": "native-cli-output",
+      "sha256": "a8c5cd3af13fd928eabd4a48cca83dc74d9ee5fe4e06ae6ba62b26cf7031a2fa"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "306f6da3c34f87576d38bb10ee142a5d6397b3120c04dc19d7c284585617a16d"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "0c0a4345ecfa1fb8ee7066b93e551ca8c47dc3d322e5718064416ec0bdd4cb73"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 19,
+    "withResults": 19,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Working planner, with the CLI checked.",
+    "paragraphs": [
+      {
+        "text": "OpenCode implemented the planner and added API and CLI tests. It corrected a failing CLI fixture, passed the suite, then exercised valid plans, invalid input and opaque job names.",
+        "actions": [
+          "action-7",
+          "action-9",
+          "action-10",
+          "action-12",
+          "action-16",
+          "action-17"
+        ]
+      },
+      {
+        "text": "The final suite passed all 16 tests, and independent acceptance passed all five groups. Clean finish: 324.1 seconds, compared with BANTAM FACTORY\u2019s 193.2 seconds.",
+        "actions": [
+          "action-19"
+        ]
+      }
+    ]
+  }
+}

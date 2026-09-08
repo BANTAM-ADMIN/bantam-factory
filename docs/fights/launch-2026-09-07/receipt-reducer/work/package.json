@@ -1,0 +1,241 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "receipt-reducer",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 94931,
+      "sha256": "b2f43cbbbd8debc258c39f8431eae0594062e340b6d256cb3a24a8636d720ba3",
+      "arm": "bantam-local-27b",
+      "wallMs": 112487,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 18,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "A job history you can actually trust.",
+        "paragraphs": [
+          {
+            "text": "The factory built the event reducer, challenged invalid-input handling and required executable API and CLI checks. The worker left both checks with the delivered tool.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-9",
+              "action-10",
+              "action-13",
+              "action-16"
+            ]
+          },
+          {
+            "text": "Final project tests and all five independent groups passed. The factory released the completed work after 112.5 seconds.",
+            "actions": [
+              "action-17",
+              "action-18"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 88817,
+      "sha256": "33801ba634531acc488156c30fefac291a787048bc71edcc5d26565208d5e8f7",
+      "arm": "deepseek-local-27b",
+      "wallMs": 442738,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 20,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Passed, with a longer testing detour.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek implemented the reducer and added tests, then investigated a failing assertion and corrected the extra suite. It went on to check CLI output, file permissions and the supplied files before finishing in 442.7 seconds.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-13",
+              "action-14",
+              "action-17",
+              "action-19"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 76783,
+      "sha256": "36471a8c558a201792ad245a8bb531fb5493e7d901aae621c8305c19a22e2dee",
+      "arm": "hermes",
+      "wallMs": 577573,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 15,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Correct reducer, nearly the full window.",
+        "paragraphs": [
+          {
+            "text": "Hermes built the reducer and extra tests, worked through a failing added expectation and exercised the command line. Both the project suite and all five independent groups passed. Its clean finish took 577.6 seconds.",
+            "actions": [
+              "action-7",
+              "action-8",
+              "action-11",
+              "action-12",
+              "action-14",
+              "action-15"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 41936,
+      "sha256": "376f41d2eca46316d569b12fec02e556ef2f10e46d1eaef469df48e021b50d48",
+      "arm": "codex-astra",
+      "wallMs": 114133,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js, test/receipt-report-extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 114.1 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 39146,
+      "sha256": "ef88c23193469705d43016173fc910acd8ecf7a8751773205178d7dfbf5008a0",
+      "arm": "codex-sol",
+      "wallMs": 166661,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js. The project suite and all five independent acceptance groups passed, with a clean finish in 166.7 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 43477,
+      "sha256": "e3b9f2bd2f0fd6789c188f5dde4efab7bbf848a844188e019ebe4cb017ac0245",
+      "arm": "codex-terra",
+      "wallMs": 107185,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js. The project suite and all five independent acceptance groups passed, with a clean finish in 107.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 80122,
+      "sha256": "bee0656ebd7c556992522eb5c087a1f58074be3e6bdde842c1bdfcd510dde796",
+      "arm": "opencode",
+      "wallMs": 480073,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 21,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Correct reducer, after fixing the added tests.",
+        "paragraphs": [
+          {
+            "text": "OpenCode wrote the reducer plus API and CLI tests. The first suite run failed; it inspected a syntax problem in its CLI test file, corrected both added test files and passed all 21 tests.",
+            "actions": [
+              "action-7",
+              "action-9",
+              "action-10",
+              "action-14",
+              "action-16",
+              "action-18"
+            ]
+          },
+          {
+            "text": "It then checked duplicate events, CLI errors and import behavior. Independent acceptance passed all five groups, with a clean finish in 480.1 seconds.",
+            "actions": [
+              "action-19",
+              "action-20",
+              "action-21"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

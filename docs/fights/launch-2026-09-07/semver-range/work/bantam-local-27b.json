@@ -1,0 +1,1410 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "semver-range",
+  "arm": "bantam-local-27b",
+  "wallMs": 399879,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T13:17:24.124Z",
+  "task": "# Repair a semantic-version precedence and range checker\n\nRepair the exported ES-module functions `compareVersions(a, b)` and\n`satisfies(version, range)` in `semver-range.js`, and implement its CLI. These\nare pure string comparisons: no clock, no network, no filesystem.\n\nA version is `MAJOR.MINOR.PATCH`, each a nonnegative integer with no leading\nzero, optionally followed by `-PRERELEASE` and/or `+BUILD`. Both PRERELEASE and\nBUILD are dot-separated nonempty identifiers of ASCII alphanumerics and `-`.\nA purely numeric prerelease identifier must not have a leading zero. Anything\nelse throws an Error.\n\n`compareVersions` returns `-1`, `0` or `1` by precedence:\n\n- Compare major, then minor, then patch numerically.\n- Build metadata is ignored entirely, so `1.0.0+a` and `1.0.0+b` are equal.\n- A version WITH a prerelease has LOWER precedence than the same version\n  without one, so `1.0.0-rc` is below `1.0.0`.\n- Otherwise compare prerelease identifiers left to right. Two numeric\n  identifiers compare numerically, so `9` is below `10`. Two non-numeric\n  identifiers compare by ASCII order. A numeric identifier is always below a\n  non-numeric one. If every shared identifier is equal, the shorter list has\n  LOWER precedence, so `1.0.0-a` is below `1.0.0-a.1`.\n\n`satisfies` returns a boolean. A range is one or more clauses separated by\n`||`; the range holds when any clause holds. A clause is one or more\nwhitespace-separated comparators that must ALL hold. A comparator is an\noptional operator `=`, `<`, `<=`, `>` or `>=` (default `=`) followed by a\nversion. Comparators use the same precedence rules.\n\nA version WITH a prerelease satisfies a clause only when the clause also\ncontains at least one comparator whose version has a prerelease and the same\nmajor, minor and patch. So `1.2.3-rc.1` does not satisfy `>=1.0.0 <2.0.0`, but\nit does satisfy `>=1.2.3-rc.0 <2.0.0`. Versions without a prerelease are\nunaffected by this rule.\n\nDo not mutate inputs; frozen inputs must work. Invalid versions or ranges throw\nan Error.\n\nCLI: `node semver-range.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{versions,range}` where `versions` is\na dense array of version strings and `range` is a range string; extra fields are\nignored. Print exactly `{sorted,satisfying}` as one JSON value followed by\nnewline, exit 0, and write no stderr. `sorted` lists every input version in\nascending precedence, keeping input order among equals; `satisfying` lists those\nthat satisfy the range, in the same order as `sorted`. Validate `range` on every\ninvocation, including when `versions` is empty and no version is ever tested\nagainst it. Invalid arguments/files/JSON/API input exit 2, with nonempty stderr\nand no stdout.\nImporting the module must not run the CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+  "source": "factory-turns-and-verification",
+  "actions": [
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "read_file",
+            "p": "semver-range.js"
+          },
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "list_dir",
+            "p": "test"
+          }
+        ]
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"semver-range.js\"}\nsemver-range.js (36 lines, showing 1-36):\n1\t// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n2\t// above its release, prerelease identifiers never compare numerically, and any\n3\t// prerelease is admitted into every range.\n4\tconst PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n5\t\n6\tfunction parse(v){\n7\t  const m=PATTERN.exec(v);\n8\t  if(!m)throw Error('invalid version');\n9\t  return {major:+m[1],minor:+m[2],patch:+m[3],\n10\t    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n11\t}\n12\t\n13\texport function compareVersions(a,b){\n14\t  const x=parse(a),y=parse(b);\n15\t  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n16\t  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n17\t  for(let i=0;i<Math.max(left.length,right.length);i++){\n18\t    if(left[i]===undefined)return -1;\n19\t    if(right[i]===undefined)return 1;\n20\t    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n21\t  }\n22\t  return 0;\n23\t}\n24\t\n25\texport function satisfies(version,range){\n26\t  for(const clause of String(range).split('||')){\n27\t    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n28\t    if(comparators.every(text=>{\n29\t      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n30\t      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n31\t      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n32\t    }))return true;\n33\t  }\n34\t  return false;\n35\t}\n36\t\n\u2014 end of file (36 lines); nothing beyond line 36, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n\u2014 end of file (2 lines); nothing beyond line 2, do not re-read this range.\n\n# 3 {\"a\":\"list_dir\",\"p\":\"test\"}\ntest:\npublic.test.js",
+      "atMs": 3371.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 0,
+      "id": "action-1"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "test/public.test.js"
+      },
+      "output": "test/public.test.js (12 lines, showing 1-12):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport {compareVersions, satisfies} from '../semver-range.js';\n4\ttest('build metadata is ignored and a prerelease ranks below its release',()=>{\n5\t  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n6\t  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n7\t});\n8\ttest('a plain version satisfies a bounded range',()=>{\n9\t  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n10\t  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n11\t});\n12\t\n\u2014 end of file (12 lines); nothing beyond line 12, do not re-read this range.",
+      "atMs": 4513.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 1,
+      "id": "action-2"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "semver-range.js",
+        "content": "// Semantic-version precedence and range checker.\nconst NUMERIC=/(^\\d+$)/;\nconst IDENT=/^[0-9A-Za-z-]+$/;\nconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\nconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n\nfunction checkIdentifiers(list){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease);\n  checkIdentifiers(build);\n  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n}\n\nfunction isNumericId(id){return NUMERIC.test(id);}\n\nfunction compareIds(a,b){\n  const an=isNumericId(a),bn=isNumericId(b);\n  if(an&&bn){\n    const d=BigInt(a)-BigInt(b);\n    return d<0n?-1:d>0n?1:0;\n  }\n  if(an)return -1;\n  if(bn)return 1;\n  return a<b?-1:a>b?1:0;\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){\n    const d=x[key]-y[key];\n    if(d)return d<0?-1:1;\n  }\n  const lp=x.prerelease,rp=y.prerelease;\n  if(lp.length===0&&rp.length===0)return 0;\n  if(lp.length===0)return 1;\n  if(rp.length===0)return -1;\n  const n=Math.min(lp.length,rp.length);\n  for(let i=0;i<n;i++){\n    const d=compareIds(lp[i],rp[i]);\n    if(d)return d;\n  }\n  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n  return 0;\n}\n\nconst OPS=['>=','<=','>','<','='];\n\nfunction parseComparator(text){\n  let op='=';\n  for(const o of OPS){\n    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n  }\n  if(text==='')throw Error('invalid comparator');\n  return {op,version:parse(text)};\n}\n\nfunction parseRange(range){\n  if(typeof range!=='string')throw Error('invalid range');\n  const clauses=range.split('||').map(clause=>{\n    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n    if(parts.length===0)throw Error('invalid range');\n    return parts.map(parseComparator);\n  });\n  return clauses;\n}\n\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{\n      const d=compareVersions(version,c.version);\n      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n    }))continue;\n    if(hasPrerelease(v)){\n      const same=comparators.some(c=>hasPrerelease(c.version)&&\n        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n      if(!same)continue;\n    }\n    return true;\n  }\n  return false;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n    process.stderr.write('cannot read input file\\n');\n    process.exit(2);\n  }\n  let data;\n  try{data=JSON.parse(raw);}catch{\n    process.stderr.write('invalid JSON\\n');\n    process.exit(2);\n  }\n  if(data===null||Array.isArray(data)||typeof data!=='object'){\n    process.stderr.write('input must be an object\\n');\n    process.exit(2);\n  }\n  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n    process.stderr.write('versions must be an array of strings\\n');\n    process.exit(2);\n  }\n  if(typeof data.range!=='string'){\n    process.stderr.write('range must be a string\\n');\n    process.exit(2);\n  }\n  let sorted,satisfying;\n  try{\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }\n  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n  process.exit(0);\n}\n\nimport fs from 'node:fs';\nif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 10 executable statement(s) by AST comparison; 7 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: checkIdentifiers (AFTER L7), isNumericId (AFTER L25), compareIds (AFTER L27), parseComparator (AFTER L59).\n- BEFORE semver-range.js:4 in <module>: \"const PATTERN=/^(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\\\+([0-9A-Za-z.-]+))?$/;\"\n  No retained function anchor is established.\n- BEFORE semver-range.js:7 in parse: \"const m=PATTERN.exec(v);\"\n  STAGED AFTER semver-range.js:15 (next-retained-statement): \"throw Error('invalid version');\".\n- BEFORE semver-range.js:9 in parse: \"return {major:+m[1],minor:+m[2],patch:+m[3],\\n    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\"\n  STAGED AFTER semver-range.js:15 (previous-retained-statement): \"throw Error('invalid version');\".\n- BEFORE semver-range.js:16 in compareVersions: \"const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\"\n  STAGED AFTER semver-range.js:49 (next-retained-statement): \"let i=0\".\n- BEFORE semver-range.js:20 in compareVersions: \"return left[i]<right[i]?-1:1;\"\n  STAGED AFTER semver-range.js:45 (next-retained-statement): \"return 0;\".\n- BEFORE semver-range.js:26 in satisfies: \"const clause\"\n  STAGED AFTER semver-range.js:93 (next-retained-statement): \"return true;\".\n4 more removed statements omitted from this bounded display.\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:4c47d42253aeea9d467d6e8d288c4dd3247b89d795181e8986b8b9cba996a145.",
+      "atMs": 17890.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 2,
+      "id": "action-3"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "semver-range.js",
+        "content": "// Semantic-version precedence and range checker.\nimport fs from 'node:fs';\nconst NUMERIC=/(^\\d+$)/;\nconst IDENT=/^[0-9A-Za-z-]+$/;\nconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\nconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n\nfunction checkIdentifiers(list){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease);\n  checkIdentifiers(build);\n  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n}\n\nfunction isNumericId(id){return NUMERIC.test(id);}\n\nfunction compareIds(a,b){\n  const an=isNumericId(a),bn=isNumericId(b);\n  if(an&&bn){\n    const d=BigInt(a)-BigInt(b);\n    return d<0n?-1:d>0n?1:0;\n  }\n  if(an)return -1;\n  if(bn)return 1;\n  return a<b?-1:a>b?1:0;\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){\n    const d=x[key]-y[key];\n    if(d)return d<0?-1:1;\n  }\n  const lp=x.prerelease,rp=y.prerelease;\n  if(lp.length===0&&rp.length===0)return 0;\n  if(lp.length===0)return 1;\n  if(rp.length===0)return -1;\n  const n=Math.min(lp.length,rp.length);\n  for(let i=0;i<n;i++){\n    const d=compareIds(lp[i],rp[i]);\n    if(d)return d;\n  }\n  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n  return 0;\n}\n\nconst OPS=['>=','<=','>','<','='];\n\nfunction parseComparator(text){\n  let op='=';\n  for(const o of OPS){\n    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n  }\n  if(text==='')throw Error('invalid comparator');\n  return {op,version:parse(text)};\n}\n\nfunction parseRange(range){\n  if(typeof range!=='string')throw Error('invalid range');\n  const clauses=range.split('||').map(clause=>{\n    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n    if(parts.length===0)throw Error('invalid range');\n    return parts.map(parseComparator);\n  });\n  return clauses;\n}\n\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{\n      const d=compareVersions(version,c.version);\n      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n    }))continue;\n    if(hasPrerelease(v)){\n      const same=comparators.some(c=>hasPrerelease(c.version)&&\n        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n      if(!same)continue;\n    }\n    return true;\n  }\n  return false;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n    process.stderr.write('cannot read input file\\n');\n    process.exit(2);\n  }\n  let data;\n  try{data=JSON.parse(raw);}catch{\n    process.stderr.write('invalid JSON\\n');\n    process.exit(2);\n  }\n  if(data===null||Array.isArray(data)||typeof data!=='object'){\n    process.stderr.write('input must be an object\\n');\n    process.exit(2);\n  }\n  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n    process.stderr.write('versions must be an array of strings\\n');\n    process.exit(2);\n  }\n  if(typeof data.range!=='string'){\n    process.stderr.write('range must be a string\\n');\n    process.exit(2);\n  }\n  let sorted,satisfying;\n  try{\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }\n  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n  process.exit(0);\n}\n\nif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 10 executable statement(s) by AST comparison; 7 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: checkIdentifiers (AFTER L8), isNumericId (AFTER L26), compareIds (AFTER L28), parseComparator (AFTER L60).\n- BEFORE semver-range.js:4 in <module>: \"const PATTERN=/^(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)\\\\.(0|[1-9]\\\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\\\+([0-9A-Za-z.-]+))?$/;\"\n  No retained function anchor is established.\n- BEFORE semver-range.js:7 in parse: \"const m=PATTERN.exec(v);\"\n  STAGED AFTER semver-range.js:16 (next-retained-statement): \"throw Error('invalid version');\".\n- BEFORE semver-range.js:9 in parse: \"return {major:+m[1],minor:+m[2],patch:+m[3],\\n    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\"\n  STAGED AFTER semver-range.js:16 (previous-retained-statement): \"throw Error('invalid version');\".\n- BEFORE semver-range.js:16 in compareVersions: \"const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\"\n  STAGED AFTER semver-range.js:50 (next-retained-statement): \"let i=0\".\n- BEFORE semver-range.js:20 in compareVersions: \"return left[i]<right[i]?-1:1;\"\n  STAGED AFTER semver-range.js:46 (next-retained-statement): \"return 0;\".\n- BEFORE semver-range.js:26 in satisfies: \"const clause\"\n  STAGED AFTER semver-range.js:94 (next-retained-statement): \"return true;\".\n4 more removed statements omitted from this bounded display.\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:9be7fa215ada28874d317168c2824e9d752b2ab5eb0f166e054c22ec365fbc1f.",
+      "atMs": 30255.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 3,
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "semver-range.js",
+        "content": "// Semantic-version precedence and range checker.\nimport fs from 'node:fs';\nconst NUMERIC=/(^\\d+$)/;\nconst IDENT=/^[0-9A-Za-z-]+$/;\nconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\nconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n\nfunction checkIdentifiers(list){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease);\n  checkIdentifiers(build);\n  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n}\n\nfunction isNumericId(id){return NUMERIC.test(id);}\n\nfunction compareIds(a,b){\n  const an=isNumericId(a),bn=isNumericId(b);\n  if(an&&bn){\n    const d=BigInt(a)-BigInt(b);\n    return d<0n?-1:d>0n?1:0;\n  }\n  if(an)return -1;\n  if(bn)return 1;\n  return a<b?-1:a>b?1:0;\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){\n    const d=x[key]-y[key];\n    if(d)return d<0?-1:1;\n  }\n  const lp=x.prerelease,rp=y.prerelease;\n  if(lp.length===0&&rp.length===0)return 0;\n  if(lp.length===0)return 1;\n  if(rp.length===0)return -1;\n  const n=Math.min(lp.length,rp.length);\n  for(let i=0;i<n;i++){\n    const d=compareIds(lp[i],rp[i]);\n    if(d)return d;\n  }\n  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n  return 0;\n}\n\nconst OPS=['>=','<=','>','<','='];\n\nfunction parseComparator(text){\n  let op='=';\n  for(const o of OPS){\n    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n  }\n  if(text==='')throw Error('invalid comparator');\n  return {op,version:parse(text)};\n}\n\nfunction parseRange(range){\n  if(typeof range!=='string')throw Error('invalid range');\n  const clauses=range.split('||').map(clause=>{\n    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n    if(parts.length===0)throw Error('invalid range');\n    return parts.map(parseComparator);\n  });\n  return clauses;\n}\n\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{\n      const d=compareVersions(version,c.version);\n      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n    }))continue;\n    if(hasPrerelease(v)){\n      const same=comparators.some(c=>hasPrerelease(c.version)&&\n        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n      if(!same)continue;\n    }\n    return true;\n  }\n  return false;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n    process.stderr.write('cannot read input file\\n');\n    process.exit(2);\n  }\n  let data;\n  try{data=JSON.parse(raw);}catch{\n    process.stderr.write('invalid JSON\\n');\n    process.exit(2);\n  }\n  if(data===null||Array.isArray(data)||typeof data!=='object'){\n    process.stderr.write('input must be an object\\n');\n    process.exit(2);\n  }\n  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n    process.stderr.write('versions must be an array of strings\\n');\n    process.exit(2);\n  }\n  if(typeof data.range!=='string'){\n    process.stderr.write('range must be a string\\n');\n    process.exit(2);\n  }\n  let sorted,satisfying;\n  try{\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }\n  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n  process.exit(0);\n}\n\nif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n"
+      },
+      "output": "wrote 4229 bytes to semver-range.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `compareVersions` is also referenced in: test/public.test.js\n  `satisfies` is also referenced in: test/public.test.js",
+      "atMs": 42708.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 4,
+      "id": "action-5"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test 2>&1"
+      },
+      "output": "VERDICT: 1 of 2 tests FAILED (1 passed).\nFailing tests:\n  \u2717 a plain version satisfies a bounded range (test/public.test.js:8) \u2014 invalid version\n$ npm test 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.084992\n  ...\n# Subtest: a plain version satisfies a bounded range\nnot ok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.341994\n  location: '/workspace/test/public.test.js:8:1'\n  failureType: 'testCodeFailure'\n  error: 'invalid version'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    parse (file:///workspace/semver-range.js:16:32)\n    compareVersions (file:///workspace/semver-range.js:40:22)\n    file:///workspace/semver-range.js:86:15\n    Array.every (<anonymous>)\n    satisfies (file:///workspace/semver-range.js:85:21)\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:9:16)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.557162\n\n\n[fix-tests] 1 test(s) fail (1 already pass). Investigate them ONE at a time \u2014 compare the failure, test and task contract before choosing a change, then re-run the tests:\n\nFAILING: \"a plain version satisfies a bounded range\" (public.test.js:8)\n  see the assertion in the test output\n  Test provenance: protected. This is a protected invariant: keep the test unchanged. Diagnose the implementation or environment against the task; if the evidence conflicts, report the conflict instead of weakening the test.\n  failing test source:\n    test('a plain version satisfies a bounded range',()=>{\n      assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n      assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n[baseline] This is the first time this suite has been measured in this run, and 1 edit came before it \u2014 so nothing measured this suite before you changed it. These 1 failure(s) may be yours, may be pre-existing, or both, and this run cannot tell you which. If that distinction matters, check one out of the way (git stash, or revert your change in one file) and run the same command again. 1/2 is now the number later runs are compared against.",
+      "atMs": 43328.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 5,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 1,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 1, turn 6). Recorded command: \"npm test 2>&1\". Recorded tests: 1 passed, 1 failed, 2 total.\nFailing stack site: \"test/public.test.js\":9. Current source (\">\" marks that line):\n7   });\n8   test('a plain version satisfies a bounded range',()=>{\n9 >   assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"a plain version satisfies a bounded range\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-6"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "semver-range.js",
+        "old": "      const d=compareVersions(version,c.version);",
+        "new": "      const d=compareVersions(v,c.version);"
+      },
+      "output": "replaced 1 occurrence in semver-range.js\n[peer] `compareVersions` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `compareIds` (semver-range.js:39):\n  return a<b?-1:a>b?1:0;\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){\n    const d=x[key]-y[key];\n\u2014 `runCli` (semver-range.js:130):\n  let sorted,satisfying;\n  try{\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));",
+      "atMs": 46380.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 6,
+      "id": "action-7"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test 2>&1"
+      },
+      "output": "VERDICT: 1 of 2 tests FAILED (1 passed).\nFailing tests:\n  \u2717 a plain version satisfies a bounded range (test/public.test.js:8) \u2014 invalid version\n$ npm test 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.048932\n  ...\n# Subtest: a plain version satisfies a bounded range\nnot ok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.344163\n  location: '/workspace/test/public.test.js:8:1'\n  failureType: 'testCodeFailure'\n  error: 'invalid version'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    parse (file:///workspace/semver-range.js:16:32)\n    compareVersions (file:///workspace/semver-range.js:40:11)\n    file:///workspace/semver-range.js:86:15\n    Array.every (<anonymous>)\n    satisfies (file:///workspace/semver-range.js:85:21)\n    TestContext.<anonymous> (file:///workspace/test/public.test.js:9:16)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.663691\n\n\n[fix-tests] 1 test(s) fail (1 already pass). Investigate them ONE at a time \u2014 compare the failure, test and task contract before choosing a change, then re-run the tests:\n\nFAILING: \"a plain version satisfies a bounded range\" (public.test.js:8)\n  see the assertion in the test output\n  Test provenance: protected. This is a protected invariant: keep the test unchanged. Diagnose the implementation or environment against the task; if the evidence conflicts, report the conflict instead of weakening the test.\n  failing test source:\n    test('a plain version satisfies a bounded range',()=>{\n      assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n      assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n\n[fix-tests] evidence pinned for \"a plain version satisfies a bounded range\" (red x2) \u2014 the test and its failure, verbatim:\nTEST FILE SETUP / SHARED HELPERS:\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {compareVersions, satisfies} from '../semver-range.js';\n\nFAILING TEST BODY:\ntest('a plain version satisfies a bounded range',()=>{\n  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n});\nFAILURE: ? vs expected ?",
+      "atMs": 47703.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 7,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 8). Recorded command: \"npm test 2>&1\". Recorded tests: 1 passed, 1 failed, 2 total.\nFailing stack site: \"test/public.test.js\":9. Current source (\">\" marks that line):\n7   });\n8   test('a plain version satisfies a bounded range',()=>{\n9 >   assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"a plain version satisfies a bounded range\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-8"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "semver-range.js",
+        "start": 38,
+        "limit": 55
+      },
+      "output": "semver-range.js (143 lines, showing 38-92):\n38\t\n39\texport function compareVersions(a,b){\n40\t  const x=parse(a),y=parse(b);\n41\t  for(const key of ['major','minor','patch']){\n42\t    const d=x[key]-y[key];\n43\t    if(d)return d<0?-1:1;\n44\t  }\n45\t  const lp=x.prerelease,rp=y.prerelease;\n46\t  if(lp.length===0&&rp.length===0)return 0;\n47\t  if(lp.length===0)return 1;\n48\t  if(rp.length===0)return -1;\n49\t  const n=Math.min(lp.length,rp.length);\n50\t  for(let i=0;i<n;i++){\n51\t    const d=compareIds(lp[i],rp[i]);\n52\t    if(d)return d;\n53\t  }\n54\t  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n55\t  return 0;\n56\t}\n57\t\n58\tconst OPS=['>=','<=','>','<','='];\n59\t\n60\tfunction parseComparator(text){\n61\t  let op='=';\n62\t  for(const o of OPS){\n63\t    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n64\t  }\n65\t  if(text==='')throw Error('invalid comparator');\n66\t  return {op,version:parse(text)};\n67\t}\n68\t\n69\tfunction parseRange(range){\n70\t  if(typeof range!=='string')throw Error('invalid range');\n71\t  const clauses=range.split('||').map(clause=>{\n72\t    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n73\t    if(parts.length===0)throw Error('invalid range');\n74\t    return parts.map(parseComparator);\n75\t  });\n76\t  return clauses;\n77\t}\n78\t\n79\tfunction hasPrerelease(v){return v.prerelease.length>0;}\n80\t\n81\texport function satisfies(version,range){\n82\t  const v=parse(version);\n83\t  const clauses=parseRange(range);\n84\t  for(const comparators of clauses){\n85\t    if(!comparators.every(c=>{\n86\t      const d=compareVersions(v,c.version);\n87\t      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n88\t    }))continue;\n89\t    if(hasPrerelease(v)){\n90\t      const same=comparators.some(c=>hasPrerelease(c.version)&&\n91\t        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n92\t      if(!same)continue;\n... (51 more lines \u2014 take bigger bites: omit \"limit\" to get up to ~600 lines per read)",
+      "atMs": 51257.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 8,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 8). Recorded command: \"npm test 2>&1\". Recorded tests: 1 passed, 1 failed, 2 total.\nFailing stack site: \"test/public.test.js\":9. Current source (\">\" marks that line):\n7   });\n8   test('a plain version satisfies a bounded range',()=>{\n9 >   assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"a plain version satisfies a bounded range\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-9"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "semver-range.js",
+        "old": "export function compareVersions(a,b){\n  const x=parse(a),y=parse(b);",
+        "new": "export function compareVersions(a,b){\n  const x=(typeof a==='object'&&a!==null&&a.prerelease!==undefined)?a:parse(a);\n  const y=(typeof b==='object'&&b!==null&&b.prerelease!==undefined)?b:parse(b);"
+      },
+      "output": "replaced 1 occurrence in semver-range.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `prerelease` is also referenced in: test/public.test.js\n[peer] `parse` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `parseComparator` (semver-range.js:67):\n    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n  }\n  if(text==='')throw Error('invalid comparator');\n  return {op,version:parse(text)};\n}\n\nfunction parseRange(range){\n\u2014 `hasPrerelease` (semver-range.js:83):\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{",
+      "atMs": 53158.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 9,
+      "id": "action-10"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test 2>&1"
+      },
+      "output": "VERDICT: all 2 tests passed.\n$ npm test 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.064752\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.270403\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.407625",
+      "atMs": 53830.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 10,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 3,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 3 needs fresh focused execution, then the configured project check. Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not. Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away."
+      },
+      "id": "action-11"
+    },
+    {
+      "name": "supervisor-review",
+      "category": "other",
+      "request": {
+        "focus": "collection-preconditions",
+        "generation": 3
+      },
+      "output": {
+        "status": "report",
+        "advisory": true,
+        "findings": [
+          {
+            "entrypoint": "satisfies(version, range)",
+            "requirement": "A version WITH a prerelease satisfies a clause only when the clause also contains at least one comparator whose version has a prerelease and the same major, minor and patch.",
+            "location": "semver-range.js / satisfies",
+            "fixture": "satisfies('1.2.3-rc.1', '1.2.3-rc.0 || 1.2.3-rc.2')",
+            "expected": "The range holds because the second clause contains a comparator with a prerelease and the same major, minor, and patch.",
+            "predicted": "The first clause fails the comparator check. The second clause passes the comparator check, but the prerelease guard fails because the comparator version is 1.2.3-rc.2, which is not equal to 1.2.3-rc.1.",
+            "contrast": {
+              "observable": "satisfies('1.2.3-rc.1', '1.2.3-rc.0 || 1.2.3-rc.2')",
+              "expectedJson": "true",
+              "predictedJson": "false"
+            }
+          }
+        ],
+        "note": "",
+        "report": "1. satisfies(version, range) \u2014 semver-range.js / satisfies\nPublic requirement: A version WITH a prerelease satisfies a clause only when the clause also contains at least one comparator whose version has a prerelease and the same major, minor and patch.\nProposed fixture/assertion (NOT executed): satisfies('1.2.3-rc.1', '1.2.3-rc.0 || 1.2.3-rc.2')\nExpected: The range holds because the second clause contains a comparator with a prerelease and the same major, minor, and patch.\nPredicted from source: The first clause fails the comparator check. The second clause passes the comparator check, but the prerelease guard fails because the comparator version is 1.2.3-rc.2, which is not equal to 1.2.3-rc.1.",
+        "quality": {
+          "status": "bounded",
+          "deferred": [],
+          "noteIncomplete": false,
+          "candidateVerified": false,
+          "scope": "source-hypothesis-with-declared-observable-contrast"
+        }
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "turn": 10,
+      "id": "action-12"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "semver-range.js",
+        "start": 94,
+        "limit": 60
+      },
+      "output": "semver-range.js (144 lines, showing 94-144):\n94\t    }\n95\t    return true;\n96\t  }\n97\t  return false;\n98\t}\n99\t\n100\tfunction runCli(){\n101\t  const args=process.argv.slice(2);\n102\t  if(args.length!==1){\n103\t    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n104\t    process.exit(2);\n105\t  }\n106\t  let raw;\n107\t  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n108\t    process.stderr.write('cannot read input file\\n');\n109\t    process.exit(2);\n110\t  }\n111\t  let data;\n112\t  try{data=JSON.parse(raw);}catch{\n113\t    process.stderr.write('invalid JSON\\n');\n114\t    process.exit(2);\n115\t  }\n116\t  if(data===null||Array.isArray(data)||typeof data!=='object'){\n117\t    process.stderr.write('input must be an object\\n');\n118\t    process.exit(2);\n119\t  }\n120\t  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n121\t    process.stderr.write('versions must be an array of strings\\n');\n122\t    process.exit(2);\n123\t  }\n124\t  if(typeof data.range!=='string'){\n125\t    process.stderr.write('range must be a string\\n');\n126\t    process.exit(2);\n127\t  }\n128\t  let sorted,satisfying;\n129\t  try{\n130\t    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n131\t      const d=compareVersions(a.v,b.v);\n132\t      return d!==0?d:a.i-b.i;\n133\t    }).map(x=>x.v);\n134\t    satisfying=sorted.filter(v=>satisfies(v,data.range));\n135\t  }catch(err){\n136\t    process.stderr.write(String(err&&err.message||err)+'\\n');\n137\t    process.exit(2);\n138\t  }\n139\t  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n140\t  process.exit(0);\n141\t}\n142\t\n143\tif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n144\t\n\u2014 end of file (144 lines); nothing beyond line 144, do not re-read this range.\n\n[context-audit] That turn took 62s against a 2s median. A long turn alone does not establish a context problem. Check whether the time was expected for this command or model request. If a repair is stalled, re-read the current file region and the actual failing evidence before retrying.",
+      "atMs": 116838.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 11,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 3,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 3 needs fresh focused execution, then the configured project check. Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not. Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away."
+      },
+      "id": "action-13"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node -e \"import('./semver-range.js').then(m=>{const a=m.compareVersions,b=m.satisfies;const t=(x,y)=>{if(x!==y)throw new Error('FAIL: '+x+' !== '+y)};t(a('1.0.0+a','1.0.0+b'),0);t(a('1.0.0-rc','1.0.0'),-1);t(a('1.0.0','1.0.0-rc'),1);t(a('1.0.0-rc','1.0.0-rc.1'),-1);t(a('1.0.0-a.10','1.0.0-a.9'),1);t(a('1.0.0-a','1.0.0-b'),-1);t(a('1.0.0-1','1.0.0-a'),-1);t(a('1.0.0-0','1.0.0-1'),-1);t(a('2.0.0','1.9.9'),1);t(a('1.2.3','1.2.4'),-1);t(a('1.2.3','1.2.3'),0);t(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);t(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);t(b('1.2.3','>=1.0.0 <2.0.0'),true);t(b('1.2.3-rc.1','1.2.3-rc.1'),true);t(b('1.2.3-rc.1','1.2.3'),false);t(b('1.2.3','1.2.3-rc.1'),false);t(b('1.2.3-rc.1','>=1.2.3-rc.1'),true);t(b('1.2.3-rc.1','>1.2.3-rc.1'),false);t(b('1.2.3-rc.1','<=1.2.3-rc.1'),true);t(b('1.2.3-rc.1','<1.2.3-rc.1'),false);t(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);t(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);t(b('1.2.3-rc.1','1.2.3-rc.0'),true);try{a('01.0.0','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-01','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0+','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-a..b','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-a_b','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0',' ');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','||');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','=');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','> ');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};console.log('ALL API CHECKS PASSED')})\" 2>&1"
+      },
+      "output": "$ node -e \"import('./semver-range.js').then(m=>{const a=m.compareVersions,b=m.satisfies;const t=(x,y)=>{if(x!==y)throw new Error('FAIL: '+x+' !== '+y)};t(a('1.0.0+a','1.0.0+b'),0);t(a('1.0.0-rc','1.0.0'),-1);t(a('1.0.0','1.0.0-rc'),1);t(a('1.0.0-rc','1.0.0-rc.1'),-1);t(a('1.0.0-a.10','1.0.0-a.9'),1);t(a('1.0.0-a','1.0.0-b'),-1);t(a('1.0.0-1','1.0.0-a'),-1);t(a('1.0.0-0','1.0.0-1'),-1);t(a('2.0.0','1.9.9'),1);t(a('1.2.3','1.2.4'),-1);t(a('1.2.3','1.2.3'),0);t(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);t(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);t(b('1.2.3','>=1.0.0 <2.0.0'),true);t(b('1.2.3-rc.1','1.2.3-rc.1'),true);t(b('1.2.3-rc.1','1.2.3'),false);t(b('1.2.3','1.2.3-rc.1'),false);t(b('1.2.3-rc.1','>=1.2.3-rc.1'),true);t(b('1.2.3-rc.1','>1.2.3-rc.1'),false);t(b('1.2.3-rc.1','<=1.2.3-rc.1'),true);t(b('1.2.3-rc.1','<1.2.3-rc.1'),false);t(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);t(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);t(b('1.2.3-rc.1','1.2.3-rc.0'),true);try{a('01.0.0','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-01','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0+','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-a..b','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{a('1.0.0-a_b','1.0.0');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0',' ');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','||');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','=');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};try{b('1.0.0','> ');throw new Error('no throw')};catch(e){if(e.message!=='no throw')throw e};console.log('ALL API CHECKS PASSED')})\" 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\n[eval]:1\nimport('./semver-range.js').then(m=>{const a=m.compareVersions,b=m.satisfies;const t=(x,y)=>{if(x!==y)throw new Error('FAIL: '+x+' !== '+y)};t(a('1.0.0+a','1.0.0+b'),0);t(a('1.0.0-rc','1.0.0'),-1);t(a('1.0.0','1.0.0-rc'),1);t(a('1.0.0-rc','1.0.0-rc.1'),-1);t(a('1.0.0-a.10','1.0.0-a.9'),1);t(a('1.0.0-a','1.0.0-b'),-1);t(a('1.0.0-1','1.0.0-a'),-1);t(a('1.0.0-0','1.0.0-1'),-1);t(a('2.0.0','1.9.9'),1);t(a('1.2.3','1.2.4'),-1);t(a('1.2.3','1.2.3'),0);t(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);t(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);t(b('1.2.3','>=1.0.0 <2.0.0'),true);t(b('1.2.3-rc.1','1.2.3-rc.1'),true);t(b('1.2.3-rc.1','1.2.3'),false);t(b('1.2.3','1.2.3-rc.1'),false);t(b('1.2.3-rc\n... [1747 chars clipped] ...\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      \n\nSyntaxError: Missing catch or finally after try\n    at makeContextifyScript (node:internal/vm:185:14)\n    at node:internal/process/execution:107:22\n    at [eval]-wrapper:6:24\n    at runScript (node:internal/process/execution:101:62)\n    at evalScript (node:internal/process/execution:133:3)\n    at node:internal/main/eval_string:51:3\n\nNode.js v20.19.4",
+      "atMs": 130945.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 12,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 3,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 3 still needs focused proof. Execution: turn 13 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Next: use a permitted file-edit action (e.g. write_file) to create a new workspace check script, e.g. check-contract.mjs. Import the real production API and assert public-contract expectations with node:assert/strict. Temporary fixture DATA goes under os.tmpdir(); the check SCRIPT stays in the workspace. In a separate permitted shell action run only node check-contract.mjs (substitute its actual relative path): no cd, bash -c, setup, echo, filters or cleanup. Keep the check; printed pass messages are not proof. Start with one discriminating fixture/assertion and execute it before expanding coverage. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-14"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "check-contract.mjs",
+        "content": "import assert from 'node:assert/strict';\nimport {compareVersions as a, satisfies as b} from './semver-range.js';\n\n// precedence\nassert.equal(a('1.0.0+a','1.0.0+b'),0);\nassert.equal(a('1.0.0-rc','1.0.0'),-1);\nassert.equal(a('1.0.0','1.0.0-rc'),1);\nassert.equal(a('1.0.0-rc','1.0.0-rc.1'),-1);\nassert.equal(a('1.0.0-a.10','1.0.0-a.9'),1);\nassert.equal(a('1.0.0-a','1.0.0-b'),-1);\nassert.equal(a('1.0.0-1','1.0.0-a'),-1);\nassert.equal(a('1.0.0-0','1.0.0-1'),-1);\nassert.equal(a('2.0.0','1.9.9'),1);\nassert.equal(a('1.2.3','1.2.4'),-1);\nassert.equal(a('1.2.3','1.2.3'),0);\nassert.equal(a('1.0.0-rc.1','1.0.0-rc.1'),0);\n\n// satisfies\nassert.equal(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);\nassert.equal(b('1.2.3','>=1.0.0 <2.0.0'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3'),false);\nassert.equal(b('1.2.3','1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','>1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','<=1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','<1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.1 || 1.0.0'),true);\nassert.equal(b('1.2.3-rc.1','1.0.0'),false);\n\n// invalid versions throw\nfor(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0+01','1.0.0-1.01','1.0','1.0.0.1','','1.0.0-','1.0.0+a..b','1.0.0-a.b-']){\n  assert.throws(()=>a(bad,'1.0.0'),Error);\n  assert.throws(()=>a('1.0.0',bad),Error);\n}\n\n// invalid ranges throw\nfor(const bad of ['',' ','||','=' ,'> ','1.0.0 ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0 1.0.1 1.0.2','1.0.0!','1.0.0-01']){\n  assert.throws(()=>b('1.0.0',bad),Error);\n}\n\n// frozen inputs work\nconst fv=Object.freeze('1.2.3');\nconst fr=Object.freeze('>=1.0.0');\nassert.equal(b(fv,fr),true);\n\nconsole.log('ALL API CHECKS PASSED');\n"
+      },
+      "output": "wrote 2018 bytes to check-contract.mjs\n[peer] `satisfies` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `hasPrerelease` (semver-range.js:82):\n\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n\u2014 `runCli` (semver-range.js:134):\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);",
+      "atMs": 145733.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 13,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 4,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 4 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6991f1f27dc7799a55071f6c8d082122b9844cd3a71ca2228827ff6a5b60388e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-15"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///workspace/check-contract.mjs:29:8\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 15, generation 4. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 147506.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 14,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 4,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 4 still needs focused proof. Execution: turn 15 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6991f1f27dc7799a55071f6c8d082122b9844cd3a71ca2228827ff6a5b60388e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-16"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "check-contract.mjs",
+        "old": "assert.equal(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),true);",
+        "new": "assert.equal(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),false);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 || 1.0.0'),true);"
+      },
+      "output": "replaced 1 occurrence in check-contract.mjs\n\n[context-audit] That turn took 28s against a 3s median. A long turn alone does not establish a context problem. Check whether the time was expected for this command or model request. If a repair is stalled, re-read the current file region and the actual failing evidence before retrying.\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 15, generation 4. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 176043.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 15,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 5,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 5 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 5cec42cb945234b3032f67af69a38b5991c9c8ba524d0deee7ee0efd32d4df73). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-17"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:37:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 17, generation 5. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 178569.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 16,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 5,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 5 still needs focused proof. Execution: turn 17 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 5cec42cb945234b3032f67af69a38b5991c9c8ba524d0deee7ee0efd32d4df73). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-18"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "semver-range.js",
+        "start": 1,
+        "limit": 37
+      },
+      "output": "semver-range.js (144 lines, showing 1-37):\n1\t// Semantic-version precedence and range checker.\n2\timport fs from 'node:fs';\n3\tconst NUMERIC=/(^\\d+$)/;\n4\tconst IDENT=/^[0-9A-Za-z-]+$/;\n5\tconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\n6\tconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n7\t\n8\tfunction checkIdentifiers(list){\n9\t  for(const id of list){\n10\t    if(!IDENT.test(id))throw Error('invalid identifier');\n11\t    if(NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n12\t  }\n13\t}\n14\t\n15\tfunction parse(v){\n16\t  if(typeof v!=='string')throw Error('invalid version');\n17\t  const m=VERSION.exec(v);\n18\t  if(!m)throw Error('invalid version');\n19\t  const prerelease=m[4]===undefined?[]:m[4].split('.');\n20\t  const build=m[5]===undefined?[]:m[5].split('.');\n21\t  checkIdentifiers(prerelease);\n22\t  checkIdentifiers(build);\n23\t  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n24\t}\n25\t\n26\tfunction isNumericId(id){return NUMERIC.test(id);}\n27\t\n28\tfunction compareIds(a,b){\n29\t  const an=isNumericId(a),bn=isNumericId(b);\n30\t  if(an&&bn){\n31\t    const d=BigInt(a)-BigInt(b);\n32\t    return d<0n?-1:d>0n?1:0;\n33\t  }\n34\t  if(an)return -1;\n35\t  if(bn)return 1;\n36\t  return a<b?-1:a>b?1:0;\n37\t}\n... (107 more lines \u2014 take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 17, generation 5. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 218594.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 17,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 5,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 5 still needs focused proof. Execution: turn 17 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 5cec42cb945234b3032f67af69a38b5991c9c8ba524d0deee7ee0efd32d4df73). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-19"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "check-contract.mjs",
+        "old": "for(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0+01','1.0.0-1.01','1.0','1.0.0.1','','1.0.0-','1.0.0+a..b','1.0.0-a.b-']){",
+        "new": "for(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0+01','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b','1.0.0-a.b-']){"
+      },
+      "output": "replaced 1 occurrence in check-contract.mjs\n[auto-verify] You have edited but not run the tests in 8 turns \u2014 reading and reasoning is not verification, so I ran them for you \u2014 PASS: VERDICT: all 2 tests passed. The configured tests PASS. Keep intended regression checks; do not edit or delete files merely to tidy a green tree. Follow any current verification workflow for additional required proof. If the task is complete and no proof is pending, request DONE; other completion gates still apply.\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.058721\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.271733\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.870801\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 17, generation 5. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 224358.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 18,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 6,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 6 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-20"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "failingTests": [],
+        "outputSha256": "7376b7c9eaca1c899c2a5b44dae51416072480e56ed6de025681326696973f0f"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 18,
+      "id": "action-21"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:37:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 20, generation 6. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 226314.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 19,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 6,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 6 still needs focused proof. Execution: turn 20 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-22"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "semver-range.js",
+        "old": "function checkIdentifiers(list){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease);\n  checkIdentifiers(build);",
+        "new": "function checkIdentifiers(list,numeric){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(numeric&&NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease,true);\n  checkIdentifiers(build,false);"
+      },
+      "output": "replaced 1 occurrence in semver-range.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `build` is also referenced in: test/public.test.js\n[peer] `NUMERIC` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `isNumericId` (semver-range.js:26):\n  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n}\n\nfunction isNumericId(id){return NUMERIC.test(id);}\n\nfunction compareIds(a,b){\n  const an=isNumericId(a),bn=isNumericId(b);\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 20, generation 6. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 246706.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 20,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 7,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 7 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-23"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:37:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 22, generation 7. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 247996.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 21,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 7,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 7 still needs focused proof. Execution: turn 22 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-24"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "check-contract.mjs",
+        "start": 30,
+        "limit": 20
+      },
+      "output": "check-contract.mjs (52 lines, showing 30-49):\n30\tassert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),false);\n31\tassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 || 1.0.0'),true);\n32\tassert.equal(b('1.2.3-rc.1','1.2.3-rc.1 || 1.0.0'),true);\n33\tassert.equal(b('1.2.3-rc.1','1.0.0'),false);\n34\t\n35\t// invalid versions throw\n36\tfor(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0+01','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b','1.0.0-a.b-']){\n37\t  assert.throws(()=>a(bad,'1.0.0'),Error);\n38\t  assert.throws(()=>a('1.0.0',bad),Error);\n39\t}\n40\t\n41\t// invalid ranges throw\n42\tfor(const bad of ['',' ','||','=' ,'> ','1.0.0 ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0 1.0.1 1.0.2','1.0.0!','1.0.0-01']){\n43\t  assert.throws(()=>b('1.0.0',bad),Error);\n44\t}\n45\t\n46\t// frozen inputs work\n47\tconst fv=Object.freeze('1.2.3');\n48\tconst fr=Object.freeze('>=1.0.0');\n49\tassert.equal(b(fv,fr),true);\n... (3 more lines \u2014 take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 22, generation 7. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 251053.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 22,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 7,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 7 still needs focused proof. Execution: turn 22 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-25"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "semver-range.js",
+        "old": "const VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;",
+        "new": "const VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;"
+      },
+      "output": "replaced 1 occurrence in semver-range.js\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 22, generation 7. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 253567.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 23,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 8,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 8 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-26"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:37:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 25, generation 8. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 254561.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 24,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 8,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 8 still needs focused proof. Execution: turn 25 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 6edc7fd22b06e3ecf15ea00cf8520aa553bd4a8e1ebc763abeb653cfcc24095e). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-27"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "check-contract.mjs",
+        "old": "'1.0.0-a.b.01','1.0.0-01.0','1.0.0+01','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b','1.0.0-a.b-']){",
+        "new": "'1.0.0-a.b.01','1.0.0-01.0','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b','1.0.0-a.b-']){"
+      },
+      "output": "replaced 1 occurrence in check-contract.mjs\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 25, generation 8. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 279100.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 25,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 9,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 9 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 d8c2cc84a4aa8098eb99391410fd250f6952638d187102cde17a24e11e3a2140). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-28"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:37:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[auto-verify] You have edited but not run the tests in 8 turns \u2014 reading and reasoning is not verification, so I ran them for you \u2014 PASS: VERDICT: all 2 tests passed. The configured tests PASS. Keep intended regression checks; do not edit or delete files merely to tidy a green tree. Follow any current verification workflow for additional required proof. If the task is complete and no proof is pending, request DONE; other completion gates still apply.\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.06926\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.275423\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.329925",
+      "atMs": 282138.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 26,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 9,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 9 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 d8c2cc84a4aa8098eb99391410fd250f6952638d187102cde17a24e11e3a2140). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-29"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "failingTests": [],
+        "outputSha256": "ff9a0ce7cf40748e53bbda9798004ddf3af427ca394d60e1de65034cb705919e"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 26,
+      "id": "action-30"
+    },
+    {
+      "name": "supervisor-review",
+      "category": "other",
+      "request": {
+        "focus": "collection-preconditions",
+        "generation": 9
+      },
+      "output": {
+        "status": "report",
+        "advisory": true,
+        "findings": [
+          {
+            "entrypoint": "CLI",
+            "requirement": "Print exactly {sorted,satisfying} as one JSON value followed by newline, exit 0, and write no stderr.",
+            "location": "semver-range.js/runCli",
+            "fixture": "node semver-range.js <(echo '{\"versions\":[\"1.0.0\",\"1.0.0\"],\"range\":\"=1.0.0\"}')",
+            "expected": "stdout contains {\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}\\n, exit 0, stderr empty.",
+            "predicted": "stdout contains {\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\"]}\\n, exit 0, stderr empty.",
+            "contrast": {
+              "observable": "stdout",
+              "expectedJson": "{\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}\n",
+              "predictedJson": "{\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\"]}\n"
+            }
+          }
+        ],
+        "note": "",
+        "report": "1. CLI \u2014 semver-range.js/runCli\nPublic requirement: Print exactly {sorted,satisfying} as one JSON value followed by newline, exit 0, and write no stderr.\nProposed fixture/assertion (NOT executed): node semver-range.js <(echo '{\"versions\":[\"1.0.0\",\"1.0.0\"],\"range\":\"=1.0.0\"}')\nExpected: stdout contains {\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}\\n, exit 0, stderr empty.\nPredicted from source: stdout contains {\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\"]}\\n, exit 0, stderr empty.",
+        "quality": {
+          "status": "bounded",
+          "deferred": [],
+          "noteIncomplete": false,
+          "candidateVerified": false,
+          "scope": "source-hypothesis-with-declared-observable-contrast"
+        }
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "turn": 26,
+      "id": "action-31"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "check-contract.mjs",
+        "old": "'1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b','1.0.0-a.b-']){",
+        "new": "'1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b']){"
+      },
+      "output": "replaced 1 occurrence in check-contract.mjs\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 27, generation 9. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 305298.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 27,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 10,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 10 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 fdf6ffb34bfdb31b079b64d5eeac60110a6807955c9a3a4eb0cefac773d8b1f5). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-32"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception (Error).\n    at file:///workspace/check-contract.mjs:43:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Function: Error] { stackTraceLimit: 10 },\n  operator: 'throws'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 29, generation 10. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 309393.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 28,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 10,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 10 still needs focused proof. Execution: turn 29 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 fdf6ffb34bfdb31b079b64d5eeac60110a6807955c9a3a4eb0cefac773d8b1f5). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-33"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "check-contract.mjs",
+        "old": "for(const bad of ['',' ','||','=' ,'> ','1.0.0 ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0 1.0.1 1.0.2','1.0.0!','1.0.0-01']){\n  assert.throws(()=>b('1.0.0',bad),Error);\n}",
+        "new": "for(const bad of ['',' ','||','=' ,'> ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0!','1.0.0-01']){\n  assert.throws(()=>b('1.0.0',bad),Error);\n}\n// these are VALID ranges (must not throw)\nfor(const ok of ['1.0.0 ','1.0.0 1.0.1 1.0.2','>=1.0.0 <2.0.0','1.0.0 || 2.0.0']){\n  assert.equal(typeof b('1.0.0',ok),'boolean');\n}"
+      },
+      "output": "replaced 1 occurrence in check-contract.mjs\n[budget] halfway: 30 of 60 turns used. If reconnaissance is still the bulk of what you have done, start converging on the deliverable now.\n[diagnosis] Unresolved focused-check observation: \"node check-contract.mjs 2>&1\" exited 1 at turn 29, generation 10. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 324739.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 29,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-34"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs 2>&1"
+      },
+      "output": "$ node check-contract.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nALL API CHECKS PASSED\n\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: npm test. Result: PASS.\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.08837\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.273123\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 42.511667\n\n[auto-verify] The focused and configured project receipts are now complete on generation 11. Focused command: \"node check-contract.mjs 2>&1\". No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.",
+      "atMs": 330316.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 30,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 11,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 11). Focused command: \"node check-contract.mjs 2>&1\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-35"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "failingTests": [],
+        "outputSha256": "bf5a4f14ad20356277e762eafdcc7208d5c9278257dcf18107f9e09eb398b4cd"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 30,
+      "id": "action-36"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "cd /tmp && printf '%s' '{\"versions\":[\"1.0.0\",\"1.0.0\",\"2.0.0\",\"1.0.0-rc\"],\"range\":\">=1.0.0 <2.0.0\"}' > /tmp/semver-cli-test.json && node /workspace/semver-range.js /tmp/semver-cli-test.json; echo \"exit=$?\""
+      },
+      "output": "ERROR: shell already runs in workspace: /workspace. Do not cd to /tmp; run the command directly.",
+      "atMs": 334365.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 31,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 11,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 11). Focused command: \"node check-contract.mjs 2>&1\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-37"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "printf '%s' '{\"versions\":[\"1.0.0\",\"1.0.0\",\"2.0.0\",\"1.0.0-rc\"],\"range\":\">=1.0.0 <2.0.0\"}' > /tmp/semver-cli-test.json && node semver-range.js /tmp/semver-cli-test.json; echo \"exit=$?\""
+      },
+      "output": "$ printf '%s' '{\"versions\":[\"1.0.0\",\"1.0.0\",\"2.0.0\",\"1.0.0-rc\"],\"range\":\">=1.0.0 <2.0.0\"}' > /tmp/semver-cli-test.json && node semver-range.js /tmp/semver-cli-test.json; echo \"exit=$?\"\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n{\"sorted\":[\"1.0.0-rc\",\"1.0.0\",\"1.0.0\",\"2.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}\nexit=0\n\n[verification uncertainty] outer shell success may mask an inner runner failure: compound shell syntax can mask an earlier failure. This is not a passing check. Run the executable check directly, without output filters or shell control that can mask its exit status.",
+      "atMs": 347760.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 32,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 33 ran and exited 0. Focused-proof admission: NOT ADMITTED. The launcher is compound or its status is opaque; an outer zero does not establish the required direct assertion result. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-38"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node semver-range.js /tmp/semver-cli-test.json"
+      },
+      "output": "$ node semver-range.js /tmp/semver-cli-test.json\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n{\"sorted\":[\"1.0.0-rc\",\"1.0.0\",\"1.0.0\",\"2.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}",
+      "atMs": 350165.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 33,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 34 ran and exited 0. Focused-proof admission: NOT ADMITTED. The receipt does not establish a recognized focused assertion with complete execution evidence; zero matched tests and printed PASS are not proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-39"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node semver-range.js 2>&1; echo \"exit=$?\""
+      },
+      "output": "$ node semver-range.js 2>&1; echo \"exit=$?\"\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nusage: node semver-range.js INPUT_JSON_FILE\nexit=2\n\n[verification uncertainty] outer shell success may mask an inner runner failure: compound shell syntax can mask an earlier failure. This is not a passing check. Run the executable check directly, without output filters or shell control that can mask its exit status.",
+      "atMs": 351442.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 34,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 35 ran and exited 0. Focused-proof admission: NOT ADMITTED. The launcher is compound or its status is opaque; an outer zero does not establish the required direct assertion result. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-40"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node semver-range.js 2>&1"
+      },
+      "output": "$ node semver-range.js 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 2\nusage: node semver-range.js INPUT_JSON_FILE",
+      "atMs": 352692.0,
+      "endedMs": null,
+      "exitCode": 2,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 35,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 36 ran and exited 2. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-41"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "printf '%s' '{\"versions\":[\"1.0.0\",\"1.0.0\"],\"range\":\"=1.0.0\"}' > /tmp/s1.json && node semver-range.js /tmp/s1.json"
+      },
+      "output": "$ printf '%s' '{\"versions\":[\"1.0.0\",\"1.0.0\"],\"range\":\"=1.0.0\"}' > /tmp/s1.json && node semver-range.js /tmp/s1.json\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n{\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}",
+      "atMs": 358923.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 36,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 37 ran and exited 0. Focused-proof admission: NOT ADMITTED. The launcher is compound or its status is opaque; an outer zero does not establish the required direct assertion result. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-42"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node semver-range.js /tmp/s1.json"
+      },
+      "output": "$ node semver-range.js /tmp/s1.json\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n{\"sorted\":[\"1.0.0\",\"1.0.0\"],\"satisfying\":[\"1.0.0\",\"1.0.0\"]}\n\n[progress-awareness] Work has already been authored; 8 recent turns produced no new progress. Do not restart implementation or make an unrelated edit to satisfy this notice. Check the CURRENT artifact against the public contract. For an inconclusive shell check, run one direct executable witness without output filters, echoed exit codes, or status-masking suffixes. For an expected error, assert the expected exit/stdout/stderr in a small test whose own exit reports whether the assertion passed. Keep new tests in a new permitted file. Repair only a demonstrated defect, run project verification, and finish with the measured result.",
+      "atMs": 360655.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 37,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 11,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 11 still needs focused proof. Execution: turn 38 ran and exited 0. Focused-proof admission: NOT ADMITTED. The receipt does not establish a recognized focused assertion with complete execution evidence; zero matched tests and printed PASS are not proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-43"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "check-cli.mjs",
+        "content": "import assert from 'node:assert/strict';\nimport {spawnSync} from 'node:child_process';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\n\nconst entry = new URL('./semver-range.js', import.meta.url).pathname;\nconst tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semver-cli-'));\n\nfunction run(args) {\n  return spawnSync(process.execPath, [entry, ...args], {encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL'});\n}\n\nfunction writeFile(name, content) {\n  const p = path.join(tmp, name);\n  fs.writeFileSync(p, content);\n  return p;\n}\n\n// valid case: sorted + satisfying\n{\n  const f = writeFile('ok.json', JSON.stringify({versions: ['1.0.0', '1.0.0', '2.0.0', '1.0.0-rc'], range: '>=1.0.0 <2.0.0'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.equal(r.stderr, '');\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0-rc', '1.0.0', '1.0.0', '2.0.0'], satisfying: ['1.0.0', '1.0.0']});\n  assert.ok(r.stdout.endsWith('\\n'));\n}\n\n// no args \u2192 exit 2, nonempty stderr, no stdout\n{\n  const r = run([]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// missing file \u2192 exit 2\n{\n  const r = run([path.join(tmp, 'nope.json')]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// invalid JSON \u2192 exit 2\n{\n  const f = writeFile('bad.json', 'not json');\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// invalid range \u2192 exit 2\n{\n  const f = writeFile('badrange.json', JSON.stringify({versions: [], range: ''}));\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// empty versions, valid range \u2192 exit 0\n{\n  const f = writeFile('empty.json', JSON.stringify({versions: [], range: '>=1.0.0'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.equal(r.stderr, '');\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: [], satisfying: []});\n}\n\n// extra fields ignored\n{\n  const f = writeFile('extra.json', JSON.stringify({versions: ['1.0.0'], range: '1.0.0', foo: 'bar'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0'], satisfying: ['1.0.0']});\n}\n\n// null / array \u2192 exit 2\nfor (const bad of ['null', '[1,2]']) {\n  const f = writeFile('badtype.json', bad);\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\nfs.rmSync(tmp, {recursive: true, force: true});\nconsole.log('ALL CLI CHECKS PASSED');\n"
+      },
+      "output": "wrote 2681 bytes to check-cli.mjs\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `parse` is also referenced in: semver-range.js\n[scope] Verification invalidated: workspace generation 11 -> 12; changed \"check-cli.mjs\". Earlier PASS receipts describe generation 11, not this tree. Deleting a check script also changes the verified workspace. Finish necessary cleanup BEFORE the final focused check and configured project check; keep intended checks. Obtain fresh receipts before DONE.\n[auto-verify] You have edited but not run the tests in 8 turns \u2014 reading and reasoning is not verification, so I ran them for you \u2014 PASS: VERDICT: all 2 tests passed. The configured tests PASS. Keep intended regression checks; do not edit or delete files merely to tidy a green tree. Follow any current verification workflow for additional required proof. If the task is complete and no proof is pending, request DONE; other completion gates still apply.\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.08448\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.269002\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.925205",
+      "atMs": 374209.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 38,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 12,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 12 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-44"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "failingTests": [],
+        "outputSha256": "ba299eb164b464ace6687e7f7a2617fd4715ebf772217e9b5e0fec18513c5623"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 38,
+      "id": "action-45"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-cli.mjs 2>&1"
+      },
+      "output": "$ node check-cli.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 1\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n0 !== 2\n\n    at file:///workspace/check-cli.mjs:59:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 2,\n  operator: 'strictEqual'\n}\n\nNode.js v20.19.4\n\n[diagnosis] Unresolved focused-check observation: \"node check-cli.mjs 2>&1\" exited 1 at turn 40, generation 12. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 377063.0,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 39,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 12,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 12 still needs focused proof. Execution: turn 40 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-46"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "semver-range.js",
+        "start": 100,
+        "limit": 44
+      },
+      "output": "semver-range.js (144 lines, showing 100-143):\n100\tfunction runCli(){\n101\t  const args=process.argv.slice(2);\n102\t  if(args.length!==1){\n103\t    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n104\t    process.exit(2);\n105\t  }\n106\t  let raw;\n107\t  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n108\t    process.stderr.write('cannot read input file\\n');\n109\t    process.exit(2);\n110\t  }\n111\t  let data;\n112\t  try{data=JSON.parse(raw);}catch{\n113\t    process.stderr.write('invalid JSON\\n');\n114\t    process.exit(2);\n115\t  }\n116\t  if(data===null||Array.isArray(data)||typeof data!=='object'){\n117\t    process.stderr.write('input must be an object\\n');\n118\t    process.exit(2);\n119\t  }\n120\t  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n121\t    process.stderr.write('versions must be an array of strings\\n');\n122\t    process.exit(2);\n123\t  }\n124\t  if(typeof data.range!=='string'){\n125\t    process.stderr.write('range must be a string\\n');\n126\t    process.exit(2);\n127\t  }\n128\t  let sorted,satisfying;\n129\t  try{\n130\t    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n131\t      const d=compareVersions(a.v,b.v);\n132\t      return d!==0?d:a.i-b.i;\n133\t    }).map(x=>x.v);\n134\t    satisfying=sorted.filter(v=>satisfies(v,data.range));\n135\t  }catch(err){\n136\t    process.stderr.write(String(err&&err.message||err)+'\\n');\n137\t    process.exit(2);\n138\t  }\n139\t  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n140\t  process.exit(0);\n141\t}\n142\t\n143\tif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n... (1 more lines \u2014 take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n[diagnosis] Unresolved focused-check observation: \"node check-cli.mjs 2>&1\" exited 1 at turn 40, generation 12. This failure was observed on the current generation. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 384421.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 40,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 12,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 12 still needs focused proof. Execution: turn 40 ran and exited 1. Focused-proof admission: NOT ADMITTED. The process or its measured tests failed. Repair a demonstrated source or fixture defect before retrying. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-47"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "a": "replace",
+        "p": "semver-range.js",
+        "old": "  let sorted,satisfying;\n  try{\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }",
+        "new": "  let sorted,satisfying;\n  try{\n    parseRange(data.range);\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }"
+      },
+      "output": "replaced 1 occurrence in semver-range.js\n[peer] `parseRange` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `hasPrerelease` (semver-range.js:84):\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{\n      const d=compareVersions(v,c.version);\n[diagnosis] Unresolved focused-check observation: \"node check-cli.mjs 2>&1\" exited 1 at turn 40, generation 12. The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective. A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.",
+      "atMs": 387964.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 41,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 13,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 13 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-48"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-cli.mjs 2>&1"
+      },
+      "output": "$ node check-cli.mjs 2>&1\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nALL CLI CHECKS PASSED\n\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: npm test. Result: PASS.\n\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.09389\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.278812\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.791701\n\n[auto-verify] The focused and configured project receipts are now complete on generation 13. Focused command: \"node check-cli.mjs 2>&1\". No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.",
+      "atMs": 389195.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 42,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 13,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 13). Focused command: \"node check-cli.mjs 2>&1\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-49"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "total": 2
+        },
+        "failingTests": [],
+        "outputSha256": "55ab1f5707bdc45d84b76c30ae5ad1a8f0d7693dfb0eb2706aed8a6fd150da6c"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 42,
+      "id": "action-50"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "semver-range.js"
+      },
+      "output": "semver-range.js (145 lines, showing 1-145):\n1\t// Semantic-version precedence and range checker.\n2\timport fs from 'node:fs';\n3\tconst NUMERIC=/(^\\d+$)/;\n4\tconst IDENT=/^[0-9A-Za-z-]+$/;\n5\tconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\n6\tconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;\n7\t\n8\tfunction checkIdentifiers(list,numeric){\n9\t  for(const id of list){\n10\t    if(!IDENT.test(id))throw Error('invalid identifier');\n11\t    if(numeric&&NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n12\t  }\n13\t}\n14\t\n15\tfunction parse(v){\n16\t  if(typeof v!=='string')throw Error('invalid version');\n17\t  const m=VERSION.exec(v);\n18\t  if(!m)throw Error('invalid version');\n19\t  const prerelease=m[4]===undefined?[]:m[4].split('.');\n20\t  const build=m[5]===undefined?[]:m[5].split('.');\n21\t  checkIdentifiers(prerelease,true);\n22\t  checkIdentifiers(build,false);\n23\t  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n24\t}\n25\t\n26\tfunction isNumericId(id){return NUMERIC.test(id);}\n27\t\n28\tfunction compareIds(a,b){\n29\t  const an=isNumericId(a),bn=isNumericId(b);\n30\t  if(an&&bn){\n31\t    const d=BigInt(a)-BigInt(b);\n32\t    return d<0n?-1:d>0n?1:0;\n33\t  }\n34\t  if(an)return -1;\n35\t  if(bn)return 1;\n36\t  return a<b?-1:a>b?1:0;\n37\t}\n38\t\n39\texport function compareVersions(a,b){\n40\t  const x=(typeof a==='object'&&a!==null&&a.prerelease!==undefined)?a:parse(a);\n41\t  const y=(typeof b==='object'&&b!==null&&b.prerelease!==undefined)?b:parse(b);\n42\t  for(const key of ['major','minor','patch']){\n43\t    const d=x[key]-y[key];\n44\t    if(d)return d<0?-1:1;\n45\t  }\n46\t  const lp=x.prerelease,rp=y.prerelease;\n47\t  if(lp.length===0&&rp.length===0)return 0;\n48\t  if(lp.length===0)return 1;\n49\t  if(rp.length===0)return -1;\n50\t  const n=Math.min(lp.length,rp.length);\n51\t  for(let i=0;i<n;i++){\n52\t    const d=compareIds(lp[i],rp[i]);\n53\t    if(d)return d;\n54\t  }\n55\t  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n56\t  return 0;\n57\t}\n58\t\n59\tconst OPS=['>=','<=','>','<','='];\n60\t\n61\tfunction parseComparator(text){\n62\t  let op='=';\n63\t  for(const o of OPS){\n64\t    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n65\t  }\n66\t  if(text==='')throw Error('invalid comparator');\n67\t  return {op,version:parse(text)};\n68\t}\n69\t\n70\tfunction parseRange(range){\n71\t  if(typeof range!=='string')throw Error('invalid range');\n72\t  const clauses=range.split('||').map(clause=>{\n73\t    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n74\t    if(parts.length===0)throw Error('invalid range');\n75\t    return parts.map(parseComparator);\n76\t  });\n77\t  return clauses;\n78\t}\n79\t\n80\tfunction hasPrerelease(v){return v.prerelease.length>0;}\n81\t\n82\texport function satisfies(version,range){\n83\t  const v=parse(version);\n84\t  const clauses=parseRange(range);\n85\t  for(const comparators of clauses){\n86\t    if(!comparators.every(c=>{\n87\t      const d=compareVersions(v,c.version);\n88\t      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n89\t    }))continue;\n90\t    if(hasPrerelease(v)){\n91\t      const same=comparators.some(c=>hasPrerelease(c.version)&&\n92\t        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n93\t      if(!same)continue;\n94\t    }\n95\t    return true;\n96\t  }\n97\t  return false;\n98\t}\n99\t\n100\tfunction runCli(){\n101\t  const args=process.argv.slice(2);\n102\t  if(args.length!==1){\n103\t    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n104\t    process.exit(2);\n105\t  }\n106\t  let raw;\n107\t  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n108\t    process.stderr.write('cannot read input file\\n');\n109\t    process.exit(2);\n110\t  }\n111\t  let data;\n112\t  try{data=JSON.parse(raw);}catch{\n113\t    process.stderr.write('invalid JSON\\n');\n114\t    process.exit(2);\n115\t  }\n116\t  if(data===null||Array.isArray(data)||typeof data!=='object'){\n117\t    process.stderr.write('input must be an object\\n');\n118\t    process.exit(2);\n119\t  }\n120\t  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n121\t    process.stderr.write('versions must be an array of strings\\n');\n122\t    process.exit(2);\n123\t  }\n124\t  if(typeof data.range!=='string'){\n125\t    process.stderr.write('range must be a string\\n');\n126\t    process.exit(2);\n127\t  }\n128\t  let sorted,satisfying;\n129\t  try{\n130\t    parseRange(data.range);\n131\t    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n132\t      const d=compareVersions(a.v,b.v);\n133\t      return d!==0?d:a.i-b.i;\n134\t    }).map(x=>x.v);\n135\t    satisfying=sorted.filter(v=>satisfies(v,data.range));\n136\t  }catch(err){\n137\t    process.stderr.write(String(err&&err.message||err)+'\\n');\n138\t    process.exit(2);\n139\t  }\n140\t  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n141\t  process.exit(0);\n142\t}\n143\t\n144\tif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n145\t\n\u2014 end of file (145 lines); nothing beyond line 145, do not re-read this range.",
+      "atMs": 392741.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 43,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 13,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 13). Focused command: \"node check-cli.mjs 2>&1\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-51"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "a": "done",
+        "summary": "Repaired semver-range.js with correct semver precedence and range logic:\n\n1. **Version parsing**: Strict regex requiring dot-separated nonempty alphanumeric/hyphen identifiers; numeric prerelease identifiers reject leading zeros; build metadata identifiers allow leading zeros.\n\n2. **compareVersions**: Compares major/minor/patch numerically, ignores build metadata, ranks prerelease versions below their release, compares prerelease identifiers left-to-right (numeric vs numeric \u2192 numeric compare, non-numeric vs non-numeric \u2192 ASCII, numeric < non-numeric, shorter list < longer list when shared prefix is equal).\n\n3. **satisfies**: Parses ranges as `||`-separated clauses of whitespace-separated comparators with optional `=`, `<`, `<=`, `>`, `>=` operators (default `=`). Prerelease versions only satisfy a clause when that clause contains at least one comparator with a prerelease version sharing the same major.minor.patch.\n\n4. **CLI**: `node semver-range.js INPUT_JSON_FILE` \u2014 validates exactly one arg, reads JSON, validates shape (non-null object with dense string array `versions` and string `range`), validates range on every invocation, prints `{sorted,satisfying}` as one JSON line, exit 0. Invalid args/files/JSON/API input \u2192 exit 2 with nonempty stderr and no stdout. Importing the module does not run the CLI.\n\nVerification: `node check-contract.mjs` (API checks) and `node check-cli.mjs` (CLI checks) both pass; `npm test` passes all 2 existing tests."
+      },
+      "output": "",
+      "atMs": 398679.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 44,
+      "id": "action-52"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 275.0,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 281.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 288.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 295.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 302.0,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 399007.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 399016.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 399026.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 399035.0,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 399045.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 399055.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 399064.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 399073.0,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Repaired semver-range.js with correct semver precedence and range logic:\n\n1. **Version parsing**: Strict regex requiring dot-separated nonempty alphanumeric/hyphen identifiers; numeric prerelease identifiers reject leading zeros; build metadata identifiers allow leading zeros.\n\n2. **compareVersions**: Compares major/minor/patch numerically, ignores build metadata, ranks prerelease versions below their release, compares prerelease identifiers left-to-right (numeric vs numeric \u2192 numeric compare, non-numeric vs non-numeric \u2192 ASCII, numeric < non-numeric, shorter list < longer list when shared prefix is equal).\n\n3. **satisfies**: Parses ranges as `||`-separated clauses of whitespace-separated comparators with optional `=`, `<`, `<=`, `>`, `>=` operators (default `=`). Prerelease versions only satisfy a clause when that clause contains at least one comparator with a prerelease version sharing the same major.minor.patch.\n\n4. **CLI**: `node semver-range.js INPUT_JSON_FILE` \u2014 validates exactly one arg, reads JSON, validates shape (non-null object with dense string array `versions` and string `range`), validates range on every invocation, prints `{sorted,satisfying}` as one JSON line, exit 0. Invalid args/files/JSON/API input \u2192 exit 2 with nonempty stderr and no stdout. Importing the module does not run the CLI.\n\nVerification: `node check-contract.mjs` (API checks) and `node check-cli.mjs` (CLI checks) both pass; `npm test` passes all 2 existing tests.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "check-cli.mjs",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "301d6a870f856fc45d7f0d7837590e1227b5dfefc95159b780333faeb74d5768",
+      "before": null,
+      "after": "import assert from 'node:assert/strict';\nimport {spawnSync} from 'node:child_process';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\n\nconst entry = new URL('./semver-range.js', import.meta.url).pathname;\nconst tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semver-cli-'));\n\nfunction run(args) {\n  return spawnSync(process.execPath, [entry, ...args], {encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL'});\n}\n\nfunction writeFile(name, content) {\n  const p = path.join(tmp, name);\n  fs.writeFileSync(p, content);\n  return p;\n}\n\n// valid case: sorted + satisfying\n{\n  const f = writeFile('ok.json', JSON.stringify({versions: ['1.0.0', '1.0.0', '2.0.0', '1.0.0-rc'], range: '>=1.0.0 <2.0.0'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.equal(r.stderr, '');\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0-rc', '1.0.0', '1.0.0', '2.0.0'], satisfying: ['1.0.0', '1.0.0']});\n  assert.ok(r.stdout.endsWith('\\n'));\n}\n\n// no args \u2192 exit 2, nonempty stderr, no stdout\n{\n  const r = run([]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// missing file \u2192 exit 2\n{\n  const r = run([path.join(tmp, 'nope.json')]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// invalid JSON \u2192 exit 2\n{\n  const f = writeFile('bad.json', 'not json');\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// invalid range \u2192 exit 2\n{\n  const f = writeFile('badrange.json', JSON.stringify({versions: [], range: ''}));\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\n// empty versions, valid range \u2192 exit 0\n{\n  const f = writeFile('empty.json', JSON.stringify({versions: [], range: '>=1.0.0'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.equal(r.stderr, '');\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: [], satisfying: []});\n}\n\n// extra fields ignored\n{\n  const f = writeFile('extra.json', JSON.stringify({versions: ['1.0.0'], range: '1.0.0', foo: 'bar'}));\n  const r = run([f]);\n  assert.equal(r.status, 0, r.stderr);\n  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0'], satisfying: ['1.0.0']});\n}\n\n// null / array \u2192 exit 2\nfor (const bad of ['null', '[1,2]']) {\n  const f = writeFile('badtype.json', bad);\n  const r = run([f]);\n  assert.equal(r.status, 2, r.stderr);\n  assert.ok(r.stderr.length > 0);\n  assert.equal(r.stdout, '');\n}\n\nfs.rmSync(tmp, {recursive: true, force: true});\nconsole.log('ALL CLI CHECKS PASSED');\n",
+      "displaySha256": "301d6a870f856fc45d7f0d7837590e1227b5dfefc95159b780333faeb74d5768",
+      "diff": "--- starter/check-cli.mjs\n+++ delivered/check-cli.mjs\n@@ -0,0 +1,91 @@\n+import assert from 'node:assert/strict';\n+import {spawnSync} from 'node:child_process';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+\n+const entry = new URL('./semver-range.js', import.meta.url).pathname;\n+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semver-cli-'));\n+\n+function run(args) {\n+  return spawnSync(process.execPath, [entry, ...args], {encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL'});\n+}\n+\n+function writeFile(name, content) {\n+  const p = path.join(tmp, name);\n+  fs.writeFileSync(p, content);\n+  return p;\n+}\n+\n+// valid case: sorted + satisfying\n+{\n+  const f = writeFile('ok.json', JSON.stringify({versions: ['1.0.0', '1.0.0', '2.0.0', '1.0.0-rc'], range: '>=1.0.0 <2.0.0'}));\n+  const r = run([f]);\n+  assert.equal(r.status, 0, r.stderr);\n+  assert.equal(r.stderr, '');\n+  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0-rc', '1.0.0', '1.0.0', '2.0.0'], satisfying: ['1.0.0', '1.0.0']});\n+  assert.ok(r.stdout.endsWith('\\n'));\n+}\n+\n+// no args \u2192 exit 2, nonempty stderr, no stdout\n+{\n+  const r = run([]);\n+  assert.equal(r.status, 2, r.stderr);\n+  assert.ok(r.stderr.length > 0);\n+  assert.equal(r.stdout, '');\n+}\n+\n+// missing file \u2192 exit 2\n+{\n+  const r = run([path.join(tmp, 'nope.json')]);\n+  assert.equal(r.status, 2, r.stderr);\n+  assert.ok(r.stderr.length > 0);\n+  assert.equal(r.stdout, '');\n+}\n+\n+// invalid JSON \u2192 exit 2\n+{\n+  const f = writeFile('bad.json', 'not json');\n+  const r = run([f]);\n+  assert.equal(r.status, 2, r.stderr);\n+  assert.ok(r.stderr.length > 0);\n+  assert.equal(r.stdout, '');\n+}\n+\n+// invalid range \u2192 exit 2\n+{\n+  const f = writeFile('badrange.json', JSON.stringify({versions: [], range: ''}));\n+  const r = run([f]);\n+  assert.equal(r.status, 2, r.stderr);\n+  assert.ok(r.stderr.length > 0);\n+  assert.equal(r.stdout, '');\n+}\n+\n+// empty versions, valid range \u2192 exit 0\n+{\n+  const f = writeFile('empty.json', JSON.stringify({versions: [], range: '>=1.0.0'}));\n+  const r = run([f]);\n+  assert.equal(r.status, 0, r.stderr);\n+  assert.equal(r.stderr, '');\n+  assert.deepEqual(JSON.parse(r.stdout), {sorted: [], satisfying: []});\n+}\n+\n+// extra fields ignored\n+{\n+  const f = writeFile('extra.json', JSON.stringify({versions: ['1.0.0'], range: '1.0.0', foo: 'bar'}));\n+  const r = run([f]);\n+  assert.equal(r.status, 0, r.stderr);\n+  assert.deepEqual(JSON.parse(r.stdout), {sorted: ['1.0.0'], satisfying: ['1.0.0']});\n+}\n+\n+// null / array \u2192 exit 2\n+for (const bad of ['null', '[1,2]']) {\n+  const f = writeFile('badtype.json', bad);\n+  const r = run([f]);\n+  assert.equal(r.status, 2, r.stderr);\n+  assert.ok(r.stderr.length > 0);\n+  assert.equal(r.stdout, '');\n+}\n+\n+fs.rmSync(tmp, {recursive: true, force: true});\n+console.log('ALL CLI CHECKS PASSED');\n"
+    },
+    {
+      "path": "check-contract.mjs",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026",
+      "before": null,
+      "after": "import assert from 'node:assert/strict';\nimport {compareVersions as a, satisfies as b} from './semver-range.js';\n\n// precedence\nassert.equal(a('1.0.0+a','1.0.0+b'),0);\nassert.equal(a('1.0.0-rc','1.0.0'),-1);\nassert.equal(a('1.0.0','1.0.0-rc'),1);\nassert.equal(a('1.0.0-rc','1.0.0-rc.1'),-1);\nassert.equal(a('1.0.0-a.10','1.0.0-a.9'),1);\nassert.equal(a('1.0.0-a','1.0.0-b'),-1);\nassert.equal(a('1.0.0-1','1.0.0-a'),-1);\nassert.equal(a('1.0.0-0','1.0.0-1'),-1);\nassert.equal(a('2.0.0','1.9.9'),1);\nassert.equal(a('1.2.3','1.2.4'),-1);\nassert.equal(a('1.2.3','1.2.3'),0);\nassert.equal(a('1.0.0-rc.1','1.0.0-rc.1'),0);\n\n// satisfies\nassert.equal(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);\nassert.equal(b('1.2.3','>=1.0.0 <2.0.0'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3'),false);\nassert.equal(b('1.2.3','1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','>1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','<=1.2.3-rc.1'),true);\nassert.equal(b('1.2.3-rc.1','<1.2.3-rc.1'),false);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),false);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),false);\nassert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 || 1.0.0'),true);\nassert.equal(b('1.2.3-rc.1','1.2.3-rc.1 || 1.0.0'),true);\nassert.equal(b('1.2.3-rc.1','1.0.0'),false);\n\n// invalid versions throw\nfor(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b']){\n  assert.throws(()=>a(bad,'1.0.0'),Error);\n  assert.throws(()=>a('1.0.0',bad),Error);\n}\n\n// invalid ranges throw\nfor(const bad of ['',' ','||','=' ,'> ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0!','1.0.0-01']){\n  assert.throws(()=>b('1.0.0',bad),Error);\n}\n// these are VALID ranges (must not throw)\nfor(const ok of ['1.0.0 ','1.0.0 1.0.1 1.0.2','>=1.0.0 <2.0.0','1.0.0 || 2.0.0']){\n  assert.equal(typeof b('1.0.0',ok),'boolean');\n}\n\n// frozen inputs work\nconst fv=Object.freeze('1.2.3');\nconst fr=Object.freeze('>=1.0.0');\nassert.equal(b(fv,fr),true);\n\nconsole.log('ALL API CHECKS PASSED');\n",
+      "displaySha256": "e2d887bbaab5dafffa5a9aede4ea52c98c252932c2d71ccf432c10bca6573026",
+      "diff": "--- starter/check-contract.mjs\n+++ delivered/check-contract.mjs\n@@ -0,0 +1,55 @@\n+import assert from 'node:assert/strict';\n+import {compareVersions as a, satisfies as b} from './semver-range.js';\n+\n+// precedence\n+assert.equal(a('1.0.0+a','1.0.0+b'),0);\n+assert.equal(a('1.0.0-rc','1.0.0'),-1);\n+assert.equal(a('1.0.0','1.0.0-rc'),1);\n+assert.equal(a('1.0.0-rc','1.0.0-rc.1'),-1);\n+assert.equal(a('1.0.0-a.10','1.0.0-a.9'),1);\n+assert.equal(a('1.0.0-a','1.0.0-b'),-1);\n+assert.equal(a('1.0.0-1','1.0.0-a'),-1);\n+assert.equal(a('1.0.0-0','1.0.0-1'),-1);\n+assert.equal(a('2.0.0','1.9.9'),1);\n+assert.equal(a('1.2.3','1.2.4'),-1);\n+assert.equal(a('1.2.3','1.2.3'),0);\n+assert.equal(a('1.0.0-rc.1','1.0.0-rc.1'),0);\n+\n+// satisfies\n+assert.equal(b('1.2.3-rc.1','>=1.0.0 <2.0.0'),false);\n+assert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 <2.0.0'),true);\n+assert.equal(b('1.2.3','>=1.0.0 <2.0.0'),true);\n+assert.equal(b('1.2.3-rc.1','1.2.3-rc.1'),true);\n+assert.equal(b('1.2.3-rc.1','1.2.3'),false);\n+assert.equal(b('1.2.3','1.2.3-rc.1'),false);\n+assert.equal(b('1.2.3-rc.1','>=1.2.3-rc.1'),true);\n+assert.equal(b('1.2.3-rc.1','>1.2.3-rc.1'),false);\n+assert.equal(b('1.2.3-rc.1','<=1.2.3-rc.1'),true);\n+assert.equal(b('1.2.3-rc.1','<1.2.3-rc.1'),false);\n+assert.equal(b('1.2.3-rc.1','1.2.3-rc.0 || 1.2.3-rc.2'),false);\n+assert.equal(b('1.2.3-rc.1','1.2.3-rc.0'),false);\n+assert.equal(b('1.2.3-rc.1','>=1.2.3-rc.0 || 1.0.0'),true);\n+assert.equal(b('1.2.3-rc.1','1.2.3-rc.1 || 1.0.0'),true);\n+assert.equal(b('1.2.3-rc.1','1.0.0'),false);\n+\n+// invalid versions throw\n+for(const bad of ['01.0.0','1.0.0-01','1.0.0-','1.0.0+','1.0.0-a..b','1.0.0-a_b','1.0.0-a.b.01','1.0.0-01.0','1.0.0-1.01','1.0','1.0.0.1','','1.0.0+a..b']){\n+  assert.throws(()=>a(bad,'1.0.0'),Error);\n+  assert.throws(()=>a('1.0.0',bad),Error);\n+}\n+\n+// invalid ranges throw\n+for(const bad of ['',' ','||','=' ,'> ','1.0.0 ||','|| 1.0.0','>','>=','<=','<','= ','1.0.0!','1.0.0-01']){\n+  assert.throws(()=>b('1.0.0',bad),Error);\n+}\n+// these are VALID ranges (must not throw)\n+for(const ok of ['1.0.0 ','1.0.0 1.0.1 1.0.2','>=1.0.0 <2.0.0','1.0.0 || 2.0.0']){\n+  assert.equal(typeof b('1.0.0',ok),'boolean');\n+}\n+\n+// frozen inputs work\n+const fv=Object.freeze('1.2.3');\n+const fr=Object.freeze('>=1.0.0');\n+assert.equal(b(fv,fr),true);\n+\n+console.log('ALL API CHECKS PASSED');\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "afterSha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "before": "{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-semver-range\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "df3d1ccfb833a42573b8811f3de77ab9bbe9a7cc52e9ee4470e1fa492e258939",
+      "diff": ""
+    },
+    {
+      "path": "semver-range.js",
+      "state": "changed",
+      "beforeSha256": "1c520e5f91e40f99acbcaf7491720772dfad7be54b6be32dc9b090aac76767de",
+      "afterSha256": "d1f09acd30336a097109a8554b5c62f934f966bf3206c14da2a072f39423bd7e",
+      "before": "// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n// above its release, prerelease identifiers never compare numerically, and any\n// prerelease is admitted into every range.\nconst PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n\nfunction parse(v){\n  const m=PATTERN.exec(v);\n  if(!m)throw Error('invalid version');\n  return {major:+m[1],minor:+m[2],patch:+m[3],\n    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n}\n\nexport function compareVersions(a,b){\n  const x=parse(a),y=parse(b);\n  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n  for(let i=0;i<Math.max(left.length,right.length);i++){\n    if(left[i]===undefined)return -1;\n    if(right[i]===undefined)return 1;\n    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n  }\n  return 0;\n}\n\nexport function satisfies(version,range){\n  for(const clause of String(range).split('||')){\n    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n    if(comparators.every(text=>{\n      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n    }))return true;\n  }\n  return false;\n}\n",
+      "after": "// Semantic-version precedence and range checker.\nimport fs from 'node:fs';\nconst NUMERIC=/(^\\d+$)/;\nconst IDENT=/^[0-9A-Za-z-]+$/;\nconst NUMERIC_ID=/^(0|[1-9]\\d*)$/;\nconst VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;\n\nfunction checkIdentifiers(list,numeric){\n  for(const id of list){\n    if(!IDENT.test(id))throw Error('invalid identifier');\n    if(numeric&&NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n  }\n}\n\nfunction parse(v){\n  if(typeof v!=='string')throw Error('invalid version');\n  const m=VERSION.exec(v);\n  if(!m)throw Error('invalid version');\n  const prerelease=m[4]===undefined?[]:m[4].split('.');\n  const build=m[5]===undefined?[]:m[5].split('.');\n  checkIdentifiers(prerelease,true);\n  checkIdentifiers(build,false);\n  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n}\n\nfunction isNumericId(id){return NUMERIC.test(id);}\n\nfunction compareIds(a,b){\n  const an=isNumericId(a),bn=isNumericId(b);\n  if(an&&bn){\n    const d=BigInt(a)-BigInt(b);\n    return d<0n?-1:d>0n?1:0;\n  }\n  if(an)return -1;\n  if(bn)return 1;\n  return a<b?-1:a>b?1:0;\n}\n\nexport function compareVersions(a,b){\n  const x=(typeof a==='object'&&a!==null&&a.prerelease!==undefined)?a:parse(a);\n  const y=(typeof b==='object'&&b!==null&&b.prerelease!==undefined)?b:parse(b);\n  for(const key of ['major','minor','patch']){\n    const d=x[key]-y[key];\n    if(d)return d<0?-1:1;\n  }\n  const lp=x.prerelease,rp=y.prerelease;\n  if(lp.length===0&&rp.length===0)return 0;\n  if(lp.length===0)return 1;\n  if(rp.length===0)return -1;\n  const n=Math.min(lp.length,rp.length);\n  for(let i=0;i<n;i++){\n    const d=compareIds(lp[i],rp[i]);\n    if(d)return d;\n  }\n  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n  return 0;\n}\n\nconst OPS=['>=','<=','>','<','='];\n\nfunction parseComparator(text){\n  let op='=';\n  for(const o of OPS){\n    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n  }\n  if(text==='')throw Error('invalid comparator');\n  return {op,version:parse(text)};\n}\n\nfunction parseRange(range){\n  if(typeof range!=='string')throw Error('invalid range');\n  const clauses=range.split('||').map(clause=>{\n    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n    if(parts.length===0)throw Error('invalid range');\n    return parts.map(parseComparator);\n  });\n  return clauses;\n}\n\nfunction hasPrerelease(v){return v.prerelease.length>0;}\n\nexport function satisfies(version,range){\n  const v=parse(version);\n  const clauses=parseRange(range);\n  for(const comparators of clauses){\n    if(!comparators.every(c=>{\n      const d=compareVersions(v,c.version);\n      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n    }))continue;\n    if(hasPrerelease(v)){\n      const same=comparators.some(c=>hasPrerelease(c.version)&&\n        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n      if(!same)continue;\n    }\n    return true;\n  }\n  return false;\n}\n\nfunction runCli(){\n  const args=process.argv.slice(2);\n  if(args.length!==1){\n    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n    process.stderr.write('cannot read input file\\n');\n    process.exit(2);\n  }\n  let data;\n  try{data=JSON.parse(raw);}catch{\n    process.stderr.write('invalid JSON\\n');\n    process.exit(2);\n  }\n  if(data===null||Array.isArray(data)||typeof data!=='object'){\n    process.stderr.write('input must be an object\\n');\n    process.exit(2);\n  }\n  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n    process.stderr.write('versions must be an array of strings\\n');\n    process.exit(2);\n  }\n  if(typeof data.range!=='string'){\n    process.stderr.write('range must be a string\\n');\n    process.exit(2);\n  }\n  let sorted,satisfying;\n  try{\n    parseRange(data.range);\n    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n      const d=compareVersions(a.v,b.v);\n      return d!==0?d:a.i-b.i;\n    }).map(x=>x.v);\n    satisfying=sorted.filter(v=>satisfies(v,data.range));\n  }catch(err){\n    process.stderr.write(String(err&&err.message||err)+'\\n');\n    process.exit(2);\n  }\n  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n  process.exit(0);\n}\n\nif(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n",
+      "displaySha256": "d1f09acd30336a097109a8554b5c62f934f966bf3206c14da2a072f39423bd7e",
+      "diff": "--- starter/semver-range.js\n+++ delivered/semver-range.js\n@@ -1,35 +1,144 @@\n-// Deliberately flawed: build metadata affects precedence, a prerelease ranks\n-// above its release, prerelease identifiers never compare numerically, and any\n-// prerelease is admitted into every range.\n-const PATTERN=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z.-]+))?(?:\\+([0-9A-Za-z.-]+))?$/;\n+// Semantic-version precedence and range checker.\n+import fs from 'node:fs';\n+const NUMERIC=/(^\\d+$)/;\n+const IDENT=/^[0-9A-Za-z-]+$/;\n+const NUMERIC_ID=/^(0|[1-9]\\d*)$/;\n+const VERSION=/^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$/;\n+\n+function checkIdentifiers(list,numeric){\n+  for(const id of list){\n+    if(!IDENT.test(id))throw Error('invalid identifier');\n+    if(numeric&&NUMERIC.test(id)&&!NUMERIC_ID.test(id))throw Error('invalid numeric identifier');\n+  }\n+}\n \n function parse(v){\n-  const m=PATTERN.exec(v);\n+  if(typeof v!=='string')throw Error('invalid version');\n+  const m=VERSION.exec(v);\n   if(!m)throw Error('invalid version');\n-  return {major:+m[1],minor:+m[2],patch:+m[3],\n-    prerelease:m[4]===undefined?[]:m[4].split('.'),build:m[5]===undefined?[]:m[5].split('.')};\n+  const prerelease=m[4]===undefined?[]:m[4].split('.');\n+  const build=m[5]===undefined?[]:m[5].split('.');\n+  checkIdentifiers(prerelease,true);\n+  checkIdentifiers(build,false);\n+  return {major:+m[1],minor:+m[2],patch:+m[3],prerelease,build};\n+}\n+\n+function isNumericId(id){return NUMERIC.test(id);}\n+\n+function compareIds(a,b){\n+  const an=isNumericId(a),bn=isNumericId(b);\n+  if(an&&bn){\n+    const d=BigInt(a)-BigInt(b);\n+    return d<0n?-1:d>0n?1:0;\n+  }\n+  if(an)return -1;\n+  if(bn)return 1;\n+  return a<b?-1:a>b?1:0;\n }\n \n export function compareVersions(a,b){\n-  const x=parse(a),y=parse(b);\n-  for(const key of ['major','minor','patch']){const d=x[key]-y[key];if(d)return d<0?-1:1;}\n-  const left=[...x.prerelease,...x.build],right=[...y.prerelease,...y.build];\n-  for(let i=0;i<Math.max(left.length,right.length);i++){\n-    if(left[i]===undefined)return -1;\n-    if(right[i]===undefined)return 1;\n-    if(left[i]!==right[i])return left[i]<right[i]?-1:1;\n+  const x=(typeof a==='object'&&a!==null&&a.prerelease!==undefined)?a:parse(a);\n+  const y=(typeof b==='object'&&b!==null&&b.prerelease!==undefined)?b:parse(b);\n+  for(const key of ['major','minor','patch']){\n+    const d=x[key]-y[key];\n+    if(d)return d<0?-1:1;\n   }\n+  const lp=x.prerelease,rp=y.prerelease;\n+  if(lp.length===0&&rp.length===0)return 0;\n+  if(lp.length===0)return 1;\n+  if(rp.length===0)return -1;\n+  const n=Math.min(lp.length,rp.length);\n+  for(let i=0;i<n;i++){\n+    const d=compareIds(lp[i],rp[i]);\n+    if(d)return d;\n+  }\n+  if(lp.length!==rp.length)return lp.length<rp.length?-1:1;\n   return 0;\n }\n \n+const OPS=['>=','<=','>','<','='];\n+\n+function parseComparator(text){\n+  let op='=';\n+  for(const o of OPS){\n+    if(text.startsWith(o)){op=o;text=text.slice(o.length);break;}\n+  }\n+  if(text==='')throw Error('invalid comparator');\n+  return {op,version:parse(text)};\n+}\n+\n+function parseRange(range){\n+  if(typeof range!=='string')throw Error('invalid range');\n+  const clauses=range.split('||').map(clause=>{\n+    const parts=clause.trim().split(/\\s+/).filter(Boolean);\n+    if(parts.length===0)throw Error('invalid range');\n+    return parts.map(parseComparator);\n+  });\n+  return clauses;\n+}\n+\n+function hasPrerelease(v){return v.prerelease.length>0;}\n+\n export function satisfies(version,range){\n-  for(const clause of String(range).split('||')){\n-    const comparators=clause.trim().split(/\\s+/).filter(Boolean);\n-    if(comparators.every(text=>{\n-      const op=['>=','<=','>','<','='].find(o=>text.startsWith(o))??'=';\n-      const d=compareVersions(version,text.slice(op==='='&&!text.startsWith('=')?0:op.length));\n-      return op==='='?d===0:op==='>'?d>0:op==='>='?d>=0:op==='<'?d<0:d<=0;\n-    }))return true;\n+  const v=parse(version);\n+  const clauses=parseRange(range);\n+  for(const comparators of clauses){\n+    if(!comparators.every(c=>{\n+      const d=compareVersions(v,c.version);\n+      return c.op==='='?d===0:c.op==='>'?d>0:c.op==='>='?d>=0:c.op==='<'?d<0:d<=0;\n+    }))continue;\n+    if(hasPrerelease(v)){\n+      const same=comparators.some(c=>hasPrerelease(c.version)&&\n+        c.version.major===v.major&&c.version.minor===v.minor&&c.version.patch===v.patch);\n+      if(!same)continue;\n+    }\n+    return true;\n   }\n   return false;\n }\n+\n+function runCli(){\n+  const args=process.argv.slice(2);\n+  if(args.length!==1){\n+    process.stderr.write('usage: node semver-range.js INPUT_JSON_FILE\\n');\n+    process.exit(2);\n+  }\n+  let raw;\n+  try{raw=fs.readFileSync(args[0],'utf8');}catch{\n+    process.stderr.write('cannot read input file\\n');\n+    process.exit(2);\n+  }\n+  let data;\n+  try{data=JSON.parse(raw);}catch{\n+    process.stderr.write('invalid JSON\\n');\n+    process.exit(2);\n+  }\n+  if(data===null||Array.isArray(data)||typeof data!=='object'){\n+    process.stderr.write('input must be an object\\n');\n+    process.exit(2);\n+  }\n+  if(!Array.isArray(data.versions)||!data.versions.every(x=>typeof x==='string')){\n+    process.stderr.write('versions must be an array of strings\\n');\n+    process.exit(2);\n+  }\n+  if(typeof data.range!=='string'){\n+    process.stderr.write('range must be a string\\n');\n+    process.exit(2);\n+  }\n+  let sorted,satisfying;\n+  try{\n+    parseRange(data.range);\n+    sorted=data.versions.map((v,i)=>({v,i})).sort((a,b)=>{\n+      const d=compareVersions(a.v,b.v);\n+      return d!==0?d:a.i-b.i;\n+    }).map(x=>x.v);\n+    satisfying=sorted.filter(v=>satisfies(v,data.range));\n+  }catch(err){\n+    process.stderr.write(String(err&&err.message||err)+'\\n');\n+    process.exit(2);\n+  }\n+  process.stdout.write(JSON.stringify({sorted,satisfying})+'\\n');\n+  process.exit(0);\n+}\n+\n+if(process.argv[1]&&import.meta.url===`file://${process.argv[1]}`)runCli();\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "afterSha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {compareVersions, satisfies} from '../semver-range.js';\ntest('build metadata is ignored and a prerelease ranks below its release',()=>{\n  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n});\ntest('a plain version satisfies a bounded range',()=>{\n  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {compareVersions, satisfies} from '../semver-range.js';\ntest('build metadata is ignored and a prerelease ranks below its release',()=>{\n  assert.equal(compareVersions('1.0.0+a','1.0.0+b'),0);\n  assert.equal(compareVersions('1.0.0-rc','1.0.0'),-1);\n});\ntest('a plain version satisfies a bounded range',()=>{\n  assert.equal(satisfies('1.2.3','>=1.0.0 <2.0.0'),true);\n  assert.equal(satisfies('2.0.0','>=1.0.0 <2.0.0'),false);\n});\n",
+      "displaySha256": "2fa9c0ce16a20be31219bd282cb2d035bc214c798613f3dc27c03e04a295d460",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-semver-range@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: build metadata is ignored and a prerelease ranks below its release\nok 1 - build metadata is ignored and a prerelease ranks below its release\n  ---\n  duration_ms: 1.08726\n  ...\n# Subtest: a plain version satisfies a bounded range\nok 2 - a plain version satisfies a bounded range\n  ---\n  duration_ms: 0.271502\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.778939\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"semver-range\",\"pass\":true,\"groups\":[{\"name\":\"core-precedence-and-build-metadata\",\"pass\":true},{\"name\":\"prerelease-ordering-rules\",\"pass\":true},{\"name\":\"comparator-sets-and-unions\",\"pass\":true},{\"name\":\"prerelease-range-admission\",\"pass\":true},{\"name\":\"validation-and-cli-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "096d29fa8a2a16dc836bc2c938b7a5de86f24755052555bcd0cf570e1df790aa"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "d6e1263b9501978a8eb3fa1c7bf00dce3f419683e14ff9a7b4b89f73e5bed238"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "6152d960785df180b2dde41fe6e1991eeff4211625887a671c6835e7f3e39e75"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "5dd54d13239b0640de3216468b12660d8839b3ac110365c806062c32b8c46c67"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "44cc8cc108b17b34a82a8f57c82f5318ae2ea376161f7332a85282319cfad1d9"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 52,
+    "withResults": 52,
+    "normalizedPathOccurrences": 42,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "The factory stayed with the job until it passed.",
+    "paragraphs": [
+      {
+        "text": "The version selector needed several rounds of source and test corrections. The factory kept the worker on focused assertions, then sent CLI behavior through a separate executable check.",
+        "actions": [
+          "action-6",
+          "action-23",
+          "action-26",
+          "action-35",
+          "action-44",
+          "action-46"
+        ]
+      },
+      {
+        "text": "That CLI check failed, the worker changed the implementation, and the rerun passed. Final project tests and all five independent groups passed before delivery at 399.9 seconds.",
+        "actions": [
+          "action-46",
+          "action-48",
+          "action-49",
+          "action-50",
+          "action-52"
+        ]
+      }
+    ]
+  }
+}

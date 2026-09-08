@@ -1,0 +1,774 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "retry-budget",
+  "arm": "hermes",
+  "wallMs": 562038,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T05:01:53.902Z",
+  "task": "# Repair a retry-budget controller\n\nRepair the exported ES-module function `nextRetry(options)` and implement its\nCLI in retry-budget.js. The pure function decides when a worker can retry\nafter a failure; it must not sleep, read the clock, or make network requests.\n\nOptions must be a non-null, non-array object with all these required fields:\n`attempt` is a positive safe integer (1 means the first retry after failure);\n`elapsedMs`, `baseMs`, `maxDelayMs`, and `budgetMs` are nonnegative safe integers;\n`retryAfterMs` is null or a nonnegative safe integer; `retryable` is a boolean.\nExtra fields are ignored. Validate every field even if retryable is false.\nInvalid input throws an Error. Do not mutate input; frozen objects must work.\n\nIf retryable is false, return exactly\n`{retry:false,delayMs:null,reason:'non-retryable'}`.\nOtherwise compute exponential delay `baseMs * 2 ** (attempt - 1)`, capped at\nmaxDelayMs. This must work for every valid safe-integer attempt, including huge\nattempts, without loops proportional to attempt or overflow bugs. A zero base\nmeans zero exponential delay even for a huge attempt.\n\nIf retryAfterMs is not null, it is a minimum server-requested wait: take the\nmaximum of the capped exponential delay and retryAfterMs. The server hint is\nNOT capped by maxDelayMs. If elapsedMs already exceeds budgetMs, or the wait\nexceeds `budgetMs - elapsedMs`, return exactly\n`{retry:false,delayMs:null,reason:'budget-exhausted'}`. Equality is allowed:\nscheduling the retry exactly at the budget boundary is valid for this API.\nOtherwise return exactly `{retry:true,delayMs:WAIT,reason:'scheduled'}`.\n\nCLI: `node retry-budget.js INPUT_JSON_FILE`. Require exactly one argument.\nThe JSON value is the options object. Success prints exactly the API result\nas one JSON value followed by newline, exits 0, and has no stderr. A valid\ndecision not to retry is still success. Invalid arguments/files/JSON/API input\nexit 2 with nonempty stderr and no stdout. Importing must not run the CLI.\n\nDo not add dependencies or change package.json or existing public tests. You\nmay add tests. Verification uses a read-only workspace: temporary fixtures go\nin os.tmpdir() and must be cleaned up. Run npm test before finishing.\nIndependent checks vary values, not this public contract.\n",
+  "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+  "source": "hermes-native-database",
+  "actions": [
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "ls -la /workspace && cat /workspace/package.json"
+      },
+      "output": {
+        "output": "total 8\ndrwxrwxr-x 1 bantam bantam  62 Sep  8 05:01 .\ndrwxr-xr-x 1 root   root    54 Sep  8 05:01 ..\n-rw-rw-r-- 1 bantam bantam 114 Sep  8 05:01 package.json\n-rw-rw-r-- 1 bantam bantam 355 Sep  8 05:01 retry-budget.js\ndrwxrwxr-x 1 bantam bantam  28 Sep  8 05:01 test\n{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 6832.533,
+      "endedMs": 6918.289,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/retry-budget.js"
+      },
+      "output": {
+        "content": "1|// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\n2|export function nextRetry(o){\n3|  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n4|  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n5|    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n6|}\n7|",
+        "total_lines": 6,
+        "file_size": 355,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 8261.013,
+      "endedMs": 8339.293,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "search_files",
+      "category": "inspect",
+      "request": {
+        "pattern": "*",
+        "target": "files",
+        "path": "/workspace/test"
+      },
+      "output": {
+        "total_count": 1,
+        "files": [
+          "/workspace/test/public.test.js"
+        ]
+      },
+      "atMs": 8261.013,
+      "endedMs": 8365.325,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/public.test.js"
+      },
+      "output": {
+        "content": "1|import test from 'node:test';\n2|import assert from 'node:assert/strict';\n3|import {nextRetry} from '../retry-budget.js';\n4|const base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\n5|test('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\n6|test('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n7|",
+        "total_lines": 6,
+        "file_size": 515,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 9449.31,
+      "endedMs": 9530.191,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "path": "/workspace/retry-budget.js",
+        "content": "import {readFileSync, realpathSync} from 'node:fs';\nimport {fileURLToPath, pathToFileURL} from 'node:url';\n\nfunction isNonNegativeSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n\nexport function nextRetry(options){\n  if (typeof options !== 'object' || options === null || Array.isArray(options)){\n    throw new Error('options must be a non-null, non-array object');\n  }\n  const attempt = options.attempt;\n  const elapsedMs = options.elapsedMs;\n  const baseMs = options.baseMs;\n  const maxDelayMs = options.maxDelayMs;\n  const budgetMs = options.budgetMs;\n  const retryAfterMs = options.retryAfterMs;\n  const retryable = options.retryable;\n\n  if (!Number.isSafeInteger(attempt) || attempt < 1){\n    throw new Error('attempt must be a positive safe integer');\n  }\n  if (!isNonNegativeSafeInt(elapsedMs)){\n    throw new Error('elapsedMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(baseMs)){\n    throw new Error('baseMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(maxDelayMs)){\n    throw new Error('maxDelayMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(budgetMs)){\n    throw new Error('budgetMs must be a nonnegative safe integer');\n  }\n  if (retryAfterMs !== null && !isNonNegativeSafeInt(retryAfterMs)){\n    throw new Error('retryAfterMs must be null or a nonnegative safe integer');\n  }\n  if (typeof retryable !== 'boolean'){\n    throw new Error('retryable must be a boolean');\n  }\n\n  if (!retryable){\n    return {retry:false,delayMs:null,reason:'non-retryable'};\n  }\n\n  // baseMs * 2 ** (attempt - 1), capped at maxDelayMs. The power is exact in\n  // binary floating point until it overflows to Infinity, so min() saturates\n  // at maxDelayMs for huge attempts with no loop and no precision loss below\n  // the cap. A zero base means zero delay regardless of the attempt.\n  const expDelay = baseMs === 0\n    ? 0\n    : Math.min(maxDelayMs, baseMs * 2 ** (attempt - 1));\n  const wait = retryAfterMs === null ? expDelay : Math.max(expDelay, retryAfterMs);\n\n  if (elapsedMs > budgetMs || wait > budgetMs - elapsedMs){\n    return {retry:false,delayMs:null,reason:'budget-exhausted'};\n  }\n  return {retry:true,delayMs:wait,reason:'scheduled'};\n}\n\nfunction isMainModule(){\n  const entry = process.argv[1];\n  if (!entry) return false;\n  try {\n    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n  } catch {\n    return false;\n  }\n}\n\nfunction runCli(){\n  const args = process.argv.slice(2);\n  let parsed;\n  try {\n    if (args.length !== 1){\n      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n    }\n    const raw = readFileSync(args[0], 'utf8').replace(/^\\uFEFF/, '');\n    parsed = JSON.parse(raw);\n  } catch (err){\n    process.stderr.write(`retry-budget: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  let result;\n  try {\n    result = nextRetry(parsed);\n  } catch (err){\n    process.stderr.write(`retry-budget: invalid options: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  process.stdout.write(`${JSON.stringify(result)}\\n`);\n}\n\nif (isMainModule()){\n  runCli();\n}\n"
+      },
+      "output": {
+        "bytes_written": 3125,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/retry-budget.js",
+        "files_modified": [
+          "/workspace/retry-budget.js"
+        ]
+      },
+      "atMs": 172338.149,
+      "endedMs": 172608.968,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {execFile} from 'node:child_process';\nimport {promisify} from 'node:util';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join, resolve} from 'node:path';\nimport {nextRetry} from '../retry-budget.js';\n\nconst run = promisify(execFile);\nconst scriptPath = resolve(new URL('../retry-budget.js', import.meta.url).pathname);\nconst tmpRoot = mkdtempSync(join(tmpdir(), 'retry-budget-test-'));\nconst fixtures = [];\ntest.after(() => rmSync(tmpRoot, {recursive: true, force: true}));\n\nfunction fixture(name, content){\n  const file = join(tmpRoot, name);\n  writeFileSync(file, content);\n  fixtures.push(file);\n  return file;\n}\n\nconst base = {attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\n\ntest('exponential delay doubles per attempt and caps at maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 2}), {retry: true, delayMs: 20, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 3}), {retry: true, delayMs: 40, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('huge attempts cap without loops or overflow', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 10 ** 9}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 9007199254740991}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('zero base means zero delay even for huge attempts', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 0, attempt: 9007199254740991}),\n    {retry: true, delayMs: 0, reason: 'scheduled'},\n  );\n});\n\ntest('exact power-of-two delays stay precise', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 1, maxDelayMs: 9007199254740991, budgetMs: 9007199254740991, attempt: 40}),\n    {retry: true, delayMs: 549755813888, reason: 'scheduled'}, // 2**39\n  );\n});\n\ntest('retryAfterMs is a floor and is not capped by maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 50}), {retry: true, delayMs: 50, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 1000, budgetMs: 5000}), {retry: true, delayMs: 1000, reason: 'scheduled'});\n  // exponential below the hint loses\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 150, budgetMs: 5000}), {retry: true, delayMs: 150, reason: 'scheduled'});\n  // exponential above the hint wins\n  assert.deepEqual(nextRetry({...base, attempt: 5, retryAfterMs: 10}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('budget boundary: equality is allowed', () => {\n  // wait exactly fills the remaining budget\n  assert.deepEqual(nextRetry({...base, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // zero base with zero budget schedules at the boundary\n  assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n  // one tick over is exhausted\n  assert.deepEqual(nextRetry({...base, budgetMs: 99, elapsedMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  assert.deepEqual(nextRetry({...base, budgetMs: 0, elapsedMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('elapsedMs exceeding budgetMs is exhausted', () => {\n  assert.deepEqual(nextRetry({...base, elapsedMs: 1001, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('non-retryable returns the exact decision and ignores math', () => {\n  assert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\n});\n\ntest('extra fields are ignored', () => {\n  assert.deepEqual(nextRetry({...base, whatever: 42, label: 'x'}), {retry: true, delayMs: 10, reason: 'scheduled'});\n});\n\ntest('frozen input works and is not mutated', () => {\n  const frozen = Object.freeze({...base});\n  assert.deepEqual(nextRetry(frozen), {retry: true, delayMs: 10, reason: 'scheduled'});\n  const mutable = {...base};\n  const before = JSON.parse(JSON.stringify(mutable));\n  nextRetry(mutable);\n  assert.deepEqual(mutable, before);\n  const result = nextRetry(base);\n  assert.deepEqual(Object.keys(result).sort(), ['delayMs', 'reason', 'retry']);\n});\n\ntest('every field is validated even when retryable is false', () => {\n  const bad = (patch) => {\n    assert.throws(() => nextRetry({...base, retryable: false, ...patch}), Error);\n  };\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: -1});\n  bad({elapsedMs: -1});\n  bad({baseMs: -1});\n  bad({maxDelayMs: -1});\n  bad({budgetMs: -1});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: 1.5});\n});\n\ntest('invalid options throw', () => {\n  const throwsFor = (value) => assert.throws(() => nextRetry(value), Error);\n  throwsFor(null);\n  throwsFor(5);\n  throwsFor('nope');\n  throwsFor([1, 2, 3]);\n  throwsFor(undefined);\n  const bad = (patch) => throwsFor({...base, ...patch});\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: NaN});\n  bad({attempt: '1'});\n  bad({elapsedMs: -1});\n  bad({elapsedMs: 1.5});\n  bad({baseMs: -1});\n  bad({baseMs: '10'});\n  bad({maxDelayMs: -1});\n  bad({maxDelayMs: 1e21});\n  bad({budgetMs: -1});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: NaN});\n  bad({retryable: 'yes'});\n  bad({retryable: 1});\n  assert.throws(() => nextRetry({...base, attempt: 1} ? {...base} : undefined, ), undefined && null); // noop guard\n  // missing fields\n  const {retryAfterMs, ...withoutHint} = base;\n  throwsFor(withoutHint);\n});\n\ntest('CLI prints exactly one JSON value plus newline on success', async () => {\n  const file = fixture('ok.json', JSON.stringify(base));\n  const {stdout, stderr} = await run('node', [scriptPath, file]);\n  assert.equal(stdout, `${JSON.stringify({retry: true, delayMs: 10, reason: 'scheduled'})}\\n`);\n  assert.equal(stderr, '');\n});\n\ntest('CLI exits 0 for valid non-retry and budget-exhausted decisions', async () => {\n  const file = fixture('noretry.json', JSON.stringify({...base, retryable: false}));\n  const {stdout, stderr} = await run('node', [scriptPath, file]);\n  assert.equal(stdout, `${JSON.stringify({retry: false, delayMs: null, reason: 'non-retryable'})}\\n`);\n  assert.equal(stderr, '');\n\n  const exhausted = fixture('exhausted.json', JSON.stringify({...base, elapsedMs: 5000}));\n  const out = await run('node', [scriptPath, exhausted]);\n  assert.equal(out.stdout, `${JSON.stringify({retry: false, delayMs: null, reason: 'budget-exhausted'})}\\n`);\n  assert.equal(out.stderr, '');\n});\n\nasync function expectCliFailure(args, label){\n  await test(`${label} exits 2 with stderr and no stdout`, async () => {\n    let code, stdout, stderr;\n    try {\n      ({stdout, stderr} = await run('node', [scriptPath, ...args]));\n      code = 0;\n    } catch (err) {\n      code = err.code;\n      stdout = err.stdout;\n      stderr = err.stderr;\n    }\n    assert.equal(code, 2);\n    assert.equal(stdout, '');\n    assert.ok(stderr.length > 0);\n  });\n}\n\nawait expectCliFailure([], 'no arguments');\nawait expectCliFailure(['a.json', 'b.json'], 'two arguments');\nawait expectCliFailure([join(tmpRoot, 'missing.json')], 'missing file');\n\ntest('CLI rejects malformed JSON and invalid options', async () => {\n  await expectCliFailure([fixture('badjson.json', '{nope')], 'malformed JSON');\n  await expectCliFailure([fixture('null.json', 'null')], 'JSON null');\n  await expectCliFailure([fixture('array.json', '[1]')], 'JSON array');\n  await expectCliFailure([fixture('str.json', '\"hi\"')], 'JSON string');\n  await expectCliFailure([fixture('missing-field.json', JSON.stringify({attempt: 1}))], 'missing required fields');\n  await expectCliFailure([fixture('bad-attempt.json', JSON.stringify({...base, attempt: 0}))], 'attempt 0');\n  await expectCliFailure([fixture('bad-retryable.json', JSON.stringify({...base, retryable: 'yes'}))], 'retryable not a boolean');\n  await expectCliFailure([fixture('big-attempt.json', JSON.stringify({...base, attempt: 2 ** 53}))], 'attempt not a safe integer');\n});\n\ntest('importing the module does not run the CLI', async () => {\n  const {stdout, stderr} = await run('node', ['-e', `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`]);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n});\n",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "bytes_written": 8668,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/extended.test.js",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ]
+      },
+      "atMs": 240536.219,
+      "endedMs": 240744.031,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  bad({retryable: 'yes'});\n  bad({retryable: 1});\n  // missing fields",
+        "old_string": "  bad({retryable: 'yes'});\n  bad({retryable: 1});\n  assert.throws(() => nextRetry({...base, attempt: 1} ? {...base} : undefined, ), undefined && null); // noop guard\n  // missing fields",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -131,7 +131,6 @@\n   bad({retryAfterMs: NaN});\n   bad({retryable: 'yes'});\n   bad({retryable: 1});\n-  assert.throws(() => nextRetry({...base, attempt: 1} ? {...base} : undefined, ), undefined && null); // noop guard\n   // missing fields\n   const {retryAfterMs, ...withoutHint} = base;\n   throwsFor(withoutHint);\n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 246857.702,
+      "endedMs": 247082.568,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "import {fileURLToPath} from 'node:url';",
+        "old_string": "import {fileURLToPath, pathToFileURL} from 'node:url';",
+        "path": "/workspace/retry-budget.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/retry-budget.js\n+++ b//workspace/retry-budget.js\n@@ -1,5 +1,5 @@\n import {readFileSync, realpathSync} from 'node:fs';\n-import {fileURLToPath, pathToFileURL} from 'node:url';\n+import {fileURLToPath} from 'node:url';\n \n function isNonNegativeSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n \n",
+        "files_modified": [
+          "/workspace/retry-budget.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/retry-budget.js"
+      },
+      "atMs": 249854.902,
+      "endedMs": 250070.258,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test",
+        "timeout": 120
+      },
+      "output": {
+        "output": "> factory-retry-budget@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: exponential delay doubles per attempt and caps at maxDelayMs\nok 1 - exponential delay doubles per attempt and caps at maxDelayMs\n  ---\n  duration_ms: 1.213059\n  ...\n# Subtest: huge attempts cap without loops or overflow\nok 2 - huge attempts cap without loops or overflow\n  ---\n  duration_ms: 0.127421\n  ...\n# Subtest: zero base means zero delay even for huge attempts\nok 3 - zero base means zero delay even for huge attempts\n  ---\n  duration_ms: 0.146041\n  ...\n# Subtest: exact power-of-two delays stay precise\nok 4 - exact power-of-two delays stay precise\n  ---\n  duration_ms: 0.120881\n  ...\n# Subtest: retryAfterMs is a floor and is not capped by maxDelayMs\nok 5 - retryAfterMs is a floor and is not capped by maxDelayMs\n  ---\n  duration_ms: 0.141241\n  ...\n# Subtest: budget boundary: equality is allowed\nnot ok 6 - budget boundary: equality is allowed\n  ---\n  duration_ms: 1.482372\n  location: '/workspace/test/extended.test.js:60:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      {\n    +   delayMs: 10,\n    -   delayMs: 100,\n        reason: 'scheduled',\n        retry: true\n      }\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    retry: true\n    delayMs: 100\n    reason: 'scheduled'\n  actual:\n    retry: true\n    delayMs: 10\n    reason: 'scheduled'\n  operator: 'deepStrictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/extended.test.js:62:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: elapsedMs exceeding budgetMs is exhausted\nok 7 - elapsedMs exceeding budgetMs is exhausted\n  ---\n  duration_ms: 0.176022\n  ...\n# Subtest: non-retryable returns the exact decision and ignores math\nok 8 - non-retryable returns the exact decision and ignores math\n  ---\n  duration_ms: 0.150251\n  ...\n# Subtest: extra fields are ignored\nok 9 - extra fields are ignored\n  ---\n  duration_ms: 0.173641\n  ...\n# Subtest: frozen input works and is not mutated\nok 10 - frozen input works and is not mutated\n  ---\n  duration_ms: 0.224792\n  ...\n# Subtest: every field is validated even when retryable is false\nok 11 - every field is validated even when retryable is false\n  ---\n  duration_ms: 0.375833\n  ...\n# Subtest: invalid options throw\nok 12 - invalid options throw\n  ---\n  duration_ms: 0.327953\n  ...\n# Subtest: CLI prints exactly one JSON value plus newline on success\nok 13 - CLI prints exactly one JSON value plus newline on success\n  ---\n  duration_ms: 23.702771\n  ...\n# Subtest: CLI exits 0 for valid non-retry and budget-exhausted decisions\nok 14 - CLI exits 0 for valid non-retry and budget-exhausted decisions\n  ---\n  duration_ms: 42.786836\n  ...\n# Subtest: no arguments exits 2 with stderr and no stdout\nok 15 - no arguments exits 2 with stderr and no stdout\n  ---\n  duration_ms: 21.157941\n  ...\n# Subtest: two arguments exits 2 with stderr and no stdout\nok 16 - two arguments exits 2 with stderr and no stdout\n  ---\n  duration_ms: 21.251742\n  ...\n# Subtest: missing file exits 2 with stderr and no stdout\nok 17 - missing file exits 2 with stderr and no stdout\n  ---\n  duration_ms: 21.843477\n  ...\n# Subtest: CLI rejects malformed JSON and invalid options\nnot ok 18 - CLI rejects malformed JSON and invalid options\n  ---\n  duration_ms: 0.582605\n  location: '/workspace/test/extended.test.js:179:1'\n  failureType: 'testCodeFailure'\n  error: \"ENOENT: no such file or directory, open '/tmp/retry-budget-test-YVknFG/badjson.json'\"\n  code: 'ENOENT'\n  stack: |-\n    writeFileSync (node:fs:2368:20)\n    fixture (file:///workspace/test/extended.test.js:18:3)\n    TestContext.<anonymous> (file:///workspace/test/extended.test.js:180:27)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.start (node:internal/test_runner/test:702:17)\n    startSubtest (node:internal/test_runner/harness:259:17)\n    run (node:internal/test_runner/harness:267:14)\n    test (node:internal/test_runner/harness:278:12)\n    file:///workspace/test/extended.test.js:179:1\n  ...\n# Subtest: importing the module does not run the CLI\nok 19 - importing the module does not run the CLI\n  ---\n  duration_ms: 20.443916\n  ...\n# Subtest: first retry uses base delay\nok 20 - first retry uses base delay\n  ---\n  duration_ms: 1.25579\n  ...\n# Subtest: a valid non-retryable failure is an ordinary decision\nok 21 - a valid non-retryable failure is an ordinary decision\n  ---\n  duration_ms: 0.118911\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 19\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 195.635961\nnpm notice\nnpm notice New minor version of npm available! 11.5.2 -> 11.19.1\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1\nnpm notice To update run: npm install -g npm@11.19.1\nnpm notice",
+        "exit_code": 1,
+        "error": null,
+        "verification_evidence": {
+          "status": "failed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 249854.902,
+      "endedMs": 250728.026,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {execFile} from 'node:child_process';\nimport {promisify} from 'node:util';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join, resolve} from 'node:path';\nimport {nextRetry} from '../retry-budget.js';\n\nconst run = promisify(execFile);\nconst scriptPath = resolve(new URL('../retry-budget.js', import.meta.url).pathname);\n\n// Each test owns its own tmpdir and always removes it, even on assertion\n// failure, so parallel test files cannot interfere and nothing is left behind.\nasync function withFixture(name, content, fn){\n  const dir = mkdtempSync(join(tmpdir(), 'retry-budget-test-'));\n  try {\n    const file = join(dir, name);\n    writeFileSync(file, content);\n    return await fn(file);\n  } finally {\n    rmSync(dir, {recursive: true, force: true});\n  }\n}\n\nasync function cli(args, label){\n  let code, stdout, stderr;\n  try {\n    ({stdout, stderr} = await run('node', [scriptPath, ...args]));\n    code = 0;\n  } catch (err) {\n    code = err.code;\n    stdout = err.stdout;\n    stderr = err.stderr;\n  }\n  return {code, stdout, stderr, label};\n}\n\nasync function expectCliSuccess(file, expected){\n  const {code, stdout, stderr} = await cli([file], 'cli success');\n  assert.equal(code, 0);\n  assert.equal(stdout, `${JSON.stringify(expected)}\\n`);\n  assert.equal(stderr, '');\n}\n\nasync function expectCliFailure(args, label){\n  const {code, stdout, stderr} = await cli(args, label);\n  assert.equal(code, 2, `${label}: expected exit code 2, got ${code}; stderr=${stderr}`);\n  assert.equal(stdout, '', `${label}: expected empty stdout, got ${JSON.stringify(stdout)}`);\n  assert.ok(stderr.length > 0, `${label}: expected nonempty stderr`);\n}\n\nconst base = {attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\n\ntest('exponential delay doubles per attempt and caps at maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 2}), {retry: true, delayMs: 20, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 3}), {retry: true, delayMs: 40, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('huge attempts cap without loops or overflow', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 10 ** 9}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 9007199254740991}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('zero base means zero delay even for huge attempts', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 0, attempt: 9007199254740991}),\n    {retry: true, delayMs: 0, reason: 'scheduled'},\n  );\n});\n\ntest('exact power-of-two delays stay precise', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 1, maxDelayMs: 9007199254740991, budgetMs: 9007199254740991, attempt: 40}),\n    {retry: true, delayMs: 549755813888, reason: 'scheduled'}, // 2**39\n  );\n});\n\ntest('retryAfterMs is a floor and is not capped by maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 50}), {retry: true, delayMs: 50, reason: 'scheduled'});\n  // hint above maxDelayMs is honored, not capped\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 1000, budgetMs: 5000}), {retry: true, delayMs: 1000, reason: 'scheduled'});\n  // exponential below the hint loses\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 150, budgetMs: 5000}), {retry: true, delayMs: 150, reason: 'scheduled'});\n  // exponential above the hint wins\n  assert.deepEqual(nextRetry({...base, attempt: 5, retryAfterMs: 10}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // hint at zero behaves like the exponential value\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 0}), {retry: true, delayMs: 10, reason: 'scheduled'});\n});\n\ntest('budget boundary: equality is allowed', () => {\n  // wait exactly fills the whole budget\n  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // wait exactly fills the remaining budget\n  assert.deepEqual(nextRetry({...base, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // zero base with zero budget schedules exactly at the boundary\n  assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n  // hint scheduling exactly at the boundary\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 990, budgetMs: 990}), {retry: true, delayMs: 990, reason: 'scheduled'});\n  // one tick over is exhausted\n  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 99}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  assert.deepEqual(nextRetry({...base, elapsedMs: 501, budgetMs: 600}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  assert.deepEqual(nextRetry({...base, budgetMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('elapsedMs exceeding budgetMs is exhausted', () => {\n  assert.deepEqual(nextRetry({...base, elapsedMs: 1001, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  // equal elapsed/budget is not \"exceeds\"; the wait still decides\n  assert.deepEqual(nextRetry({...base, elapsedMs: 1000, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('non-retryable returns the exact decision and ignores math', () => {\n  assert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\n  // even an unbounded hint cannot make it retry\n  assert.deepEqual(nextRetry({...base, retryable: false, retryAfterMs: 1}), {retry: false, delayMs: null, reason: 'non-retryable'});\n});\n\ntest('extra fields are ignored', () => {\n  assert.deepEqual(nextRetry({...base, whatever: 42, label: 'x', [Symbol.for('x')]: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n});\n\ntest('frozen input works and is not mutated', () => {\n  const frozen = Object.freeze({...base, retryAfterMs: null});\n  assert.deepEqual(nextRetry(frozen), {retry: true, delayMs: 10, reason: 'scheduled'});\n  const mutable = {...base};\n  const before = JSON.parse(JSON.stringify(mutable));\n  nextRetry(mutable);\n  assert.deepEqual(mutable, before);\n  const result = nextRetry(base);\n  assert.deepEqual(Object.keys(result).sort(), ['delayMs', 'reason', 'retry']);\n});\n\ntest('every field is validated even when retryable is false', () => {\n  const bad = (patch) => {\n    assert.throws(() => nextRetry({...base, retryable: false, ...patch}), Error);\n  };\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: -1});\n  bad({elapsedMs: -1});\n  bad({elapsedMs: 1.5});\n  bad({baseMs: -1});\n  bad({maxDelayMs: -1});\n  bad({budgetMs: -1});\n  bad({budgetMs: 1.5});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: 1.5});\n});\n\ntest('invalid options throw', () => {\n  const throwsFor = (value) => assert.throws(() => nextRetry(value), Error);\n  throwsFor(null);\n  throwsFor(undefined);\n  throwsFor(5);\n  throwsFor('nope');\n  throwsFor([1, 2, 3]);\n  const bad = (patch) => throwsFor({...base, ...patch});\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: NaN});\n  bad({attempt: '1'});\n  bad({attempt: -1});\n  bad({elapsedMs: -1});\n  bad({elapsedMs: 1.5});\n  bad({elapsedMs: null});\n  bad({baseMs: -1});\n  bad({baseMs: '10'});\n  bad({maxDelayMs: -1});\n  bad({maxDelayMs: 1e21});\n  bad({budgetMs: -1});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: NaN});\n  bad({retryable: 'yes'});\n  bad({retryable: 1});\n  bad({retryable: null});\n  // missing required fields\n  for (const key of ['attempt', 'elapsedMs', 'baseMs', 'maxDelayMs', 'budgetMs', 'retryable']) {\n    const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...rest} = base;\n    throwsFor(key === 'attempt' ? {...rest, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable} : {...base, [key]: undefined});\n  }\n  const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...withoutRetryable} = base;\n  throwsFor({...attempt: 1, ...withoutRetryable});\n});\n\ntest('CLI prints exactly one JSON value plus newline on success', async () => {\n  await withFixture('ok.json', JSON.stringify(base), (file) =>\n    expectCliSuccess(file, {retry: true, delayMs: 10, reason: 'scheduled'}),\n  );\n});\n\ntest('CLI exits 0 for valid non-retry and budget-exhausted decisions', async () => {\n  await withFixture('noretry.json', JSON.stringify({...base, retryable: false}), (file) =>\n    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'non-retryable'}),\n  );\n  await withFixture('exhausted.json', JSON.stringify({...base, elapsedMs: 5000}), (file) =>\n    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'budget-exhausted'}),\n  );\n  await withFixture('hint.json', JSON.stringify({...base, retryAfterMs: 1000, budgetMs: 5000}), (file) =>\n    expectCliSuccess(file, {retry: true, delayMs: 1000, reason: 'scheduled'}),\n  );\n});\n\ntest('CLI argument and file failures exit 2 with stderr and no stdout', async () => {\n  await expectCliFailure([], 'no arguments');\n  await expectCliFailure(['a.json', 'b.json'], 'two arguments');\n  await expectCliFailure([join(tmpdir(), 'retry-budget-definitely-missing-file.json')], 'missing file');\n});\n\ntest('CLI rejects malformed JSON and invalid options', async () => {\n  const cases = [\n    ['badjson.json', '{nope', 'malformed JSON'],\n    ['null.json', 'null', 'JSON null'],\n    ['array.json', '[1]', 'JSON array'],\n    ['str.json', '\"hi\"', 'JSON string'],\n    ['missing-field.json', JSON.stringify({attempt: 1}), 'missing required fields'],\n    ['bad-attempt.json', JSON.stringify({...base, attempt: 0}), 'attempt 0'],\n    ['bad-retryable.json', JSON.stringify({...base, retryable: 'yes'}), 'retryable not a boolean'],\n    ['big-attempt.json', JSON.stringify({...base, attempt: 2 ** 53}), 'attempt not a safe integer'],\n    ['negative-base.json', JSON.stringify({...base, baseMs: -1}), 'negative baseMs'],\n  ];\n  for (const [name, content, label] of cases) {\n    await withFixture(name, content, (file) => expectCliFailure([file], label));\n  }\n});\n\ntest('importing the module does not run the CLI', async () => {\n  const {code, stdout, stderr} = await cli([], 'import check (no args to -e)');\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n  const {code: code2, stdout: out2, stderr: err2} = await run('node', [\n    '-e',\n    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n  ]);\n  assert.equal(code2, 0);\n  assert.equal(out2, '');\n  assert.equal(err2, '');\n});\n",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "bytes_written": 10852,
+        "dirs_created": true,
+        "verified": true,
+        "lint": {
+          "status": "error",
+          "output": "/workspace/test/extended.test.js:186\n  throwsFor({...attempt: 1, ...withoutRetryable});\n                       ^\n\nSyntaxError: Unexpected token ':'\n    at checkSyntax (node:internal/main/check_syntax:74:5)\n\nNode.js v20.19.4",
+          "message": "Pre-existing lint errors \u2014 this edit didn't introduce new ones but the file is still broken."
+        },
+        "resolved_path": "/workspace/test/extended.test.js",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ]
+      },
+      "atMs": 383390.639,
+      "endedMs": 383587.53,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  throwsFor({...withoutRetryable, attempt: 1});",
+        "old_string": "  throwsFor({...attempt: 1, ...withoutRetryable});",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -183,7 +183,7 @@\n     throwsFor(key === 'attempt' ? {...rest, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable} : {...base, [key]: undefined});\n   }\n   const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...withoutRetryable} = base;\n-  throwsFor({...attempt: 1, ...withoutRetryable});\n+  throwsFor({...withoutRetryable, attempt: 1});\n });\n \n test('CLI prints exactly one JSON value plus newline on success', async () => {\n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 387610.804,
+      "endedMs": 387834.384,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-11"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | tail -30",
+        "timeout": 120
+      },
+      "output": {
+        "output": "code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 2\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/extended.test.js:232:10)\n    process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    async Test.run (node:internal/test_runner/test:797:9)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: first retry uses base delay\nok 18 - first retry uses base delay\n  ---\n  duration_ms: 1.188909\n  ...\n# Subtest: a valid non-retryable failure is an ordinary decision\nok 19 - a valid non-retryable failure is an ordinary decision\n  ---\n  duration_ms: 0.121371\n  ...\n1..19\n# tests 19\n# suites 0\n# pass 17\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 403.99934",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 390635.576,
+      "endedMs": 391291.865,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-12"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -E \"^(not ok|ok [0-9]+ -)\" ",
+        "timeout": 120
+      },
+      "output": {
+        "output": "ok 1 - exponential delay doubles per attempt and caps at maxDelayMs\nok 2 - huge attempts cap without loops or overflow\nok 3 - zero base means zero delay even for huge attempts\nok 4 - exact power-of-two delays stay precise\nok 5 - retryAfterMs is a floor and is not capped by maxDelayMs\nnot ok 6 - budget boundary: equality is allowed\nok 7 - elapsedMs exceeding budgetMs is exhausted\nok 8 - non-retryable returns the exact decision and ignores math\nok 9 - extra fields are ignored\nok 10 - frozen input works and is not mutated\nok 11 - every field is validated even when retryable is false\nok 12 - invalid options throw\nok 13 - CLI prints exactly one JSON value plus newline on success\nok 14 - CLI exits 0 for valid non-retry and budget-exhausted decisions\nok 15 - CLI argument and file failures exit 2 with stderr and no stdout\nok 16 - CLI rejects malformed JSON and invalid options\nnot ok 17 - importing the module does not run the CLI\nok 18 - first retry uses base delay\nok 19 - a valid non-retryable failure is an ordinary decision",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 393734.51,
+      "endedMs": 394398.815,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-13"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --test test/extended.test.js 2>&1 | grep -A12 \"budget boundary\"",
+        "timeout": 60
+      },
+      "output": {
+        "output": "# Subtest: budget boundary: equality is allowed\nnot ok 6 - budget boundary: equality is allowed\n  ---\n  duration_ms: 1.492431\n  location: '/workspace/test/extended.test.js:93:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      {\n    +   delayMs: 10,\n    -   delayMs: 100,\n        reason: 'scheduled',",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 401891.703,
+      "endedMs": 402487.895,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-14"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/extended.test.js",
+        "offset": 88,
+        "limit": 20
+      },
+      "output": {
+        "content": "88|  assert.deepEqual(nextRetry({...base, attempt: 5, retryAfterMs: 10}), {retry: true, delayMs: 100, reason: 'scheduled'});\n89|  // hint at zero behaves like the exponential value\n90|  assert.deepEqual(nextRetry({...base, retryAfterMs: 0}), {retry: true, delayMs: 10, reason: 'scheduled'});\n91|});\n92|\n93|test('budget boundary: equality is allowed', () => {\n94|  // wait exactly fills the whole budget\n95|  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n96|  // wait exactly fills the remaining budget\n97|  assert.deepEqual(nextRetry({...base, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n98|  // zero base with zero budget schedules exactly at the boundary\n99|  assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n100|  // hint scheduling exactly at the boundary\n101|  assert.deepEqual(nextRetry({...base, retryAfterMs: 990, budgetMs: 990}), {retry: true, delayMs: 990, reason: 'scheduled'});\n102|  // one tick over is exhausted\n103|  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 99}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n104|  assert.deepEqual(nextRetry({...base, elapsedMs: 501, budgetMs: 600}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n105|  assert.deepEqual(nextRetry({...base, budgetMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n106|});\n107|\n108|",
+        "total_lines": 242,
+        "file_size": 10849,
+        "truncated": true,
+        "hint": "Use offset=108 to continue reading (showing 88-107 of 242 lines)",
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 407922.767,
+      "endedMs": 408003.234,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-15"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  // wait exactly fills the remaining budget\n  assert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});",
+        "old_string": "  // wait exactly fills the remaining budget\n  assert.deepEqual(nextRetry({...base, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -94,7 +94,7 @@\n   // wait exactly fills the whole budget\n   assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n   // wait exactly fills the remaining budget\n-  assert.deepEqual(nextRetry({...base, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+  assert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n   // zero base with zero budget schedules exactly at the boundary\n   assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n   // hint scheduling exactly at the boundary\n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "_warning": "/workspace/test/extended.test.js was last read with offset/limit pagination (partial view). Re-read the whole file before overwriting it.",
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 419514.991,
+      "endedMs": 419730.96,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-16"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "test('importing the module does not run the CLI', async () => {\n  const {code, stdout, stderr} = await run('node', [\n    '-e',\n    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n  ]);\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n});",
+        "old_string": "test('importing the module does not run the CLI', async () => {\n  const {code, stdout, stderr} = await cli([], 'import check (no args to -e)');\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n  const {code: code2, stdout: out2, stderr: err2} = await run('node', [\n    '-e',\n    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n  ]);\n  assert.equal(code2, 0);\n  assert.equal(out2, '');\n  assert.equal(err2, '');\n});",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -228,15 +228,11 @@\n });\n \n test('importing the module does not run the CLI', async () => {\n-  const {code, stdout, stderr} = await cli([], 'import check (no args to -e)');\n+  const {code, stdout, stderr} = await run('node', [\n+    '-e',\n+    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n+  ]);\n   assert.equal(code, 0);\n   assert.equal(stdout, '');\n   assert.equal(stderr, '');\n-  const {code: code2, stdout: out2, stderr: err2} = await run('node', [\n-    '-e',\n-    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n-  ]);\n-  assert.equal(code2, 0);\n-  assert.equal(out2, '');\n-  assert.equal(err2, '');\n-});\n+});\n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 419514.991,
+      "endedMs": 419953.452,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-17"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -E \"^(not ok|ok [0-9]+ -|# (tests|pass|fail|suites))\"",
+        "timeout": 120
+      },
+      "output": {
+        "output": "ok 1 - exponential delay doubles per attempt and caps at maxDelayMs\nok 2 - huge attempts cap without loops or overflow\nok 3 - zero base means zero delay even for huge attempts\nok 4 - exact power-of-two delays stay precise\nok 5 - retryAfterMs is a floor and is not capped by maxDelayMs\nnot ok 6 - budget boundary: equality is allowed\nok 7 - elapsedMs exceeding budgetMs is exhausted\nok 8 - non-retryable returns the exact decision and ignores math\nok 9 - extra fields are ignored\nok 10 - frozen input works and is not mutated\nok 11 - every field is validated even when retryable is false\nok 12 - invalid options throw\nok 13 - CLI prints exactly one JSON value plus newline on success\nok 14 - CLI exits 0 for valid non-retry and budget-exhausted decisions\nok 15 - CLI argument and file failures exit 2 with stderr and no stdout\nok 16 - CLI rejects malformed JSON and invalid options\nnot ok 17 - importing the module does not run the CLI\nok 18 - first retry uses base delay\nok 19 - a valid non-retryable failure is an ordinary decision\n# tests 19\n# suites 0\n# pass 17\n# fail 2",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 423014.019,
+      "endedMs": 423696.974,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-18"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --test test/extended.test.js 2>&1 | grep -B2 -A20 \"not ok 6\"",
+        "timeout": 60
+      },
+      "output": {
+        "output": "...\n# Subtest: budget boundary: equality is allowed\nnot ok 6 - budget boundary: equality is allowed\n  ---\n  duration_ms: 1.518771\n  location: '/workspace/test/extended.test.js:93:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      {\n    +   delayMs: 10,\n    +   reason: 'scheduled',\n    +   retry: true\n    -   delayMs: null,\n    -   reason: 'budget-exhausted',\n    -   retry: false\n      }\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    retry: false",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 427453.214,
+      "endedMs": 428049.712,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-19"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "  assert.deepEqual(nextRetry({...base, elapsedMs: 601, budgetMs: 610}), {retry: false, delayMs: null, reason: 'budget-exhausted'});",
+        "old_string": "  assert.deepEqual(nextRetry({...base, elapsedMs: 501, budgetMs: 600}), {retry: false, delayMs: null, reason: 'budget-exhausted'});",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -101,7 +101,7 @@\n   assert.deepEqual(nextRetry({...base, retryAfterMs: 990, budgetMs: 990}), {retry: true, delayMs: 990, reason: 'scheduled'});\n   // one tick over is exhausted\n   assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 99}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n-  assert.deepEqual(nextRetry({...base, elapsedMs: 501, budgetMs: 600}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+  assert.deepEqual(nextRetry({...base, elapsedMs: 601, budgetMs: 610}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n   assert.deepEqual(nextRetry({...base, budgetMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n });\n \n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 444360.372,
+      "endedMs": 444586.525,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-20"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node --test test/extended.test.js 2>&1 | grep -B2 -A20 \"not ok 17\"",
+        "timeout": 60
+      },
+      "output": {
+        "output": "...\n# Subtest: importing the module does not run the CLI\nnot ok 17 - importing the module does not run the CLI\n  ---\n  duration_ms: 20.311472\n  location: '/workspace/test/extended.test.js:230:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    undefined !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///workspace/test/extended.test.js:235:10)\n    process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    async Test.run (node:internal/test_runner/test:797:9)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n1..17",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 447853.123,
+      "endedMs": 448449.653,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-21"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/extended.test.js",
+        "offset": 1,
+        "limit": 40
+      },
+      "output": {
+        "content": "1|import test from 'node:test';\n2|import assert from 'node:assert/strict';\n3|import {execFile} from 'node:child_process';\n4|import {promisify} from 'node:util';\n5|import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\n6|import {tmpdir} from 'node:os';\n7|import {join, resolve} from 'node:path';\n8|import {nextRetry} from '../retry-budget.js';\n9|\n10|const run = promisify(execFile);\n11|const scriptPath = resolve(new URL('../retry-budget.js', import.meta.url).pathname);\n12|\n13|// Each test owns its own tmpdir and always removes it, even on assertion\n14|// failure, so parallel test files cannot interfere and nothing is left behind.\n15|async function withFixture(name, content, fn){\n16|  const dir = mkdtempSync(join(tmpdir(), 'retry-budget-test-'));\n17|  try {\n18|    const file = join(dir, name);\n19|    writeFileSync(file, content);\n20|    return await fn(file);\n21|  } finally {\n22|    rmSync(dir, {recursive: true, force: true});\n23|  }\n24|}\n25|\n26|async function cli(args, label){\n27|  let code, stdout, stderr;\n28|  try {\n29|    ({stdout, stderr} = await run('node', [scriptPath, ...args]));\n30|    code = 0;\n31|  } catch (err) {\n32|    code = err.code;\n33|    stdout = err.stdout;\n34|    stderr = err.stderr;\n35|  }\n36|  return {code, stdout, stderr, label};\n37|}\n38|\n39|async function expectCliSuccess(file, expected){\n40|  const {code, stdout, stderr} = await cli([file], 'cli success');\n41|",
+        "total_lines": 238,
+        "file_size": 10684,
+        "truncated": true,
+        "hint": "Use offset=41 to continue reading (showing 1-40 of 238 lines)",
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 519893.159,
+      "endedMs": 519978.312,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-22"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "path": "/workspace/test/extended.test.js",
+        "offset": 228,
+        "limit": 11
+      },
+      "output": {
+        "content": "228|});\n229|\n230|test('importing the module does not run the CLI', async () => {\n231|  const {code, stdout, stderr} = await run('node', [\n232|    '-e',\n233|    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n234|  ]);\n235|  assert.equal(code, 0);\n236|  assert.equal(stdout, '');\n237|  assert.equal(stderr, '');\n238|});\n239|",
+        "total_lines": 238,
+        "file_size": 10684,
+        "truncated": false,
+        "is_binary": false,
+        "is_image": false
+      },
+      "atMs": 522182.231,
+      "endedMs": 522271.235,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-23"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "mode": "replace",
+        "new_string": "test('importing the module does not run the CLI', async () => {\n  let code, stdout, stderr;\n  try {\n    ({stdout, stderr} = await run('node', [\n      '-e',\n      `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n    ]));\n    code = 0;\n  } catch (err) {\n    code = err.code;\n    stdout = err.stdout;\n    stderr = err.stderr;\n  }\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n});",
+        "old_string": "test('importing the module does not run the CLI', async () => {\n  const {code, stdout, stderr} = await run('node', [\n    '-e',\n    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n  ]);\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n});",
+        "path": "/workspace/test/extended.test.js"
+      },
+      "output": {
+        "success": true,
+        "diff": "--- a//workspace/test/extended.test.js\n+++ b//workspace/test/extended.test.js\n@@ -228,10 +228,18 @@\n });\n \n test('importing the module does not run the CLI', async () => {\n-  const {code, stdout, stderr} = await run('node', [\n-    '-e',\n-    `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n-  ]);\n+  let code, stdout, stderr;\n+  try {\n+    ({stdout, stderr} = await run('node', [\n+      '-e',\n+      `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n+    ]));\n+    code = 0;\n+  } catch (err) {\n+    code = err.code;\n+    stdout = err.stdout;\n+    stderr = err.stderr;\n+  }\n   assert.equal(code, 0);\n   assert.equal(stdout, '');\n   assert.equal(stderr, '');\n",
+        "files_modified": [
+          "/workspace/test/extended.test.js"
+        ],
+        "lint": {
+          "status": "ok",
+          "output": ""
+        },
+        "_warning": "/workspace/test/extended.test.js was last read with offset/limit pagination (partial view). Re-read the whole file before overwriting it.",
+        "resolved_path": "/workspace/test/extended.test.js"
+      },
+      "atMs": 527397.979,
+      "endedMs": 527621.902,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-24"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && npm test 2>&1 | grep -E \"^(not ok|ok [0-9]+ -|# (tests|pass|fail|suites))\"",
+        "timeout": 120
+      },
+      "output": {
+        "output": "ok 1 - exponential delay doubles per attempt and caps at maxDelayMs\nok 2 - huge attempts cap without loops or overflow\nok 3 - zero base means zero delay even for huge attempts\nok 4 - exact power-of-two delays stay precise\nok 5 - retryAfterMs is a floor and is not capped by maxDelayMs\nok 6 - budget boundary: equality is allowed\nok 7 - elapsedMs exceeding budgetMs is exhausted\nok 8 - non-retryable returns the exact decision and ignores math\nok 9 - extra fields are ignored\nok 10 - frozen input works and is not mutated\nok 11 - every field is validated even when retryable is false\nok 12 - invalid options throw\nok 13 - CLI prints exactly one JSON value plus newline on success\nok 14 - CLI exits 0 for valid non-retry and budget-exhausted decisions\nok 15 - CLI argument and file failures exit 2 with stderr and no stdout\nok 16 - CLI rejects malformed JSON and invalid options\nok 17 - importing the module does not run the CLI\nok 18 - first retry uses base delay\nok 19 - a valid non-retryable failure is an ordinary decision\n# tests 19\n# suites 0\n# pass 19\n# fail 0",
+        "exit_code": 0,
+        "error": null,
+        "verification_evidence": {
+          "status": "passed",
+          "kind": "test",
+          "scope": "full",
+          "canonical_command": "npm run test"
+        }
+      },
+      "atMs": 531066.318,
+      "endedMs": 531722.888,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-25"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && node -e '\nimport(\"./retry-budget.js\").then(({nextRetry}) => {\n  // huge attempt, no overflow\n  console.log(JSON.stringify(nextRetry({attempt: 2**30, elapsedMs: 0, baseMs: 10, maxDelayMs: 1000, budgetMs: 100000, retryAfterMs: null, retryable: true})));\n  // zero base, huge attempt\n  console.log(JSON.stringify(nextRetry({attempt: Number.MAX_SAFE_INTEGER, elapsedMs: 0, baseMs: 0, maxDelayMs: 100, budgetMs: 0, retryAfterMs: null, retryable: true})));\n  // hint not capped by maxDelayMs\n  console.log(JSON.stringify(nextRetry({attempt: 1, elapsedMs: 0, baseMs: 10, maxDelayMs: 100, budgetMs: 10000, retryAfterMs: 9999, retryable: true})));\n  // frozen input\n  console.log(JSON.stringify(nextRetry(Object.freeze({attempt: 1, elapsedMs: 0, baseMs: 10, maxDelayMs: 100, budgetMs: 100, retryAfterMs: null, retryable: false, extra: 1}))));\n  // boundary equality\n  console.log(JSON.stringify(nextRetry({attempt: 1, elapsedMs: 90, baseMs: 10, maxDelayMs: 100, budgetMs: 100, retryAfterMs: null, retryable: true})));\n});'",
+        "timeout": 60
+      },
+      "output": {
+        "output": "{\"retry\":true,\"delayMs\":1000,\"reason\":\"scheduled\"}\n{\"retry\":true,\"delayMs\":0,\"reason\":\"scheduled\"}\n{\"retry\":true,\"delayMs\":9999,\"reason\":\"scheduled\"}\n{\"retry\":false,\"delayMs\":null,\"reason\":\"non-retryable\"}\n{\"retry\":true,\"delayMs\":10,\"reason\":\"scheduled\"}",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 548398.279,
+      "endedMs": 548470.748,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-26"
+    },
+    {
+      "name": "terminal",
+      "category": "command",
+      "request": {
+        "command": "cd /workspace && tmp=$(mktemp -d) && printf '%s' '{\"attempt\":3,\"elapsedMs\":5,\"baseMs\":10,\"maxDelayMs\":100,\"budgetMs\":1000,\"retryAfterMs\":null,\"retryable\":true}' > \"$tmp/a.json\" && node retry-budget.js \"$tmp/a.json\" | od -c | tail -3 && node retry-budget.js \"$tmp/a.json\" 2> \"$tmp/err\" ; echo \"success-exit=$? stderr-bytes=$(wc -c < \"$tmp/err\")\" && node retry-budget.js 2>/dev/null; echo \"noargs-exit=$?\" && node retry-budget.js \"$tmp/a.json\" extra 2>/dev/null; echo \"twoargs-exit=$?\" && node retry-budget.js /nonexistent.json 2>/dev/null; echo \"missingfile-exit=$?\" && printf 'not json' > \"$tmp/bad.json\" && node retry-budget.js \"$tmp/bad.json\" >/dev/null 2>&1; echo \"badjson-exit=$?\" && printf '%s' '[\"array\"]' > \"$tmp/arr.json\" && node retry-budget.js \"$tmp/arr.json\" >/dev/null 2>&1; echo \"array-exit=$?\" && rm -rf \"$tmp\"",
+        "timeout": 120
+      },
+      "output": {
+        "output": "0000040   o   n   \"   :   \"   s   c   h   e   d   u   l   e   d   \"   }\n0000060  \\n\n0000061\n{\"retry\":true,\"delayMs\":40,\"reason\":\"scheduled\"}\nsuccess-exit=0 stderr-bytes=0\nnoargs-exit=2\ntwoargs-exit=2\nmissingfile-exit=2\nbadjson-exit=2\narray-exit=2",
+        "exit_code": 0,
+        "error": null
+      },
+      "atMs": 548398.279,
+      "endedMs": 548664.785,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-27"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "All verified. Everything passes:\n\n**`npm test`: 19/19 pass** (public test + 18 extended tests).\n\nFinal contract checks (all real execution):\n\nAPI-level:\n- `attempt: 2**30` and `MAX_SAFE_INTEGER` \u2192 capped at maxDelayMs, no overflow, no loops\n- zero base + huge attempt + zero budget \u2192 `{retry:true, delayMs:0, reason:'scheduled'}` (equality at boundary allowed)\n- `retryAfterMs: 9999` with `maxDelayMs: 100` \u2192 `delayMs: 9999` (hint not capped)\n- frozen input + extra fields \u2192 works, ignored\n- `elapsedMs: 90` + wait 10 = budget 100 \u2192 `scheduled` (boundary equality)\n\nCLI:\n- success prints exactly `{\"retry\":true,\"delayMs\":40,\"reason\":\"scheduled\"}` + one `\\n` (byte-checked with `od`), exit 0, zero stderr bytes\n- no args / two args / missing file / malformed JSON / JSON array \u2192 all exit 2 with nonempty stderr and no stdout\n\nFiles:\n- /workspace/retry-budget.js \u2014 repaired `nextRetry(options)`: pure (no sleep/clock/network), validates all fields as safe integers (positive for attempt, nonnegative for the rest, null-or-nonnegative for retryAfterMs, boolean retryable, non-null non-array object), exponential delay via `baseMs === 0 ? 0 : Math.min(baseMs * 2 ** (attempt - 1), maxDelayMs)`, hint floor via `Math.max(delay, retryAfterMs)`, budget check `wait > budgetMs - elapsedMs` \u2192 `budget-exhausted`, exact object literals for all three outcomes; CLI gated on `process.argv[1]` realpath match so importing never runs it\n- /workspace/test/extended.test.js \u2014 new tests; each CLI test owns its own tmpdir fixture under `os.tmpdir()` and removes it in a `finally` block, so the read-only workspace stays clean\n\nThe two failures I fixed along the way were both bugs in my own tests (a wrong expected value \u2014 10 vs 100 \u2014 and `test.after` deleting a shared tmpdir out from under pending subtests), not in the implementation.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "afterSha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "before": "{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "diff": ""
+    },
+    {
+      "path": "retry-budget.js",
+      "state": "changed",
+      "beforeSha256": "c7e286124dcb89878660e22ada1a73e85aa54c4aec5d05af484c687f3a28bd80",
+      "afterSha256": "542dfcaaaa04aeabc855db898ee1bdf338db8c999c31b2f8c64713e9146ddc5a",
+      "before": "// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\nexport function nextRetry(o){\n  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n}\n",
+      "after": "import {readFileSync, realpathSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\n\nfunction isNonNegativeSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n\nexport function nextRetry(options){\n  if (typeof options !== 'object' || options === null || Array.isArray(options)){\n    throw new Error('options must be a non-null, non-array object');\n  }\n  const attempt = options.attempt;\n  const elapsedMs = options.elapsedMs;\n  const baseMs = options.baseMs;\n  const maxDelayMs = options.maxDelayMs;\n  const budgetMs = options.budgetMs;\n  const retryAfterMs = options.retryAfterMs;\n  const retryable = options.retryable;\n\n  if (!Number.isSafeInteger(attempt) || attempt < 1){\n    throw new Error('attempt must be a positive safe integer');\n  }\n  if (!isNonNegativeSafeInt(elapsedMs)){\n    throw new Error('elapsedMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(baseMs)){\n    throw new Error('baseMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(maxDelayMs)){\n    throw new Error('maxDelayMs must be a nonnegative safe integer');\n  }\n  if (!isNonNegativeSafeInt(budgetMs)){\n    throw new Error('budgetMs must be a nonnegative safe integer');\n  }\n  if (retryAfterMs !== null && !isNonNegativeSafeInt(retryAfterMs)){\n    throw new Error('retryAfterMs must be null or a nonnegative safe integer');\n  }\n  if (typeof retryable !== 'boolean'){\n    throw new Error('retryable must be a boolean');\n  }\n\n  if (!retryable){\n    return {retry:false,delayMs:null,reason:'non-retryable'};\n  }\n\n  // baseMs * 2 ** (attempt - 1), capped at maxDelayMs. The power is exact in\n  // binary floating point until it overflows to Infinity, so min() saturates\n  // at maxDelayMs for huge attempts with no loop and no precision loss below\n  // the cap. A zero base means zero delay regardless of the attempt.\n  const expDelay = baseMs === 0\n    ? 0\n    : Math.min(maxDelayMs, baseMs * 2 ** (attempt - 1));\n  const wait = retryAfterMs === null ? expDelay : Math.max(expDelay, retryAfterMs);\n\n  if (elapsedMs > budgetMs || wait > budgetMs - elapsedMs){\n    return {retry:false,delayMs:null,reason:'budget-exhausted'};\n  }\n  return {retry:true,delayMs:wait,reason:'scheduled'};\n}\n\nfunction isMainModule(){\n  const entry = process.argv[1];\n  if (!entry) return false;\n  try {\n    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n  } catch {\n    return false;\n  }\n}\n\nfunction runCli(){\n  const args = process.argv.slice(2);\n  let parsed;\n  try {\n    if (args.length !== 1){\n      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n    }\n    const raw = readFileSync(args[0], 'utf8').replace(/^\\uFEFF/, '');\n    parsed = JSON.parse(raw);\n  } catch (err){\n    process.stderr.write(`retry-budget: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  let result;\n  try {\n    result = nextRetry(parsed);\n  } catch (err){\n    process.stderr.write(`retry-budget: invalid options: ${err.message}\\n`);\n    process.exitCode = 2;\n    return;\n  }\n  process.stdout.write(`${JSON.stringify(result)}\\n`);\n}\n\nif (isMainModule()){\n  runCli();\n}\n",
+      "displaySha256": "542dfcaaaa04aeabc855db898ee1bdf338db8c999c31b2f8c64713e9146ddc5a",
+      "diff": "--- starter/retry-budget.js\n+++ delivered/retry-budget.js\n@@ -1,6 +1,96 @@\n-// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\n-export function nextRetry(o){\n-  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n-  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n-    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n+import {readFileSync, realpathSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n+\n+function isNonNegativeSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n+\n+export function nextRetry(options){\n+  if (typeof options !== 'object' || options === null || Array.isArray(options)){\n+    throw new Error('options must be a non-null, non-array object');\n+  }\n+  const attempt = options.attempt;\n+  const elapsedMs = options.elapsedMs;\n+  const baseMs = options.baseMs;\n+  const maxDelayMs = options.maxDelayMs;\n+  const budgetMs = options.budgetMs;\n+  const retryAfterMs = options.retryAfterMs;\n+  const retryable = options.retryable;\n+\n+  if (!Number.isSafeInteger(attempt) || attempt < 1){\n+    throw new Error('attempt must be a positive safe integer');\n+  }\n+  if (!isNonNegativeSafeInt(elapsedMs)){\n+    throw new Error('elapsedMs must be a nonnegative safe integer');\n+  }\n+  if (!isNonNegativeSafeInt(baseMs)){\n+    throw new Error('baseMs must be a nonnegative safe integer');\n+  }\n+  if (!isNonNegativeSafeInt(maxDelayMs)){\n+    throw new Error('maxDelayMs must be a nonnegative safe integer');\n+  }\n+  if (!isNonNegativeSafeInt(budgetMs)){\n+    throw new Error('budgetMs must be a nonnegative safe integer');\n+  }\n+  if (retryAfterMs !== null && !isNonNegativeSafeInt(retryAfterMs)){\n+    throw new Error('retryAfterMs must be null or a nonnegative safe integer');\n+  }\n+  if (typeof retryable !== 'boolean'){\n+    throw new Error('retryable must be a boolean');\n+  }\n+\n+  if (!retryable){\n+    return {retry:false,delayMs:null,reason:'non-retryable'};\n+  }\n+\n+  // baseMs * 2 ** (attempt - 1), capped at maxDelayMs. The power is exact in\n+  // binary floating point until it overflows to Infinity, so min() saturates\n+  // at maxDelayMs for huge attempts with no loop and no precision loss below\n+  // the cap. A zero base means zero delay regardless of the attempt.\n+  const expDelay = baseMs === 0\n+    ? 0\n+    : Math.min(maxDelayMs, baseMs * 2 ** (attempt - 1));\n+  const wait = retryAfterMs === null ? expDelay : Math.max(expDelay, retryAfterMs);\n+\n+  if (elapsedMs > budgetMs || wait > budgetMs - elapsedMs){\n+    return {retry:false,delayMs:null,reason:'budget-exhausted'};\n+  }\n+  return {retry:true,delayMs:wait,reason:'scheduled'};\n }\n+\n+function isMainModule(){\n+  const entry = process.argv[1];\n+  if (!entry) return false;\n+  try {\n+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));\n+  } catch {\n+    return false;\n+  }\n+}\n+\n+function runCli(){\n+  const args = process.argv.slice(2);\n+  let parsed;\n+  try {\n+    if (args.length !== 1){\n+      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n+    }\n+    const raw = readFileSync(args[0], 'utf8').replace(/^\\uFEFF/, '');\n+    parsed = JSON.parse(raw);\n+  } catch (err){\n+    process.stderr.write(`retry-budget: ${err.message}\\n`);\n+    process.exitCode = 2;\n+    return;\n+  }\n+  let result;\n+  try {\n+    result = nextRetry(parsed);\n+  } catch (err){\n+    process.stderr.write(`retry-budget: invalid options: ${err.message}\\n`);\n+    process.exitCode = 2;\n+    return;\n+  }\n+  process.stdout.write(`${JSON.stringify(result)}\\n`);\n+}\n+\n+if (isMainModule()){\n+  runCli();\n+}\n"
+    },
+    {
+      "path": "test/extended.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "f6f8c89f6eec3e37d2298a31dda785f7c5efb296d2733d6546ecaba972661a0d",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {execFile} from 'node:child_process';\nimport {promisify} from 'node:util';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join, resolve} from 'node:path';\nimport {nextRetry} from '../retry-budget.js';\n\nconst run = promisify(execFile);\nconst scriptPath = resolve(new URL('../retry-budget.js', import.meta.url).pathname);\n\n// Each test owns its own tmpdir and always removes it, even on assertion\n// failure, so parallel test files cannot interfere and nothing is left behind.\nasync function withFixture(name, content, fn){\n  const dir = mkdtempSync(join(tmpdir(), 'retry-budget-test-'));\n  try {\n    const file = join(dir, name);\n    writeFileSync(file, content);\n    return await fn(file);\n  } finally {\n    rmSync(dir, {recursive: true, force: true});\n  }\n}\n\nasync function cli(args, label){\n  let code, stdout, stderr;\n  try {\n    ({stdout, stderr} = await run('node', [scriptPath, ...args]));\n    code = 0;\n  } catch (err) {\n    code = err.code;\n    stdout = err.stdout;\n    stderr = err.stderr;\n  }\n  return {code, stdout, stderr, label};\n}\n\nasync function expectCliSuccess(file, expected){\n  const {code, stdout, stderr} = await cli([file], 'cli success');\n  assert.equal(code, 0);\n  assert.equal(stdout, `${JSON.stringify(expected)}\\n`);\n  assert.equal(stderr, '');\n}\n\nasync function expectCliFailure(args, label){\n  const {code, stdout, stderr} = await cli(args, label);\n  assert.equal(code, 2, `${label}: expected exit code 2, got ${code}; stderr=${stderr}`);\n  assert.equal(stdout, '', `${label}: expected empty stdout, got ${JSON.stringify(stdout)}`);\n  assert.ok(stderr.length > 0, `${label}: expected nonempty stderr`);\n}\n\nconst base = {attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\n\ntest('exponential delay doubles per attempt and caps at maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 2}), {retry: true, delayMs: 20, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 3}), {retry: true, delayMs: 40, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('huge attempts cap without loops or overflow', () => {\n  assert.deepEqual(nextRetry({...base, attempt: 10 ** 9}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  assert.deepEqual(nextRetry({...base, attempt: 9007199254740991}), {retry: true, delayMs: 100, reason: 'scheduled'});\n});\n\ntest('zero base means zero delay even for huge attempts', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 0, attempt: 9007199254740991}),\n    {retry: true, delayMs: 0, reason: 'scheduled'},\n  );\n});\n\ntest('exact power-of-two delays stay precise', () => {\n  assert.deepEqual(\n    nextRetry({...base, baseMs: 1, maxDelayMs: 9007199254740991, budgetMs: 9007199254740991, attempt: 40}),\n    {retry: true, delayMs: 549755813888, reason: 'scheduled'}, // 2**39\n  );\n});\n\ntest('retryAfterMs is a floor and is not capped by maxDelayMs', () => {\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 50}), {retry: true, delayMs: 50, reason: 'scheduled'});\n  // hint above maxDelayMs is honored, not capped\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 1000, budgetMs: 5000}), {retry: true, delayMs: 1000, reason: 'scheduled'});\n  // exponential below the hint loses\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 150, budgetMs: 5000}), {retry: true, delayMs: 150, reason: 'scheduled'});\n  // exponential above the hint wins\n  assert.deepEqual(nextRetry({...base, attempt: 5, retryAfterMs: 10}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // hint at zero behaves like the exponential value\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 0}), {retry: true, delayMs: 10, reason: 'scheduled'});\n});\n\ntest('budget boundary: equality is allowed', () => {\n  // wait exactly fills the whole budget\n  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // wait exactly fills the remaining budget\n  assert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n  // zero base with zero budget schedules exactly at the boundary\n  assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n  // hint scheduling exactly at the boundary\n  assert.deepEqual(nextRetry({...base, retryAfterMs: 990, budgetMs: 990}), {retry: true, delayMs: 990, reason: 'scheduled'});\n  // one tick over is exhausted\n  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 99}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  assert.deepEqual(nextRetry({...base, elapsedMs: 601, budgetMs: 610}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  assert.deepEqual(nextRetry({...base, budgetMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('elapsedMs exceeding budgetMs is exhausted', () => {\n  assert.deepEqual(nextRetry({...base, elapsedMs: 1001, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n  // equal elapsed/budget is not \"exceeds\"; the wait still decides\n  assert.deepEqual(nextRetry({...base, elapsedMs: 1000, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n});\n\ntest('non-retryable returns the exact decision and ignores math', () => {\n  assert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\n  // even an unbounded hint cannot make it retry\n  assert.deepEqual(nextRetry({...base, retryable: false, retryAfterMs: 1}), {retry: false, delayMs: null, reason: 'non-retryable'});\n});\n\ntest('extra fields are ignored', () => {\n  assert.deepEqual(nextRetry({...base, whatever: 42, label: 'x', [Symbol.for('x')]: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n});\n\ntest('frozen input works and is not mutated', () => {\n  const frozen = Object.freeze({...base, retryAfterMs: null});\n  assert.deepEqual(nextRetry(frozen), {retry: true, delayMs: 10, reason: 'scheduled'});\n  const mutable = {...base};\n  const before = JSON.parse(JSON.stringify(mutable));\n  nextRetry(mutable);\n  assert.deepEqual(mutable, before);\n  const result = nextRetry(base);\n  assert.deepEqual(Object.keys(result).sort(), ['delayMs', 'reason', 'retry']);\n});\n\ntest('every field is validated even when retryable is false', () => {\n  const bad = (patch) => {\n    assert.throws(() => nextRetry({...base, retryable: false, ...patch}), Error);\n  };\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: -1});\n  bad({elapsedMs: -1});\n  bad({elapsedMs: 1.5});\n  bad({baseMs: -1});\n  bad({maxDelayMs: -1});\n  bad({budgetMs: -1});\n  bad({budgetMs: 1.5});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: 1.5});\n});\n\ntest('invalid options throw', () => {\n  const throwsFor = (value) => assert.throws(() => nextRetry(value), Error);\n  throwsFor(null);\n  throwsFor(undefined);\n  throwsFor(5);\n  throwsFor('nope');\n  throwsFor([1, 2, 3]);\n  const bad = (patch) => throwsFor({...base, ...patch});\n  bad({attempt: 0});\n  bad({attempt: 1.5});\n  bad({attempt: 2 ** 53});\n  bad({attempt: NaN});\n  bad({attempt: '1'});\n  bad({attempt: -1});\n  bad({elapsedMs: -1});\n  bad({elapsedMs: 1.5});\n  bad({elapsedMs: null});\n  bad({baseMs: -1});\n  bad({baseMs: '10'});\n  bad({maxDelayMs: -1});\n  bad({maxDelayMs: 1e21});\n  bad({budgetMs: -1});\n  bad({retryAfterMs: -1});\n  bad({retryAfterMs: NaN});\n  bad({retryable: 'yes'});\n  bad({retryable: 1});\n  bad({retryable: null});\n  // missing required fields\n  for (const key of ['attempt', 'elapsedMs', 'baseMs', 'maxDelayMs', 'budgetMs', 'retryable']) {\n    const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...rest} = base;\n    throwsFor(key === 'attempt' ? {...rest, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable} : {...base, [key]: undefined});\n  }\n  const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...withoutRetryable} = base;\n  throwsFor({...withoutRetryable, attempt: 1});\n});\n\ntest('CLI prints exactly one JSON value plus newline on success', async () => {\n  await withFixture('ok.json', JSON.stringify(base), (file) =>\n    expectCliSuccess(file, {retry: true, delayMs: 10, reason: 'scheduled'}),\n  );\n});\n\ntest('CLI exits 0 for valid non-retry and budget-exhausted decisions', async () => {\n  await withFixture('noretry.json', JSON.stringify({...base, retryable: false}), (file) =>\n    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'non-retryable'}),\n  );\n  await withFixture('exhausted.json', JSON.stringify({...base, elapsedMs: 5000}), (file) =>\n    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'budget-exhausted'}),\n  );\n  await withFixture('hint.json', JSON.stringify({...base, retryAfterMs: 1000, budgetMs: 5000}), (file) =>\n    expectCliSuccess(file, {retry: true, delayMs: 1000, reason: 'scheduled'}),\n  );\n});\n\ntest('CLI argument and file failures exit 2 with stderr and no stdout', async () => {\n  await expectCliFailure([], 'no arguments');\n  await expectCliFailure(['a.json', 'b.json'], 'two arguments');\n  await expectCliFailure([join(tmpdir(), 'retry-budget-definitely-missing-file.json')], 'missing file');\n});\n\ntest('CLI rejects malformed JSON and invalid options', async () => {\n  const cases = [\n    ['badjson.json', '{nope', 'malformed JSON'],\n    ['null.json', 'null', 'JSON null'],\n    ['array.json', '[1]', 'JSON array'],\n    ['str.json', '\"hi\"', 'JSON string'],\n    ['missing-field.json', JSON.stringify({attempt: 1}), 'missing required fields'],\n    ['bad-attempt.json', JSON.stringify({...base, attempt: 0}), 'attempt 0'],\n    ['bad-retryable.json', JSON.stringify({...base, retryable: 'yes'}), 'retryable not a boolean'],\n    ['big-attempt.json', JSON.stringify({...base, attempt: 2 ** 53}), 'attempt not a safe integer'],\n    ['negative-base.json', JSON.stringify({...base, baseMs: -1}), 'negative baseMs'],\n  ];\n  for (const [name, content, label] of cases) {\n    await withFixture(name, content, (file) => expectCliFailure([file], label));\n  }\n});\n\ntest('importing the module does not run the CLI', async () => {\n  let code, stdout, stderr;\n  try {\n    ({stdout, stderr} = await run('node', [\n      '-e',\n      `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n    ]));\n    code = 0;\n  } catch (err) {\n    code = err.code;\n    stdout = err.stdout;\n    stderr = err.stderr;\n  }\n  assert.equal(code, 0);\n  assert.equal(stdout, '');\n  assert.equal(stderr, '');\n});\n",
+      "displaySha256": "f6f8c89f6eec3e37d2298a31dda785f7c5efb296d2733d6546ecaba972661a0d",
+      "diff": "--- starter/test/extended.test.js\n+++ delivered/test/extended.test.js\n@@ -0,0 +1,246 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import {execFile} from 'node:child_process';\n+import {promisify} from 'node:util';\n+import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\n+import {tmpdir} from 'node:os';\n+import {join, resolve} from 'node:path';\n+import {nextRetry} from '../retry-budget.js';\n+\n+const run = promisify(execFile);\n+const scriptPath = resolve(new URL('../retry-budget.js', import.meta.url).pathname);\n+\n+// Each test owns its own tmpdir and always removes it, even on assertion\n+// failure, so parallel test files cannot interfere and nothing is left behind.\n+async function withFixture(name, content, fn){\n+  const dir = mkdtempSync(join(tmpdir(), 'retry-budget-test-'));\n+  try {\n+    const file = join(dir, name);\n+    writeFileSync(file, content);\n+    return await fn(file);\n+  } finally {\n+    rmSync(dir, {recursive: true, force: true});\n+  }\n+}\n+\n+async function cli(args, label){\n+  let code, stdout, stderr;\n+  try {\n+    ({stdout, stderr} = await run('node', [scriptPath, ...args]));\n+    code = 0;\n+  } catch (err) {\n+    code = err.code;\n+    stdout = err.stdout;\n+    stderr = err.stderr;\n+  }\n+  return {code, stdout, stderr, label};\n+}\n+\n+async function expectCliSuccess(file, expected){\n+  const {code, stdout, stderr} = await cli([file], 'cli success');\n+  assert.equal(code, 0);\n+  assert.equal(stdout, `${JSON.stringify(expected)}\\n`);\n+  assert.equal(stderr, '');\n+}\n+\n+async function expectCliFailure(args, label){\n+  const {code, stdout, stderr} = await cli(args, label);\n+  assert.equal(code, 2, `${label}: expected exit code 2, got ${code}; stderr=${stderr}`);\n+  assert.equal(stdout, '', `${label}: expected empty stdout, got ${JSON.stringify(stdout)}`);\n+  assert.ok(stderr.length > 0, `${label}: expected nonempty stderr`);\n+}\n+\n+const base = {attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\n+\n+test('exponential delay doubles per attempt and caps at maxDelayMs', () => {\n+  assert.deepEqual(nextRetry({...base, attempt: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n+  assert.deepEqual(nextRetry({...base, attempt: 2}), {retry: true, delayMs: 20, reason: 'scheduled'});\n+  assert.deepEqual(nextRetry({...base, attempt: 3}), {retry: true, delayMs: 40, reason: 'scheduled'});\n+  assert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+});\n+\n+test('huge attempts cap without loops or overflow', () => {\n+  assert.deepEqual(nextRetry({...base, attempt: 10 ** 9}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+  assert.deepEqual(nextRetry({...base, attempt: 9007199254740991}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+});\n+\n+test('zero base means zero delay even for huge attempts', () => {\n+  assert.deepEqual(\n+    nextRetry({...base, baseMs: 0, attempt: 9007199254740991}),\n+    {retry: true, delayMs: 0, reason: 'scheduled'},\n+  );\n+});\n+\n+test('exact power-of-two delays stay precise', () => {\n+  assert.deepEqual(\n+    nextRetry({...base, baseMs: 1, maxDelayMs: 9007199254740991, budgetMs: 9007199254740991, attempt: 40}),\n+    {retry: true, delayMs: 549755813888, reason: 'scheduled'}, // 2**39\n+  );\n+});\n+\n+test('retryAfterMs is a floor and is not capped by maxDelayMs', () => {\n+  assert.deepEqual(nextRetry({...base, retryAfterMs: 50}), {retry: true, delayMs: 50, reason: 'scheduled'});\n+  // hint above maxDelayMs is honored, not capped\n+  assert.deepEqual(nextRetry({...base, retryAfterMs: 1000, budgetMs: 5000}), {retry: true, delayMs: 1000, reason: 'scheduled'});\n+  // exponential below the hint loses\n+  assert.deepEqual(nextRetry({...base, retryAfterMs: 150, budgetMs: 5000}), {retry: true, delayMs: 150, reason: 'scheduled'});\n+  // exponential above the hint wins\n+  assert.deepEqual(nextRetry({...base, attempt: 5, retryAfterMs: 10}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+  // hint at zero behaves like the exponential value\n+  assert.deepEqual(nextRetry({...base, retryAfterMs: 0}), {retry: true, delayMs: 10, reason: 'scheduled'});\n+});\n+\n+test('budget boundary: equality is allowed', () => {\n+  // wait exactly fills the whole budget\n+  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+  // wait exactly fills the remaining budget\n+  assert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 500, budgetMs: 600}), {retry: true, delayMs: 100, reason: 'scheduled'});\n+  // zero base with zero budget schedules exactly at the boundary\n+  assert.deepEqual(nextRetry({...base, baseMs: 0, budgetMs: 0, elapsedMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\n+  // hint scheduling exactly at the boundary\n+  assert.deepEqual(nextRetry({...base, retryAfterMs: 990, budgetMs: 990}), {retry: true, delayMs: 990, reason: 'scheduled'});\n+  // one tick over is exhausted\n+  assert.deepEqual(nextRetry({...base, attempt: 5, budgetMs: 99}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+  assert.deepEqual(nextRetry({...base, elapsedMs: 601, budgetMs: 610}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+  assert.deepEqual(nextRetry({...base, budgetMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+});\n+\n+test('elapsedMs exceeding budgetMs is exhausted', () => {\n+  assert.deepEqual(nextRetry({...base, elapsedMs: 1001, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+  // equal elapsed/budget is not \"exceeds\"; the wait still decides\n+  assert.deepEqual(nextRetry({...base, elapsedMs: 1000, budgetMs: 1000}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\n+});\n+\n+test('non-retryable returns the exact decision and ignores math', () => {\n+  assert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\n+  // even an unbounded hint cannot make it retry\n+  assert.deepEqual(nextRetry({...base, retryable: false, retryAfterMs: 1}), {retry: false, delayMs: null, reason: 'non-retryable'});\n+});\n+\n+test('extra fields are ignored', () => {\n+  assert.deepEqual(nextRetry({...base, whatever: 42, label: 'x', [Symbol.for('x')]: 1}), {retry: true, delayMs: 10, reason: 'scheduled'});\n+});\n+\n+test('frozen input works and is not mutated', () => {\n+  const frozen = Object.freeze({...base, retryAfterMs: null});\n+  assert.deepEqual(nextRetry(frozen), {retry: true, delayMs: 10, reason: 'scheduled'});\n+  const mutable = {...base};\n+  const before = JSON.parse(JSON.stringify(mutable));\n+  nextRetry(mutable);\n+  assert.deepEqual(mutable, before);\n+  const result = nextRetry(base);\n+  assert.deepEqual(Object.keys(result).sort(), ['delayMs', 'reason', 'retry']);\n+});\n+\n+test('every field is validated even when retryable is false', () => {\n+  const bad = (patch) => {\n+    assert.throws(() => nextRetry({...base, retryable: false, ...patch}), Error);\n+  };\n+  bad({attempt: 0});\n+  bad({attempt: 1.5});\n+  bad({attempt: 2 ** 53});\n+  bad({attempt: -1});\n+  bad({elapsedMs: -1});\n+  bad({elapsedMs: 1.5});\n+  bad({baseMs: -1});\n+  bad({maxDelayMs: -1});\n+  bad({budgetMs: -1});\n+  bad({budgetMs: 1.5});\n+  bad({retryAfterMs: -1});\n+  bad({retryAfterMs: 1.5});\n+});\n+\n+test('invalid options throw', () => {\n+  const throwsFor = (value) => assert.throws(() => nextRetry(value), Error);\n+  throwsFor(null);\n+  throwsFor(undefined);\n+  throwsFor(5);\n+  throwsFor('nope');\n+  throwsFor([1, 2, 3]);\n+  const bad = (patch) => throwsFor({...base, ...patch});\n+  bad({attempt: 0});\n+  bad({attempt: 1.5});\n+  bad({attempt: 2 ** 53});\n+  bad({attempt: NaN});\n+  bad({attempt: '1'});\n+  bad({attempt: -1});\n+  bad({elapsedMs: -1});\n+  bad({elapsedMs: 1.5});\n+  bad({elapsedMs: null});\n+  bad({baseMs: -1});\n+  bad({baseMs: '10'});\n+  bad({maxDelayMs: -1});\n+  bad({maxDelayMs: 1e21});\n+  bad({budgetMs: -1});\n+  bad({retryAfterMs: -1});\n+  bad({retryAfterMs: NaN});\n+  bad({retryable: 'yes'});\n+  bad({retryable: 1});\n+  bad({retryable: null});\n+  // missing required fields\n+  for (const key of ['attempt', 'elapsedMs', 'baseMs', 'maxDelayMs', 'budgetMs', 'retryable']) {\n+    const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...rest} = base;\n+    throwsFor(key === 'attempt' ? {...rest, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable} : {...base, [key]: undefined});\n+  }\n+  const {attempt, elapsedMs, baseMs, maxDelayMs, budgetMs, retryable, ...withoutRetryable} = base;\n+  throwsFor({...withoutRetryable, attempt: 1});\n+});\n+\n+test('CLI prints exactly one JSON value plus newline on success', async () => {\n+  await withFixture('ok.json', JSON.stringify(base), (file) =>\n+    expectCliSuccess(file, {retry: true, delayMs: 10, reason: 'scheduled'}),\n+  );\n+});\n+\n+test('CLI exits 0 for valid non-retry and budget-exhausted decisions', async () => {\n+  await withFixture('noretry.json', JSON.stringify({...base, retryable: false}), (file) =>\n+    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'non-retryable'}),\n+  );\n+  await withFixture('exhausted.json', JSON.stringify({...base, elapsedMs: 5000}), (file) =>\n+    expectCliSuccess(file, {retry: false, delayMs: null, reason: 'budget-exhausted'}),\n+  );\n+  await withFixture('hint.json', JSON.stringify({...base, retryAfterMs: 1000, budgetMs: 5000}), (file) =>\n+    expectCliSuccess(file, {retry: true, delayMs: 1000, reason: 'scheduled'}),\n+  );\n+});\n+\n+test('CLI argument and file failures exit 2 with stderr and no stdout', async () => {\n+  await expectCliFailure([], 'no arguments');\n+  await expectCliFailure(['a.json', 'b.json'], 'two arguments');\n+  await expectCliFailure([join(tmpdir(), 'retry-budget-definitely-missing-file.json')], 'missing file');\n+});\n+\n+test('CLI rejects malformed JSON and invalid options', async () => {\n+  const cases = [\n+    ['badjson.json', '{nope', 'malformed JSON'],\n+    ['null.json', 'null', 'JSON null'],\n+    ['array.json', '[1]', 'JSON array'],\n+    ['str.json', '\"hi\"', 'JSON string'],\n+    ['missing-field.json', JSON.stringify({attempt: 1}), 'missing required fields'],\n+    ['bad-attempt.json', JSON.stringify({...base, attempt: 0}), 'attempt 0'],\n+    ['bad-retryable.json', JSON.stringify({...base, retryable: 'yes'}), 'retryable not a boolean'],\n+    ['big-attempt.json', JSON.stringify({...base, attempt: 2 ** 53}), 'attempt not a safe integer'],\n+    ['negative-base.json', JSON.stringify({...base, baseMs: -1}), 'negative baseMs'],\n+  ];\n+  for (const [name, content, label] of cases) {\n+    await withFixture(name, content, (file) => expectCliFailure([file], label));\n+  }\n+});\n+\n+test('importing the module does not run the CLI', async () => {\n+  let code, stdout, stderr;\n+  try {\n+    ({stdout, stderr} = await run('node', [\n+      '-e',\n+      `import(${JSON.stringify(`file://${scriptPath}`)}).then(m => { if (typeof m.nextRetry !== 'function') process.exit(1); });`,\n+    ]));\n+    code = 0;\n+  } catch (err) {\n+    code = err.code;\n+    stdout = err.stdout;\n+    stderr = err.stderr;\n+  }\n+  assert.equal(code, 0);\n+  assert.equal(stdout, '');\n+  assert.equal(stderr, '');\n+});\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "afterSha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {nextRetry} from '../retry-budget.js';\nconst base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\ntest('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\ntest('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {nextRetry} from '../retry-budget.js';\nconst base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\ntest('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\ntest('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n",
+      "displaySha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-retry-budget@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: exponential delay doubles per attempt and caps at maxDelayMs\nok 1 - exponential delay doubles per attempt and caps at maxDelayMs\n  ---\n  duration_ms: 1.678762\n  ...\n# Subtest: huge attempts cap without loops or overflow\nok 2 - huge attempts cap without loops or overflow\n  ---\n  duration_ms: 0.148811\n  ...\n# Subtest: zero base means zero delay even for huge attempts\nok 3 - zero base means zero delay even for huge attempts\n  ---\n  duration_ms: 0.128991\n  ...\n# Subtest: exact power-of-two delays stay precise\nok 4 - exact power-of-two delays stay precise\n  ---\n  duration_ms: 0.124671\n  ...\n# Subtest: retryAfterMs is a floor and is not capped by maxDelayMs\nok 5 - retryAfterMs is a floor and is not capped by maxDelayMs\n  ---\n  duration_ms: 0.209362\n  ...\n# Subtest: budget boundary: equality is allowed\nok 6 - budget boundary: equality is allowed\n  ---\n  duration_ms: 0.229062\n  ...\n# Subtest: elapsedMs exceeding budgetMs is exhausted\nok 7 - elapsedMs exceeding budgetMs is exhausted\n  ---\n  duration_ms: 0.119361\n  ...\n# Subtest: non-retryable returns the exact decision and ignores math\nok 8 - non-retryable returns the exact decision and ignores math\n  ---\n  duration_ms: 0.122441\n  ...\n# Subtest: extra fields are ignored\nok 9 - extra fields are ignored\n  ---\n  duration_ms: 0.197811\n  ...\n# Subtest: frozen input works and is not mutated\nok 10 - frozen input works and is not mutated\n  ---\n  duration_ms: 0.225842\n  ...\n# Subtest: every field is validated even when retryable is false\nok 11 - every field is validated even when retryable is false\n  ---\n  duration_ms: 0.953427\n  ...\n# Subtest: invalid options throw\nok 12 - invalid options throw\n  ---\n  duration_ms: 0.345763\n  ...\n# Subtest: CLI prints exactly one JSON value plus newline on success\nok 13 - CLI prints exactly one JSON value plus newline on success\n  ---\n  duration_ms: 24.857375\n  ...\n# Subtest: CLI exits 0 for valid non-retry and budget-exhausted decisions\nok 14 - CLI exits 0 for valid non-retry and budget-exhausted decisions\n  ---\n  duration_ms: 64.49536\n  ...\n# Subtest: CLI argument and file failures exit 2 with stderr and no stdout\nok 15 - CLI argument and file failures exit 2 with stderr and no stdout\n  ---\n  duration_ms: 65.550317\n  ...\n# Subtest: CLI rejects malformed JSON and invalid options\nok 16 - CLI rejects malformed JSON and invalid options\n  ---\n  duration_ms: 195.119281\n  ...\n# Subtest: importing the module does not run the CLI\nok 17 - importing the module does not run the CLI\n  ---\n  duration_ms: 20.2148\n  ...\n# Subtest: first retry uses base delay\nok 18 - first retry uses base delay\n  ---\n  duration_ms: 1.228209\n  ...\n# Subtest: a valid non-retryable failure is an ordinary decision\nok 19 - a valid non-retryable failure is an ordinary decision\n  ---\n  duration_ms: 0.120661\n  ...\n1..19\n# tests 19\n# suites 0\n# pass 19\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 417.939737\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"retry-budget\",\"pass\":true,\"groups\":[{\"name\":\"exponential-backoff-and-cap\",\"pass\":true},{\"name\":\"retry-hints-and-budget-boundaries\",\"pass\":true},{\"name\":\"huge-attempts-zero-and-safe-arithmetic\",\"pass\":true},{\"name\":\"validation-and-immutability\",\"pass\":true},{\"name\":\"cli-and-error-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "2a2547782b0d5dc4b4cea7833fb3d92636c626980ea5564958f5d0888b40395f"
+    },
+    {
+      "kind": "native-session-database",
+      "sha256": "66ea5820de54a0f92a23d18dcaa357407a7629cbb19915474904fac4cd068f74"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "481ec10f6b9c296eb456174845c0e8ce155d052631e3afd5c40cd34d7e13d433"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "1633347d91b576e755c396f76aabeaa0cdce68e23d79668349695d5261936ac3"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 27,
+    "withResults": 27,
+    "normalizedPathOccurrences": 0,
+    "replayedToolRecords": 13
+  },
+  "explanation": {
+    "title": "The added tests needed repeated repair.",
+    "paragraphs": [
+      {
+        "text": "Hermes built retry logic, then revised its extra test suite across several failing runs. It eventually passed the suite and checked API boundaries and CLI errors. The accepted tool finished in 562.0 seconds.",
+        "actions": [
+          "action-9",
+          "action-10",
+          "action-19",
+          "action-24",
+          "action-25",
+          "action-27"
+        ]
+      }
+    ]
+  }
+}

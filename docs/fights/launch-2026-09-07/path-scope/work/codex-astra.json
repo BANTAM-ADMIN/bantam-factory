@@ -1,0 +1,248 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "path-scope",
+  "arm": "codex-astra",
+  "wallMs": 107931,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T15:00:58.891Z",
+  "task": "# Extend a workspace containment guard\n\n`path-scope.js` already exports a working `normalizeSegments(input)`. Keep its\nexported behavior exactly as it is, and add `resolveWithin(root, candidate)`\nplus a CLI, both as ES module exports. This is a lexical decision over POSIX\npath strings only. It never touches the filesystem, resolves no symlinks, and\nis not a security boundary on its own.\n\n`root` and `candidate` must be nonempty strings containing no NUL, and `root`\nmust start with `/`. Validate both before resolving anything.\n\nResolve `candidate` against `root`: a candidate starting with `/` resolves from\nthe filesystem root, otherwise it resolves inside `root`. Normalize the result\nby dropping empty segments and `.` segments, and by removing the previous\nsegment for each `..`. A `..` with nothing left to remove is discarded, so a\npath can never climb above `/`. `\\` is an ordinary character, never a\nseparator, and segments such as `..foo`, `...` and `.hidden` are ordinary names.\n\n`candidate` is inside `root` when the normalized root segments are a complete\nleading run of the normalized candidate segments. Sharing a textual prefix is\nnot enough: with root `/a/b`, the candidate `/a/bc` is outside.\n\nReturn exactly `{inside, resolved, relative}`. `resolved` is the normalized\nabsolute path, always starting with `/` and never ending with `/` unless it is\nexactly `/`. `relative` is the path from `root` to the candidate when inside,\n`''` when they are the same location, and `null` when outside. Do not mutate\nyour inputs. Invalid inputs throw an Error.\n\nExample: root `/srv/ws`, candidate `../ws/sub/../file.txt` returns\n`{inside:true, resolved:'/srv/ws/file.txt', relative:'file.txt'}`, while\ncandidate `/srv/wsx` returns `{inside:false, resolved:'/srv/wsx', relative:null}`.\n\nCLI: `node path-scope.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{root,candidate}`; extra fields are\nignored. Success prints exactly the API result as one JSON value followed by\nnewline, exits 0, and writes no stderr. Invalid arguments/files/JSON/API input\nexit 2, with nonempty stderr and no stdout. Importing the module must not run\nthe CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"pwd; rg --files -g 'AGENTS.md' -g 'path-scope.js' -g 'package.json' -g '*test*' -g '!node_modules'\",\"max_output_tokens\":4000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"47f756\",\"wall_time_seconds\":0.00000307,\"exit_code\":0,\"original_token_count\":47,\"output\":\"/workspace\\npackage.json\\npath-scope.js\\ntest/public.test.js\\n\"}"
+        }
+      ],
+      "atMs": 10147.0,
+      "endedMs": 10221.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"cat path-scope.js package.json test/public.test.js; for p in . .. ../.. ../../..; do if [ -f \\\"$p/AGENTS.md\\\" ]; then cat \\\"$p/AGENTS.md\\\"; fi; done\",\"max_output_tokens\":6000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"874201\",\"wall_time_seconds\":0.00000337,\"exit_code\":0,\"original_token_count\":276,\"output\":\"// Existing, working helper. Preserve its exported behavior.\\nexport function normalizeSegments(input){\\n  if(typeof input!=='string')throw Error('invalid path');\\n  const segments=[];\\n  for(const part of input.split('/')){\\n    if(part===''||part==='.')continue;\\n    if(part==='..'){segments.pop();continue;}\\n    segments.push(part);\\n  }\\n  return segments;\\n}\\n\\nexport function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\\n{\\\"name\\\":\\\"factory-path-scope\\\",\\\"version\\\":\\\"1.0.0\\\",\\\"private\\\":true,\\\"type\\\":\\\"module\\\",\\\"scripts\\\":{\\\"test\\\":\\\"node --test\\\"}}\\nimport test from 'node:test';\\nimport assert from 'node:assert/strict';\\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\\ntest('the existing helper keeps normalizing segments',()=>{\\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\\n});\\ntest('a candidate that stays inside reports its path from the root',()=>{\\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\\n});\\n\"}"
+        }
+      ],
+      "atMs": 18578.0,
+      "endedMs": 18637.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"p=\\\"$PWD\\\"; while [ \\\"$p\\\" != / ]; do p=$(dirname \\\"$p\\\"); if [ -f \\\"$p/AGENTS.md\\\" ]; then printf '%s\\\\n' \\\"$p/AGENTS.md\\\"; cat \\\"$p/AGENTS.md\\\"; fi; done; git status --short\",\"max_output_tokens\":3000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"84f9a1\",\"wall_time_seconds\":0.00000191,\"exit_code\":128,\"original_token_count\":68,\"output\":\"fatal: not a git repository (or any parent up to mount point /recording)\\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\\n\"}"
+        }
+      ],
+      "atMs": 28976.0,
+      "endedMs": 29033.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: /workspace/path-scope.js\\n@@\\n+import {readFileSync} from 'node:fs';\\n+import {pathToFileURL} from 'node:url';\\n+\\n@@\\n-export function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\\n+// Lexical POSIX containment only; this does not inspect symlinks or the filesystem.\\n+export function resolveWithin(root,candidate){\\n+  for(const input of [root,candidate]){\\n+    if(typeof input!=='string'||input.length===0||input.includes('\\\\0')){\\n+      throw Error('paths must be nonempty strings without NUL');\\n+    }\\n+  }\\n+  if(!root.startsWith('/'))throw Error('root must be absolute');\\n+\\n+  const rootSegments=normalizeSegments(root);\\n+  const candidateSegments=normalizeSegments(\\n+    candidate.startsWith('/')?candidate:`/${rootSegments.join('/')}/${candidate}`\\n+  );\\n+  const inside=rootSegments.length<=candidateSegments.length&&\\n+    rootSegments.every((segment,index)=>segment===candidateSegments[index]);\\n+  return {\\n+    inside,\\n+    resolved:`/${candidateSegments.join('/')}`,\\n+    relative:inside?candidateSegments.slice(rootSegments.length).join('/'):null\\n+  };\\n+}\\n+\\n+// Return an exit code so importing callers can invoke the CLI without exiting.\\n+export function cli(args=process.argv.slice(2)){\\n+  try{\\n+    if(args.length!==1)throw Error('usage: node path-scope.js INPUT_JSON_FILE');\\n+    const input=JSON.parse(readFileSync(args[0],'utf8'));\\n+    if(input===null||typeof input!=='object'||Array.isArray(input)){\\n+      throw Error('input JSON must be an object');\\n+    }\\n+    const result=resolveWithin(input.root,input.candidate);\\n+    process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+    return 0;\\n+  }catch(error){\\n+    process.stderr.write(`${error.message}\\\\n`);\\n+    return 2;\\n+  }\\n+}\\n+\\n+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){\\n+  process.exitCode=cli();\\n+}\\n*** End Patch\"));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 50833.0,
+      "endedMs": 50878.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.exec_command({cmd:\"cat path-scope.js\",\"max_output_tokens\":3000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"f0c7fb\",\"wall_time_seconds\":0.00000264,\"exit_code\":0,\"original_token_count\":505,\"output\":\"// Existing, working helper. Preserve its exported behavior.\\nexport function normalizeSegments(input){\\n  if(typeof input!=='string')throw Error('invalid path');\\n  const segments=[];\\n  for(const part of input.split('/')){\\n    if(part===''||part==='.')continue;\\n    if(part==='..'){segments.pop();continue;}\\n    segments.push(part);\\n  }\\n  return segments;\\n}\\n\\n// Lexical POSIX containment only; this does not inspect symlinks or the filesystem.\\nexport function resolveWithin(root,candidate){\\n  for(const input of [root,candidate]){\\n    if(typeof input!=='string'||input.length===0||input.includes('\\\\0')){\\n      throw Error('paths must be nonempty strings without NUL');\\n    }\\n  }\\n  if(!root.startsWith('/'))throw Error('root must be absolute');\\n\\n  const rootSegments=normalizeSegments(root);\\n  const candidateSegments=normalizeSegments(\\n    candidate.startsWith('/')?candidate:`/${rootSegments.join('/')}/${candidate}`\\n  );\\n  const inside=rootSegments.length<=candidateSegments.length&&\\n    rootSegments.every((segment,index)=>segment===candidateSegments[index]);\\n  return {\\n    inside,\\n    resolved:`/${candidateSegments.join('/')}`,\\n    relative:inside?candidateSegments.slice(rootSegments.length).join('/'):null\\n  };\\n}\\n\\n// Return an exit code so importing callers can invoke the CLI without exiting.\\nexport function cli(args=process.argv.slice(2)){\\n  try{\\n    if(args.length!==1)throw Error('usage: node path-scope.js INPUT_JSON_FILE');\\n    const input=JSON.parse(readFileSync(args[0],'utf8'));\\n    if(input===null||typeof input!=='object'||Array.isArray(input)){\\n      throw Error('input JSON must be an object');\\n    }\\n    const result=resolveWithin(input.root,input.candidate);\\n    process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n    return 0;\\n  }catch(error){\\n    process.stderr.write(`${error.message}\\\\n`);\\n    return 2;\\n  }\\n}\\n\\nif(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){\\n  process.exitCode=cli();\\n}\\nimport {readFileSync} from 'node:fs';\\nimport {pathToFileURL} from 'node:url';\\n\"}"
+        }
+      ],
+      "atMs": 55295.0,
+      "endedMs": 55351.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Update File: /workspace/path-scope.js\\n@@\\n-// Existing, working helper. Preserve its exported behavior.\\n+import {readFileSync} from 'node:fs';\\n+import {pathToFileURL} from 'node:url';\\n+\\n+// Existing, working helper. Preserve its exported behavior.\\n@@\\n-import {readFileSync} from 'node:fs';\\n-import {pathToFileURL} from 'node:url';\\n*** Add File: /workspace/test/regression.test.js\\n+import test from 'node:test';\\n+import assert from 'node:assert/strict';\\n+import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\\n+import {tmpdir} from 'node:os';\\n+import {join} from 'node:path';\\n+import {fileURLToPath} from 'node:url';\\n+import {spawnSync} from 'node:child_process';\\n+import {normalizeSegments, resolveWithin, cli} from '../path-scope.js';\\n+\\n+test('lexical resolution respects normalized segment boundaries',()=>{\\n+  const cases=[\\n+    ['/srv/ws','../ws/sub/../file.txt',true,'/srv/ws/file.txt','file.txt'],\\n+    ['/a/b','/a/bc',false,'/a/bc',null],\\n+    ['/a/b','../../..',false,'/',null],\\n+    ['/a//b/../','./',true,'/a',''],\\n+    ['/../../','../../../x//./',true,'/x','x'],\\n+    ['/a/b','/a',false,'/a',null],\\n+    ['/a/b','/a/b/../b/',true,'/a/b',''],\\n+    ['/a','..foo/.../.hidden/\\\\\\\\/x',true,'/a/..foo/.../.hidden/\\\\\\\\/x','..foo/.../.hidden/\\\\\\\\/x'],\\n+    ['/a/../b','../b/c',true,'/b/c','c']\\n+  ];\\n+  for(const [root,candidate,inside,resolved,relative] of cases){\\n+    assert.deepEqual(resolveWithin(root,candidate),{inside,resolved,relative});\\n+  }\\n+});\\n+\\n+test('input validation does not change the existing helper contract',()=>{\\n+  for(const value of ['',null,undefined,0,false,[],{},'/a\\\\0b']){\\n+    assert.throws(()=>resolveWithin(value,'x'),Error);\\n+    assert.throws(()=>resolveWithin('/a',value),Error);\\n+  }\\n+  assert.throws(()=>resolveWithin('relative','/a'),Error);\\n+  assert.deepEqual(normalizeSegments(''),[]);\\n+  assert.deepEqual(normalizeSegments('a\\\\0b'),['a\\\\0b']);\\n+  assert.equal(typeof cli,'function');\\n+});\\n+\\n+const moduleURL=new URL('../path-scope.js',import.meta.url);\\n+const run=(args)=>spawnSync(process.execPath,[fileURLToPath(moduleURL),...args],{encoding:'utf8'});\\n+\\n+test('CLI emits exactly one result and rejects invalid files and inputs',()=>{\\n+  const dir=mkdtempSync(join(tmpdir(),'path-scope-'));\\n+  try{\\n+    const file=join(dir,'input.json');\\n+    writeFileSync(file,JSON.stringify({root:'/srv/ws',candidate:'../ws/file.txt',extra:123}));\\n+    const success=run([file]);\\n+    assert.equal(success.status,0);\\n+    assert.equal(success.stderr,'');\\n+    assert.equal(success.stdout,'{\\\"inside\\\":true,\\\"resolved\\\":\\\"/srv/ws/file.txt\\\",\\\"relative\\\":\\\"file.txt\\\"}\\\\n');\\n+    const reject=(args)=>{\\n+      const result=run(args);\\n+      assert.equal(result.status,2);\\n+      assert.equal(result.stdout,'');\\n+      assert.ok(result.stderr.length>0);\\n+    };\\n+    reject([]);\\n+    reject([file,file]);\\n+    reject([join(dir,'missing.json')]);\\n+    reject([dir]);\\n+    for(const contents of ['{','null','[]','42','\\\"text\\\"','{}',\\n+      '{\\\"root\\\":\\\"a\\\",\\\"candidate\\\":\\\"b\\\"}',\\n+      '{\\\"root\\\":\\\"/a\\\",\\\"candidate\\\":\\\"\\\"}',\\n+      '{\\\"root\\\":\\\"/a\\\",\\\"candidate\\\":\\\"\\\\\\\\u0000\\\"}']){\\n+      writeFileSync(file,contents);\\n+      reject([file]);\\n+    }\\n+  }finally{\\n+    rmSync(dir,{recursive:true,force:true});\\n+  }\\n+});\\n+\\n+test('importing the module is silent and does not run the CLI',()=>{\\n+  const result=spawnSync(process.execPath,['--input-type=module','-e',\\n+    `await import(${JSON.stringify(moduleURL.href)})`],{encoding:'utf8'});\\n+  assert.equal(result.status,0);\\n+  assert.equal(result.stdout,'');\\n+  assert.equal(result.stderr,'');\\n+});\\n*** End Patch\"));\ntext(await tools.exec_command({cmd:\"npm test\",\"max_output_tokens\":4000}));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.6 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"chunk_id\":\"adc0de\",\"wall_time_seconds\":0.452111831,\"exit_code\":0,\"original_token_count\":352,\"output\":\"\\n> factory-path-scope@1.0.0 test\\n> node --test\\n\\nTAP version 13\\n# Subtest: the existing helper keeps normalizing segments\\nok 1 - the existing helper keeps normalizing segments\\n  ---\\n  duration_ms: 1.215177\\n  ...\\n# Subtest: a candidate that stays inside reports its path from the root\\nok 2 - a candidate that stays inside reports its path from the root\\n  ---\\n  duration_ms: 0.181661\\n  ...\\n# Subtest: lexical resolution respects normalized segment boundaries\\nok 3 - lexical resolution respects normalized segment boundaries\\n  ---\\n  duration_ms: 1.372628\\n  ...\\n# Subtest: input validation does not change the existing helper contract\\nok 4 - input validation does not change the existing helper contract\\n  ---\\n  duration_ms: 0.498053\\n  ...\\n# Subtest: CLI emits exactly one result and rejects invalid files and inputs\\nok 5 - CLI emits exactly one result and rejects invalid files and inputs\\n  ---\\n  duration_ms: 302.787732\\n  ...\\n# Subtest: importing the module is silent and does not run the CLI\\nok 6 - importing the module is silent and does not run the CLI\\n  ---\\n  duration_ms: 19.532136\\n  ...\\n1..6\\n# tests 6\\n# suites 0\\n# pass 6\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n# todo 0\\n# duration_ms 365.658063\\nnpm notice\\nnpm notice New minor version of npm available! 11.5.2 -> 11.19.1\\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1\\nnpm notice To update run: npm install -g npm@11.19.1\\nnpm notice\\n\"}"
+        }
+      ],
+      "atMs": 100458.0,
+      "endedMs": 101078.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "afterSha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "before": "{\"name\":\"factory-path-scope\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-path-scope\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "c654229950f2505aca54d4e2ea7dfa038499c503a442250b456e85de48442f11",
+      "diff": ""
+    },
+    {
+      "path": "path-scope.js",
+      "state": "changed",
+      "beforeSha256": "b75f2a53b4a4189d3d653a17c72ab538e56507c980fd4aabef3d0d890eb810fd",
+      "afterSha256": "d5f7753517d7b31472a070ce53c4e79ef006d8f10e81e70f2c207190a11a1b80",
+      "before": "// Existing, working helper. Preserve its exported behavior.\nexport function normalizeSegments(input){\n  if(typeof input!=='string')throw Error('invalid path');\n  const segments=[];\n  for(const part of input.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){segments.pop();continue;}\n    segments.push(part);\n  }\n  return segments;\n}\n\nexport function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\n",
+      "after": "import {readFileSync} from 'node:fs';\nimport {pathToFileURL} from 'node:url';\n\n// Existing, working helper. Preserve its exported behavior.\nexport function normalizeSegments(input){\n  if(typeof input!=='string')throw Error('invalid path');\n  const segments=[];\n  for(const part of input.split('/')){\n    if(part===''||part==='.')continue;\n    if(part==='..'){segments.pop();continue;}\n    segments.push(part);\n  }\n  return segments;\n}\n\n// Lexical POSIX containment only; this does not inspect symlinks or the filesystem.\nexport function resolveWithin(root,candidate){\n  for(const input of [root,candidate]){\n    if(typeof input!=='string'||input.length===0||input.includes('\\0')){\n      throw Error('paths must be nonempty strings without NUL');\n    }\n  }\n  if(!root.startsWith('/'))throw Error('root must be absolute');\n\n  const rootSegments=normalizeSegments(root);\n  const candidateSegments=normalizeSegments(\n    candidate.startsWith('/')?candidate:`/${rootSegments.join('/')}/${candidate}`\n  );\n  const inside=rootSegments.length<=candidateSegments.length&&\n    rootSegments.every((segment,index)=>segment===candidateSegments[index]);\n  return {\n    inside,\n    resolved:`/${candidateSegments.join('/')}`,\n    relative:inside?candidateSegments.slice(rootSegments.length).join('/'):null\n  };\n}\n\n// Return an exit code so importing callers can invoke the CLI without exiting.\nexport function cli(args=process.argv.slice(2)){\n  try{\n    if(args.length!==1)throw Error('usage: node path-scope.js INPUT_JSON_FILE');\n    const input=JSON.parse(readFileSync(args[0],'utf8'));\n    if(input===null||typeof input!=='object'||Array.isArray(input)){\n      throw Error('input JSON must be an object');\n    }\n    const result=resolveWithin(input.root,input.candidate);\n    process.stdout.write(`${JSON.stringify(result)}\\n`);\n    return 0;\n  }catch(error){\n    process.stderr.write(`${error.message}\\n`);\n    return 2;\n  }\n}\n\nif(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){\n  process.exitCode=cli();\n}\n",
+      "displaySha256": "d5f7753517d7b31472a070ce53c4e79ef006d8f10e81e70f2c207190a11a1b80",
+      "diff": "--- starter/path-scope.js\n+++ delivered/path-scope.js\n@@ -1,3 +1,6 @@\n+import {readFileSync} from 'node:fs';\n+import {pathToFileURL} from 'node:url';\n+\n // Existing, working helper. Preserve its exported behavior.\n export function normalizeSegments(input){\n   if(typeof input!=='string')throw Error('invalid path');\n@@ -10,4 +13,45 @@\n   return segments;\n }\n \n-export function resolveWithin(root,candidate){throw Error('Implement containment and the CLI');}\n+// Lexical POSIX containment only; this does not inspect symlinks or the filesystem.\n+export function resolveWithin(root,candidate){\n+  for(const input of [root,candidate]){\n+    if(typeof input!=='string'||input.length===0||input.includes('\\0')){\n+      throw Error('paths must be nonempty strings without NUL');\n+    }\n+  }\n+  if(!root.startsWith('/'))throw Error('root must be absolute');\n+\n+  const rootSegments=normalizeSegments(root);\n+  const candidateSegments=normalizeSegments(\n+    candidate.startsWith('/')?candidate:`/${rootSegments.join('/')}/${candidate}`\n+  );\n+  const inside=rootSegments.length<=candidateSegments.length&&\n+    rootSegments.every((segment,index)=>segment===candidateSegments[index]);\n+  return {\n+    inside,\n+    resolved:`/${candidateSegments.join('/')}`,\n+    relative:inside?candidateSegments.slice(rootSegments.length).join('/'):null\n+  };\n+}\n+\n+// Return an exit code so importing callers can invoke the CLI without exiting.\n+export function cli(args=process.argv.slice(2)){\n+  try{\n+    if(args.length!==1)throw Error('usage: node path-scope.js INPUT_JSON_FILE');\n+    const input=JSON.parse(readFileSync(args[0],'utf8'));\n+    if(input===null||typeof input!=='object'||Array.isArray(input)){\n+      throw Error('input JSON must be an object');\n+    }\n+    const result=resolveWithin(input.root,input.candidate);\n+    process.stdout.write(`${JSON.stringify(result)}\\n`);\n+    return 0;\n+  }catch(error){\n+    process.stderr.write(`${error.message}\\n`);\n+    return 2;\n+  }\n+}\n+\n+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){\n+  process.exitCode=cli();\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "afterSha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\ntest('the existing helper keeps normalizing segments',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n});\ntest('a candidate that stays inside reports its path from the root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {normalizeSegments, resolveWithin} from '../path-scope.js';\ntest('the existing helper keeps normalizing segments',()=>{\n  assert.deepEqual(normalizeSegments('/a//b/./c'),['a','b','c']);\n  assert.deepEqual(normalizeSegments('a/../../b'),['b']);\n});\ntest('a candidate that stays inside reports its path from the root',()=>{\n  assert.deepEqual(resolveWithin('/srv/ws','sub/../file.txt'),\n    {inside:true,resolved:'/srv/ws/file.txt',relative:'file.txt'});\n});\n",
+      "displaySha256": "b9d224c9b48f4de457f94be0c0c5592f5923679aed1219eb0c2ded3ac3862a55",
+      "diff": ""
+    },
+    {
+      "path": "test/regression.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "155ab95f0b0e6756f56036a6eb065810c1d6d0738f6bca7b60c0071a657fb821",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\nimport {tmpdir} from 'node:os';\nimport {join} from 'node:path';\nimport {fileURLToPath} from 'node:url';\nimport {spawnSync} from 'node:child_process';\nimport {normalizeSegments, resolveWithin, cli} from '../path-scope.js';\n\ntest('lexical resolution respects normalized segment boundaries',()=>{\n  const cases=[\n    ['/srv/ws','../ws/sub/../file.txt',true,'/srv/ws/file.txt','file.txt'],\n    ['/a/b','/a/bc',false,'/a/bc',null],\n    ['/a/b','../../..',false,'/',null],\n    ['/a//b/../','./',true,'/a',''],\n    ['/../../','../../../x//./',true,'/x','x'],\n    ['/a/b','/a',false,'/a',null],\n    ['/a/b','/a/b/../b/',true,'/a/b',''],\n    ['/a','..foo/.../.hidden/\\\\/x',true,'/a/..foo/.../.hidden/\\\\/x','..foo/.../.hidden/\\\\/x'],\n    ['/a/../b','../b/c',true,'/b/c','c']\n  ];\n  for(const [root,candidate,inside,resolved,relative] of cases){\n    assert.deepEqual(resolveWithin(root,candidate),{inside,resolved,relative});\n  }\n});\n\ntest('input validation does not change the existing helper contract',()=>{\n  for(const value of ['',null,undefined,0,false,[],{},'/a\\0b']){\n    assert.throws(()=>resolveWithin(value,'x'),Error);\n    assert.throws(()=>resolveWithin('/a',value),Error);\n  }\n  assert.throws(()=>resolveWithin('relative','/a'),Error);\n  assert.deepEqual(normalizeSegments(''),[]);\n  assert.deepEqual(normalizeSegments('a\\0b'),['a\\0b']);\n  assert.equal(typeof cli,'function');\n});\n\nconst moduleURL=new URL('../path-scope.js',import.meta.url);\nconst run=(args)=>spawnSync(process.execPath,[fileURLToPath(moduleURL),...args],{encoding:'utf8'});\n\ntest('CLI emits exactly one result and rejects invalid files and inputs',()=>{\n  const dir=mkdtempSync(join(tmpdir(),'path-scope-'));\n  try{\n    const file=join(dir,'input.json');\n    writeFileSync(file,JSON.stringify({root:'/srv/ws',candidate:'../ws/file.txt',extra:123}));\n    const success=run([file]);\n    assert.equal(success.status,0);\n    assert.equal(success.stderr,'');\n    assert.equal(success.stdout,'{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\\n');\n    const reject=(args)=>{\n      const result=run(args);\n      assert.equal(result.status,2);\n      assert.equal(result.stdout,'');\n      assert.ok(result.stderr.length>0);\n    };\n    reject([]);\n    reject([file,file]);\n    reject([join(dir,'missing.json')]);\n    reject([dir]);\n    for(const contents of ['{','null','[]','42','\"text\"','{}',\n      '{\"root\":\"a\",\"candidate\":\"b\"}',\n      '{\"root\":\"/a\",\"candidate\":\"\"}',\n      '{\"root\":\"/a\",\"candidate\":\"\\\\u0000\"}']){\n      writeFileSync(file,contents);\n      reject([file]);\n    }\n  }finally{\n    rmSync(dir,{recursive:true,force:true});\n  }\n});\n\ntest('importing the module is silent and does not run the CLI',()=>{\n  const result=spawnSync(process.execPath,['--input-type=module','-e',\n    `await import(${JSON.stringify(moduleURL.href)})`],{encoding:'utf8'});\n  assert.equal(result.status,0);\n  assert.equal(result.stdout,'');\n  assert.equal(result.stderr,'');\n});\n",
+      "displaySha256": "155ab95f0b0e6756f56036a6eb065810c1d6d0738f6bca7b60c0071a657fb821",
+      "diff": "--- starter/test/regression.test.js\n+++ delivered/test/regression.test.js\n@@ -0,0 +1,78 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import {mkdtempSync, writeFileSync, rmSync} from 'node:fs';\n+import {tmpdir} from 'node:os';\n+import {join} from 'node:path';\n+import {fileURLToPath} from 'node:url';\n+import {spawnSync} from 'node:child_process';\n+import {normalizeSegments, resolveWithin, cli} from '../path-scope.js';\n+\n+test('lexical resolution respects normalized segment boundaries',()=>{\n+  const cases=[\n+    ['/srv/ws','../ws/sub/../file.txt',true,'/srv/ws/file.txt','file.txt'],\n+    ['/a/b','/a/bc',false,'/a/bc',null],\n+    ['/a/b','../../..',false,'/',null],\n+    ['/a//b/../','./',true,'/a',''],\n+    ['/../../','../../../x//./',true,'/x','x'],\n+    ['/a/b','/a',false,'/a',null],\n+    ['/a/b','/a/b/../b/',true,'/a/b',''],\n+    ['/a','..foo/.../.hidden/\\\\/x',true,'/a/..foo/.../.hidden/\\\\/x','..foo/.../.hidden/\\\\/x'],\n+    ['/a/../b','../b/c',true,'/b/c','c']\n+  ];\n+  for(const [root,candidate,inside,resolved,relative] of cases){\n+    assert.deepEqual(resolveWithin(root,candidate),{inside,resolved,relative});\n+  }\n+});\n+\n+test('input validation does not change the existing helper contract',()=>{\n+  for(const value of ['',null,undefined,0,false,[],{},'/a\\0b']){\n+    assert.throws(()=>resolveWithin(value,'x'),Error);\n+    assert.throws(()=>resolveWithin('/a',value),Error);\n+  }\n+  assert.throws(()=>resolveWithin('relative','/a'),Error);\n+  assert.deepEqual(normalizeSegments(''),[]);\n+  assert.deepEqual(normalizeSegments('a\\0b'),['a\\0b']);\n+  assert.equal(typeof cli,'function');\n+});\n+\n+const moduleURL=new URL('../path-scope.js',import.meta.url);\n+const run=(args)=>spawnSync(process.execPath,[fileURLToPath(moduleURL),...args],{encoding:'utf8'});\n+\n+test('CLI emits exactly one result and rejects invalid files and inputs',()=>{\n+  const dir=mkdtempSync(join(tmpdir(),'path-scope-'));\n+  try{\n+    const file=join(dir,'input.json');\n+    writeFileSync(file,JSON.stringify({root:'/srv/ws',candidate:'../ws/file.txt',extra:123}));\n+    const success=run([file]);\n+    assert.equal(success.status,0);\n+    assert.equal(success.stderr,'');\n+    assert.equal(success.stdout,'{\"inside\":true,\"resolved\":\"/srv/ws/file.txt\",\"relative\":\"file.txt\"}\\n');\n+    const reject=(args)=>{\n+      const result=run(args);\n+      assert.equal(result.status,2);\n+      assert.equal(result.stdout,'');\n+      assert.ok(result.stderr.length>0);\n+    };\n+    reject([]);\n+    reject([file,file]);\n+    reject([join(dir,'missing.json')]);\n+    reject([dir]);\n+    for(const contents of ['{','null','[]','42','\"text\"','{}',\n+      '{\"root\":\"a\",\"candidate\":\"b\"}',\n+      '{\"root\":\"/a\",\"candidate\":\"\"}',\n+      '{\"root\":\"/a\",\"candidate\":\"\\\\u0000\"}']){\n+      writeFileSync(file,contents);\n+      reject([file]);\n+    }\n+  }finally{\n+    rmSync(dir,{recursive:true,force:true});\n+  }\n+});\n+\n+test('importing the module is silent and does not run the CLI',()=>{\n+  const result=spawnSync(process.execPath,['--input-type=module','-e',\n+    `await import(${JSON.stringify(moduleURL.href)})`],{encoding:'utf8'});\n+  assert.equal(result.status,0);\n+  assert.equal(result.stdout,'');\n+  assert.equal(result.stderr,'');\n+});\n"
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-path-scope@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: the existing helper keeps normalizing segments\nok 1 - the existing helper keeps normalizing segments\n  ---\n  duration_ms: 1.218807\n  ...\n# Subtest: a candidate that stays inside reports its path from the root\nok 2 - a candidate that stays inside reports its path from the root\n  ---\n  duration_ms: 0.182211\n  ...\n# Subtest: lexical resolution respects normalized segment boundaries\nok 3 - lexical resolution respects normalized segment boundaries\n  ---\n  duration_ms: 2.055422\n  ...\n# Subtest: input validation does not change the existing helper contract\nok 4 - input validation does not change the existing helper contract\n  ---\n  duration_ms: 0.699264\n  ...\n# Subtest: CLI emits exactly one result and rejects invalid files and inputs\nok 5 - CLI emits exactly one result and rejects invalid files and inputs\n  ---\n  duration_ms: 319.336072\n  ...\n# Subtest: importing the module is silent and does not run the CLI\nok 6 - importing the module is silent and does not run the CLI\n  ---\n  duration_ms: 20.236581\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 385.539982\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"path-scope\",\"pass\":true,\"groups\":[{\"name\":\"preserved-helper-and-normalization\",\"pass\":true},{\"name\":\"traversal-and-root-clamping\",\"pass\":true},{\"name\":\"prefix-collisions-and-boundaries\",\"pass\":true},{\"name\":\"hostile-names-and-relative-receipts\",\"pass\":true},{\"name\":\"validation-and-cli-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "86985ec83b136af99591bb04a69b6e4aefc91f10582b390a815b1fa975f22e4e"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "ca6594bd2dc5d0f94dde5feab63a375101ae9f7e7fc255e25e9b9851d55384e2"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e2c0dc5f48463f4e569f476be95bd58a9d0ccac5e33ae3bcd85c4181a94e9fbb"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "0ba4a4adda28f59233b75791490b955d77655d842199eb4ac3a526809e223406"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 6,
+    "withResults": 6,
+    "normalizedPathOccurrences": 5,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Delivered and independently accepted.",
+    "paragraphs": [
+      {
+        "text": "Delivered path-scope.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 107.9 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+        "actions": [
+          "action-4",
+          "action-6"
+        ]
+      }
+    ]
+  }
+}

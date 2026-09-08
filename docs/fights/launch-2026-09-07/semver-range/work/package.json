@@ -1,0 +1,77 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "semver-range",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 178171,
+      "sha256": "cb125d70fd1be135fa946d0b3c472a08c9600a5e808022cc6162156e2dd313dd",
+      "arm": "bantam-local-27b",
+      "wallMs": 399879,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 52,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+      "explanation": {
+        "title": "The factory stayed with the job until it passed.",
+        "paragraphs": [
+          {
+            "text": "The version selector needed several rounds of source and test corrections. The factory kept the worker on focused assertions, then sent CLI behavior through a separate executable check.",
+            "actions": [
+              "action-6",
+              "action-23",
+              "action-26",
+              "action-35",
+              "action-44",
+              "action-46"
+            ]
+          },
+          {
+            "text": "That CLI check failed, the worker changed the implementation, and the rerun passed. Final project tests and all five independent groups passed before delivery at 399.9 seconds.",
+            "actions": [
+              "action-46",
+              "action-48",
+              "action-49",
+              "action-50",
+              "action-52"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 52743,
+      "sha256": "c2b4328398affa86bae55115dc41d156e3eb4b279bd466ddc7185c3f20e8fa62",
+      "arm": "codex-astra",
+      "wallMs": 136165,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "708fc55c2f04797c2aec5ffad24b141a22c00830754d69a6ff55c54fdade13b9",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered semver-range.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 136.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-5"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

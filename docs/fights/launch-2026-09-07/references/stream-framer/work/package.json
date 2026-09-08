@@ -1,0 +1,95 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "stream-framer",
+  "files": [
+    {
+      "path": "claude-sonnet.json",
+      "bytes": 37732,
+      "sha256": "edd4c3c2215627be9e955d7f7da6c3ee03ee009223969ca72f210b1885d14649",
+      "arm": "claude-sonnet",
+      "wallMs": 125876,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered stream-framer.js. The project suite and all five independent acceptance groups passed, with a clean finish in 125.9 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-opus.json",
+      "bytes": 72716,
+      "sha256": "b0fdb89f77558fba3e0220c1924f31eb7d416ad62bd6f112ad3f9729ea2780cc",
+      "arm": "claude-opus",
+      "wallMs": 185662,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered stream-framer.js, test/extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 185.7 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-9",
+              "action-13",
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-fable.json",
+      "bytes": 67822,
+      "sha256": "8e8b86538fd69a30c3ed9b6710408038b79cb328543393f877a40f2b891f40a0",
+      "arm": "claude-fable",
+      "wallMs": 128257,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 10,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered stream-framer.js, test/edge.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 128.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-8",
+              "action-9",
+              "action-10"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

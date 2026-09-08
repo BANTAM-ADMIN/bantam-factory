@@ -1,0 +1,319 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "redaction-plan",
+  "arm": "codex-terra",
+  "wallMs": 134275,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T04:38:16.009Z",
+  "task": "# Build an auditable literal-redaction planner\n\nImplement `planRedactions(text, rules)` in `redaction-plan.js`, exported as an\nES module, and its CLI. This is a deterministic literal replacement tool, not\na secret detector or a guarantee that arbitrary private information is removed.\n\n`text` must be a string. `rules` must be a dense array of non-null, non-array\nobjects, each with a unique nonempty string `id`, nonempty string `literal`,\nand string `replacement` (which may be empty). Extra fields are ignored.\nValidate every rule before doing any matching, even when text is empty.\nIDs are opaque strings, including names such as `__proto__`.\n\nFind all exact, case-sensitive literal occurrences in the ORIGINAL text,\nincluding overlapping occurrences of a literal. Do not treat literals as\nregular expressions. Offsets are zero-based JavaScript UTF-16 code-unit indices,\nas used by `String.slice`, not UTF-8 byte indices.\n\nSelect nonoverlapping edits in this order: earliest start first; at the same\nstart, longest matched literal first; with equal length, earlier rule-array\nposition first. After selecting an edit, reject matches starting before its\nend. Touching edits are allowed. Only original-text matches are considered:\nnever reprocess replacement text. Preserve all unselected source characters.\n\nReturn exactly `{text, edits, originalBytes, redactedBytes}`. `text` is the\nresult. Each edit is exactly `{start,end,id}`, ordered by source position, where\nend is exclusive. Byte counts use `Buffer.byteLength(value,'utf8')`. Do not\nmutate either input; frozen inputs must work. Invalid inputs throw an Error.\n\nExample: text `ababa`, rules `[{id:'long',literal:'aba',replacement:'X'},\n{id:'short',literal:'ba',replacement:'Y'}]` produces text `XY` and edits\n`[{start:0,end:3,id:'long'},{start:3,end:5,id:'short'}]`.\n\nCLI: `node redaction-plan.js INPUT_JSON_FILE`. Require exactly one file argument.\nThe JSON is a non-null, non-array object `{text,rules}`; extra fields are ignored.\nSuccess prints exactly the API result as one JSON value followed by newline,\nexits 0, and writes no stderr. Invalid arguments/files/JSON/API input exit 2,\nwith nonempty stderr and no stdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit package.json or existing tests. You may add\nregression tests. Verification uses a read-only workspace: put temporary files\nin os.tmpdir() and clean them up. Run npm test before finishing. Independent\nchecks vary input values, not this public contract.\n",
+  "taskSha256": "bc6431a11553ce877d4d73fad99de5f0df7f2885a9e88f6f413af07ec8a24f8e",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"pwd && rg --files -g '!*node_modules*' | sed -n '1,160p' && find . -maxdepth 2 -name AGENTS.md -o -name package.json\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "/workspace\ntest/public.test.js\nredaction-plan.js\npackage.json\n./package.json\n"
+        }
+      ],
+      "atMs": 9350.0,
+      "endedMs": 9495.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"sed -n '1,240p' redaction-plan.js && sed -n '1,260p' test/public.test.js && sed -n '1,160p' package.json\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":30000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+        }
+      ],
+      "atMs": 15109.0,
+      "endedMs": 15149.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Delete File: /workspace/redaction-plan.js\\n*** Add File: /workspace/redaction-plan.js\\n+import {readFileSync} from 'node:fs';\\n+import {resolve} from 'node:path';\\n+import {pathToFileURL} from 'node:url';\\n+\\n+function invalid(message) {\\n+  throw new Error(message);\\n+}\\n+\\n+function validateRules(rules) {\\n+  if (!Array.isArray(rules)) invalid('rules must be an array');\\n+\\n+  const ids = new Set();\\n+  const validated = [];\\n+  for (let index = 0; index < rules.length; index += 1) {\\n+    if (!(index in rules)) invalid('rules must be a dense array');\\n+\\n+    const rule = rules[index];\\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\\n+      invalid('each rule must be an object');\\n+    }\\n+\\n+    const {id, literal, replacement} = rule;\\n+    if (typeof id !== 'string' || id.length === 0) invalid('rule id must be a nonempty string');\\n+    if (ids.has(id)) invalid('rule ids must be unique');\\n+    if (typeof literal !== 'string' || literal.length === 0) {\\n+      invalid('rule literal must be a nonempty string');\\n+    }\\n+    if (typeof replacement !== 'string') invalid('rule replacement must be a string');\\n+\\n+    ids.add(id);\\n+    // Snapshot the relevant fields so later work never needs to modify inputs.\\n+    validated.push({id, literal, replacement, index});\\n+  }\\n+  return validated;\\n+}\\n+\\n+export function planRedactions(text, rules) {\\n+  if (typeof text !== 'string') invalid('text must be a string');\\n+  const validated = validateRules(rules);\\n+  const matches = [];\\n+\\n+  for (const rule of validated) {\\n+    let start = text.indexOf(rule.literal);\\n+    while (start !== -1) {\\n+      matches.push({start, end: start + rule.literal.length, rule});\\n+      // Advancing by one finds overlaps as well as nonoverlapping occurrences.\\n+      start = text.indexOf(rule.literal, start + 1);\\n+    }\\n+  }\\n+\\n+  matches.sort((left, right) =>\\n+    left.start - right.start ||\\n+    right.rule.literal.length - left.rule.literal.length ||\\n+    left.rule.index - right.rule.index);\\n+\\n+  const selected = [];\\n+  let nextAvailable = 0;\\n+  for (const match of matches) {\\n+    if (match.start >= nextAvailable) {\\n+      selected.push(match);\\n+      nextAvailable = match.end;\\n+    }\\n+  }\\n+\\n+  let output = '';\\n+  let cursor = 0;\\n+  const edits = [];\\n+  for (const match of selected) {\\n+    output += text.slice(cursor, match.start) + match.rule.replacement;\\n+    cursor = match.end;\\n+    edits.push({start: match.start, end: match.end, id: match.rule.id});\\n+  }\\n+  output += text.slice(cursor);\\n+\\n+  return {\\n+    text: output,\\n+    edits,\\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\\n+    redactedBytes: Buffer.byteLength(output, 'utf8'),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  if (process.argv.length !== 3) invalid('usage: node redaction-plan.js INPUT_JSON_FILE');\\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\\n+    invalid('input JSON must be an object');\\n+  }\\n+  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules))}\\\\n`);\\n+}\\n+\\n+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {\\n+  try {\\n+    runCli();\\n+  } catch (error) {\\n+    process.stderr.write(`${error instanceof Error ? error.message : 'invalid input'}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\napply_patch verification failed: invalid patch: multiple operations target /workspace/redaction-plan.js"
+        }
+      ],
+      "atMs": 45465.0,
+      "endedMs": 45499.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/redaction-plan.js\\n@@\\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\\n+import {readFileSync} from 'node:fs';\\n+import {resolve} from 'node:path';\\n+import {pathToFileURL} from 'node:url';\\n+\\n+function invalid(message) {\\n+  throw new Error(message);\\n+}\\n+\\n+function validateRules(rules) {\\n+  if (!Array.isArray(rules)) invalid('rules must be an array');\\n+\\n+  const ids = new Set();\\n+  const validated = [];\\n+  for (let index = 0; index < rules.length; index += 1) {\\n+    if (!(index in rules)) invalid('rules must be a dense array');\\n+\\n+    const rule = rules[index];\\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\\n+      invalid('each rule must be an object');\\n+    }\\n+\\n+    const {id, literal, replacement} = rule;\\n+    if (typeof id !== 'string' || id.length === 0) invalid('rule id must be a nonempty string');\\n+    if (ids.has(id)) invalid('rule ids must be unique');\\n+    if (typeof literal !== 'string' || literal.length === 0) {\\n+      invalid('rule literal must be a nonempty string');\\n+    }\\n+    if (typeof replacement !== 'string') invalid('rule replacement must be a string');\\n+\\n+    ids.add(id);\\n+    // Snapshot the relevant fields so later work never needs to modify inputs.\\n+    validated.push({id, literal, replacement, index});\\n+  }\\n+  return validated;\\n+}\\n+\\n+export function planRedactions(text, rules) {\\n+  if (typeof text !== 'string') invalid('text must be a string');\\n+  const validated = validateRules(rules);\\n+  const matches = [];\\n+\\n+  for (const rule of validated) {\\n+    let start = text.indexOf(rule.literal);\\n+    while (start !== -1) {\\n+      matches.push({start, end: start + rule.literal.length, rule});\\n+      // Advancing by one finds overlaps as well as nonoverlapping occurrences.\\n+      start = text.indexOf(rule.literal, start + 1);\\n+    }\\n+  }\\n+\\n+  matches.sort((left, right) =>\\n+    left.start - right.start ||\\n+    right.rule.literal.length - left.rule.literal.length ||\\n+    left.rule.index - right.rule.index);\\n+\\n+  const selected = [];\\n+  let nextAvailable = 0;\\n+  for (const match of matches) {\\n+    if (match.start >= nextAvailable) {\\n+      selected.push(match);\\n+      nextAvailable = match.end;\\n+    }\\n+  }\\n+\\n+  let output = '';\\n+  let cursor = 0;\\n+  const edits = [];\\n+  for (const match of selected) {\\n+    output += text.slice(cursor, match.start) + match.rule.replacement;\\n+    cursor = match.end;\\n+    edits.push({start: match.start, end: match.end, id: match.rule.id});\\n+  }\\n+  output += text.slice(cursor);\\n+\\n+  return {\\n+    text: output,\\n+    edits,\\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\\n+    redactedBytes: Buffer.byteLength(output, 'utf8'),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  if (process.argv.length !== 3) invalid('usage: node redaction-plan.js INPUT_JSON_FILE');\\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\\n+    invalid('input JSON must be an object');\\n+  }\\n+  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules)}\\\\n`);\\n+}\\n+\\n+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {\\n+  try {\\n+    runCli();\\n+  } catch (error) {\\n+    process.stderr.write(`${error instanceof Error ? error.message : 'invalid input'}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 69372.0,
+      "endedMs": 69409.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test && task_tmp=$(mktemp -d) && trap 'rm -rf \\\"$task_tmp\\\"' EXIT && printf '%s' '{\\\"text\\\":\\\"ababa\\\",\\\"rules\\\":[{\\\"id\\\":\\\"long\\\",\\\"literal\\\":\\\"aba\\\",\\\"replacement\\\":\\\"X\\\"},{\\\"id\\\":\\\"short\\\",\\\"literal\\\":\\\"ba\\\",\\\"replacement\\\":\\\"Y\\\"}]}' > \\\"$task_tmp/input.json\\\" && node redaction-plan.js \\\"$task_tmp/input.json\\\" && if node redaction-plan.js >/tmp/redaction-plan.stdout 2>/tmp/redaction-plan.stderr; then exit 1; fi && test ! -s /tmp/redaction-plan.stdout && test -s /tmp/redaction-plan.stderr\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\nexec_command failed: CreateProcess { message: \"Rejected(\\\"`/bin/sh -lc 'npm test && task_tmp=$(mktemp -d) && trap '\\\\\\\"'rm -rf \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp\\\\\\\"'\\\\\\\"' EXIT && printf '%s' '{\\\\\\\\\\\\\\\"text\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"ababa\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"rules\\\\\\\\\\\\\\\":[{\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"long\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"literal\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"aba\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"replacement\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"X\\\\\\\\\\\\\\\"},{\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"short\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"literal\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"ba\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"replacement\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"Y\\\\\\\\\\\\\\\"}]}' > \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp/input.json\\\\\\\" && node redaction-plan.js \\\\\\\"$task_tmp/input.json\\\\\\\" && if node redaction-plan.js >/tmp/redaction-plan.stdout 2>/tmp/redaction-plan.stderr; then exit 1; fi && test ! -s /tmp/redaction-plan.stdout && test -s /tmp/redaction-plan.stderr'` rejected: rm -f style commands are not permitted. Use a safer approach\\\")\" }"
+        }
+      ],
+      "atMs": 82967.0,
+      "endedMs": 83025.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# file:///workspace/redaction-plan.js:89\n#   process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules)}\\\\n`);\n#                                                                                ^\n# SyntaxError: missing ) after argument list\n#     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)\n#     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:146:18)\n#     at \\#translate (node:internal/modules/esm/loader:431:12)\n#     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:478:27)\n# Node.js v20.19.4\n# Subtest: /workspace/test/public.test.js\nnot ok 1 - /workspace/test/public.test.js\n  ---\n  duration_ms: 26.786915\n  location: '/workspace/test/public.test.js:1:1'\n  failureType: 'testCodeFailure'\n  exitCode: 1\n  signal: ~\n  error: 'test failed'\n  code: 'ERR_TEST_FAILURE'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 30.615649\n"
+        }
+      ],
+      "atMs": 88056.0,
+      "endedMs": 88314.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/redaction-plan.js\\n@@\\n-  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules)}\\\\n`);\\n+  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules))}\\\\n`);\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 96243.0,
+      "endedMs": 96288.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.2 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: literal replacement has an original-position receipt\nok 1 - literal replacement has an original-position receipt\n  ---\n  duration_ms: 1.328038\n  ...\n# Subtest: longest same-start match wins\nok 2 - longest same-start match wins\n  ---\n  duration_ms: 0.140911\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 39.630334\n"
+        }
+      ],
+      "atMs": 102803.0,
+      "endedMs": 102979.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"node --input-type=module -e \\\"import assert from 'node:assert/strict'; import {mkdtempSync,writeFileSync,rmSync} from 'node:fs'; import {tmpdir} from 'node:os'; import {join} from 'node:path'; import {spawnSync} from 'node:child_process'; import {planRedactions} from './redaction-plan.js'; const rules=Object.freeze([Object.freeze({id:'__proto__',literal:'\ud83d\ude00a',replacement:''}),Object.freeze({id:'tie',literal:'a',replacement:'Q'})]); assert.deepEqual(planRedactions('\ud83d\ude00a\ud83d\ude00a',rules),{text:'',edits:[{start:0,end:3,id:'__proto__'},{start:3,end:6,id:'__proto__'}],originalBytes:10,redactedBytes:0}); assert.throws(()=>planRedactions('',[{id:'x',literal:'',replacement:''}])); const directory=mkdtempSync(join(tmpdir(),'redaction-plan-')); try { const file=join(directory,'input.json'); writeFileSync(file,JSON.stringify({text:'ababa',rules:[{id:'long',literal:'aba',replacement:'X'},{id:'short',literal:'ba',replacement:'Y'}]})); const success=spawnSync(process.execPath,['redaction-plan.js',file],{encoding:'utf8'}); assert.equal(success.status,0); assert.equal(success.stdout,'{\\\\\\\"text\\\\\\\":\\\\\\\"XY\\\\\\\",\\\\\\\"edits\\\\\\\":[{\\\\\\\"start\\\\\\\":0,\\\\\\\"end\\\\\\\":3,\\\\\\\"id\\\\\\\":\\\\\\\"long\\\\\\\"},{\\\\\\\"start\\\\\\\":3,\\\\\\\"end\\\\\\\":5,\\\\\\\"id\\\\\\\":\\\\\\\"short\\\\\\\"}],\\\\\\\"originalBytes\\\\\\\":5,\\\\\\\"redactedBytes\\\\\\\":2}\\\\\\\\n'); assert.equal(success.stderr,''); const failure=spawnSync(process.execPath,['redaction-plan.js'],{encoding:'utf8'}); assert.equal(failure.status,2); assert.equal(failure.stdout,''); assert.notEqual(failure.stderr,''); } finally { rmSync(directory,{recursive:true,force:true}); }\\\"\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": ""
+        }
+      ],
+      "atMs": 117352.0,
+      "endedMs": 117454.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"git diff --check && git diff -- redaction-plan.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000});\ntext(r.output);\n",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>\n\nDiff output format options\n    -p, --patch           generate patch\n    -s, --no-patch        suppress diff output\n    -u                    generate patch\n    -U, --unified[=<n>]   generate diffs with <n> lines context\n    -W, --[no-]function-context\n                          generate diffs with <n> lines context\n    --raw                 generate the diff in raw format\n    --patch-with-raw      synonym for '-p --raw'\n    --patch-with-stat     synonym for '-p --stat'\n    --numstat             machine friendly --stat\n    --shortstat           output only the last line of --stat\n    -X, --dirstat[=<param1,param2>...]\n                          output the distribution of relative amount of changes for each sub-directory\n    --cumulative          synonym for --dirstat=cumulative\n    --dirstat-by-file[=<param1,param2>...]\n                          synonym for --dirstat=files,param1,param2...\n    --check               warn if changes introduce conflict markers or whitespace errors\n    --summary             condensed summary such as creations, renames and mode changes\n    --name-only           show only names of changed files\n    --name-status         show only names and status of changed files\n    --stat[=<width>[,<name-width>[,<count>]]]\n                          generate diffstat\n    --stat-width <width>  generate diffstat with a given width\n    --stat-name-width <width>\n                          generate diffstat with a given name width\n    --stat-graph-width <width>\n                          generate diffstat with a given graph width\n    --stat-count <count>  generate diffstat with limited lines\n    --[no-]compact-summary\n                          generate compact summary in diffstat\n    --binary              output a binary diff that can be applied\n    --[no-]full-index     show full pre- and post-image object names on the \"index\" lines\n    --[no-]color[=<when>] show colored diff\n    --ws-error-highlight <kind>\n                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff\n    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat\n    --[no-]abbrev[=<n>]   use <n> digits to display object names\n    --src-prefix <prefix> show the given source prefix instead of \"a/\"\n    --dst-prefix <prefix> show the given destination prefix instead of \"b/\"\n    --line-prefix <prefix>\n                          prepend an additional prefix to every line of output\n    --no-prefix           do not show any source or destination prefix\n    --default-prefix      use default prefixes a/ and b/\n    --inter-hunk-context <n>\n                          show context between diff hunks up to the specified number of lines\n    --output-indicator-new <char>\n                          specify the character to indicate a new line instead of '+'\n    --output-indicator-old <char>\n                          specify the character to indicate an old line instead of '-'\n    --output-indicator-context <char>\n                          specify the character to indicate a context instead of ' '\n\nDiff rename options\n    -B, --break-rewrites[=<n>[/<m>]]\n                          break complete rewrite changes into pairs of delete and create\n    -M, --find-renames[=<n>]\n                          detect renames\n    -D, --irreversible-delete\n                          omit the preimage for deletes\n    -C, --find-copies[=<n>]\n                          detect copies\n    --[no-]find-copies-harder\n                          use unmodified files as source to find copies\n    --no-renames          disable rename detection\n    --[no-]rename-empty   use empty blobs as rename source\n    --[no-]follow         continue listing the history of a file beyond renames\n    -l <n>                prevent rename/copy detection if the number of rename/copy targets exceeds given limit\n\nDiff algorithm options\n    --minimal             produce the smallest possible diff\n    -w, --ignore-all-space\n                          ignore whitespace when comparing lines\n    -b, --ignore-space-change\n                          ignore changes in amount of whitespace\n    --ignore-space-at-eol ignore changes in whitespace at EOL\n    --ignore-cr-at-eol    ignore carrier-return at the end of line\n    --ignore-blank-lines  ignore changes whose lines are all blank\n    -I, --[no-]ignore-matching-lines <regex>\n                          ignore changes whose all lines match <regex>\n    --[no-]indent-heuristic\n                          heuristic to shift diff hunk boundaries for easy reading\n    --patience            generate diff using the \"patience diff\" algorithm\n    --histogram           generate diff using the \"histogram diff\" algorithm\n    --diff-algorithm <algorithm>\n                          choose a diff algorithm\n    --anchored <text>     generate diff using the \"anchored diff\" algorithm\n    --word-diff[=<mode>]  show word diff, using <mode> to delimit changed words\n    --word-diff-regex <regex>\n                          use <regex> to decide what a word is\n    --color-words[=<regex>]\n                          equivalent to --word-diff=color --word-diff-regex=<regex>\n    --[no-]color-moved[=<mode>]\n                          moved lines of code are colored differently\n    --[no-]color-moved-ws <mode>\n                          how white spaces are ignored in --color-moved\n\nOther diff options\n    --[no-]relative[=<prefix>]\n                          when run from subdir, exclude changes outside and show relative paths\n    -a, --[no-]text       treat all files as text\n    -R                    swap two inputs, reverse the diff\n    --[no-]exit-code      exit with 1 if there were differences, 0 otherwise\n    --[no-]quiet          disable all output of the program\n    --[no-]ext-diff       allow an external diff helper to be executed\n    --[no-]textconv       run external text conversion filters when comparing binary files\n    --ignore-submodules[=<when>]\n                          ignore changes to submodules in the diff generation\n    --submodule[=<format>]\n                          specify how differences in submodules are shown\n    --ita-invisible-in-index\n                          hide 'git add -N' entries from the index\n    --ita-visible-in-index\n                          treat 'git add -N' entries as real in the index\n    -S <string>           look for differences that change the number of occurrences of the specified string\n    -G <regex>            look for differences that change the number of occurrences of the specified regex\n    --pickaxe-all         show all changes in the changeset with -S or -G\n    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression\n    -O <file>             control the order in which files appear in the output\n    --rotate-to <path>    show the change in the specified path first\n    --skip-to <path>      skip the output to the specified path\n    --find-object <object-id>\n                          look for differences that change the number of occurrences of the specified object\n    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]\n                          select files by diff type\n    --output <file>       output to a specific file\n\n"
+        }
+      ],
+      "atMs": 122590.0,
+      "endedMs": 122644.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "afterSha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "before": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-redaction-plan\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "7b9e699103c81777df0c3b98d72d2fd23fdd4bef1420e6a2a11dbcd158e507d9",
+      "diff": ""
+    },
+    {
+      "path": "redaction-plan.js",
+      "state": "changed",
+      "beforeSha256": "900b6d09006497db276b37cf36eda6320cb138933887746f90fdaa38f63182da",
+      "afterSha256": "4715e933e8d8f864d1499c4a1c57d425f872e44fad4df56c5f3a2bc4c6fb62ff",
+      "before": "export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n",
+      "after": "import {readFileSync} from 'node:fs';\nimport {resolve} from 'node:path';\nimport {pathToFileURL} from 'node:url';\n\nfunction invalid(message) {\n  throw new Error(message);\n}\n\nfunction validateRules(rules) {\n  if (!Array.isArray(rules)) invalid('rules must be an array');\n\n  const ids = new Set();\n  const validated = [];\n  for (let index = 0; index < rules.length; index += 1) {\n    if (!(index in rules)) invalid('rules must be a dense array');\n\n    const rule = rules[index];\n    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n      invalid('each rule must be an object');\n    }\n\n    const {id, literal, replacement} = rule;\n    if (typeof id !== 'string' || id.length === 0) invalid('rule id must be a nonempty string');\n    if (ids.has(id)) invalid('rule ids must be unique');\n    if (typeof literal !== 'string' || literal.length === 0) {\n      invalid('rule literal must be a nonempty string');\n    }\n    if (typeof replacement !== 'string') invalid('rule replacement must be a string');\n\n    ids.add(id);\n    // Snapshot the relevant fields so later work never needs to modify inputs.\n    validated.push({id, literal, replacement, index});\n  }\n  return validated;\n}\n\nexport function planRedactions(text, rules) {\n  if (typeof text !== 'string') invalid('text must be a string');\n  const validated = validateRules(rules);\n  const matches = [];\n\n  for (const rule of validated) {\n    let start = text.indexOf(rule.literal);\n    while (start !== -1) {\n      matches.push({start, end: start + rule.literal.length, rule});\n      // Advancing by one finds overlaps as well as nonoverlapping occurrences.\n      start = text.indexOf(rule.literal, start + 1);\n    }\n  }\n\n  matches.sort((left, right) =>\n    left.start - right.start ||\n    right.rule.literal.length - left.rule.literal.length ||\n    left.rule.index - right.rule.index);\n\n  const selected = [];\n  let nextAvailable = 0;\n  for (const match of matches) {\n    if (match.start >= nextAvailable) {\n      selected.push(match);\n      nextAvailable = match.end;\n    }\n  }\n\n  let output = '';\n  let cursor = 0;\n  const edits = [];\n  for (const match of selected) {\n    output += text.slice(cursor, match.start) + match.rule.replacement;\n    cursor = match.end;\n    edits.push({start: match.start, end: match.end, id: match.rule.id});\n  }\n  output += text.slice(cursor);\n\n  return {\n    text: output,\n    edits,\n    originalBytes: Buffer.byteLength(text, 'utf8'),\n    redactedBytes: Buffer.byteLength(output, 'utf8'),\n  };\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) invalid('usage: node redaction-plan.js INPUT_JSON_FILE');\n  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    invalid('input JSON must be an object');\n  }\n  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules))}\\n`);\n}\n\nif (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : 'invalid input'}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "4715e933e8d8f864d1499c4a1c57d425f872e44fad4df56c5f3a2bc4c6fb62ff",
+      "diff": "--- starter/redaction-plan.js\n+++ delivered/redaction-plan.js\n@@ -1 +1,99 @@\n-export function planRedactions(text,rules){throw Error('Implement the planner and CLI');}\n+import {readFileSync} from 'node:fs';\n+import {resolve} from 'node:path';\n+import {pathToFileURL} from 'node:url';\n+\n+function invalid(message) {\n+  throw new Error(message);\n+}\n+\n+function validateRules(rules) {\n+  if (!Array.isArray(rules)) invalid('rules must be an array');\n+\n+  const ids = new Set();\n+  const validated = [];\n+  for (let index = 0; index < rules.length; index += 1) {\n+    if (!(index in rules)) invalid('rules must be a dense array');\n+\n+    const rule = rules[index];\n+    if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {\n+      invalid('each rule must be an object');\n+    }\n+\n+    const {id, literal, replacement} = rule;\n+    if (typeof id !== 'string' || id.length === 0) invalid('rule id must be a nonempty string');\n+    if (ids.has(id)) invalid('rule ids must be unique');\n+    if (typeof literal !== 'string' || literal.length === 0) {\n+      invalid('rule literal must be a nonempty string');\n+    }\n+    if (typeof replacement !== 'string') invalid('rule replacement must be a string');\n+\n+    ids.add(id);\n+    // Snapshot the relevant fields so later work never needs to modify inputs.\n+    validated.push({id, literal, replacement, index});\n+  }\n+  return validated;\n+}\n+\n+export function planRedactions(text, rules) {\n+  if (typeof text !== 'string') invalid('text must be a string');\n+  const validated = validateRules(rules);\n+  const matches = [];\n+\n+  for (const rule of validated) {\n+    let start = text.indexOf(rule.literal);\n+    while (start !== -1) {\n+      matches.push({start, end: start + rule.literal.length, rule});\n+      // Advancing by one finds overlaps as well as nonoverlapping occurrences.\n+      start = text.indexOf(rule.literal, start + 1);\n+    }\n+  }\n+\n+  matches.sort((left, right) =>\n+    left.start - right.start ||\n+    right.rule.literal.length - left.rule.literal.length ||\n+    left.rule.index - right.rule.index);\n+\n+  const selected = [];\n+  let nextAvailable = 0;\n+  for (const match of matches) {\n+    if (match.start >= nextAvailable) {\n+      selected.push(match);\n+      nextAvailable = match.end;\n+    }\n+  }\n+\n+  let output = '';\n+  let cursor = 0;\n+  const edits = [];\n+  for (const match of selected) {\n+    output += text.slice(cursor, match.start) + match.rule.replacement;\n+    cursor = match.end;\n+    edits.push({start: match.start, end: match.end, id: match.rule.id});\n+  }\n+  output += text.slice(cursor);\n+\n+  return {\n+    text: output,\n+    edits,\n+    originalBytes: Buffer.byteLength(text, 'utf8'),\n+    redactedBytes: Buffer.byteLength(output, 'utf8'),\n+  };\n+}\n+\n+function runCli() {\n+  if (process.argv.length !== 3) invalid('usage: node redaction-plan.js INPUT_JSON_FILE');\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n+    invalid('input JSON must be an object');\n+  }\n+  process.stdout.write(`${JSON.stringify(planRedactions(input.text, input.rules))}\\n`);\n+}\n+\n+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {\n+  try {\n+    runCli();\n+  } catch (error) {\n+    process.stderr.write(`${error instanceof Error ? error.message : 'invalid input'}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "afterSha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {planRedactions} from '../redaction-plan.js';\ntest('literal replacement has an original-position receipt',()=>{\n  assert.deepEqual(planRedactions('a.b a.b',[{id:'dot',literal:'a.b',replacement:'X'}]),\n    {text:'X X',edits:[{start:0,end:3,id:'dot'},{start:4,end:7,id:'dot'}],originalBytes:7,redactedBytes:3});\n});\ntest('longest same-start match wins',()=>{\n  assert.equal(planRedactions('ababa',[{id:'a',literal:'ab',replacement:'S'},{id:'b',literal:'aba',replacement:'L'}]).text,'Lba');\n});\n",
+      "displaySha256": "1c30332df39881aa9ae73b819e5f497df7f5b7625e2c113a1b22aa5998c6d9cb",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-redaction-plan@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: literal replacement has an original-position receipt\nok 1 - literal replacement has an original-position receipt\n  ---\n  duration_ms: 1.325268\n  ...\n# Subtest: longest same-start match wins\nok 2 - longest same-start match wins\n  ---\n  duration_ms: 0.143531\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 39.949496\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"redaction-plan\",\"pass\":true,\"groups\":[{\"name\":\"literal-matching-and-edit-receipts\",\"pass\":true},{\"name\":\"overlap-priority-and-single-pass\",\"pass\":true},{\"name\":\"unicode-bytes-and-opaque-identities\",\"pass\":true},{\"name\":\"validation-and-immutability\",\"pass\":true},{\"name\":\"cli-and-error-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "dfbdfc6a0e64b03b2aacd5e36665a38342b455788d32fa34825b0d37afd876fd"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "07a60bc960b20eddf983a415799bd21dec4f141b1c7fb6e1c06d3a86671a21b6"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "16a31a9514b418e5943b3991e99fae9cc30109fb591f032e6a2874a89d816272"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e7209e1aa47f509defc1a504881683c20df03ff99135799cd403dd4d8f3d233c"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 10,
+    "withResults": 10,
+    "normalizedPathOccurrences": 17,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Delivered and independently accepted.",
+    "paragraphs": [
+      {
+        "text": "Delivered redaction-plan.js. The project suite and all five independent acceptance groups passed, with a clean finish in 134.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+        "actions": [
+          "action-4",
+          "action-7",
+          "action-10"
+        ]
+      }
+    ]
+  }
+}

@@ -21,8 +21,9 @@ passed all five groups, but a timeout is not a completion.
 BANTAM FACTORY was the fastest local contender: 66.0% less wall time than DeepSeek
 Harness on the same weights, while Hermes did not finish within the 600 s
 limit. Astra was fastest overall; BANTAM FACTORY finished 16.2 seconds later and ahead
-of Terra and Sol. These are single observations, not statistically established
-rankings or evidence that the models have identical general capability.
+of Terra and Sol. These are the recorded elapsed times for this work order.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
@@ -73,13 +74,8 @@ All selected runtimes passed offline checks before scoring. Local inference
 was serial. No manual repairs, teacher requests or post-result changes to the
 candidates were made.
 
-This is a previously used development task, not a held-out evaluation or a
-pure context ablation. Native prompts, tools, sampling and output policies
+This is a previously used development task. Native prompts, tools, sampling and output policies
 differ. All six planned contenders remain in this one-card derivative,
-including the timeout and the frontier contenders that were faster. Raw
-transcripts, source and machine details remain private. Public packages
-contain allowlisted measurements and replay counters. Hash manifests exclude
-this README and do not establish authorship or authorize executing imported
-evidence.
+including the timeout and the frontier contenders that were faster. The work views include recorded actions, acceptance output and delivered files. Asset hashes cover the generated files; this explanatory note is separate.
 
 </details>

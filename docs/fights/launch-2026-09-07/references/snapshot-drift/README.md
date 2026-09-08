@@ -17,7 +17,9 @@ to its roster.
 
 For context, BANTAM FACTORY's earlier local 27B attempt on this work order passed 5/5
 in 124.3 s, and native Codex Terra in 106.2 s. Those came from a different run
-window and, for BANTAM FACTORY, a different model. Individual observations, not a ranking.
+window and, for BANTAM FACTORY, a different model.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
 <summary>Token receipts, run conditions & provenance</summary>

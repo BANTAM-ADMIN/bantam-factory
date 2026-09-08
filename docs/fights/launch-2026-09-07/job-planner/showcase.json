@@ -1,7 +1,7 @@
 {
   "schema": "bantam.factory-showcase.v1",
   "mode": "public",
-  "generatedAt": "2026-09-08T04:30:24.403Z",
+  "generatedAt": "2026-09-08T18:34:39.916Z",
   "privacy": {
     "redacted": true,
     "rawEvidenceIncluded": false,
@@ -15,15 +15,33 @@
       "complete": true,
       "startedAt": "2026-09-08T04:08:52.140Z",
       "finishedAt": "2026-09-08T04:30:23.201Z",
+      "followups": [
+        {
+          "schema": "bantam.fight-followup.v1",
+          "previousSourceSha256": "011a94e8abb92d3ef4ab78c9e93e908130ea25829d253d0de34ee3f989de43a2",
+          "baselineManifestSha256": "c9a7147b247bb5d67dce0ac4a40581d339b120e8abad09b79e99219da54c666d",
+          "manifestSha256": "14b5449f49019b2b670805d01f409d6e8d8e0e5995a361b7bfeb1dcbc5675073",
+          "materialsSha256": "0af668d2102e4340761f514cbfe5ffcc2dc4226adf61c67f3e8ffb2ecec01245",
+          "modelSha256": "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+          "startedAt": "2026-09-08T18:14:16.442Z",
+          "finishedAt": "2026-09-08T18:34:39.916Z",
+          "arms": [
+            "opencode"
+          ],
+          "wallMs": 600000,
+          "contextTokens": 72192,
+          "peerOutputTokens": 32768
+        }
+      ],
       "counts": {
-        "observed": 6,
-        "planned": 6,
-        "accepted": 5,
-        "completed": 5,
-        "pass": 5,
-        "groupsMeasured": 6,
-        "groupsPassed": 27,
-        "groupsTotal": 30
+        "observed": 7,
+        "planned": 7,
+        "accepted": 6,
+        "completed": 6,
+        "pass": 6,
+        "groupsMeasured": 7,
+        "groupsPassed": 32,
+        "groupsTotal": 35
       },
       "cards": [
         {
@@ -109,6 +127,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 16718,
+                  "milliseconds": 166368.453,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "prefill": {
+                  "tokens": 34904,
+                  "milliseconds": 19418.414,
+                  "measuredRequests": 20,
+                  "totalRequests": 20
+                },
+                "evidenceSha256": "20c7eab48b5f5305a61cdd4399f78fc1be3e2543c92db7e8b80d570e0ded795c",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -280,27 +318,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 16718,
-                  "milliseconds": 166368.453,
-                  "measuredRequests": 20,
-                  "totalRequests": 20
-                },
-                "prefill": {
-                  "tokens": 34904,
-                  "milliseconds": 19418.414,
-                  "measuredRequests": 20,
-                  "totalRequests": 20
-                },
-                "evidenceSha256": "20c7eab48b5f5305a61cdd4399f78fc1be3e2543c92db7e8b80d570e0ded795c",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-job-planner-r1-lane2",
@@ -371,6 +389,26 @@
                   }
                 },
                 "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 32153,
+                  "milliseconds": 465383.21900000004,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 13702,
+                  "milliseconds": 11672.007999999998,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "88e738bcbe8b19521a6a6afedfa4fb1e27532f5b03dab090f791facd698a8fa9",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -510,27 +548,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 32153,
-                  "milliseconds": 465383.21900000004,
-                  "measuredRequests": 16,
-                  "totalRequests": 16
-                },
-                "prefill": {
-                  "tokens": 13702,
-                  "milliseconds": 11672.007999999998,
-                  "measuredRequests": 16,
-                  "totalRequests": 16
-                },
-                "evidenceSha256": "88e738bcbe8b19521a6a6afedfa4fb1e27532f5b03dab090f791facd698a8fa9",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-job-planner-r1-lane3",
@@ -621,6 +639,26 @@
                     "responseBytes": 110370
                   }
                 ]
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 34848,
+                  "milliseconds": 570691.756,
+                  "measuredRequests": 12,
+                  "totalRequests": 13
+                },
+                "prefill": {
+                  "tokens": 24077,
+                  "milliseconds": 13453.303,
+                  "measuredRequests": 12,
+                  "totalRequests": 13
+                },
+                "evidenceSha256": "f12bc3434a9672d50f362e60cf22d9144861632a14973405f8b1161ec9561409",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
               },
               "tokenUpdates": [
                 {
@@ -728,27 +766,7 @@
               "inventory": [],
               "warnings": [],
               "artifactCount": 0,
-              "artifactBytes": 0,
-              "performance": {
-                "source": "saved-server-timings",
-                "generation": {
-                  "tokens": 34848,
-                  "milliseconds": 570691.756,
-                  "measuredRequests": 12,
-                  "totalRequests": 13
-                },
-                "prefill": {
-                  "tokens": 24077,
-                  "milliseconds": 13453.303,
-                  "measuredRequests": 12,
-                  "totalRequests": 13
-                },
-                "evidenceSha256": "f12bc3434a9672d50f362e60cf22d9144861632a14973405f8b1161ec9561409",
-                "hardware": "rtx-4090-24gb",
-                "hardwareBasis": "operator-confirmed",
-                "quantization": "Q4_K_P",
-                "contextTokens": 72192
-              }
+              "artifactBytes": 0
             },
             {
               "id": "s1-job-planner-r1-lane4",
@@ -1133,6 +1151,236 @@
               ],
               "events": [],
               "timedEvents": 53,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-job-planner-r1-lane7",
+              "arm": "opencode",
+              "label": "OpenCode",
+              "model": "Qwen 27B · same local model",
+              "family": "local",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 324088,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 350184,
+                  "outputTokens": 20854,
+                  "cacheHitTokens": 331725,
+                  "freshInputTokens": 18459
+                },
+                "subset": {
+                  "inputTokens": 350184,
+                  "outputTokens": 20854,
+                  "cacheHitTokens": 331725,
+                  "freshInputTokens": 18459
+                },
+                "native": null,
+                "server": {
+                  "inputTokens": 350160,
+                  "outputTokens": 20850,
+                  "cacheHitTokens": 331700,
+                  "freshInputTokens": 18460
+                },
+                "complete": true,
+                "requests": 16,
+                "measuredRequests": 16,
+                "serverIdleBefore": true,
+                "serverIdleAfter": true,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 16,
+                    "totalRequests": 16,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "performance": {
+                "source": "saved-server-timings",
+                "generation": {
+                  "tokens": 20854,
+                  "milliseconds": 303587.603,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "prefill": {
+                  "tokens": 18459,
+                  "milliseconds": 13390.247000000001,
+                  "measuredRequests": 16,
+                  "totalRequests": 16
+                },
+                "evidenceSha256": "a90b7d32d607e5e495bc566bd88f2ab0b0a66169ef5e905962532cd4efa7bf02",
+                "hardware": "rtx-4090-24gb",
+                "hardwareBasis": "operator-confirmed",
+                "quantization": "Q4_K_P",
+                "contextTokens": 72192
+              },
+              "tokenUpdates": [
+                {
+                  "t": 6812,
+                  "inputTokens": 1196,
+                  "outputTokens": 223,
+                  "cacheHitTokens": 577,
+                  "freshInputTokens": 619,
+                  "partial": false
+                },
+                {
+                  "t": 8253,
+                  "inputTokens": 9289,
+                  "outputTokens": 269,
+                  "cacheHitTokens": 8051,
+                  "freshInputTokens": 1238,
+                  "partial": false
+                },
+                {
+                  "t": 9512,
+                  "inputTokens": 17596,
+                  "outputTokens": 368,
+                  "cacheHitTokens": 16191,
+                  "freshInputTokens": 1405,
+                  "partial": false
+                },
+                {
+                  "t": 10400,
+                  "inputTokens": 26496,
+                  "outputTokens": 411,
+                  "cacheHitTokens": 24598,
+                  "freshInputTokens": 1898,
+                  "partial": false
+                },
+                {
+                  "t": 233284,
+                  "inputTokens": 35875,
+                  "outputTokens": 14895,
+                  "cacheHitTokens": 33542,
+                  "freshInputTokens": 2333,
+                  "partial": false
+                },
+                {
+                  "t": 256218,
+                  "inputTokens": 59767,
+                  "outputTokens": 16274,
+                  "cacheHitTokens": 42917,
+                  "freshInputTokens": 16850,
+                  "partial": false
+                },
+                {
+                  "t": 282618,
+                  "inputTokens": 85058,
+                  "outputTokens": 18347,
+                  "cacheHitTokens": 68187,
+                  "freshInputTokens": 16871,
+                  "partial": false
+                },
+                {
+                  "t": 285821,
+                  "inputTokens": 112452,
+                  "outputTokens": 18552,
+                  "cacheHitTokens": 95552,
+                  "freshInputTokens": 16900,
+                  "partial": false
+                },
+                {
+                  "t": 288774,
+                  "inputTokens": 141179,
+                  "outputTokens": 18690,
+                  "cacheHitTokens": 123151,
+                  "freshInputTokens": 18028,
+                  "partial": false
+                },
+                {
+                  "t": 292115,
+                  "inputTokens": 170082,
+                  "outputTokens": 18930,
+                  "cacheHitTokens": 152017,
+                  "freshInputTokens": 18065,
+                  "partial": false
+                },
+                {
+                  "t": 295175,
+                  "inputTokens": 199244,
+                  "outputTokens": 19125,
+                  "cacheHitTokens": 181160,
+                  "freshInputTokens": 18084,
+                  "partial": false
+                },
+                {
+                  "t": 300916,
+                  "inputTokens": 228667,
+                  "outputTokens": 19526,
+                  "cacheHitTokens": 210516,
+                  "freshInputTokens": 18151,
+                  "partial": false
+                },
+                {
+                  "t": 305562,
+                  "inputTokens": 258579,
+                  "outputTokens": 19782,
+                  "cacheHitTokens": 240341,
+                  "freshInputTokens": 18238,
+                  "partial": false
+                },
+                {
+                  "t": 308656,
+                  "inputTokens": 288832,
+                  "outputTokens": 20017,
+                  "cacheHitTokens": 270510,
+                  "freshInputTokens": 18322,
+                  "partial": false
+                },
+                {
+                  "t": 311021,
+                  "inputTokens": 319426,
+                  "outputTokens": 20150,
+                  "cacheHitTokens": 300999,
+                  "freshInputTokens": 18427,
+                  "partial": false
+                },
+                {
+                  "t": 323828,
+                  "inputTokens": 350184,
+                  "outputTokens": 20854,
+                  "cacheHitTokens": 331725,
+                  "freshInputTokens": 18459,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 88,
               "untimedEvents": 0,
               "stopReasons": [],
               "files": [],

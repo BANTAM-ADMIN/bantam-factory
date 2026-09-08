@@ -21,6 +21,8 @@ BANTAM FACTORY's; Sonnet's was within a second of it; Opus's was slower. Those c
 from a different run window and, for BANTAM FACTORY, a different model. Individual
 observations, not a ranking.
 
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
+
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
 
@@ -52,8 +54,7 @@ These attempts ran serially in their own queue while a separate local/Codex
 comparison was recording on the same machine, so CPU and I/O contention
 remained possible. The local model was not used by Claude. Work-order and
 starter materials were frozen; candidates received the same independent
-graders. Public exports omit raw prompts, source, credentials and machine
-paths. Asset hashes cover generated files, not these notes.
+graders. The work views include recorded actions, checks and delivered files. Asset hashes cover generated files, not these notes.
 
 The earlier [September 7 reference set](../../../claude-references-2026-09-07/patch-transaction/README.md)
 recorded Sonnet in 31.4 s and Opus in 129.3 s on this work order from source

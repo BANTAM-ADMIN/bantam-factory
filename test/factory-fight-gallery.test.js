@@ -54,7 +54,7 @@ test('featured wins exclude timeouts, missing clocks and different-model compari
   assert.equal(featuredFight(data),null,'output-only is not a completed speed comparison');
   card.rows[1].passed=true;card.rows[1].outcome='PASS';
   assert.equal(featuredFight(data).ratio,600000/58000);
-  assert.match(renderFightGallery(data),/Selected highlight, not a universal ranking/);
+  assert.match(renderFightGallery(data),/Recorded highlight/);
   card.rows[1].arm='codex-astra';assert.equal(featuredFight(data),null);
   card.rows[1].arm='hermes';card.rows[0].wallMs=0;assert.equal(featuredFight(data),null);
   card.rows[0].wallMs=700000;assert.equal(featuredFight(data),null,'a loss is not a featured win');

@@ -1,0 +1,238 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "hermes.json",
+      "bytes": 101514,
+      "sha256": "6ade19a63c6a56dd924f72d2495e12ae575f339ae4170fabb6c414da3858f275",
+      "arm": "hermes",
+      "wallMs": 496987,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered the verifier and a test suite.",
+        "paragraphs": [
+          {
+            "text": "Hermes patched the snapshot implementation, passed the original tests, added verification tests and exercised clean, changed and invalid CLI cases. The work passed all five independent groups and finished in 497.0 seconds.",
+            "actions": [
+              "action-7",
+              "action-8",
+              "action-10",
+              "action-11",
+              "action-13",
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 57758,
+      "sha256": "c64314fec52aae4a76023d3857f72966b1f94409d1c93b2c0fa43e1069309b3d",
+      "arm": "codex-astra",
+      "wallMs": 146163,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered snapshot.js, test/snapshot-extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 146.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 56677,
+      "sha256": "c9f9ed4825393d24372111c9d178b8d60b50801bc5d20bb9818679c588316c8f",
+      "arm": "codex-sol",
+      "wallMs": 513418,
+      "outcome": "FAIL",
+      "accepted": false,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 1,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "A protected test was changed.",
+        "paragraphs": [
+          {
+            "text": "The delivered workspace changed snapshot.js, test/snapshot.test.js. Although the acceptance checks passed, the supplied test file was protected by the work order. Changing it failed the protected-file check, so the recorded outcome is FAIL. Elapsed time: 513.4 seconds.",
+            "actions": [
+              "action-3",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 48211,
+      "sha256": "4c066b4004eae065d9ecef22dc67ef6c527b7b03e5fd00ffdb0b4316872c556e",
+      "arm": "codex-terra",
+      "wallMs": 106217,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered snapshot.js. The project suite and all five independent acceptance groups passed, with a clean finish in 106.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-6",
+              "action-8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 106843,
+      "sha256": "33f442391ee721b74968512ef6abef51cc2f4f124b00e523723544971564d0e5",
+      "arm": "bantam-local-27b",
+      "wallMs": 124343,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 22,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "The filesystem claims became real checks.",
+        "paragraphs": [
+          {
+            "text": "The factory extended the snapshot tool and sent a supervisor’s symlink concern into a live filesystem check. The worker then built a focused regression file and corrected its test fixtures until it passed.",
+            "actions": [
+              "action-3",
+              "action-5",
+              "action-6",
+              "action-12",
+              "action-19",
+              "action-20"
+            ]
+          },
+          {
+            "text": "The delivered tool passed all five independent groups, including symlink handling and source binding. Current project tests passed before the factory accepted completion at 124.3 seconds.",
+            "actions": [
+              "action-21",
+              "action-22"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 91542,
+      "sha256": "45088647a9fb6cf46afe49630f1143be10570c64994159f6800558234f2b5ada",
+      "arm": "deepseek-local-27b",
+      "wallMs": 465784,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 17,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Passed after tests and filesystem probes.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek extended snapshot verification, added a suite and corrected an added test after inspecting its failure. It then exercised snapshot creation, drift and error handling through temporary filesystem fixtures. Clean finish: 465.8 seconds.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-11",
+              "action-13",
+              "action-17"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 86545,
+      "sha256": "af910a8807c45df4517c2e8e0418c2f281ff380883c8078eefe4a9adeec6fe13",
+      "arm": "opencode",
+      "wallMs": 403218,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Accepted after a test-fixture correction.",
+        "paragraphs": [
+          {
+            "text": "OpenCode extended the snapshot tool and added verification tests. After a failing suite run, it corrected an added test and passed all 16 tests. A CLI probe then demonstrated clean verification and changed or missing files.",
+            "actions": [
+              "action-7",
+              "action-8",
+              "action-10",
+              "action-11",
+              "action-12",
+              "action-13"
+            ]
+          },
+          {
+            "text": "All five independent groups passed. The clean finish took 403.2 seconds; BANTAM FACTORY completed the same work order in 124.3 seconds.",
+            "actions": []
+          }
+        ]
+      }
+    }
+  ]
+}

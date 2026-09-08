@@ -24,8 +24,9 @@
 Give BANTAM FACTORY a job: build an app, fix a stubborn bug, automate the boring part.
 It brings your model the tools, context, and checks to get the work done.
 
-The factory formula: **turn big jobs into chicken problems**—clear inputs,
-useful tools, and results you can check. Build. Test. Repair. Repeat.
+The factory formula: **turn big jobs into chicken problems**. Put the model at
+one station at a time—as worker, reviewer, or test builder. The factory runs
+the checks, feeds back the result, and directs the next repair or delivery.
 
 ## Same model. Bigger punch.
 
@@ -36,9 +37,9 @@ across the published cards: **82.6–105.2 tokens/second**.
 
 | BANTAM FACTORY vs. | BANTAM FACTORY finished | Watch the fight |
 | --- | --- | --- |
-| **Hermes** | **5.1× faster** · 112.5s vs. 577.6s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
+| **Hermes** | **8.8× faster** · 58.1s vs. 512.2s | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
 | **DeepSeek Harness** | **3.9× faster** · 112.5s vs. 442.7s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
-| **OpenCode** | **6.8× faster** · 81.8s vs. 559.0s | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html) |
+| **OpenCode** | **6.8× faster** · 81.8s vs. 559.0s | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
 
 These are highlights from recorded development tasks. Open a card for every
 contender, the checks, and the run conditions.
@@ -48,7 +49,10 @@ The little model can trade punches with frontier agents, too:
 took **58.1s locally vs. 110.6s in native Codex/Astra**, both 5/5.
 
 **[Enter the fight gallery →](https://bantam-admin.github.io/bantam-factory/)**
-Pick a task. Put agents side by side. Replay the clock. See who delivered.
+Pick a task. Put agents side by side. Read how it went. Inspect every recorded
+action and the files they delivered.
+
+**[Try a tool the factory built in 58 seconds →](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#try-it)**
 
 ## What can it do?
 

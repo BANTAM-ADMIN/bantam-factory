@@ -1,0 +1,201 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "retry-budget",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 99720,
+      "sha256": "3643515fa349a60f1d468b5cf771f3003dd006a5ec4d59555cc5a2664e9fe07f",
+      "arm": "bantam-local-27b",
+      "wallMs": 141654,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 18,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "The retry rules got executable coverage.",
+        "paragraphs": [
+          {
+            "text": "The factory repaired retry arithmetic, then required focused API and command-line checks. When inline checks failed, the worker made saved assertion files and ran them directly.",
+            "actions": [
+              "action-6",
+              "action-8",
+              "action-9",
+              "action-10",
+              "action-13",
+              "action-16"
+            ]
+          },
+          {
+            "text": "The final project suite and all five independent groups passed. The factory accepted the completed tool at 141.7 seconds.",
+            "actions": [
+              "action-17",
+              "action-18"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 83703,
+      "sha256": "dea9e10141866d246e57066aef7e82b21799a8e70592b603044791e996dde48b",
+      "arm": "deepseek-local-27b",
+      "wallMs": 445841,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 16,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "Passed after checking the CLI boundary.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek repaired retry logic and added tests. It checked API values and CLI output, made two implementation edits, then ran the checks again. All five independent groups passed; clean finish took 445.8 seconds.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-9",
+              "action-10",
+              "action-11",
+              "action-13"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 107687,
+      "sha256": "e2a1bc0b8afb6ef693535436bd46b585f73b4fd15c7e0f89c57eac9817bf54ee",
+      "arm": "hermes",
+      "wallMs": 562038,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 27,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "The added tests needed repeated repair.",
+        "paragraphs": [
+          {
+            "text": "Hermes built retry logic, then revised its extra test suite across several failing runs. It eventually passed the suite and checked API boundaries and CLI errors. The accepted tool finished in 562.0 seconds.",
+            "actions": [
+              "action-9",
+              "action-10",
+              "action-19",
+              "action-24",
+              "action-25",
+              "action-27"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 39811,
+      "sha256": "f1706ed5e23a563c3dbd9379629b9feefd922717c88e181e8b27d453db13cdf6",
+      "arm": "codex-astra",
+      "wallMs": 137291,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered retry-budget.js, test/retry-budget.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 137.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 44548,
+      "sha256": "527103796c926564d2e0e4f883478621c6e6dd6c9b51cc4d393946c1c4da6fc5",
+      "arm": "codex-sol",
+      "wallMs": 231835,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered retry-budget.js. The project suite and all five independent acceptance groups passed, with a clean finish in 231.8 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-7"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 40566,
+      "sha256": "ff4c2b81b746113f562304b51472f4cd2ea08ae556ece3f0d3c47f5dc7e4e866",
+      "arm": "codex-terra",
+      "wallMs": 143182,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 9,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered retry-budget.js. The project suite and all five independent acceptance groups passed, with a clean finish in 143.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-9"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

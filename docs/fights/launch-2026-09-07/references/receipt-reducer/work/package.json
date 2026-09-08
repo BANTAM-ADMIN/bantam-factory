@@ -1,0 +1,93 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "receipt-reducer",
+  "files": [
+    {
+      "path": "claude-sonnet.json",
+      "bytes": 30113,
+      "sha256": "f58fdcb3cc145d0246b5fa80b37738ede8f3f72ec6746305ba7bb213c8db97e2",
+      "arm": "claude-sonnet",
+      "wallMs": 36582,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js. The project suite and all five independent acceptance groups passed, with a clean finish in 36.6 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-opus.json",
+      "bytes": 58971,
+      "sha256": "dd585056a3ba1ba7fcad09d9960c95c4636a310741448d19a9b858dd9bc577a9",
+      "arm": "claude-opus",
+      "wallMs": 89438,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js, test/extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 89.4 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-7",
+              "action-8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-fable.json",
+      "bytes": 42155,
+      "sha256": "c17b7f940a3ee7c95bf4b793235f7fcc38fe55f7fba7ac0ca7a3140245595aab",
+      "arm": "claude-fable",
+      "wallMs": 58516,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 2,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2af13d2dc4d8aceb713b3cf26b76718c3958eab733b14581282c4fac4dff2c98",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered receipt-report.js, test/receipt-report.extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 58.5 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-2"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

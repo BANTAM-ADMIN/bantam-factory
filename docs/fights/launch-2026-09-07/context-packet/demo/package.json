@@ -1,0 +1,28 @@
+{
+  "schema": "bantam.reviewed-fight-demo.v1",
+  "card": "context-packet",
+  "arm": "bantam-local-27b",
+  "wallMs": 58072,
+  "candidateSha256": "ca2ddf5e46889ec3d2d68eab4c4179c6fa5452f49d0506a519020a768fa36158",
+  "manifestSha256": "95d4892a13b72f588347b61c80bdf928d70db0616d66a8c7ef310d4cd31799c2",
+  "adapter": "verbatim-api-with-browser-utf8",
+  "reviewedSourceIncluded": true,
+  "files": [
+    {
+      "path": "context-packet.js",
+      "bytes": 3905,
+      "sha256": "ca2ddf5e46889ec3d2d68eab4c4179c6fa5452f49d0506a519020a768fa36158"
+    },
+    {
+      "path": "api.mjs",
+      "bytes": 2771,
+      "sha256": "4f5743e5118286f12abf8b979bc2d5810d7ba6bf606454a721b793ff2ae3a0a7"
+    },
+    {
+      "path": "worker.mjs",
+      "bytes": 608,
+      "sha256": "884c8f920fa78105490f475449b233988cf3c6fa0a7e1582417e64c9429779c8"
+    }
+  ],
+  "type": "module"
+}

@@ -1,57 +1,42 @@
-# Patch transaction · launch series
+# Patch transaction · fight card
 
-[Watch the fight](share/index.html) · [Share image](share/share-card.png) ·
-[Detailed replay](index.html) · [Portable measurements](share/fight-card.json)
+[Open the fight](share/index.html) · [Share image](share/share-card.png) · [Measurements](share/fight-card.json)
 
-Extend an edit engine to validate all preimages and apply compatible edits as
-one transaction. Same starter and independent grader for every system; one
-recorded attempt each, without manual candidate repairs.
+Extend a patch tool to check every proposed change before applying a batch of edits. A stale edit must leave the original data intact.
 
-| System | Independent groups | Outcome | Wall time |
+| System | Independent groups | Outcome | Elapsed time |
 |---|---:|---|---:|
-| BANTAM FACTORY · local 27B | 5/5 | PASS, accepted completion | 81.772 s |
-| OpenCode · same local 27B | 5/5 | PASS, clean completion | 559.000 s |
-| Codex · native Astra | 5/5 | PASS, clean completion | 90.337 s |
+| BANTAM FACTORY · local 27B | 5/5 | PASS | 81.772 s |
+| DeepSeek Harness · same local 27B | 5/5 | OUTPUT_ONLY | 600.005 s |
+| Hermes · same local 27B | 5/5 | TIMEOUT | 600.005 s |
+| OpenCode · same local 27B | 5/5 | PASS | 559.000 s |
+| Codex · native Astra | 5/5 | PASS | 90.337 s |
 
-BANTAM FACTORY took 85.4% less elapsed time than OpenCode in this same-model attempt.
-All three systems completed accepted work. Astra is a different-model reference,
-not an ablation of BANTAM FACTORY's local harness.
+**Same local model:** BANTAM FACTORY, DeepSeek Harness, Hermes and OpenCode use the same Qwen 27B weights. Codex uses the frontier model named in its row.
+
+PASS means accepted work and a clean finish. OUTPUT_ONLY means accepted output without a clean finish. A timeout's elapsed time is its stopping boundary, not its time to successful completion.
+
+**The local rig:** NVIDIA RTX 4090 · 24 GB · Qwen 27B Q4_K_P · 72,192-token context. Open a lane for its measured generation speed and coverage.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
-<summary>Token receipts, run conditions & provenance</summary>
+<summary>Run conditions, token accounting & recording receipts</summary>
 
-## Complete recorded totals
+This is a selected development work order. BANTAM FACTORY was qualified before the missing challenger lanes were run. The task was used during development before these recordings. The task was not changed for a challenger, and no candidate received manual repairs.
 
-| System / scope | Input | Output | Cached input | Fresh input |
-|---|---:|---:|---:|---:|
-| BANTAM FACTORY · 16/16 requests | 117,752 | 5,018 | 99,749 | 18,003 |
-| OpenCode · 20/20 requests | 429,797 | 35,018 | 379,806 | 49,991 |
-| Astra · native aggregate | 74,840 | 2,269 | 66,304 | 8,536 |
+**Follow-up recordings:** DeepSeek Harness, Hermes, starting 2026-09-08T17:16:05.398Z UTC (the `Z` suffix denotes UTC). All planned follow-up attempts for this card are included, including failures and timeouts. The original published lanes remain unchanged. The replay aligns each run's start to zero; these were separate recording windows.
 
-BANTAM FACTORY used fewer tokens than OpenCode, but more than Astra. Input includes
-cached input; the columns are not additive. Astra's native aggregate does not
-provide the same request-level coverage as the local wire recorder.
+The follow-ups ran from frozen checkout `75012c4426841e45fc960390608e5c0482389b12`. The task, starter, independent grader and model file hashes matched the saved BANTAM FACTORY baseline before execution and during export. The portable measurements contain a follow-up receipt with hashes of the original public summary, both private manifests, the task materials and the model weights. Raw records remain private.
 
-Separate idle-bounded server counters differ from wire totals by one cached
-input token for BANTAM FACTORY and four for OpenCode. The public data retains both
-sources; these overlapping scopes must not be added or forced to match.
+Recorded challenger versions: DeepSeek Harness 0.1.2-rc.1, Hermes Agent 0.20.0 (2026.8.3).
 
-## Conditions and provenance
+Each challenger had a ten-minute wall limit and a 32,768-token per-request output allowance. Peer clients declared a 65,536-token context; the server served 72,192 tokens. BANTAM FACTORY uses separate requests allowing up to 4,096 reasoning tokens and 8,192 action tokens. Native prompts, tools, sampling, input reservation and compaction policies differ.
 
-Frozen factory checkout `6bf118ba5f5fc0d06127fa1368ee85c5011d7590`; runtime
-unchanged by subsequent history-only privacy cleanup and presentation work.
-Local contenders used the existing Qwen 27B Q4_K_P control, 72K context and
-CPU vision projection, not the recommended DavidAU download. OpenCode had a
-32,768-token per-request output allowance; BANTAM FACTORY and native Astra have their
-own action/output policies. Local inference was serial, with frontier work
-allowed alongside it. Sampling, cache and native tool policies were not equalized.
+Local inference was serial on the existing warm server, with no restart or cache erase. Earlier runs may have left reusable prefixes. The host also performed lightweight reporting and browser checks during the follow-ups. Some original frontier runs overlapped original local runs; see the [original recording notes](https://github.com/BANTAM-ADMIN/bantam-factory/blob/75012c4426841e45fc960390608e5c0482389b12/docs/fights/launch-2026-09-07/patch-transaction/README.md) for their conditions.
 
-This is one previously used development work order, not a held-out reliability
-study or universal ranking. This directory is a one-card derivative of the
-broader launch series; all three planned contenders are retained. Raw evidence
-and the frozen benchmark clone remain private. Public exports contain only
-allowlisted labels, measurements and replay counters—not source, prompts or
-machine paths. Asset manifests hash generated files, excluding this README;
-they do not attest authorship or authorize execution.
+BANTAM FACTORY's token receipts cover all 16 requests. Other lanes identify full totals, measured subsets and native aggregates separately. Missing counters remain unknown. Input already includes cached input. Server windows and native reports overlap the request receipts and must not be added to them. Generation speed uses saved server timing receipts; it excludes tools and tests, and partial coverage is labeled.
+
+The work views include recorded actions, supervisor checks and delivered files. Machine paths are normalized in the displayed record. Asset hashes bind the published files to this export. This explanatory file is outside the asset hashes.
 
 </details>

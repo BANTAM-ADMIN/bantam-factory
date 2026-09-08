@@ -18,7 +18,9 @@ to its roster.
 For context, BANTAM FACTORY's earlier local 27B attempt on this work order passed 5/5
 in 58.1 s and native Codex Astra in 110.6 s. BANTAM FACTORY's attempt was quicker than
 all three Claude attempts here. Those came from a different run window and,
-for BANTAM FACTORY, a different model. Individual observations, not a ranking.
+for BANTAM FACTORY, a different model.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
@@ -51,8 +53,7 @@ These attempts ran serially in their own queue while a separate local/Codex
 comparison was recording on the same machine, so CPU and I/O contention
 remained possible. The local model was not used by Claude. Work-order and
 starter materials were frozen; candidates received the same independent
-graders. Public exports omit raw prompts, source, credentials and machine
-paths. Asset hashes cover generated files, not these notes.
+graders. The work views include recorded actions, checks and delivered files. Asset hashes cover generated files, not these notes.
 
 The earlier [September 7 reference set](../../../claude-references-2026-09-07/context-packet/README.md)
 recorded Sonnet in 62.2 s and Opus in 67.3 s on this work order from source

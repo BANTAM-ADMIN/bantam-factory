@@ -1,0 +1,676 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "context-packet",
+  "arm": "bantam-local-27b",
+  "wallMs": 58072,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T02:05:08.091Z",
+  "task": "# Context packet: build a bounded evidence packer\n\nImplement `context-packet.js`, using Node.js builtins only. A factory needs to\nchoose complete context sections without silently losing required evidence.\nThis is a deterministic byte-budget packer, not a tokenizer or a claim about\noptimal model context. Export synchronous `packContext(sections, maxBytes)`.\n\nValidate the entire input before packing, even when the budget is zero or a\nsection would be omitted. `maxBytes` is a nonnegative safe integer. `sections`\nis a dense array of non-null, non-array objects; missing array slots are invalid.\nEach object has required fields:\n\n```\n{id: NONEMPTY_STRING, text: STRING, priority: NONNEGATIVE_SAFE_INTEGER,\n required: BOOLEAN}\n```\n\nIDs are unique exact strings, including case. Spaces, Unicode, newlines, NUL\nand names such as `__proto__` are valid IDs. Unknown object fields are ignored.\nDo not coerce values. Invalid input throws an Error. Do not mutate inputs.\n\nThe exact serialized frame for one section is:\n\n```\n'### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n'\n```\n\nIts cost is `Buffer.byteLength(frame, 'utf8')`, including the framing and both\nnewlines. Frames are indivisible. Do not shorten text, normalize newlines,\ninvent references, or substitute character count for UTF-8 byte count.\n\n1. Include all required sections first, in their original input order. Ignore\n   their priority when ordering them. If their combined cost exceeds maxBytes,\n   throw an Error instead of returning a partial required set.\n2. Visit optional sections by descending priority, breaking ties by original\n   input order. Include a section if its entire frame fits the remaining\n   budget. Otherwise skip it and continue trying later sections.\n3. Output sections in that inclusion order. Report omitted optional IDs in\n   original input order, not priority order.\n\nReturn exactly:\n\n```\n{text: CONCATENATED_FRAMES, bytes: UTF8_BYTE_COUNT,\n included: [ID_IN_OUTPUT_ORDER], omitted: [ID_IN_INPUT_ORDER]}\n```\n\nAn empty input returns `{text:'',bytes:0,included:[],omitted:[]}` for any valid\nbudget. Exact fits are allowed. Neither the source text nor the returned\nframing is trimmed.\n\nCLI: `node context-packet.js INPUT_JSON_FILE`. The UTF-8 JSON file contains\n`{sections, maxBytes}`; extra fields are ignored. Exactly one argument is\nrequired. Success prints exactly one result JSON plus newline, exits 0 and\nhas no stderr. Invalid arguments, unreadable files, invalid JSON or API input,\nand insufficient required-section budget exit 2, with nonempty stderr and no\nstdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification runs in a read-only workspace: any test fixtures\nmust be created beneath `os.tmpdir()` and removed afterward. Run `npm test`\nbefore finishing. Hidden acceptance uses this same contract with other values.\n",
+  "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+  "source": "factory-turns-and-verification",
+  "actions": [
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "list_dir",
+            "p": "."
+          },
+          {
+            "a": "read_file",
+            "p": "context-packet.js"
+          },
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "list_dir",
+            "p": "test"
+          }
+        ]
+      },
+      "output": "# 1 {\"a\":\"list_dir\",\"p\":\".\"}\n.:\ncontext-packet.js\npackage.json\ntest/\n\n# 2 {\"a\":\"read_file\",\"p\":\"context-packet.js\"}\ncontext-packet.js (5 lines, showing 1-5):\n1\t// Build the public API and CLI described in the supplied work order.\n2\texport function packContext(sections,maxBytes){\n3\t  throw new Error('packContext is not implemented');\n4\t}\n5\t\n\u2014 end of file (5 lines); nothing beyond line 5, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n\u2014 end of file (2 lines); nothing beyond line 2, do not re-read this range.\n\n# 4 {\"a\":\"list_dir\",\"p\":\"test\"}\ntest:\npublic.test.js",
+      "atMs": 3075.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 0,
+      "supervisor": {
+        "phase": "cli",
+        "generation": 0,
+        "text": "CLI VERIFICATION REQUIRED: \"context-packet.js\" has no passing current-generation CLI receipt (generation 0). API-only assertions, a green project suite, and printed/echoed exit codes do not prove this entrypoint. DONE is not available until the CLI obligation is satisfied.\nNo complete, source-bound CLI check is available; missing, malformed, interrupted, or unbound receipts cannot establish success.\nNext: run the configured project verifier to trigger the controller CLI station. There is no worker station verb. It runs once per source generation; repeating an unchanged check does not retry a failed/unavailable station. Do not make gratuitous edits merely to force a retry.\nThe real CLI must preserve the measured public API JSON return plus newline, exit 0, and no stderr. API correctness still requires the configured tests. Public missing/extra arguments: exit 2, empty stdout, nonempty stderr."
+      },
+      "id": "action-1"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "a": "read_file",
+        "p": "test/public.test.js"
+      },
+      "output": "test/public.test.js (25 lines, showing 1-25):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport {packContext} from '../context-packet.js';\n4\tconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\n5\ttest('required evidence is included before optional priority',()=>{\n6\t  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n7\t    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n8\t});\n9\ttest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n10\t  const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n11\t  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n12\t    text:frame,bytes,included:['\u96ea'],omitted:['large']});\n13\t});\n14\ttest('empty selection and required overflow',()=>{\n15\t  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n16\t  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n17\t});\n18\ttest('validate omitted entries too and leave input unchanged',()=>{\n19\t  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n20\t  assert.throws(()=>packContext(new Array(1),0),Error);\n21\t  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n22\t  assert.deepEqual(packContext(input,100).included,['b','a']);\n23\t  assert.equal(JSON.stringify(input),before);\n24\t});\n25\t\n\u2014 end of file (25 lines); nothing beyond line 25, do not re-read this range.",
+      "atMs": 4118.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 1,
+      "supervisor": {
+        "phase": "cli",
+        "generation": 0,
+        "text": "CLI VERIFICATION REQUIRED: \"context-packet.js\" has no passing current-generation CLI receipt (generation 0). API-only assertions, a green project suite, and printed/echoed exit codes do not prove this entrypoint. DONE is not available until the CLI obligation is satisfied.\nNo complete, source-bound CLI check is available; missing, malformed, interrupted, or unbound receipts cannot establish success.\nNext: run the configured project verifier to trigger the controller CLI station. There is no worker station verb. It runs once per source generation; repeating an unchanged check does not retry a failed/unavailable station. Do not make gratuitous edits merely to force a retry.\nThe real CLI must preserve the measured public API JSON return plus newline, exit 0, and no stderr. API correctness still requires the configured tests. Public missing/extra arguments: exit 2, empty stdout, nonempty stderr."
+      },
+      "id": "action-2"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "context-packet.js",
+        "content": "// Bounded evidence packer: deterministic byte-budget context packing.\nimport {readFileSync} from 'node:fs';\nimport {isMainThread} from 'node:worker_threads';\nimport {fileURLToPath} from 'node:url';\nimport process from 'node:process';\n\nfunction isNonemptyString(v){ return typeof v === 'string' && v.length > 0; }\nfunction isNonnegSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n\nfunction validateSections(sections){\n  if (!Array.isArray(sections)) throw new Error('sections must be an array');\n  const seen = new Set();\n  for (let i = 0; i < sections.length; i++) {\n    const s = sections[i];\n    if (s === null || s === undefined) throw new Error('section slot ' + i + ' is missing or null');\n    if (Array.isArray(s) || typeof s !== 'object') throw new Error('section ' + i + ' is not an object');\n    if (!isNonemptyString(s.id)) throw new Error('section ' + i + ' has invalid id');\n    if (typeof s.text !== 'string') throw new Error('section ' + i + ' has invalid text');\n    if (!isNonnegSafeInt(s.priority)) throw new Error('section ' + i + ' has invalid priority');\n    if (typeof s.required !== 'boolean') throw new Error('section ' + i + ' has invalid required');\n    if (seen.has(s.id)) throw new Error('duplicate id: ' + s.id);\n    seen.add(s.id);\n  }\n}\n\nfunction frameOf(section){\n  return '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n}\n\nexport function packContext(sections, maxBytes){\n  if (!isNonnegSafeInt(maxBytes)) throw new Error('maxBytes must be a nonnegative safe integer');\n  validateSections(sections);\n\n  const required = [];\n  const optional = [];\n  for (let i = 0; i < sections.length; i++) {\n    (sections[i].required ? required : optional).push(i);\n  }\n\n  let remaining = maxBytes;\n  const included = [];\n  const includedSet = new Set();\n  let text = '';\n\n  for (const i of required) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost > remaining) throw new Error('required sections exceed budget');\n    text += frame;\n    remaining -= cost;\n    included.push(sections[i].id);\n    includedSet.add(sections[i].id);\n  }\n\n  const optionalSorted = optional.slice().sort((a, b) => {\n    const pa = sections[a].priority;\n    const pb = sections[b].priority;\n    if (pb !== pa) return pb - pa;\n    return a - b;\n  });\n\n  for (const i of optionalSorted) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost <= remaining) {\n      text += frame;\n      remaining -= cost;\n      included.push(sections[i].id);\n      includedSet.add(sections[i].id);\n    }\n  }\n\n  const omitted = [];\n  for (let i = 0; i < sections.length; i++) {\n    if (!sections[i].required && !includedSet.has(sections[i].id)) omitted.push(sections[i].id);\n  }\n\n  return {text, bytes: Buffer.byteLength(text, 'utf8'), included, omitted};\n}\n\nfunction runCli(argv){\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node context-packet.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try {\n    raw = readFileSync(argv[0], 'utf8');\n  } catch (err) {\n    process.stderr.write('cannot read input file: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  let data;\n  try {\n    data = JSON.parse(raw);\n  } catch (err) {\n    process.stderr.write('invalid JSON: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n    process.stderr.write('input must be a JSON object with sections and maxBytes\\n');\n    process.exit(2);\n  }\n  try {\n    const result = packContext(data.sections, data.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write('invalid input: ' + err.message + '\\n');\n    process.exit(2);\n  }\n}\n\nif (isMainThread && process.argv[1] === fileURLToPath(import.meta.url)) {\n  runCli(process.argv.slice(2));\n}\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 1 executable statement(s) by AST comparison; 5 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: isNonemptyString (AFTER L7), isNonnegSafeInt (AFTER L8), validateSections (AFTER L10), frameOf (AFTER L26).\n- BEFORE context-packet.js:3 in packContext: \"throw new Error('packContext is not implemented');\"\n  STAGED AFTER context-packet.js:30 (retained function).\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:e62c7b4d15dcb3cb71bd1ac3e8219022c4d597576b620f9111c1f1eb972f330e.",
+      "atMs": 15752.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 2,
+      "supervisor": {
+        "phase": "cli",
+        "generation": 0,
+        "text": "CLI VERIFICATION REQUIRED: \"context-packet.js\" has no passing current-generation CLI receipt (generation 0). API-only assertions, a green project suite, and printed/echoed exit codes do not prove this entrypoint. DONE is not available until the CLI obligation is satisfied.\nNo complete, source-bound CLI check is available; missing, malformed, interrupted, or unbound receipts cannot establish success.\nNext: run the configured project verifier to trigger the controller CLI station. There is no worker station verb. It runs once per source generation; repeating an unchanged check does not retry a failed/unavailable station. Do not make gratuitous edits merely to force a retry.\nThe real CLI must preserve the measured public API JSON return plus newline, exit 0, and no stderr. API correctness still requires the configured tests. Public missing/extra arguments: exit 2, empty stdout, nonempty stderr."
+      },
+      "id": "action-3"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "context-packet.js",
+        "content": "// Bounded evidence packer: deterministic byte-budget context packing.\nimport {readFileSync} from 'node:fs';\nimport {isMainThread} from 'node:worker_threads';\nimport {fileURLToPath} from 'node:url';\nimport process from 'node:process';\n\nfunction isNonemptyString(v){ return typeof v === 'string' && v.length > 0; }\nfunction isNonnegSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n\nfunction validateSections(sections){\n  if (!Array.isArray(sections)) throw new Error('sections must be an array');\n  const seen = new Set();\n  for (let i = 0; i < sections.length; i++) {\n    const s = sections[i];\n    if (s === null || s === undefined) throw new Error('section slot ' + i + ' is missing or null');\n    if (Array.isArray(s) || typeof s !== 'object') throw new Error('section ' + i + ' is not an object');\n    if (!isNonemptyString(s.id)) throw new Error('section ' + i + ' has invalid id');\n    if (typeof s.text !== 'string') throw new Error('section ' + i + ' has invalid text');\n    if (!isNonnegSafeInt(s.priority)) throw new Error('section ' + i + ' has invalid priority');\n    if (typeof s.required !== 'boolean') throw new Error('section ' + i + ' has invalid required');\n    if (seen.has(s.id)) throw new Error('duplicate id: ' + s.id);\n    seen.add(s.id);\n  }\n}\n\nfunction frameOf(section){\n  return '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n}\n\nexport function packContext(sections, maxBytes){\n  if (!isNonnegSafeInt(maxBytes)) throw new Error('maxBytes must be a nonnegative safe integer');\n  validateSections(sections);\n\n  const required = [];\n  const optional = [];\n  for (let i = 0; i < sections.length; i++) {\n    (sections[i].required ? required : optional).push(i);\n  }\n\n  let remaining = maxBytes;\n  const included = [];\n  const includedSet = new Set();\n  let text = '';\n\n  for (const i of required) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost > remaining) throw new Error('required sections exceed budget');\n    text += frame;\n    remaining -= cost;\n    included.push(sections[i].id);\n    includedSet.add(sections[i].id);\n  }\n\n  const optionalSorted = optional.slice().sort((a, b) => {\n    const pa = sections[a].priority;\n    const pb = sections[b].priority;\n    if (pb !== pa) return pb - pa;\n    return a - b;\n  });\n\n  for (const i of optionalSorted) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost <= remaining) {\n      text += frame;\n      remaining -= cost;\n      included.push(sections[i].id);\n      includedSet.add(sections[i].id);\n    }\n  }\n\n  const omitted = [];\n  for (let i = 0; i < sections.length; i++) {\n    if (!sections[i].required && !includedSet.has(sections[i].id)) omitted.push(sections[i].id);\n  }\n\n  return {text, bytes: Buffer.byteLength(text, 'utf8'), included, omitted};\n}\n\nfunction runCli(argv){\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node context-packet.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try {\n    raw = readFileSync(argv[0], 'utf8');\n  } catch (err) {\n    process.stderr.write('cannot read input file: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  let data;\n  try {\n    data = JSON.parse(raw);\n  } catch (err) {\n    process.stderr.write('invalid JSON: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n    process.stderr.write('input must be a JSON object with sections and maxBytes\\n');\n    process.exit(2);\n  }\n  try {\n    const result = packContext(data.sections, data.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write('invalid input: ' + err.message + '\\n');\n    process.exit(2);\n  }\n}\n\nif (isMainThread && process.argv[1] === fileURLToPath(import.meta.url)) {\n  runCli(process.argv.slice(2));\n}\n"
+      },
+      "output": "wrote 3905 bytes to context-packet.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `section` is also referenced in: test/public.test.js\n  `packContext` is also referenced in: test/public.test.js\n  `frame` is also referenced in: test/public.test.js\n\n[contract-cli-station; generation 1]\nCLI cases: complete.\nScope: CLI/API coherence on one model-designed input and explicit argument boundaries. Shared business-logic bugs can pass this check. This is not API correctness, project verification or task completion.\nReason: assertion_passed\nCase input (model-designed, not an oracle): {\"module\":\"context-packet.js\",\"input\":{\"sections\":[{\"id\":\"alpha\",\"text\":\"hello world\",\"priority\":1,\"required\":true},{\"id\":\"beta\",\"text\":\"second section\",\"priority\":2,\"required\":false}],\"maxBytes\":256}}\nMeasured API reference: returned; actual exit 0, return channel 259 bytes.\nMeasured child valid-input: passed; actual exit 0, stdout 122 bytes, stderr 0 bytes.\nMeasured child missing-argument: passed; actual exit 2, stdout 0 bytes, stderr 46 bytes.\nMeasured child extra-argument: passed; actual exit 2, stdout 0 bytes, stderr 46 bytes.\nThese CLI cases settled; current configured project verification and all other completion gates still apply.\n[cli-project-check] The configured verifier ran after the CLI station: pass.\n\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.324932\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.160432\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.299053\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.239013\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45.430384",
+      "atMs": 27005.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 3,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 1,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 1 needs fresh focused execution, then the configured project check. Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not. Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away."
+      },
+      "id": "action-4"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "total": 4
+        },
+        "failingTests": [],
+        "outputSha256": "7ddabdc53204ef358d1124ad77c6dc9b68974da308742192b63de59f87e209b4"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 3,
+      "id": "action-5"
+    },
+    {
+      "name": "factory-cli-check",
+      "category": "other",
+      "request": {
+        "question": "Does the CLI preserve the measured public API return for this model-designed valid input and obey its explicit process contract on these exact source inputs?",
+        "input": {
+          "module": "context-packet.js",
+          "input": {
+            "sections": [
+              {
+                "id": "alpha",
+                "text": "hello world",
+                "priority": 1,
+                "required": true
+              },
+              {
+                "id": "beta",
+                "text": "second section",
+                "priority": 2,
+                "required": false
+              }
+            ],
+            "maxBytes": 256
+          }
+        },
+        "designReused": false
+      },
+      "output": {
+        "status": "complete",
+        "stages": [
+          {
+            "stage": "setup",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nfs.mkdirSync(root,{mode:0o755});fs.writeFileSync(fixture,JSON.stringify(spec.input)+LF,{flag:'\"'\"'wx'\"'\"',mode:0o644});console.log('\"'\"'CLI fixture created'\"'\"');'",
+            "executed": true,
+            "code": 0,
+            "stdout": "CLI fixture created\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 478
+          },
+          {
+            "stage": "witness",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nconst f=fs.lstatSync(fixture),m=fs.lstatSync(module);assert.ok(f.isFile()&&!f.isSymbolicLink());assert.ok(m.isFile()&&!m.isSymbolicLink());assert.equal(fs.readFileSync(fixture,'\"'\"'utf8'\"'\"'),JSON.stringify(spec.input)+LF);console.log(JSON.stringify({schema:'\"'\"'bantam.cli-assertion-witness.v1'\"'\"',fixture:true,entrypoint:true}));'",
+            "executed": true,
+            "code": 0,
+            "stdout": "{\"schema\":\"bantam.cli-assertion-witness.v1\",\"fixture\":true,\"entrypoint\":true}\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 420
+          },
+          {
+            "stage": "check",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nimport {spawnSync} from '\"'\"'node:child_process'\"'\"';import crypto from '\"'\"'node:crypto'\"'\"';\nconst sha=b=>crypto.createHash('\"'\"'sha256'\"'\"').update(b).digest('\"'\"'hex'\"'\"');\nconst options={cwd:root,env:{...process.env},stdio:['\"'\"'ignore'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"'],timeout:2000,killSignal:'\"'\"'SIGKILL'\"'\"',maxBuffer:16384};\nconst measure=result=>{const m={status:Number.isInteger(result.status)?result.status:null,signal:result.signal??null,error:result.error?String(result.error.code??result.error.message):null};\n for(const [name,b]of [['\"'\"'stdout'\"'\"',result.stdout??Buffer.alloc(0)],['\"'\"'stderr'\"'\"',result.stderr??Buffer.alloc(0)]])Object.assign(m,{[name+'\"'\"'Bytes'\"'\"']:b.length,[name+'\"'\"'Sha256'\"'\"']:sha(b),[name+'\"'\"'Base64'\"'\"']:b.toString('\"'\"'base64'\"'\"')});return m;};\nconst api=spawnSync(process.execPath,['\"'\"'--input-type=module'\"'\"','\"'\"'-e'\"'\"',\"\\nimport fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import {pathToFileURL} from '\"'\"'node:url'\"'\"';\\nconst emit=fs.writeSync.bind(fs),stringify=JSON.stringify.bind(JSON);\\nconst {spec,contract,subject}=JSON.parse(process.env.BANTAM_CLI_REFERENCE);\\nconst diagnostic=error=>({name:String(error?.name??'\"'\"'Error'\"'\"').slice(0,80),message:String(error?.message??error).slice(0,500),stack:String(error?.stack??'\"'\"''\"'\"').slice(0,1000)});\\nconst packet=(kind,value=null,error=null)=>emit(3,stringify({schema:'\"'\"'bantam.cli-api-reference.v1'\"'\"',module:spec.module,export:contract.api.export,kind,value,diagnostic:error===null?null:diagnostic(error)})+'\"'\"'\\\\n'\"'\"');\\nfunction jsonOnly(value,depth=0,seen=new Set()){\\n if(depth>16)return false;\\n if(value===null||typeof value==='\"'\"'string'\"'\"'||typeof value==='\"'\"'boolean'\"'\"')return true;\\n if(typeof value==='\"'\"'number'\"'\"')return Number.isFinite(value)&&!Object.is(value,-0);\\n if(!value||typeof value!=='\"'\"'object'\"'\"'||seen.has(value))return false;\\n if(!Array.isArray(value)&&Object.getPrototypeOf(value)!==Object.prototype&&Object.getPrototypeOf(value)!==null)return false;\\n seen.add(value);const descriptors=Object.getOwnPropertyDescriptors(value);\\n if(Reflect.ownKeys(value).some(k=>typeof k==='\"'\"'symbol'\"'\"'))return false;\\n for(const [key,d]of Object.entries(descriptors)){\\n  if(Array.isArray(value)&&key==='\"'\"'length'\"'\"')continue;\\n  if(!d.enumerable||!Object.hasOwn(d,'\"'\"'value'\"'\"')||!jsonOnly(d.value,depth+1,seen))return false;\\n }\\n if(Array.isArray(value)&&(Object.keys(value).length!==value.length||Object.keys(value).some((key,i)=>key!==String(i))))return false;\\n seen.delete(value);return true;\\n}\\ntry{\\n const module=await import(pathToFileURL(path.join(subject,spec.module)).href),fn=module[contract.api.export];\\n if(typeof fn!=='\"'\"'function'\"'\"')throw Error('\"'\"'public API export is not callable'\"'\"');\\n const args=contract.api.arguments.map(key=>spec.input[key]);\\n let value;try{value=fn(...args);}catch(error){packet('\"'\"'threw'\"'\"',null,error);process.exit(0);}\\n if(!jsonOnly(value))packet('\"'\"'unsupported'\"'\"',null,Error('\"'\"'synchronous public API returned a non-JSON value'\"'\"'));else packet('\"'\"'returned'\"'\"',value);\\n}catch(error){packet('\"'\"'infrastructure'\"'\"',null,error);}\\n\"],{...options,env:{...options.env,BANTAM_CLI_REFERENCE:JSON.stringify({spec,contract,subject})},stdio:['\"'\"'ignore'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"']});\nconst outcomeBytes=api.output?.[3]??Buffer.alloc(0),reference={...measure(api),outcomeBytes:outcomeBytes.length,outcomeSha256:sha(outcomeBytes),outcomeBase64:outcomeBytes.toString('\"'\"'base64'\"'\"'),result:'\"'\"'unavailable'\"'\"'};\nlet outcome;\ntry{\n assert.equal(api.error,undefined);assert.equal(api.signal,null);assert.equal(api.status,0);assert.ok(outcomeBytes.length<=16384);\n assert.equal(api.stdout.length,0,'\"'\"'API reference wrote stdout'\"'\"');assert.equal(api.stderr.length,0,'\"'\"'API reference wrote stderr'\"'\"');\n outcome=JSON.parse(new TextDecoder('\"'\"'utf-8'\"'\"',{fatal:true,ignoreBOM:true}).decode(outcomeBytes));\n assert.deepStrictEqual(Object.keys(outcome).sort(),['\"'\"'diagnostic'\"'\"','\"'\"'export'\"'\"','\"'\"'kind'\"'\"','\"'\"'module'\"'\"','\"'\"'schema'\"'\"','\"'\"'value'\"'\"']);\n assert.equal(outcome.schema,'\"'\"'bantam.cli-api-reference.v1'\"'\"');assert.equal(outcome.module,spec.module);assert.equal(outcome.export,contract.api.export);\n assert.equal(outcome.kind,'\"'\"'returned'\"'\"','\"'\"'API reference '\"'\"'+String(outcome.kind)+'\"'\"': '\"'\"'+String(outcome.diagnostic?.message??'\"'\"'no supported JSON return'\"'\"')+'\"'\"' '\"'\"'+String(outcome.diagnostic?.stack??'\"'\"''\"'\"').slice(0,180));assert.equal(outcome.diagnostic,null);\n reference.result='\"'\"'returned'\"'\"';\n}catch(error){reference.reason=String(error.message).slice(0,500);}\nconst outcomes=[];\nif(reference.result==='\"'\"'returned'\"'\"'){\n const cases=[{name:'\"'\"'valid-input'\"'\"',args:[fixture]},...(contract.arity?[{name:'\"'\"'missing-argument'\"'\"',args:[]},{name:'\"'\"'extra-argument'\"'\"',args:[fixture,fixture]}]:[])];\n for(const item of cases){\n  const result=spawnSync(process.execPath,[module,...item.args],options),measured={case:item.name,...measure(result)};\n  if(result.error||result.signal||!Number.isInteger(result.status)){outcomes.push({...measured,result:'\"'\"'unavailable'\"'\"'});continue;}\n  try{\n   if(item.name==='\"'\"'valid-input'\"'\"'){\n    assert.equal(result.status,contract.success.exitCode);assert.equal(result.stderr.length,0);\n    const text=new TextDecoder('\"'\"'utf-8'\"'\"',{fatal:true,ignoreBOM:true}).decode(result.stdout);\n    assert.ok(text.endsWith(LF),'\"'\"'stdout must end in a newline'\"'\"');assert.deepStrictEqual(JSON.parse(text.slice(0,-1)),outcome.value);\n   }else{assert.equal(result.status,contract.arity.exitCode);assert.equal(result.stdout.length,0);assert.ok(result.stderr.length>0,'\"'\"'stderr must be nonempty'\"'\"');}\n   outcomes.push({...measured,result:'\"'\"'passed'\"'\"'});\n  }catch(error){outcomes.push({...measured,result:'\"'\"'failed'\"'\"',reason:String(error.message).slice(0,500)});}\n }\n}\nconst status=reference.result!=='\"'\"'returned'\"'\"'||outcomes.some(x=>x.result==='\"'\"'unavailable'\"'\"')?'\"'\"'unavailable'\"'\"':outcomes.some(x=>x.result==='\"'\"'failed'\"'\"')?'\"'\"'failed'\"'\"':'\"'\"'complete'\"'\"';\nconsole.log(JSON.stringify({schema:'\"'\"'bantam.cli-assertion-check.v2'\"'\"',status,reference,cases:outcomes}));process.exitCode=status==='\"'\"'unavailable'\"'\"'?125:status==='\"'\"'failed'\"'\"'?1:0;\n'",
+            "executed": true,
+            "code": 0,
+            "stdout": "{\"schema\":\"bantam.cli-assertion-check.v2\",\"status\":\"complete\",\"reference\":{\"status\":0,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":0,\"stderrSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stderrBase64\":\"\",\"outcomeBytes\":259,\"outcomeSha256\":\"52a092ca0683f412449a0f1adb6637e609e14c2cb51a3a76296c5bfcf63d68e4\",\"outcomeBase64\":\"eyJzY2hlbWEiOiJiYW50YW0uY2xpLWFwaS1yZWZlcmVuY2UudjEiLCJtb2R1bGUiOiJjb250ZXh0LXBhY2tldC5qcyIsImV4cG9ydCI6InBhY2tDb250ZXh0Iiwia2luZCI6InJldHVybmVkIiwidmFsdWUiOnsidGV4dCI6IiMjIyBcImFscGhhXCJcbmhlbGxvIHdvcmxkXG4jIyMgXCJiZXRhXCJcbnNlY29uZCBzZWN0aW9uXG4iLCJieXRlcyI6NTAsImluY2x1ZGVkIjpbImFscGhhIiwiYmV0YSJdLCJvbWl0dGVkIjpbXX0sImRpYWdub3N0aWMiOm51bGx9Cg==\",\"result\":\"returned\"},\"cases\":[{\"case\":\"valid-input\",\"status\":0,\"signal\":null,\"error\":null,\"stdoutBytes\":122,\"stdoutSha256\":\"fc8bec8a84aceb7f482e6985c512d10d0a373380b5deb24832e9d55b277086c6\",\"stdoutBase64\":\"eyJ0ZXh0IjoiIyMjIFwiYWxwaGFcIlxuaGVsbG8gd29ybGRcbiMjIyBcImJldGFcIlxuc2Vjb25kIHNlY3Rpb25cbiIsImJ5dGVzIjo1MCwiaW5jbHVkZWQiOlsiYWxwaGEiLCJiZXRhIl0sIm9taXR0ZWQiOltdfQo=\",\"stderrBytes\":0,\"stderrSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stderrBase64\":\"\",\"result\":\"passed\"},{\"case\":\"missing-argument\",\"status\":2,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":46,\"stderrSha256\":\"e847be06ab4f2d5586ba686a4d1ef94399ac1aab66246647bab44fb3827edb3e\",\"stderrBase64\":\"dXNhZ2U6IG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFCg==\",\"result\":\"passed\"},{\"case\":\"extra-argument\",\"status\":2,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":46,\"stderrSha256\":\"e847be06ab4f2d5586ba686a4d1ef94399ac1aab66246647bab44fb3827edb3e\",\"stderrBase64\":\"dXNhZ2U6IG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFCg==\",\"result\":\"passed\"}]}\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 510
+          }
+        ]
+      },
+      "atMs": 29104.0,
+      "endedMs": 30514.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 3,
+      "id": "action-6"
+    },
+    {
+      "name": "supervisor-review",
+      "category": "other",
+      "request": {
+        "focus": "collection-preconditions",
+        "generation": 1
+      },
+      "output": {
+        "status": "report",
+        "advisory": true,
+        "findings": [
+          {
+            "entrypoint": "packContext",
+            "requirement": "maxBytes is a nonnegative safe integer... Invalid input throws an Error.",
+            "location": "context-packet.js / packContext",
+            "fixture": "assert.throws(() => packContext([], 1.5), Error);",
+            "expected": "The function throws an Error because 1.5 is not a safe integer.",
+            "predicted": "The function returns the empty result object {text:'', bytes:0, included:[], omitted:[]} because the validation check passes.",
+            "contrast": {
+              "observable": "packContext([], 1.5)",
+              "expectedJson": "{\"kind\":\"throw\",\"errorType\":\"Error\"}",
+              "predictedJson": "{\"kind\":\"return\",\"value\":{\"text\":\"\",\"bytes\":0,\"included\":[],\"omitted\":[]}}"
+            }
+          }
+        ],
+        "note": "",
+        "report": "1. packContext \u2014 context-packet.js / packContext\nPublic requirement: maxBytes is a nonnegative safe integer... Invalid input throws an Error.\nProposed fixture/assertion (NOT executed): assert.throws(() => packContext([], 1.5), Error);\nExpected: The function throws an Error because 1.5 is not a safe integer.\nPredicted from source: The function returns the empty result object {text:'', bytes:0, included:[], omitted:[]} because the validation check passes.",
+        "quality": {
+          "status": "bounded",
+          "deferred": [],
+          "noteIncomplete": false,
+          "candidateVerified": false,
+          "scope": "source-hypothesis-with-declared-observable-contrast"
+        }
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "turn": 3,
+      "id": "action-7"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node -e \"import('./context-packet.js').then(m=>{try{m.packContext([],1.5);console.log('NO-THROW (BAD)')}catch(e){console.log('THREW (GOOD):',e.message)}})\""
+      },
+      "output": "$ node -e \"import('./context-packet.js').then(m=>{try{m.packContext([],1.5);console.log('NO-THROW (BAD)')}catch(e){console.log('THREW (GOOD):',e.message)}})\"\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nTHREW (GOOD): maxBytes must be a nonnegative safe integer",
+      "atMs": 38903.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 4,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 1,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 1 still needs focused proof. Execution: turn 5 ran and exited 0. Focused-proof admission: NOT ADMITTED. The inline check has no recognized node:assert binding/call. A custom assert helper or if/exit check is not admitted by this bounded recognizer. Next: use a permitted file-edit action (e.g. write_file) to create a new workspace check script, e.g. check-contract.mjs. Import the real production API and assert public-contract expectations with node:assert/strict. Temporary fixture DATA goes under os.tmpdir(); the check SCRIPT stays in the workspace. In a separate permitted shell action run only node check-contract.mjs (substitute its actual relative path): no cd, bash -c, setup, echo, filters or cleanup. Keep the check; printed pass messages are not proof. Start with one discriminating fixture/assertion and execute it before expanding coverage. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-8"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "check-contract.mjs",
+        "content": "import assert from 'node:assert/strict';\nimport {packContext} from './context-packet.js';\n\n// maxBytes must be a nonnegative safe integer; 1.5 is not\nassert.throws(() => packContext([], 1.5), Error);\n\n// negative maxBytes is invalid\nassert.throws(() => packContext([], -1), Error);\n\n// non-integer maxBytes is invalid\nassert.throws(() => packContext([], 0.5), Error);\n\n// safe integer boundary: MAX_SAFE_INTEGER is valid\nconst r1 = packContext([], Number.MAX_SAFE_INTEGER);\nassert.deepEqual(r1, {text:'', bytes:0, included:[], omitted:[]});\n\n// MAX_SAFE_INTEGER + 1 is NOT a safe integer\nassert.throws(() => packContext([], Number.MAX_SAFE_INTEGER + 1), Error);\n\n// sections must be a dense array; missing slots are invalid\nassert.throws(() => packContext(new Array(1), 100), Error);\n\n// null section is invalid\nassert.throws(() => packContext([null], 100), Error);\n\n// array section is invalid\nassert.throws(() => packContext([[]], 100), Error);\n\n// non-object section is invalid\nassert.throws(() => packContext(['str'], 100), Error);\n\n// empty id is invalid\nassert.throws(() => packContext([{id:'', text:'', priority:0, required:false}], 100), Error);\n\n// non-string id is invalid\nassert.throws(() => packContext([{id:1, text:'', priority:0, required:false}], 100), Error);\n\n// non-string text is invalid\nassert.throws(() => packContext([{id:'a', text:1, priority:0, required:false}], 100), Error);\n\n// negative priority is invalid\nassert.throws(() => packContext([{id:'a', text:'', priority:-1, required:false}], 100), Error);\n\n// non-boolean required is invalid\nassert.throws(() => packContext([{id:'a', text:'', priority:0, required:'yes'}], 100), Error);\n\n// duplicate IDs are invalid\nassert.throws(() => packContext([{id:'x', text:'', priority:0, required:false},{id:'x', text:'', priority:0, required:false}], 100), Error);\n\n// case-sensitive IDs: 'A' and 'a' are distinct\nconst r2 = packContext([{id:'A', text:'a', priority:0, required:false},{id:'a', text:'b', priority:0, required:false}], 100);\nassert.deepEqual(r2.included, ['A','a']);\n\n// __proto__ is a valid ID\nconst r3 = packContext([{id:'__proto__', text:'p', priority:0, required:false}], 100);\nassert.equal(r3.included[0], '__proto__');\n\n// required overflow throws even with valid sections\nassert.throws(() => packContext([{id:'r', text:'x'.repeat(100), priority:0, required:true}], 10), Error);\n\n// optional skip continues to later sections\nconst r4 = packContext(\n  [{id:'big', text:'x'.repeat(50), priority:10, required:false},\n   {id:'small', text:'y', priority:5, required:false}],\n  Buffer.byteLength('### \"small\"\\ny\\n', 'utf8')\n);\nassert.deepEqual(r4.included, ['small']);\nassert.deepEqual(r4.omitted, ['big']);\n\n// omitted reported in input order, not priority order\nconst r5 = packContext(\n  [{id:'low', text:'a', priority:1, required:false},\n   {id:'high', text:'b', priority:10, required:false}],\n  Buffer.byteLength('### \"high\"\\nb\\n', 'utf8')\n);\nassert.deepEqual(r5.included, ['high']);\nassert.deepEqual(r5.omitted, ['low']);\n\n// input is not mutated\nconst input = [{id:'a', text:'x', priority:1, required:false}];\nconst before = JSON.stringify(input);\npackContext(input, 100);\nassert.equal(JSON.stringify(input), before);\n\nconsole.log('all contract checks passed');\n"
+      },
+      "output": "wrote 3250 bytes to check-contract.mjs\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `included` is also referenced in: context-packet.js, test/public.test.js\n  `omitted` is also referenced in: context-packet.js, test/public.test.js\n  `required` is also referenced in: context-packet.js, test/public.test.js\n[peer] `packContext` is also handled elsewhere in this repo. These functions operate on it \u2014 check whether they do something around it your edit is missing:\n\u2014 `frameOf` (context-packet.js:30):\n  return '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n}\n\nexport function packContext(sections, maxBytes){\n  if (!isNonnegSafeInt(maxBytes)) throw new Error('maxBytes must be a nonnegative safe integer');\n  validateSections(sections);\n\n\u2014 `runCli` (context-packet.js:105):\n    process.exit(2);\n  }\n  try {\n    const result = packContext(data.sections, data.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n    process.exit(0);\n  } catch (err) {\n[scope] Verification invalidated: workspace generation 1 -> 2; changed \"check-contract.mjs\". Earlier PASS receipts describe generation 1, not this tree. Deleting a check script also changes the verified workspace. Finish necessary cleanup BEFORE the final focused check and configured project check; keep intended checks. Obtain fresh receipts before DONE.\n\n[contract-cli-station; generation 2]\nCLI cases: complete.\nScope: CLI/API coherence on one model-designed input and explicit argument boundaries. Shared business-logic bugs can pass this check. This is not API correctness, project verification or task completion.\nReason: assertion_passed\nCase input (model-designed, not an oracle): {\"module\":\"context-packet.js\",\"input\":{\"sections\":[{\"id\":\"alpha\",\"text\":\"hello world\",\"priority\":1,\"required\":true},{\"id\":\"beta\",\"text\":\"second section\",\"priority\":2,\"required\":false}],\"maxBytes\":256}}\nMeasured API reference: returned; actual exit 0, return channel 259 bytes.\nMeasured child valid-input: passed; actual exit 0, stdout 122 bytes, stderr 0 bytes.\nMeasured child missing-argument: passed; actual exit 2, stdout 0 bytes, stderr 46 bytes.\nMeasured child extra-argument: passed; actual exit 2, stdout 0 bytes, stderr 46 bytes.\nThese CLI cases settled; current configured project verification and all other completion gates still apply.\n[cli-project-check] The configured verifier ran after the CLI station: pass.\n\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.301712\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.155641\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.302293\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.234212\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 44.506003",
+      "atMs": 49616.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 5,
+      "supervisor": {
+        "phase": "focused",
+        "generation": 2,
+        "text": "CONTRACT AUDIT PHASE: completion is not yet available; generation 2 still needs focused proof. Existing authored check located in CURRENT source: \"check-contract.mjs\" (sha256 27ffda142f28829b7d91f6b4ced598e3f146ae487fd54d01c47d6acaa8538946). Next: run exactly \"node check-contract.mjs\" directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. A successful admitted focused check still requires fresh configured project verification. No completion gate is waived. The audit is a hypothesis, not an oracle."
+      },
+      "id": "action-9"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "total": 4
+        },
+        "failingTests": [],
+        "outputSha256": "bd2678e0841b983f11f703e7887c167ab309fe8028fa5bd1be84017eb034522d"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 5,
+      "id": "action-10"
+    },
+    {
+      "name": "factory-cli-check",
+      "category": "other",
+      "request": {
+        "question": "Does the CLI preserve the measured public API return for this model-designed valid input and obey its explicit process contract on these exact source inputs?",
+        "input": {
+          "module": "context-packet.js",
+          "input": {
+            "sections": [
+              {
+                "id": "alpha",
+                "text": "hello world",
+                "priority": 1,
+                "required": true
+              },
+              {
+                "id": "beta",
+                "text": "second section",
+                "priority": 2,
+                "required": false
+              }
+            ],
+            "maxBytes": 256
+          }
+        },
+        "designReused": true
+      },
+      "output": {
+        "status": "complete",
+        "stages": [
+          {
+            "stage": "setup",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nfs.mkdirSync(root,{mode:0o755});fs.writeFileSync(fixture,JSON.stringify(spec.input)+LF,{flag:'\"'\"'wx'\"'\"',mode:0o644});console.log('\"'\"'CLI fixture created'\"'\"');'",
+            "executed": true,
+            "code": 0,
+            "stdout": "CLI fixture created\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 433
+          },
+          {
+            "stage": "witness",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nconst f=fs.lstatSync(fixture),m=fs.lstatSync(module);assert.ok(f.isFile()&&!f.isSymbolicLink());assert.ok(m.isFile()&&!m.isSymbolicLink());assert.equal(fs.readFileSync(fixture,'\"'\"'utf8'\"'\"'),JSON.stringify(spec.input)+LF);console.log(JSON.stringify({schema:'\"'\"'bantam.cli-assertion-witness.v1'\"'\"',fixture:true,entrypoint:true}));'",
+            "executed": true,
+            "code": 0,
+            "stdout": "{\"schema\":\"bantam.cli-assertion-witness.v1\",\"fixture\":true,\"entrypoint\":true}\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 416
+          },
+          {
+            "stage": "check",
+            "command": "node --input-type=module -e 'import fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import assert from '\"'\"'node:assert/strict'\"'\"';\nconst {spec,contract}=JSON.parse(Buffer.from('\"'\"'eyJzcGVjIjp7Im1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXQiOnsic2VjdGlvbnMiOlt7ImlkIjoiYWxwaGEiLCJ0ZXh0IjoiaGVsbG8gd29ybGQiLCJwcmlvcml0eSI6MSwicmVxdWlyZWQiOnRydWV9LHsiaWQiOiJiZXRhIiwidGV4dCI6InNlY29uZCBzZWN0aW9uIiwicHJpb3JpdHkiOjIsInJlcXVpcmVkIjpmYWxzZX1dLCJtYXhCeXRlcyI6MjU2fX0sImNvbnRyYWN0Ijp7InNjaGVtYSI6ImJhbnRhbS5jbGktY29udHJhY3QudjIiLCJ0YXNrU2hhMjU2IjoiMmQxNmQzNDI5NWZlYTI0N2I2NWRiZTgxYWZhNzY5MzRiYzc1MDhiZmEzZTcxM2ZiNzc4MGM3Yjc2ZjlkYzdmYyIsIm1vZHVsZSI6ImNvbnRleHQtcGFja2V0LmpzIiwiaW5wdXRLaW5kIjoianNvbi1maWxlIiwiYXBpIjp7ImV4cG9ydCI6InBhY2tDb250ZXh0IiwiYXJndW1lbnRzIjpbInNlY3Rpb25zIiwibWF4Qnl0ZXMiXX0sInN1Y2Nlc3MiOnsiZXhpdENvZGUiOjAsInN0ZG91dCI6InNpbmdsZS1qc29uLW5ld2xpbmUiLCJzdGRlcnIiOiJlbXB0eSJ9LCJhcml0eSI6eyJhcmd1bWVudHMiOjEsImV4aXRDb2RlIjoyLCJzdGRvdXQiOiJlbXB0eSIsInN0ZGVyciI6Im5vbmVtcHR5In0sImV2aWRlbmNlIjpbIkNMSTogYG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFYC4gVGhlIFVURi04IEpTT04gZmlsZSBjb250YWluc1xuYHtzZWN0aW9ucywgbWF4Qnl0ZXN9YDsgZXh0cmEgZmllbGRzIGFyZSBpZ25vcmVkLiBFeGFjdGx5IG9uZSBhcmd1bWVudCBpc1xucmVxdWlyZWQuIFN1Y2Nlc3MgcHJpbnRzIGV4YWN0bHkgb25lIHJlc3VsdCBKU09OIHBsdXMgbmV3bGluZSwgZXhpdHMgMCBhbmRcbmhhcyBubyBzdGRlcnIuIEludmFsaWQgYXJndW1lbnRzLCB1bnJlYWRhYmxlIGZpbGVzLCBpbnZhbGlkIEpTT04gb3IgQVBJIGlucHV0LFxuYW5kIGluc3VmZmljaWVudCByZXF1aXJlZC1zZWN0aW9uIGJ1ZGdldCBleGl0IDIsIHdpdGggbm9uZW1wdHkgc3RkZXJyIGFuZCBub1xuc3Rkb3V0LiBJbXBvcnRpbmcgdGhlIG1vZHVsZSBtdXN0IG5vdCBydW4gdGhlIENMSS4iLCJFeHBvcnQgc3luY2hyb25vdXMgYHBhY2tDb250ZXh0KHNlY3Rpb25zLCBtYXhCeXRlcylgIl19fQ=='\"'\"','\"'\"'base64'\"'\"').toString());\nconst root=path.join(process.cwd(),'\"'\"'case'\"'\"'),fixture=path.join(root,'\"'\"'input.json'\"'\"'),subject=path.join(process.cwd(),'\"'\"'subject'\"'\"'),module=path.join(subject,spec.module);\nconst LF=String.fromCharCode(10);\nimport {spawnSync} from '\"'\"'node:child_process'\"'\"';import crypto from '\"'\"'node:crypto'\"'\"';\nconst sha=b=>crypto.createHash('\"'\"'sha256'\"'\"').update(b).digest('\"'\"'hex'\"'\"');\nconst options={cwd:root,env:{...process.env},stdio:['\"'\"'ignore'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"'],timeout:2000,killSignal:'\"'\"'SIGKILL'\"'\"',maxBuffer:16384};\nconst measure=result=>{const m={status:Number.isInteger(result.status)?result.status:null,signal:result.signal??null,error:result.error?String(result.error.code??result.error.message):null};\n for(const [name,b]of [['\"'\"'stdout'\"'\"',result.stdout??Buffer.alloc(0)],['\"'\"'stderr'\"'\"',result.stderr??Buffer.alloc(0)]])Object.assign(m,{[name+'\"'\"'Bytes'\"'\"']:b.length,[name+'\"'\"'Sha256'\"'\"']:sha(b),[name+'\"'\"'Base64'\"'\"']:b.toString('\"'\"'base64'\"'\"')});return m;};\nconst api=spawnSync(process.execPath,['\"'\"'--input-type=module'\"'\"','\"'\"'-e'\"'\"',\"\\nimport fs from '\"'\"'node:fs'\"'\"';import path from '\"'\"'node:path'\"'\"';import {pathToFileURL} from '\"'\"'node:url'\"'\"';\\nconst emit=fs.writeSync.bind(fs),stringify=JSON.stringify.bind(JSON);\\nconst {spec,contract,subject}=JSON.parse(process.env.BANTAM_CLI_REFERENCE);\\nconst diagnostic=error=>({name:String(error?.name??'\"'\"'Error'\"'\"').slice(0,80),message:String(error?.message??error).slice(0,500),stack:String(error?.stack??'\"'\"''\"'\"').slice(0,1000)});\\nconst packet=(kind,value=null,error=null)=>emit(3,stringify({schema:'\"'\"'bantam.cli-api-reference.v1'\"'\"',module:spec.module,export:contract.api.export,kind,value,diagnostic:error===null?null:diagnostic(error)})+'\"'\"'\\\\n'\"'\"');\\nfunction jsonOnly(value,depth=0,seen=new Set()){\\n if(depth>16)return false;\\n if(value===null||typeof value==='\"'\"'string'\"'\"'||typeof value==='\"'\"'boolean'\"'\"')return true;\\n if(typeof value==='\"'\"'number'\"'\"')return Number.isFinite(value)&&!Object.is(value,-0);\\n if(!value||typeof value!=='\"'\"'object'\"'\"'||seen.has(value))return false;\\n if(!Array.isArray(value)&&Object.getPrototypeOf(value)!==Object.prototype&&Object.getPrototypeOf(value)!==null)return false;\\n seen.add(value);const descriptors=Object.getOwnPropertyDescriptors(value);\\n if(Reflect.ownKeys(value).some(k=>typeof k==='\"'\"'symbol'\"'\"'))return false;\\n for(const [key,d]of Object.entries(descriptors)){\\n  if(Array.isArray(value)&&key==='\"'\"'length'\"'\"')continue;\\n  if(!d.enumerable||!Object.hasOwn(d,'\"'\"'value'\"'\"')||!jsonOnly(d.value,depth+1,seen))return false;\\n }\\n if(Array.isArray(value)&&(Object.keys(value).length!==value.length||Object.keys(value).some((key,i)=>key!==String(i))))return false;\\n seen.delete(value);return true;\\n}\\ntry{\\n const module=await import(pathToFileURL(path.join(subject,spec.module)).href),fn=module[contract.api.export];\\n if(typeof fn!=='\"'\"'function'\"'\"')throw Error('\"'\"'public API export is not callable'\"'\"');\\n const args=contract.api.arguments.map(key=>spec.input[key]);\\n let value;try{value=fn(...args);}catch(error){packet('\"'\"'threw'\"'\"',null,error);process.exit(0);}\\n if(!jsonOnly(value))packet('\"'\"'unsupported'\"'\"',null,Error('\"'\"'synchronous public API returned a non-JSON value'\"'\"'));else packet('\"'\"'returned'\"'\"',value);\\n}catch(error){packet('\"'\"'infrastructure'\"'\"',null,error);}\\n\"],{...options,env:{...options.env,BANTAM_CLI_REFERENCE:JSON.stringify({spec,contract,subject})},stdio:['\"'\"'ignore'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"','\"'\"'pipe'\"'\"']});\nconst outcomeBytes=api.output?.[3]??Buffer.alloc(0),reference={...measure(api),outcomeBytes:outcomeBytes.length,outcomeSha256:sha(outcomeBytes),outcomeBase64:outcomeBytes.toString('\"'\"'base64'\"'\"'),result:'\"'\"'unavailable'\"'\"'};\nlet outcome;\ntry{\n assert.equal(api.error,undefined);assert.equal(api.signal,null);assert.equal(api.status,0);assert.ok(outcomeBytes.length<=16384);\n assert.equal(api.stdout.length,0,'\"'\"'API reference wrote stdout'\"'\"');assert.equal(api.stderr.length,0,'\"'\"'API reference wrote stderr'\"'\"');\n outcome=JSON.parse(new TextDecoder('\"'\"'utf-8'\"'\"',{fatal:true,ignoreBOM:true}).decode(outcomeBytes));\n assert.deepStrictEqual(Object.keys(outcome).sort(),['\"'\"'diagnostic'\"'\"','\"'\"'export'\"'\"','\"'\"'kind'\"'\"','\"'\"'module'\"'\"','\"'\"'schema'\"'\"','\"'\"'value'\"'\"']);\n assert.equal(outcome.schema,'\"'\"'bantam.cli-api-reference.v1'\"'\"');assert.equal(outcome.module,spec.module);assert.equal(outcome.export,contract.api.export);\n assert.equal(outcome.kind,'\"'\"'returned'\"'\"','\"'\"'API reference '\"'\"'+String(outcome.kind)+'\"'\"': '\"'\"'+String(outcome.diagnostic?.message??'\"'\"'no supported JSON return'\"'\"')+'\"'\"' '\"'\"'+String(outcome.diagnostic?.stack??'\"'\"''\"'\"').slice(0,180));assert.equal(outcome.diagnostic,null);\n reference.result='\"'\"'returned'\"'\"';\n}catch(error){reference.reason=String(error.message).slice(0,500);}\nconst outcomes=[];\nif(reference.result==='\"'\"'returned'\"'\"'){\n const cases=[{name:'\"'\"'valid-input'\"'\"',args:[fixture]},...(contract.arity?[{name:'\"'\"'missing-argument'\"'\"',args:[]},{name:'\"'\"'extra-argument'\"'\"',args:[fixture,fixture]}]:[])];\n for(const item of cases){\n  const result=spawnSync(process.execPath,[module,...item.args],options),measured={case:item.name,...measure(result)};\n  if(result.error||result.signal||!Number.isInteger(result.status)){outcomes.push({...measured,result:'\"'\"'unavailable'\"'\"'});continue;}\n  try{\n   if(item.name==='\"'\"'valid-input'\"'\"'){\n    assert.equal(result.status,contract.success.exitCode);assert.equal(result.stderr.length,0);\n    const text=new TextDecoder('\"'\"'utf-8'\"'\"',{fatal:true,ignoreBOM:true}).decode(result.stdout);\n    assert.ok(text.endsWith(LF),'\"'\"'stdout must end in a newline'\"'\"');assert.deepStrictEqual(JSON.parse(text.slice(0,-1)),outcome.value);\n   }else{assert.equal(result.status,contract.arity.exitCode);assert.equal(result.stdout.length,0);assert.ok(result.stderr.length>0,'\"'\"'stderr must be nonempty'\"'\"');}\n   outcomes.push({...measured,result:'\"'\"'passed'\"'\"'});\n  }catch(error){outcomes.push({...measured,result:'\"'\"'failed'\"'\"',reason:String(error.message).slice(0,500)});}\n }\n}\nconst status=reference.result!=='\"'\"'returned'\"'\"'||outcomes.some(x=>x.result==='\"'\"'unavailable'\"'\"')?'\"'\"'unavailable'\"'\"':outcomes.some(x=>x.result==='\"'\"'failed'\"'\"')?'\"'\"'failed'\"'\"':'\"'\"'complete'\"'\"';\nconsole.log(JSON.stringify({schema:'\"'\"'bantam.cli-assertion-check.v2'\"'\"',status,reference,cases:outcomes}));process.exitCode=status==='\"'\"'unavailable'\"'\"'?125:status==='\"'\"'failed'\"'\"'?1:0;\n'",
+            "executed": true,
+            "code": 0,
+            "stdout": "{\"schema\":\"bantam.cli-assertion-check.v2\",\"status\":\"complete\",\"reference\":{\"status\":0,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":0,\"stderrSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stderrBase64\":\"\",\"outcomeBytes\":259,\"outcomeSha256\":\"52a092ca0683f412449a0f1adb6637e609e14c2cb51a3a76296c5bfcf63d68e4\",\"outcomeBase64\":\"eyJzY2hlbWEiOiJiYW50YW0uY2xpLWFwaS1yZWZlcmVuY2UudjEiLCJtb2R1bGUiOiJjb250ZXh0LXBhY2tldC5qcyIsImV4cG9ydCI6InBhY2tDb250ZXh0Iiwia2luZCI6InJldHVybmVkIiwidmFsdWUiOnsidGV4dCI6IiMjIyBcImFscGhhXCJcbmhlbGxvIHdvcmxkXG4jIyMgXCJiZXRhXCJcbnNlY29uZCBzZWN0aW9uXG4iLCJieXRlcyI6NTAsImluY2x1ZGVkIjpbImFscGhhIiwiYmV0YSJdLCJvbWl0dGVkIjpbXX0sImRpYWdub3N0aWMiOm51bGx9Cg==\",\"result\":\"returned\"},\"cases\":[{\"case\":\"valid-input\",\"status\":0,\"signal\":null,\"error\":null,\"stdoutBytes\":122,\"stdoutSha256\":\"fc8bec8a84aceb7f482e6985c512d10d0a373380b5deb24832e9d55b277086c6\",\"stdoutBase64\":\"eyJ0ZXh0IjoiIyMjIFwiYWxwaGFcIlxuaGVsbG8gd29ybGRcbiMjIyBcImJldGFcIlxuc2Vjb25kIHNlY3Rpb25cbiIsImJ5dGVzIjo1MCwiaW5jbHVkZWQiOlsiYWxwaGEiLCJiZXRhIl0sIm9taXR0ZWQiOltdfQo=\",\"stderrBytes\":0,\"stderrSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stderrBase64\":\"\",\"result\":\"passed\"},{\"case\":\"missing-argument\",\"status\":2,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":46,\"stderrSha256\":\"e847be06ab4f2d5586ba686a4d1ef94399ac1aab66246647bab44fb3827edb3e\",\"stderrBase64\":\"dXNhZ2U6IG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFCg==\",\"result\":\"passed\"},{\"case\":\"extra-argument\",\"status\":2,\"signal\":null,\"error\":null,\"stdoutBytes\":0,\"stdoutSha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"stdoutBase64\":\"\",\"stderrBytes\":46,\"stderrSha256\":\"e847be06ab4f2d5586ba686a4d1ef94399ac1aab66246647bab44fb3827edb3e\",\"stderrBase64\":\"dXNhZ2U6IG5vZGUgY29udGV4dC1wYWNrZXQuanMgSU5QVVRfSlNPTl9GSUxFCg==\",\"result\":\"passed\"}]}\n",
+            "stderr": "",
+            "timedOut": false,
+            "durationMs": 516
+          }
+        ]
+      },
+      "atMs": 49667.0,
+      "endedMs": 51034.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 5,
+      "id": "action-11"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "node check-contract.mjs"
+      },
+      "output": "$ node check-contract.mjs\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\nall contract checks passed\n\n[contract-audit-check] Focused assertion accepted. The controller then executed the exact configured project check: npm test. Result: PASS.\n\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.315601\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.159391\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.305302\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.237382\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 44.954746\n\n[auto-verify] The focused and configured project receipts are now complete on generation 2. Focused command: \"node check-contract.mjs\". No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.",
+      "atMs": 53303.0,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 6,
+      "supervisor": {
+        "phase": "ready",
+        "generation": 2,
+        "text": "VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation 2). Focused command: \"node check-contract.mjs\". There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up."
+      },
+      "id": "action-12"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "command": "npm test"
+      },
+      "output": {
+        "status": "pass",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "total": 4
+        },
+        "failingTests": [],
+        "outputSha256": "5a5cf1cb210c6aeaf3206ff95c3beadf9862920e39e287a8f95fcfc149056ebd"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-automatic-check",
+      "turn": 6,
+      "id": "action-13"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "a": "done",
+        "summary": "Implemented `packContext(sections, maxBytes)` in `context-packet.js` with full input validation (dense array, non-null/non-array objects, nonempty string id, string text, nonnegative safe integer priority, boolean required, unique IDs), exact UTF-8 byte-budget packing (required sections first in input order, optional by descending priority with input-order tiebreak, skip-and-continue), and a CLI that reads a JSON file and prints the result. All 4 public tests pass, the focused contract check (20 assertions covering safe-integer boundaries, validation edge cases, `__proto__` IDs, case-sensitive IDs, mutation safety, and skip-continue behavior) passes, and the CLI station confirmed correct exit codes and output for valid/missing/extra argument cases."
+      },
+      "output": "",
+      "atMs": 57736.0,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 7,
+      "id": "action-14"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 307.0,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 321.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 333.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 345.0,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 358.0,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 57783.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 57791.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 57798.0,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 57805.0,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 57813.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 57821.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 57828.0,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 57836.0,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Implemented `packContext(sections, maxBytes)` in `context-packet.js` with full input validation (dense array, non-null/non-array objects, nonempty string id, string text, nonnegative safe integer priority, boolean required, unique IDs), exact UTF-8 byte-budget packing (required sections first in input order, optional by descending priority with input-order tiebreak, skip-and-continue), and a CLI that reads a JSON file and prints the result. All 4 public tests pass, the focused contract check (20 assertions covering safe-integer boundaries, validation edge cases, `__proto__` IDs, case-sensitive IDs, mutation safety, and skip-continue behavior) passes, and the CLI station confirmed correct exit codes and output for valid/missing/extra argument cases.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "check-contract.mjs",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "27ffda142f28829b7d91f6b4ced598e3f146ae487fd54d01c47d6acaa8538946",
+      "before": null,
+      "after": "import assert from 'node:assert/strict';\nimport {packContext} from './context-packet.js';\n\n// maxBytes must be a nonnegative safe integer; 1.5 is not\nassert.throws(() => packContext([], 1.5), Error);\n\n// negative maxBytes is invalid\nassert.throws(() => packContext([], -1), Error);\n\n// non-integer maxBytes is invalid\nassert.throws(() => packContext([], 0.5), Error);\n\n// safe integer boundary: MAX_SAFE_INTEGER is valid\nconst r1 = packContext([], Number.MAX_SAFE_INTEGER);\nassert.deepEqual(r1, {text:'', bytes:0, included:[], omitted:[]});\n\n// MAX_SAFE_INTEGER + 1 is NOT a safe integer\nassert.throws(() => packContext([], Number.MAX_SAFE_INTEGER + 1), Error);\n\n// sections must be a dense array; missing slots are invalid\nassert.throws(() => packContext(new Array(1), 100), Error);\n\n// null section is invalid\nassert.throws(() => packContext([null], 100), Error);\n\n// array section is invalid\nassert.throws(() => packContext([[]], 100), Error);\n\n// non-object section is invalid\nassert.throws(() => packContext(['str'], 100), Error);\n\n// empty id is invalid\nassert.throws(() => packContext([{id:'', text:'', priority:0, required:false}], 100), Error);\n\n// non-string id is invalid\nassert.throws(() => packContext([{id:1, text:'', priority:0, required:false}], 100), Error);\n\n// non-string text is invalid\nassert.throws(() => packContext([{id:'a', text:1, priority:0, required:false}], 100), Error);\n\n// negative priority is invalid\nassert.throws(() => packContext([{id:'a', text:'', priority:-1, required:false}], 100), Error);\n\n// non-boolean required is invalid\nassert.throws(() => packContext([{id:'a', text:'', priority:0, required:'yes'}], 100), Error);\n\n// duplicate IDs are invalid\nassert.throws(() => packContext([{id:'x', text:'', priority:0, required:false},{id:'x', text:'', priority:0, required:false}], 100), Error);\n\n// case-sensitive IDs: 'A' and 'a' are distinct\nconst r2 = packContext([{id:'A', text:'a', priority:0, required:false},{id:'a', text:'b', priority:0, required:false}], 100);\nassert.deepEqual(r2.included, ['A','a']);\n\n// __proto__ is a valid ID\nconst r3 = packContext([{id:'__proto__', text:'p', priority:0, required:false}], 100);\nassert.equal(r3.included[0], '__proto__');\n\n// required overflow throws even with valid sections\nassert.throws(() => packContext([{id:'r', text:'x'.repeat(100), priority:0, required:true}], 10), Error);\n\n// optional skip continues to later sections\nconst r4 = packContext(\n  [{id:'big', text:'x'.repeat(50), priority:10, required:false},\n   {id:'small', text:'y', priority:5, required:false}],\n  Buffer.byteLength('### \"small\"\\ny\\n', 'utf8')\n);\nassert.deepEqual(r4.included, ['small']);\nassert.deepEqual(r4.omitted, ['big']);\n\n// omitted reported in input order, not priority order\nconst r5 = packContext(\n  [{id:'low', text:'a', priority:1, required:false},\n   {id:'high', text:'b', priority:10, required:false}],\n  Buffer.byteLength('### \"high\"\\nb\\n', 'utf8')\n);\nassert.deepEqual(r5.included, ['high']);\nassert.deepEqual(r5.omitted, ['low']);\n\n// input is not mutated\nconst input = [{id:'a', text:'x', priority:1, required:false}];\nconst before = JSON.stringify(input);\npackContext(input, 100);\nassert.equal(JSON.stringify(input), before);\n\nconsole.log('all contract checks passed');\n",
+      "displaySha256": "27ffda142f28829b7d91f6b4ced598e3f146ae487fd54d01c47d6acaa8538946",
+      "diff": "--- starter/check-contract.mjs\n+++ delivered/check-contract.mjs\n@@ -0,0 +1,85 @@\n+import assert from 'node:assert/strict';\n+import {packContext} from './context-packet.js';\n+\n+// maxBytes must be a nonnegative safe integer; 1.5 is not\n+assert.throws(() => packContext([], 1.5), Error);\n+\n+// negative maxBytes is invalid\n+assert.throws(() => packContext([], -1), Error);\n+\n+// non-integer maxBytes is invalid\n+assert.throws(() => packContext([], 0.5), Error);\n+\n+// safe integer boundary: MAX_SAFE_INTEGER is valid\n+const r1 = packContext([], Number.MAX_SAFE_INTEGER);\n+assert.deepEqual(r1, {text:'', bytes:0, included:[], omitted:[]});\n+\n+// MAX_SAFE_INTEGER + 1 is NOT a safe integer\n+assert.throws(() => packContext([], Number.MAX_SAFE_INTEGER + 1), Error);\n+\n+// sections must be a dense array; missing slots are invalid\n+assert.throws(() => packContext(new Array(1), 100), Error);\n+\n+// null section is invalid\n+assert.throws(() => packContext([null], 100), Error);\n+\n+// array section is invalid\n+assert.throws(() => packContext([[]], 100), Error);\n+\n+// non-object section is invalid\n+assert.throws(() => packContext(['str'], 100), Error);\n+\n+// empty id is invalid\n+assert.throws(() => packContext([{id:'', text:'', priority:0, required:false}], 100), Error);\n+\n+// non-string id is invalid\n+assert.throws(() => packContext([{id:1, text:'', priority:0, required:false}], 100), Error);\n+\n+// non-string text is invalid\n+assert.throws(() => packContext([{id:'a', text:1, priority:0, required:false}], 100), Error);\n+\n+// negative priority is invalid\n+assert.throws(() => packContext([{id:'a', text:'', priority:-1, required:false}], 100), Error);\n+\n+// non-boolean required is invalid\n+assert.throws(() => packContext([{id:'a', text:'', priority:0, required:'yes'}], 100), Error);\n+\n+// duplicate IDs are invalid\n+assert.throws(() => packContext([{id:'x', text:'', priority:0, required:false},{id:'x', text:'', priority:0, required:false}], 100), Error);\n+\n+// case-sensitive IDs: 'A' and 'a' are distinct\n+const r2 = packContext([{id:'A', text:'a', priority:0, required:false},{id:'a', text:'b', priority:0, required:false}], 100);\n+assert.deepEqual(r2.included, ['A','a']);\n+\n+// __proto__ is a valid ID\n+const r3 = packContext([{id:'__proto__', text:'p', priority:0, required:false}], 100);\n+assert.equal(r3.included[0], '__proto__');\n+\n+// required overflow throws even with valid sections\n+assert.throws(() => packContext([{id:'r', text:'x'.repeat(100), priority:0, required:true}], 10), Error);\n+\n+// optional skip continues to later sections\n+const r4 = packContext(\n+  [{id:'big', text:'x'.repeat(50), priority:10, required:false},\n+   {id:'small', text:'y', priority:5, required:false}],\n+  Buffer.byteLength('### \"small\"\\ny\\n', 'utf8')\n+);\n+assert.deepEqual(r4.included, ['small']);\n+assert.deepEqual(r4.omitted, ['big']);\n+\n+// omitted reported in input order, not priority order\n+const r5 = packContext(\n+  [{id:'low', text:'a', priority:1, required:false},\n+   {id:'high', text:'b', priority:10, required:false}],\n+  Buffer.byteLength('### \"high\"\\nb\\n', 'utf8')\n+);\n+assert.deepEqual(r5.included, ['high']);\n+assert.deepEqual(r5.omitted, ['low']);\n+\n+// input is not mutated\n+const input = [{id:'a', text:'x', priority:1, required:false}];\n+const before = JSON.stringify(input);\n+packContext(input, 100);\n+assert.equal(JSON.stringify(input), before);\n+\n+console.log('all contract checks passed');\n"
+    },
+    {
+      "path": "context-packet.js",
+      "state": "changed",
+      "beforeSha256": "dd5730e6268aa45f6b813d210203429cfd25ecce5e8fc4180424b787a7cf06d3",
+      "afterSha256": "ca2ddf5e46889ec3d2d68eab4c4179c6fa5452f49d0506a519020a768fa36158",
+      "before": "// Build the public API and CLI described in the supplied work order.\nexport function packContext(sections,maxBytes){\n  throw new Error('packContext is not implemented');\n}\n",
+      "after": "// Bounded evidence packer: deterministic byte-budget context packing.\nimport {readFileSync} from 'node:fs';\nimport {isMainThread} from 'node:worker_threads';\nimport {fileURLToPath} from 'node:url';\nimport process from 'node:process';\n\nfunction isNonemptyString(v){ return typeof v === 'string' && v.length > 0; }\nfunction isNonnegSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n\nfunction validateSections(sections){\n  if (!Array.isArray(sections)) throw new Error('sections must be an array');\n  const seen = new Set();\n  for (let i = 0; i < sections.length; i++) {\n    const s = sections[i];\n    if (s === null || s === undefined) throw new Error('section slot ' + i + ' is missing or null');\n    if (Array.isArray(s) || typeof s !== 'object') throw new Error('section ' + i + ' is not an object');\n    if (!isNonemptyString(s.id)) throw new Error('section ' + i + ' has invalid id');\n    if (typeof s.text !== 'string') throw new Error('section ' + i + ' has invalid text');\n    if (!isNonnegSafeInt(s.priority)) throw new Error('section ' + i + ' has invalid priority');\n    if (typeof s.required !== 'boolean') throw new Error('section ' + i + ' has invalid required');\n    if (seen.has(s.id)) throw new Error('duplicate id: ' + s.id);\n    seen.add(s.id);\n  }\n}\n\nfunction frameOf(section){\n  return '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n}\n\nexport function packContext(sections, maxBytes){\n  if (!isNonnegSafeInt(maxBytes)) throw new Error('maxBytes must be a nonnegative safe integer');\n  validateSections(sections);\n\n  const required = [];\n  const optional = [];\n  for (let i = 0; i < sections.length; i++) {\n    (sections[i].required ? required : optional).push(i);\n  }\n\n  let remaining = maxBytes;\n  const included = [];\n  const includedSet = new Set();\n  let text = '';\n\n  for (const i of required) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost > remaining) throw new Error('required sections exceed budget');\n    text += frame;\n    remaining -= cost;\n    included.push(sections[i].id);\n    includedSet.add(sections[i].id);\n  }\n\n  const optionalSorted = optional.slice().sort((a, b) => {\n    const pa = sections[a].priority;\n    const pb = sections[b].priority;\n    if (pb !== pa) return pb - pa;\n    return a - b;\n  });\n\n  for (const i of optionalSorted) {\n    const frame = frameOf(sections[i]);\n    const cost = Buffer.byteLength(frame, 'utf8');\n    if (cost <= remaining) {\n      text += frame;\n      remaining -= cost;\n      included.push(sections[i].id);\n      includedSet.add(sections[i].id);\n    }\n  }\n\n  const omitted = [];\n  for (let i = 0; i < sections.length; i++) {\n    if (!sections[i].required && !includedSet.has(sections[i].id)) omitted.push(sections[i].id);\n  }\n\n  return {text, bytes: Buffer.byteLength(text, 'utf8'), included, omitted};\n}\n\nfunction runCli(argv){\n  if (argv.length !== 1) {\n    process.stderr.write('usage: node context-packet.js INPUT_JSON_FILE\\n');\n    process.exit(2);\n  }\n  let raw;\n  try {\n    raw = readFileSync(argv[0], 'utf8');\n  } catch (err) {\n    process.stderr.write('cannot read input file: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  let data;\n  try {\n    data = JSON.parse(raw);\n  } catch (err) {\n    process.stderr.write('invalid JSON: ' + err.message + '\\n');\n    process.exit(2);\n  }\n  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n    process.stderr.write('input must be a JSON object with sections and maxBytes\\n');\n    process.exit(2);\n  }\n  try {\n    const result = packContext(data.sections, data.maxBytes);\n    process.stdout.write(JSON.stringify(result) + '\\n');\n    process.exit(0);\n  } catch (err) {\n    process.stderr.write('invalid input: ' + err.message + '\\n');\n    process.exit(2);\n  }\n}\n\nif (isMainThread && process.argv[1] === fileURLToPath(import.meta.url)) {\n  runCli(process.argv.slice(2));\n}\n",
+      "displaySha256": "ca2ddf5e46889ec3d2d68eab4c4179c6fa5452f49d0506a519020a768fa36158",
+      "diff": "--- starter/context-packet.js\n+++ delivered/context-packet.js\n@@ -1,4 +1,116 @@\n-// Build the public API and CLI described in the supplied work order.\n-export function packContext(sections,maxBytes){\n-  throw new Error('packContext is not implemented');\n+// Bounded evidence packer: deterministic byte-budget context packing.\n+import {readFileSync} from 'node:fs';\n+import {isMainThread} from 'node:worker_threads';\n+import {fileURLToPath} from 'node:url';\n+import process from 'node:process';\n+\n+function isNonemptyString(v){ return typeof v === 'string' && v.length > 0; }\n+function isNonnegSafeInt(v){ return Number.isSafeInteger(v) && v >= 0; }\n+\n+function validateSections(sections){\n+  if (!Array.isArray(sections)) throw new Error('sections must be an array');\n+  const seen = new Set();\n+  for (let i = 0; i < sections.length; i++) {\n+    const s = sections[i];\n+    if (s === null || s === undefined) throw new Error('section slot ' + i + ' is missing or null');\n+    if (Array.isArray(s) || typeof s !== 'object') throw new Error('section ' + i + ' is not an object');\n+    if (!isNonemptyString(s.id)) throw new Error('section ' + i + ' has invalid id');\n+    if (typeof s.text !== 'string') throw new Error('section ' + i + ' has invalid text');\n+    if (!isNonnegSafeInt(s.priority)) throw new Error('section ' + i + ' has invalid priority');\n+    if (typeof s.required !== 'boolean') throw new Error('section ' + i + ' has invalid required');\n+    if (seen.has(s.id)) throw new Error('duplicate id: ' + s.id);\n+    seen.add(s.id);\n+  }\n }\n+\n+function frameOf(section){\n+  return '### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n';\n+}\n+\n+export function packContext(sections, maxBytes){\n+  if (!isNonnegSafeInt(maxBytes)) throw new Error('maxBytes must be a nonnegative safe integer');\n+  validateSections(sections);\n+\n+  const required = [];\n+  const optional = [];\n+  for (let i = 0; i < sections.length; i++) {\n+    (sections[i].required ? required : optional).push(i);\n+  }\n+\n+  let remaining = maxBytes;\n+  const included = [];\n+  const includedSet = new Set();\n+  let text = '';\n+\n+  for (const i of required) {\n+    const frame = frameOf(sections[i]);\n+    const cost = Buffer.byteLength(frame, 'utf8');\n+    if (cost > remaining) throw new Error('required sections exceed budget');\n+    text += frame;\n+    remaining -= cost;\n+    included.push(sections[i].id);\n+    includedSet.add(sections[i].id);\n+  }\n+\n+  const optionalSorted = optional.slice().sort((a, b) => {\n+    const pa = sections[a].priority;\n+    const pb = sections[b].priority;\n+    if (pb !== pa) return pb - pa;\n+    return a - b;\n+  });\n+\n+  for (const i of optionalSorted) {\n+    const frame = frameOf(sections[i]);\n+    const cost = Buffer.byteLength(frame, 'utf8');\n+    if (cost <= remaining) {\n+      text += frame;\n+      remaining -= cost;\n+      included.push(sections[i].id);\n+      includedSet.add(sections[i].id);\n+    }\n+  }\n+\n+  const omitted = [];\n+  for (let i = 0; i < sections.length; i++) {\n+    if (!sections[i].required && !includedSet.has(sections[i].id)) omitted.push(sections[i].id);\n+  }\n+\n+  return {text, bytes: Buffer.byteLength(text, 'utf8'), included, omitted};\n+}\n+\n+function runCli(argv){\n+  if (argv.length !== 1) {\n+    process.stderr.write('usage: node context-packet.js INPUT_JSON_FILE\\n');\n+    process.exit(2);\n+  }\n+  let raw;\n+  try {\n+    raw = readFileSync(argv[0], 'utf8');\n+  } catch (err) {\n+    process.stderr.write('cannot read input file: ' + err.message + '\\n');\n+    process.exit(2);\n+  }\n+  let data;\n+  try {\n+    data = JSON.parse(raw);\n+  } catch (err) {\n+    process.stderr.write('invalid JSON: ' + err.message + '\\n');\n+    process.exit(2);\n+  }\n+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {\n+    process.stderr.write('input must be a JSON object with sections and maxBytes\\n');\n+    process.exit(2);\n+  }\n+  try {\n+    const result = packContext(data.sections, data.maxBytes);\n+    process.stdout.write(JSON.stringify(result) + '\\n');\n+    process.exit(0);\n+  } catch (err) {\n+    process.stderr.write('invalid input: ' + err.message + '\\n');\n+    process.exit(2);\n+  }\n+}\n+\n+if (isMainThread && process.argv[1] === fileURLToPath(import.meta.url)) {\n+  runCli(process.argv.slice(2));\n+}\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "afterSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "before": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "diff": ""
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "afterSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n    text:frame,bytes,included:['\u96ea'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"\u96ea\"\\n\u00e9\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('\u96ea','\u00e9',1)],bytes),{\n    text:frame,bytes,included:['\u96ea'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "displaySha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.349452\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.161861\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.299472\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.238782\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45.202488\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"context-packet\",\"pass\":true,\"groups\":[{\"name\":\"required-sections-and-reservation\",\"pass\":true},{\"name\":\"utf8-framing-and-exact-budget\",\"pass\":true},{\"name\":\"optional-priority-skip-and-stable-ties\",\"pass\":true},{\"name\":\"validation-opaque-identities-and-immutability\",\"pass\":true},{\"name\":\"cli-json-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "95d4892a13b72f588347b61c80bdf928d70db0616d66a8c7ef310d4cd31799c2"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "0391d20d541ed3f032df598577360785b997d944feb99bb34b08a4739cb4af31"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "882b72f36308d1d7a79a1814b7b8717705be4ddd8dc27a092705969e09bbb5bc"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "79f75162fd5ed8d8769dfda23996fa305b9ebeb55b85111da356e71108b13841"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "c60d5af38884fb3d732e9b51b1b32a8896dc2fb5a0541a678a1e7d87e2ec1004"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 14,
+    "withResults": 14,
+    "normalizedPathOccurrences": 2,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Built. Challenged. Checked. Done.",
+    "paragraphs": [
+      {
+        "text": "The factory built the packer, ran the project tests and checked its command-line behavior. A supervisor then questioned fractional byte limits. The worker tested that question: the implementation already rejected them correctly.",
+        "actions": [
+          "action-4",
+          "action-6",
+          "action-7",
+          "action-8"
+        ]
+      },
+      {
+        "text": "A console message was not enough to close the check. The factory required an executable assertion, kept it as regression coverage, verified the current files and directed the worker to finish. Accepted work in 58.1 seconds.",
+        "actions": [
+          "action-9",
+          "action-12",
+          "action-13",
+          "action-14"
+        ]
+      }
+    ]
+  }
+}

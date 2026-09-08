@@ -1,0 +1,256 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "retry-budget",
+  "arm": "codex-sol",
+  "wallMs": 231835,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-08T04:54:21.683Z",
+  "task": "# Repair a retry-budget controller\n\nRepair the exported ES-module function `nextRetry(options)` and implement its\nCLI in retry-budget.js. The pure function decides when a worker can retry\nafter a failure; it must not sleep, read the clock, or make network requests.\n\nOptions must be a non-null, non-array object with all these required fields:\n`attempt` is a positive safe integer (1 means the first retry after failure);\n`elapsedMs`, `baseMs`, `maxDelayMs`, and `budgetMs` are nonnegative safe integers;\n`retryAfterMs` is null or a nonnegative safe integer; `retryable` is a boolean.\nExtra fields are ignored. Validate every field even if retryable is false.\nInvalid input throws an Error. Do not mutate input; frozen objects must work.\n\nIf retryable is false, return exactly\n`{retry:false,delayMs:null,reason:'non-retryable'}`.\nOtherwise compute exponential delay `baseMs * 2 ** (attempt - 1)`, capped at\nmaxDelayMs. This must work for every valid safe-integer attempt, including huge\nattempts, without loops proportional to attempt or overflow bugs. A zero base\nmeans zero exponential delay even for a huge attempt.\n\nIf retryAfterMs is not null, it is a minimum server-requested wait: take the\nmaximum of the capped exponential delay and retryAfterMs. The server hint is\nNOT capped by maxDelayMs. If elapsedMs already exceeds budgetMs, or the wait\nexceeds `budgetMs - elapsedMs`, return exactly\n`{retry:false,delayMs:null,reason:'budget-exhausted'}`. Equality is allowed:\nscheduling the retry exactly at the budget boundary is valid for this API.\nOtherwise return exactly `{retry:true,delayMs:WAIT,reason:'scheduled'}`.\n\nCLI: `node retry-budget.js INPUT_JSON_FILE`. Require exactly one argument.\nThe JSON value is the options object. Success prints exactly the API result\nas one JSON value followed by newline, exits 0, and has no stderr. A valid\ndecision not to retry is still success. Invalid arguments/files/JSON/API input\nexit 2 with nonempty stderr and no stdout. Importing must not run the CLI.\n\nDo not add dependencies or change package.json or existing public tests. You\nmay add tests. Verification uses a read-only workspace: temporary fixtures go\nin os.tmpdir() and must be cleaned up. Run npm test before finishing.\nIndependent checks vary values, not this public contract.\n",
+  "taskSha256": "7d39e6f0bdbf92d57c63816366b147e684cf1b042bd9e1f37cf65f875c8eda63",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"pwd && rg --files -g '!*node_modules*' && sed -n '1,240p' retry-budget.js && printf '\\\\nPACKAGE\\\\n' && sed -n '1,200p' package.json\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "/workspace\ntest/public.test.js\nretry-budget.js\npackage.json\n// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\nexport function nextRetry(o){\n  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n}\n\nPACKAGE\n{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+        }
+      ],
+      "atMs": 10286.0,
+      "endedMs": 10354.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"sed -n '1,280p' test/public.test.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {nextRetry} from '../retry-budget.js';\nconst base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\ntest('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\ntest('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n"
+        }
+      ],
+      "atMs": 17132.0,
+      "endedMs": 17167.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Delete File: /workspace/retry-budget.js\\n*** Add File: /workspace/retry-budget.js\\n+import { readFileSync } from 'node:fs';\\n+import { resolve } from 'node:path';\\n+import { pathToFileURL } from 'node:url';\\n+\\n+const NONNEGATIVE_INTEGER_FIELDS = [\\n+  'elapsedMs',\\n+  'baseMs',\\n+  'maxDelayMs',\\n+  'budgetMs',\\n+];\\n+\\n+function validateOptions(options) {\\n+  if (options === null || typeof options !== 'object' || Array.isArray(options)) {\\n+    throw new TypeError('options must be a non-null, non-array object');\\n+  }\\n+\\n+  if (!Number.isSafeInteger(options.attempt) || options.attempt < 1) {\\n+    throw new TypeError('attempt must be a positive safe integer');\\n+  }\\n+\\n+  for (const field of NONNEGATIVE_INTEGER_FIELDS) {\\n+    if (!Number.isSafeInteger(options[field]) || options[field] < 0) {\\n+      throw new TypeError(`${field} must be a nonnegative safe integer`);\\n+    }\\n+  }\\n+\\n+  if (\\n+    options.retryAfterMs !== null &&\\n+    (!Number.isSafeInteger(options.retryAfterMs) || options.retryAfterMs < 0)\\n+  ) {\\n+    throw new TypeError('retryAfterMs must be null or a nonnegative safe integer');\\n+  }\\n+\\n+  if (typeof options.retryable !== 'boolean') {\\n+    throw new TypeError('retryable must be a boolean');\\n+  }\\n+}\\n+\\n+function exponentialDelay(baseMs, attempt, maxDelayMs) {\\n+  if (baseMs === 0 || maxDelayMs === 0) return 0;\\n+  if (baseMs >= maxDelayMs) return maxDelayMs;\\n+\\n+  const exponent = attempt - 1;\\n+\\n+  // With a positive integer base, 2 ** 53 is already greater than every\\n+  // possible safe-integer cap. Avoid evaluating enormous exponents at all.\\n+  if (exponent >= 53) return maxDelayMs;\\n+\\n+  return Math.min(maxDelayMs, baseMs * 2 ** exponent);\\n+}\\n+\\n+export function nextRetry(options) {\\n+  validateOptions(options);\\n+\\n+  if (!options.retryable) {\\n+    return { retry: false, delayMs: null, reason: 'non-retryable' };\\n+  }\\n+\\n+  const exponential = exponentialDelay(\\n+    options.baseMs,\\n+    options.attempt,\\n+    options.maxDelayMs,\\n+  );\\n+  const wait = options.retryAfterMs === null\\n+    ? exponential\\n+    : Math.max(exponential, options.retryAfterMs);\\n+\\n+  if (options.elapsedMs > options.budgetMs || wait > options.budgetMs - options.elapsedMs) {\\n+    return { retry: false, delayMs: null, reason: 'budget-exhausted' };\\n+  }\\n+\\n+  return { retry: true, delayMs: wait, reason: 'scheduled' };\\n+}\\n+\\n+function runCli() {\\n+  try {\\n+    if (process.argv.length !== 3) {\\n+      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\\n+    }\\n+\\n+    const options = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+    process.stdout.write(`${JSON.stringify(nextRetry(options))}\\\\n`);\\n+  } catch (error) {\\n+    const message = error instanceof Error ? error.message : String(error);\\n+    process.stderr.write(`retry-budget: ${message}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n+\\n+if (\\n+  process.argv[1] !== undefined &&\\n+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href\\n+) {\\n+  runCli();\\n+}\\n*** End Patch\";\ntext(await tools.apply_patch(patch));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\napply_patch verification failed: invalid patch: multiple operations target /workspace/retry-budget.js"
+        }
+      ],
+      "atMs": 72057.0,
+      "endedMs": 72099.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/retry-budget.js\\n@@\\n-// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\\n-export function nextRetry(o){\\n-  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\\n-  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\\n-    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\\n-}\\n+import { readFileSync } from 'node:fs';\\n+import { resolve } from 'node:path';\\n+import { pathToFileURL } from 'node:url';\\n+\\n+const NONNEGATIVE_INTEGER_FIELDS = [\\n+  'elapsedMs',\\n+  'baseMs',\\n+  'maxDelayMs',\\n+  'budgetMs',\\n+];\\n+\\n+function validateOptions(options) {\\n+  if (options === null || typeof options !== 'object' || Array.isArray(options)) {\\n+    throw new TypeError('options must be a non-null, non-array object');\\n+  }\\n+\\n+  if (!Number.isSafeInteger(options.attempt) || options.attempt < 1) {\\n+    throw new TypeError('attempt must be a positive safe integer');\\n+  }\\n+\\n+  for (const field of NONNEGATIVE_INTEGER_FIELDS) {\\n+    if (!Number.isSafeInteger(options[field]) || options[field] < 0) {\\n+      throw new TypeError(`${field} must be a nonnegative safe integer`);\\n+    }\\n+  }\\n+\\n+  if (\\n+    options.retryAfterMs !== null &&\\n+    (!Number.isSafeInteger(options.retryAfterMs) || options.retryAfterMs < 0)\\n+  ) {\\n+    throw new TypeError('retryAfterMs must be null or a nonnegative safe integer');\\n+  }\\n+\\n+  if (typeof options.retryable !== 'boolean') {\\n+    throw new TypeError('retryable must be a boolean');\\n+  }\\n+}\\n+\\n+function exponentialDelay(baseMs, attempt, maxDelayMs) {\\n+  if (baseMs === 0 || maxDelayMs === 0) return 0;\\n+  if (baseMs >= maxDelayMs) return maxDelayMs;\\n+\\n+  const exponent = attempt - 1;\\n+\\n+  // With a positive integer base, 2 ** 53 is already greater than every\\n+  // possible safe-integer cap. Avoid evaluating enormous exponents at all.\\n+  if (exponent >= 53) return maxDelayMs;\\n+\\n+  return Math.min(maxDelayMs, baseMs * 2 ** exponent);\\n+}\\n+\\n+export function nextRetry(options) {\\n+  validateOptions(options);\\n+\\n+  if (!options.retryable) {\\n+    return { retry: false, delayMs: null, reason: 'non-retryable' };\\n+  }\\n+\\n+  const exponential = exponentialDelay(\\n+    options.baseMs,\\n+    options.attempt,\\n+    options.maxDelayMs,\\n+  );\\n+  const wait = options.retryAfterMs === null\\n+    ? exponential\\n+    : Math.max(exponential, options.retryAfterMs);\\n+\\n+  if (options.elapsedMs > options.budgetMs || wait > options.budgetMs - options.elapsedMs) {\\n+    return { retry: false, delayMs: null, reason: 'budget-exhausted' };\\n+  }\\n+\\n+  return { retry: true, delayMs: wait, reason: 'scheduled' };\\n+}\\n+\\n+function runCli() {\\n+  try {\\n+    if (process.argv.length !== 3) {\\n+      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\\n+    }\\n+\\n+    const options = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+    process.stdout.write(`${JSON.stringify(nextRetry(options))}\\\\n`);\\n+  } catch (error) {\\n+    const message = error instanceof Error ? error.message : String(error);\\n+    process.stderr.write(`retry-budget: ${message}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n+\\n+if (\\n+  process.argv[1] !== undefined &&\\n+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href\\n+) {\\n+  runCli();\\n+}\\n*** End Patch\";\ntext(await tools.apply_patch(patch));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 111234.0,
+      "endedMs": 111279.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"npm test\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":20000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-retry-budget@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: first retry uses base delay\nok 1 - first retry uses base delay\n  ---\n  duration_ms: 1.388171\n  ...\n# Subtest: a valid non-retryable failure is an ordinary decision\nok 2 - a valid non-retryable failure is an ordinary decision\n  ---\n  duration_ms: 0.121421\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 39.529625\n"
+        }
+      ],
+      "atMs": 122269.0,
+      "endedMs": 122533.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"node --input-type=module <<'NODE'\\nimport assert from 'node:assert/strict';\\nimport { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\\nimport { tmpdir } from 'node:os';\\nimport { join, resolve } from 'node:path';\\nimport { spawnSync } from 'node:child_process';\\nimport { nextRetry } from './retry-budget.js';\\n\\nconst base = Object.freeze({attempt: 1, elapsedMs: 0, baseMs: 10, maxDelayMs: 100, budgetMs: 1000, retryAfterMs: null, retryable: true});\\nassert.deepEqual(nextRetry(base), {retry: true, delayMs: 10, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 4}), {retry: true, delayMs: 80, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: Number.MAX_SAFE_INTEGER}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: Number.MAX_SAFE_INTEGER, baseMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, maxDelayMs: 20, retryAfterMs: 150}), {retry: true, delayMs: 150, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, elapsedMs: 900, maxDelayMs: 100}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, elapsedMs: 901, maxDelayMs: 100}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\\nassert.deepEqual(nextRetry({...base, elapsedMs: 1001, baseMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\\nassert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\\nassert.throws(() => nextRetry({...base, retryable: false, attempt: 0}), Error);\\nfor (const invalid of [null, [], 2, 'x']) assert.throws(() => nextRetry(invalid), Error);\\nfor (const field of ['elapsedMs', 'baseMs', 'maxDelayMs', 'budgetMs']) {\\n  assert.throws(() => nextRetry({...base, [field]: -1}), Error);\\n  assert.throws(() => nextRetry({...base, [field]: 1.5}), Error);\\n}\\nfor (const retryAfterMs of [-1, 1.5, undefined, '1']) assert.throws(() => nextRetry({...base, retryAfterMs}), Error);\\n\\nconst dir = mkdtempSync(join(tmpdir(), 'retry-budget-check-'));\\ntry {\\n  const good = join(dir, 'good.json');\\n  const bad = join(dir, 'bad.json');\\n  writeFileSync(good, JSON.stringify(base));\\n  writeFileSync(bad, '{bad');\\n  const script = resolve('retry-budget.js');\\n  let result = spawnSync(process.execPath, [script, good], {encoding: 'utf8'});\\n  assert.equal(result.status, 0);\\n  assert.equal(result.stdout, '{\\\"retry\\\":true,\\\"delayMs\\\":10,\\\"reason\\\":\\\"scheduled\\\"}\\\\n');\\n  assert.equal(result.stderr, '');\\n  result = spawnSync(process.execPath, [script], {encoding: 'utf8'});\\n  assert.equal(result.status, 2);\\n  assert.equal(result.stdout, '');\\n  assert.notEqual(result.stderr, '');\\n  result = spawnSync(process.execPath, [script, bad], {encoding: 'utf8'});\\n  assert.equal(result.status, 2);\\n  assert.equal(result.stdout, '');\\n  assert.notEqual(result.stderr, '');\\n} finally {\\n  rmSync(dir, {recursive: true, force: true});\\n}\\nconsole.log('independent checks passed');\\nNODE\\n\\ngit diff --check && git status --short && git diff -- retry-budget.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "node:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   delayMs: 10,\n-   delayMs: 100,\n    reason: 'scheduled',\n    retry: true\n  }\n    at file:///workspace/[eval1]:15:8\n    at ModuleJob.run (node:internal/modules/esm/module_job:263:25)\n    at async ModuleLoader.eval (node:internal/modules/esm/loader:217:24)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: { retry: true, delayMs: 10, reason: 'scheduled' },\n  expected: { retry: true, delayMs: 100, reason: 'scheduled' },\n  operator: 'deepStrictEqual'\n}\n\nNode.js v20.19.4\nwarning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>\n\nDiff output format options\n    -p, --patch           generate patch\n    -s, --no-patch        suppress diff output\n    -u                    generate patch\n    -U, --unified[=<n>]   generate diffs with <n> lines context\n    -W, --[no-]function-context\n                          generate diffs with <n> lines context\n    --raw                 generate the diff in raw format\n    --patch-with-raw      synonym for '-p --raw'\n    --patch-with-stat     synonym for '-p --stat'\n    --numstat             machine friendly --stat\n    --shortstat           output only the last line of --stat\n    -X, --dirstat[=<param1,param2>...]\n                          output the distribution of relative amount of changes for each sub-directory\n    --cumulative          synonym for --dirstat=cumulative\n    --dirstat-by-file[=<param1,param2>...]\n                          synonym for --dirstat=files,param1,param2...\n    --check               warn if changes introduce conflict markers or whitespace errors\n    --summary             condensed summary such as creations, renames and mode changes\n    --name-only           show only names of changed files\n    --name-status         show only names and status of changed files\n    --stat[=<width>[,<name-width>[,<count>]]]\n                          generate diffstat\n    --stat-width <width>  generate diffstat with a given width\n    --stat-name-width <width>\n                          generate diffstat with a given name width\n    --stat-graph-width <width>\n                          generate diffstat with a given graph width\n    --stat-count <count>  generate diffstat with limited lines\n    --[no-]compact-summary\n                          generate compact summary in diffstat\n    --binary              output a binary diff that can be applied\n    --[no-]full-index     show full pre- and post-image object names on the \"index\" lines\n    --[no-]color[=<when>] show colored diff\n    --ws-error-highlight <kind>\n                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff\n    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat\n    --[no-]abbrev[=<n>]   use <n> digits to display object names\n    --src-prefix <prefix> show the given source prefix instead of \"a/\"\n    --dst-prefix <prefix> show the given destination prefix instead of \"b/\"\n    --line-prefix <prefix>\n                          prepend an additional prefix to every line of output\n    --no-prefix           do not show any source or destination prefix\n    --default-prefix      use default prefixes a/ and b/\n    --inter-hunk-context <n>\n                          show context between diff hunks up to the specified number of lines\n    --output-indicator-new <char>\n                          specify the character to indicate a new line instead of '+'\n    --output-indicator-old <char>\n                          specify the character to indicate an old line instead of '-'\n    --output-indicator-context <char>\n                          specify the character to indicate a context instead of ' '\n\nDiff rename options\n    -B, --break-rewrites[=<n>[/<m>]]\n                          break complete rewrite changes into pairs of delete and create\n    -M, --find-renames[=<n>]\n                          detect renames\n    -D, --irreversible-delete\n                          omit the preimage for deletes\n    -C, --find-copies[=<n>]\n                          detect copies\n    --[no-]find-copies-harder\n                          use unmodified files as source to find copies\n    --no-renames          disable rename detection\n    --[no-]rename-empty   use empty blobs as rename source\n    --[no-]follow         continue listing the history of a file beyond renames\n    -l <n>                prevent rename/copy detection if the number of rename/copy targets exceeds given limit\n\nDiff algorithm options\n    --minimal             produce the smallest possible diff\n    -w, --ignore-all-space\n                          ignore whitespace when comparing lines\n    -b, --ignore-space-change\n                          ignore changes in amount of whitespace\n    --ignore-space-at-eol ignore changes in whitespace at EOL\n    --ignore-cr-at-eol    ignore carrier-return at the end of line\n    --ignore-blank-lines  ignore changes whose lines are all blank\n    -I, --[no-]ignore-matching-lines <regex>\n                          ignore changes whose all lines match <regex>\n    --[no-]indent-heuristic\n                          heuristic to shift diff hunk boundaries for easy reading\n    --patience            generate diff using the \"patience diff\" algorithm\n    --histogram           generate diff using the \"histogram diff\" algorithm\n    --diff-algorithm <algorithm>\n                          choose a diff algorithm\n    --anchored <text>     generate diff using the \"anchored diff\" algorithm\n    --word-diff[=<mode>]  show word diff, using <mode> to delimit changed words\n    --word-diff-regex <regex>\n                          use <regex> to decide what a word is\n    --color-words[=<regex>]\n                          equivalent to --word-diff=color --word-diff-regex=<regex>\n    --[no-]color-moved[=<mode>]\n                          moved lines of code are colored differently\n    --[no-]color-moved-ws <mode>\n                          how white spaces are ignored in --color-moved\n\nOther diff options\n    --[no-]relative[=<prefix>]\n                          when run from subdir, exclude changes outside and show relative paths\n    -a, --[no-]text       treat all files as text\n    -R                    swap two inputs, reverse the diff\n    --[no-]exit-code      exit with 1 if there were differences, 0 otherwise\n    --[no-]quiet          disable all output of the program\n    --[no-]ext-diff       allow an external diff helper to be executed\n    --[no-]textconv       run external text conversion filters when comparing binary files\n    --ignore-submodules[=<when>]\n                          ignore changes to submodules in the diff generation\n    --submodule[=<format>]\n                          specify how differences in submodules are shown\n    --ita-invisible-in-index\n                          hide 'git add -N' entries from the index\n    --ita-visible-in-index\n                          treat 'git add -N' entries as real in the index\n    -S <string>           look for differences that change the number of occurrences of the specified string\n    -G <regex>            look for differences that change the number of occurrences of the specified regex\n    --pickaxe-all         show all changes in the changeset with -S or -G\n    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression\n    -O <file>             control the order in which files appear in the output\n    --rotate-to <path>    show the change in the specified path first\n    --skip-to <path>      skip the output to the specified path\n    --find-object <object-id>\n                          look for differences that change the number of occurrences of the specified object\n    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]\n                          select files by diff type\n    --output <file>       output to a specific file\n\n"
+        }
+      ],
+      "atMs": 169980.0,
+      "endedMs": 170041.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({cmd:\"node --input-type=module <<'NODE'\\nimport assert from 'node:assert/strict';\\nimport { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\\nimport { tmpdir } from 'node:os';\\nimport { join, resolve } from 'node:path';\\nimport { spawnSync } from 'node:child_process';\\nimport { nextRetry } from './retry-budget.js';\\n\\nconst base = Object.freeze({attempt: 1, elapsedMs: 0, baseMs: 10, maxDelayMs: 100, budgetMs: 1000, retryAfterMs: null, retryable: true});\\nassert.deepEqual(nextRetry(base), {retry: true, delayMs: 10, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 4}), {retry: true, delayMs: 80, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 5}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: Number.MAX_SAFE_INTEGER}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: Number.MAX_SAFE_INTEGER, baseMs: 0}), {retry: true, delayMs: 0, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, maxDelayMs: 20, retryAfterMs: 150}), {retry: true, delayMs: 150, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 900}), {retry: true, delayMs: 100, reason: 'scheduled'});\\nassert.deepEqual(nextRetry({...base, attempt: 5, elapsedMs: 901}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\\nassert.deepEqual(nextRetry({...base, elapsedMs: 1001, baseMs: 0}), {retry: false, delayMs: null, reason: 'budget-exhausted'});\\nassert.deepEqual(nextRetry({...base, retryable: false}), {retry: false, delayMs: null, reason: 'non-retryable'});\\nassert.throws(() => nextRetry({...base, retryable: false, attempt: 0}), Error);\\nfor (const invalid of [null, [], 2, 'x']) assert.throws(() => nextRetry(invalid), Error);\\nfor (const field of ['elapsedMs', 'baseMs', 'maxDelayMs', 'budgetMs']) {\\n  assert.throws(() => nextRetry({...base, [field]: -1}), Error);\\n  assert.throws(() => nextRetry({...base, [field]: 1.5}), Error);\\n}\\nfor (const retryAfterMs of [-1, 1.5, undefined, '1']) assert.throws(() => nextRetry({...base, retryAfterMs}), Error);\\n\\nconst dir = mkdtempSync(join(tmpdir(), 'retry-budget-check-'));\\ntry {\\n  const good = join(dir, 'good.json');\\n  const bad = join(dir, 'bad.json');\\n  writeFileSync(good, JSON.stringify(base));\\n  writeFileSync(bad, '{bad');\\n  const script = resolve('retry-budget.js');\\n  let result = spawnSync(process.execPath, [script, good], {encoding: 'utf8'});\\n  assert.equal(result.status, 0);\\n  assert.equal(result.stdout, '{\\\"retry\\\":true,\\\"delayMs\\\":10,\\\"reason\\\":\\\"scheduled\\\"}\\\\n');\\n  assert.equal(result.stderr, '');\\n  result = spawnSync(process.execPath, [script], {encoding: 'utf8'});\\n  assert.equal(result.status, 2);\\n  assert.equal(result.stdout, '');\\n  assert.notEqual(result.stderr, '');\\n  result = spawnSync(process.execPath, [script, bad], {encoding: 'utf8'});\\n  assert.equal(result.status, 2);\\n  assert.equal(result.stdout, '');\\n  assert.notEqual(result.stderr, '');\\n} finally {\\n  rmSync(dir, {recursive: true, force: true});\\n}\\nconsole.log('independent checks passed');\\nNODE\\n\\nsed -n '1,260p' retry-budget.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000}); text(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "independent checks passed\nimport { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nconst NONNEGATIVE_INTEGER_FIELDS = [\n  'elapsedMs',\n  'baseMs',\n  'maxDelayMs',\n  'budgetMs',\n];\n\nfunction validateOptions(options) {\n  if (options === null || typeof options !== 'object' || Array.isArray(options)) {\n    throw new TypeError('options must be a non-null, non-array object');\n  }\n\n  if (!Number.isSafeInteger(options.attempt) || options.attempt < 1) {\n    throw new TypeError('attempt must be a positive safe integer');\n  }\n\n  for (const field of NONNEGATIVE_INTEGER_FIELDS) {\n    if (!Number.isSafeInteger(options[field]) || options[field] < 0) {\n      throw new TypeError(`${field} must be a nonnegative safe integer`);\n    }\n  }\n\n  if (\n    options.retryAfterMs !== null &&\n    (!Number.isSafeInteger(options.retryAfterMs) || options.retryAfterMs < 0)\n  ) {\n    throw new TypeError('retryAfterMs must be null or a nonnegative safe integer');\n  }\n\n  if (typeof options.retryable !== 'boolean') {\n    throw new TypeError('retryable must be a boolean');\n  }\n}\n\nfunction exponentialDelay(baseMs, attempt, maxDelayMs) {\n  if (baseMs === 0 || maxDelayMs === 0) return 0;\n  if (baseMs >= maxDelayMs) return maxDelayMs;\n\n  const exponent = attempt - 1;\n\n  // With a positive integer base, 2 ** 53 is already greater than every\n  // possible safe-integer cap. Avoid evaluating enormous exponents at all.\n  if (exponent >= 53) return maxDelayMs;\n\n  return Math.min(maxDelayMs, baseMs * 2 ** exponent);\n}\n\nexport function nextRetry(options) {\n  validateOptions(options);\n\n  if (!options.retryable) {\n    return { retry: false, delayMs: null, reason: 'non-retryable' };\n  }\n\n  const exponential = exponentialDelay(\n    options.baseMs,\n    options.attempt,\n    options.maxDelayMs,\n  );\n  const wait = options.retryAfterMs === null\n    ? exponential\n    : Math.max(exponential, options.retryAfterMs);\n\n  if (options.elapsedMs > options.budgetMs || wait > options.budgetMs - options.elapsedMs) {\n    return { retry: false, delayMs: null, reason: 'budget-exhausted' };\n  }\n\n  return { retry: true, delayMs: wait, reason: 'scheduled' };\n}\n\nfunction runCli() {\n  try {\n    if (process.argv.length !== 3) {\n      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n    }\n\n    const options = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n    process.stdout.write(`${JSON.stringify(nextRetry(options))}\\n`);\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`retry-budget: ${message}\\n`);\n    process.exitCode = 2;\n  }\n}\n\nif (\n  process.argv[1] !== undefined &&\n  import.meta.url === pathToFileURL(resolve(process.argv[1])).href\n) {\n  runCli();\n}\n"
+        }
+      ],
+      "atMs": 210540.0,
+      "endedMs": 210664.0,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "",
+  "finalResponseKind": "none",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "afterSha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "before": "{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-retry-budget\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "90419616d8923f5ffe03c3fb46f484c65a284ea180f6c9dd2a1545b17bd56fb7",
+      "diff": ""
+    },
+    {
+      "path": "retry-budget.js",
+      "state": "changed",
+      "beforeSha256": "c7e286124dcb89878660e22ada1a73e85aa54c4aec5d05af484c687f3a28bd80",
+      "afterSha256": "5abe7e91f0a8e110b5cf2ac5c781d17d301ac039cbc39ac8050cd652466885bd",
+      "before": "// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\nexport function nextRetry(o){\n  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n}\n",
+      "after": "import { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nconst NONNEGATIVE_INTEGER_FIELDS = [\n  'elapsedMs',\n  'baseMs',\n  'maxDelayMs',\n  'budgetMs',\n];\n\nfunction validateOptions(options) {\n  if (options === null || typeof options !== 'object' || Array.isArray(options)) {\n    throw new TypeError('options must be a non-null, non-array object');\n  }\n\n  if (!Number.isSafeInteger(options.attempt) || options.attempt < 1) {\n    throw new TypeError('attempt must be a positive safe integer');\n  }\n\n  for (const field of NONNEGATIVE_INTEGER_FIELDS) {\n    if (!Number.isSafeInteger(options[field]) || options[field] < 0) {\n      throw new TypeError(`${field} must be a nonnegative safe integer`);\n    }\n  }\n\n  if (\n    options.retryAfterMs !== null &&\n    (!Number.isSafeInteger(options.retryAfterMs) || options.retryAfterMs < 0)\n  ) {\n    throw new TypeError('retryAfterMs must be null or a nonnegative safe integer');\n  }\n\n  if (typeof options.retryable !== 'boolean') {\n    throw new TypeError('retryable must be a boolean');\n  }\n}\n\nfunction exponentialDelay(baseMs, attempt, maxDelayMs) {\n  if (baseMs === 0 || maxDelayMs === 0) return 0;\n  if (baseMs >= maxDelayMs) return maxDelayMs;\n\n  const exponent = attempt - 1;\n\n  // With a positive integer base, 2 ** 53 is already greater than every\n  // possible safe-integer cap. Avoid evaluating enormous exponents at all.\n  if (exponent >= 53) return maxDelayMs;\n\n  return Math.min(maxDelayMs, baseMs * 2 ** exponent);\n}\n\nexport function nextRetry(options) {\n  validateOptions(options);\n\n  if (!options.retryable) {\n    return { retry: false, delayMs: null, reason: 'non-retryable' };\n  }\n\n  const exponential = exponentialDelay(\n    options.baseMs,\n    options.attempt,\n    options.maxDelayMs,\n  );\n  const wait = options.retryAfterMs === null\n    ? exponential\n    : Math.max(exponential, options.retryAfterMs);\n\n  if (options.elapsedMs > options.budgetMs || wait > options.budgetMs - options.elapsedMs) {\n    return { retry: false, delayMs: null, reason: 'budget-exhausted' };\n  }\n\n  return { retry: true, delayMs: wait, reason: 'scheduled' };\n}\n\nfunction runCli() {\n  try {\n    if (process.argv.length !== 3) {\n      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n    }\n\n    const options = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n    process.stdout.write(`${JSON.stringify(nextRetry(options))}\\n`);\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`retry-budget: ${message}\\n`);\n    process.exitCode = 2;\n  }\n}\n\nif (\n  process.argv[1] !== undefined &&\n  import.meta.url === pathToFileURL(resolve(process.argv[1])).href\n) {\n  runCli();\n}\n",
+      "displaySha256": "5abe7e91f0a8e110b5cf2ac5c781d17d301ac039cbc39ac8050cd652466885bd",
+      "diff": "--- starter/retry-budget.js\n+++ delivered/retry-budget.js\n@@ -1,6 +1,95 @@\n-// Deliberately flawed: wrong attempt convention, hint cap, and budget boundary.\n-export function nextRetry(o){\n-  const delayMs=Math.min(o.maxDelayMs,Math.max(o.baseMs*2**o.attempt,o.retryAfterMs||0));\n-  return o.retryable&&o.elapsedMs+delayMs<o.budgetMs\n-    ?{retry:true,delayMs,reason:'scheduled'}:{retry:false,delayMs:null,reason:'budget-exhausted'};\n+import { readFileSync } from 'node:fs';\n+import { resolve } from 'node:path';\n+import { pathToFileURL } from 'node:url';\n+\n+const NONNEGATIVE_INTEGER_FIELDS = [\n+  'elapsedMs',\n+  'baseMs',\n+  'maxDelayMs',\n+  'budgetMs',\n+];\n+\n+function validateOptions(options) {\n+  if (options === null || typeof options !== 'object' || Array.isArray(options)) {\n+    throw new TypeError('options must be a non-null, non-array object');\n+  }\n+\n+  if (!Number.isSafeInteger(options.attempt) || options.attempt < 1) {\n+    throw new TypeError('attempt must be a positive safe integer');\n+  }\n+\n+  for (const field of NONNEGATIVE_INTEGER_FIELDS) {\n+    if (!Number.isSafeInteger(options[field]) || options[field] < 0) {\n+      throw new TypeError(`${field} must be a nonnegative safe integer`);\n+    }\n+  }\n+\n+  if (\n+    options.retryAfterMs !== null &&\n+    (!Number.isSafeInteger(options.retryAfterMs) || options.retryAfterMs < 0)\n+  ) {\n+    throw new TypeError('retryAfterMs must be null or a nonnegative safe integer');\n+  }\n+\n+  if (typeof options.retryable !== 'boolean') {\n+    throw new TypeError('retryable must be a boolean');\n+  }\n }\n+\n+function exponentialDelay(baseMs, attempt, maxDelayMs) {\n+  if (baseMs === 0 || maxDelayMs === 0) return 0;\n+  if (baseMs >= maxDelayMs) return maxDelayMs;\n+\n+  const exponent = attempt - 1;\n+\n+  // With a positive integer base, 2 ** 53 is already greater than every\n+  // possible safe-integer cap. Avoid evaluating enormous exponents at all.\n+  if (exponent >= 53) return maxDelayMs;\n+\n+  return Math.min(maxDelayMs, baseMs * 2 ** exponent);\n+}\n+\n+export function nextRetry(options) {\n+  validateOptions(options);\n+\n+  if (!options.retryable) {\n+    return { retry: false, delayMs: null, reason: 'non-retryable' };\n+  }\n+\n+  const exponential = exponentialDelay(\n+    options.baseMs,\n+    options.attempt,\n+    options.maxDelayMs,\n+  );\n+  const wait = options.retryAfterMs === null\n+    ? exponential\n+    : Math.max(exponential, options.retryAfterMs);\n+\n+  if (options.elapsedMs > options.budgetMs || wait > options.budgetMs - options.elapsedMs) {\n+    return { retry: false, delayMs: null, reason: 'budget-exhausted' };\n+  }\n+\n+  return { retry: true, delayMs: wait, reason: 'scheduled' };\n+}\n+\n+function runCli() {\n+  try {\n+    if (process.argv.length !== 3) {\n+      throw new Error('usage: node retry-budget.js INPUT_JSON_FILE');\n+    }\n+\n+    const options = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n+    process.stdout.write(`${JSON.stringify(nextRetry(options))}\\n`);\n+  } catch (error) {\n+    const message = error instanceof Error ? error.message : String(error);\n+    process.stderr.write(`retry-budget: ${message}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n+\n+if (\n+  process.argv[1] !== undefined &&\n+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href\n+) {\n+  runCli();\n+}\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "afterSha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {nextRetry} from '../retry-budget.js';\nconst base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\ntest('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\ntest('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {nextRetry} from '../retry-budget.js';\nconst base={attempt:1,elapsedMs:0,baseMs:10,maxDelayMs:100,budgetMs:1000,retryAfterMs:null,retryable:true};\ntest('first retry uses base delay',()=>assert.deepEqual(nextRetry(base),{retry:true,delayMs:10,reason:'scheduled'}));\ntest('a valid non-retryable failure is an ordinary decision',()=>assert.deepEqual(nextRetry({...base,retryable:false}),{retry:false,delayMs:null,reason:'non-retryable'}));\n",
+      "displaySha256": "e38240f9b0ccb0d9203639694f4d2029757e03c3d7ad28e61b9c0b6e5882496a",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-retry-budget@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: first retry uses base delay\nok 1 - first retry uses base delay\n  ---\n  duration_ms: 1.26062\n  ...\n# Subtest: a valid non-retryable failure is an ordinary decision\nok 2 - a valid non-retryable failure is an ordinary decision\n  ---\n  duration_ms: 0.130471\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.717105\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"retry-budget\",\"pass\":true,\"groups\":[{\"name\":\"exponential-backoff-and-cap\",\"pass\":true},{\"name\":\"retry-hints-and-budget-boundaries\",\"pass\":true},{\"name\":\"huge-attempts-zero-and-safe-arithmetic\",\"pass\":true},{\"name\":\"validation-and-immutability\",\"pass\":true},{\"name\":\"cli-and-error-contract\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "2a2547782b0d5dc4b4cea7833fb3d92636c626980ea5564958f5d0888b40395f"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "71409e7eb9b094f9ddd9c2bb29542c0e1b01031a1fa9a4af8f64962c2bf395e9"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "312aa26b008745971ad5698f1592cce5e7d7fabc622c420fd0711b91d3806819"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "1633347d91b576e755c396f76aabeaa0cdce68e23d79668349695d5261936ac3"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 7,
+    "withResults": 7,
+    "normalizedPathOccurrences": 11,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Delivered and independently accepted.",
+    "paragraphs": [
+      {
+        "text": "Delivered retry-budget.js. The project suite and all five independent acceptance groups passed, with a clean finish in 231.8 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+        "actions": [
+          "action-3",
+          "action-4",
+          "action-7"
+        ]
+      }
+    ]
+  }
+}

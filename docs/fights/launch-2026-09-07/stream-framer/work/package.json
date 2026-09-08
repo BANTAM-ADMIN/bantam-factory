@@ -1,0 +1,186 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "stream-framer",
+  "files": [
+    {
+      "path": "opencode.json",
+      "bytes": 29617,
+      "sha256": "66126729528bebf6a62bf902dc065e53640dce6f10457b8fee32d79dd633648c",
+      "arm": "opencode",
+      "wallMs": 600005,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 3,
+      "changedFiles": 0,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "The starter stayed unchanged.",
+        "paragraphs": [
+          {
+            "text": "OpenCode inspected the workspace and reread the decoder and its tests. Its recorded actions stop at reading the package file; no repair was written before the ten-minute boundary.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          },
+          {
+            "text": "The unchanged starter failed all five independent groups. BANTAM FACTORY delivered the repaired decoder on this same work order.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 55339,
+      "sha256": "dc450ac11b2f4e13366787ed19711bee77e2d4a2f0acbac2d8bbe963bed2ebdf",
+      "arm": "codex-astra",
+      "wallMs": 160651,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered stream-framer.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 160.7 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 217795,
+      "sha256": "c29f2d15237fb5927c55d12d04dc1ffc3cdf81818d8f79c3ea8c6527a124dd6a",
+      "arm": "bantam-local-27b",
+      "wallMs": 432749,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 35,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "A working decoder made it off the line.",
+        "paragraphs": [
+          {
+            "text": "The factory moved the repair through implementation, failing tests, source corrections and focused probes of split Unicode, byte-order marks and decoder state.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-17",
+              "action-21",
+              "action-23"
+            ]
+          },
+          {
+            "text": "The worker left an executable regression check, ran it successfully and passed the project suite on the final files. All five independent groups passed; delivery took 432.7 seconds.",
+            "actions": [
+              "action-32",
+              "action-33",
+              "action-34",
+              "action-35"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 25284,
+      "sha256": "e15f71bae4176e810743d0a1e3b781755065434e02b3ca5802065e7cee532da3",
+      "arm": "deepseek-local-27b",
+      "wallMs": 551985,
+      "outcome": "FAIL",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 3,
+      "changedFiles": 0,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Inspected the job. Delivered no repair.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek’s saved tool record contains the workspace inspection and reads of the source, package and supplied tests. It made no recorded workspace edit; the delivered files match the starter.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "The run ended after 552.0 seconds. The unchanged decoder failed all five independent groups, including split Unicode, stream termination and command-line behavior.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 35805,
+      "sha256": "a9c90ace0c24840c8295c712386dd6071a4f4c47d12f2c5a5cb4cb1f93c71c85",
+      "arm": "hermes",
+      "wallMs": 600007,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 1,
+      "protectedChanges": 0,
+      "actions": 9,
+      "files": 3,
+      "changedFiles": 0,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Probed the runtime; the repair never landed.",
+        "paragraphs": [
+          {
+            "text": "Hermes read the decoder and tests, then ran probes of TextDecoder, byte arrays and byte-order marks. No source change reached the workspace before the ten-minute limit.",
+            "actions": [
+              "action-2",
+              "action-4",
+              "action-5",
+              "action-6",
+              "action-8",
+              "action-9"
+            ]
+          },
+          {
+            "text": "The delivered decoder was the original starter. All five independent acceptance groups failed.",
+            "actions": []
+          }
+        ]
+      }
+    }
+  ]
+}

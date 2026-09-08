@@ -1,0 +1,75 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "path-scope",
+  "files": [
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 74610,
+      "sha256": "20b390a0030d24ab9f3faf12abd2ea5528f356541ea6f54c1c824c27da2beccc",
+      "arm": "bantam-local-27b",
+      "wallMs": 75104,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 13,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+      "explanation": {
+        "title": "Similar names did not fool the boundary.",
+        "paragraphs": [
+          {
+            "text": "The factory extended path scoping, used a failing project test to guide source fixes and reran the suite. The worker then added and executed a dedicated edge-case test file.",
+            "actions": [
+              "action-5",
+              "action-6",
+              "action-7",
+              "action-8",
+              "action-10",
+              "action-11"
+            ]
+          },
+          {
+            "text": "All five independent groups passed, including traversal, prefix collisions and hostile names. The factory verified the final project and finished in 75.1 seconds.",
+            "actions": [
+              "action-12",
+              "action-13"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 35687,
+      "sha256": "f304f9eaeea4a18909dcfc142e1a8b3cc0a3bed22003994d207bb770a86868b6",
+      "arm": "codex-astra",
+      "wallMs": 107931,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "5e8f6776d675644686a43ebfd86228c647662e2a186d3ffbad5c77f856ebc2ab",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered path-scope.js, test/regression.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 107.9 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

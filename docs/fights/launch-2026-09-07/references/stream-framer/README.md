@@ -18,7 +18,9 @@ to its roster.
 For context, this is the work order BANTAM FACTORY's earlier local 27B attempt did not
 finish: it timed out at 4/5 at the 600 s limit, while native Codex Astra
 passed in 160.7 s. That disclosed loss stands. Different models and run
-windows: individual observations, not a ranking.
+windows:.
+
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
 
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
@@ -51,7 +53,6 @@ These attempts ran serially in their own queue while separate local/Codex
 comparisons were recording on the same machine, so CPU and I/O contention
 remained possible. The local model was not used by Claude. Work-order and
 starter materials were frozen; candidates received the same independent
-graders. Public exports omit raw prompts, source, credentials and machine
-paths. Asset hashes cover generated files, not these notes.
+graders. The work views include recorded actions, checks and delivered files. Asset hashes cover generated files, not these notes.
 
 </details>

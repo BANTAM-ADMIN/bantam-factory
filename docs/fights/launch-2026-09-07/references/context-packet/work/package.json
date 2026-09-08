@@ -1,0 +1,94 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "claude-sonnet.json",
+      "bytes": 46681,
+      "sha256": "82829cad5037f71d0d2cf0e036d7ccf8117d035b3d46c3790380466d6b7f047d",
+      "arm": "claude-sonnet",
+      "wallMs": 80424,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered context-packet.js. The project suite and all five independent acceptance groups passed, with a clean finish in 80.4 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-10",
+              "action-11",
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-opus.json",
+      "bytes": 55105,
+      "sha256": "cccc4910bc3f25a0cec14a2de15e432a96756aa25248091c6519edd59c5b4b40",
+      "arm": "claude-opus",
+      "wallMs": 108365,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 17,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered context-packet.js, test/extra.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 108.4 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-6",
+              "action-16",
+              "action-17"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "claude-fable.json",
+      "bytes": 47766,
+      "sha256": "094b3768001973ecdbda35b17e928e3b46fcf63e82a4d7f431d456a142149920",
+      "arm": "claude-fable",
+      "wallMs": 74221,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered context-packet.js, test/packer.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 74.2 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-4"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

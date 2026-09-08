@@ -1,0 +1,184 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "patch-transaction",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 38175,
+      "sha256": "e7ffa5675f0f947968cf2ee9f66c3a8f123fc4ac92ee6347dac9c2709cf288d5",
+      "arm": "codex-astra",
+      "wallMs": 90337,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "Delivered and independently accepted.",
+        "paragraphs": [
+          {
+            "text": "Delivered patch-transaction.js, test/transaction.test.js. The project suite and all five independent acceptance groups passed, with a clean finish in 90.3 seconds. Open the actions to inspect the edits and checks, or Files to read the result.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-local-27b.json",
+      "bytes": 93163,
+      "sha256": "b5d9ac6b012b1cd6f4729c321098629f94455225c2a96e8fdfdc754fecf16a52",
+      "arm": "bantam-local-27b",
+      "wallMs": 81772,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 13,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "The factory caught the CLI tripwire.",
+        "paragraphs": [
+          {
+            "text": "The batch-edit implementation went through the factory’s command-line check. A missing-argument run exposed a problem; the worker repaired the entry point and the factory checked it again.",
+            "actions": [
+              "action-5",
+              "action-6",
+              "action-7",
+              "action-9"
+            ]
+          },
+          {
+            "text": "The worker also executed the supervisor’s proposed edit-order assertion. Project checks passed on the final files and the transaction tool finished in 81.8 seconds.",
+            "actions": [
+              "action-10",
+              "action-11",
+              "action-12",
+              "action-13"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "opencode.json",
+      "bytes": 83206,
+      "sha256": "858951afef94bc39dd4387f929dccca37df43fc117b44840a3b4a05098906904",
+      "arm": "opencode",
+      "wallMs": 559000,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 20,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "Passed after repairing its added tests.",
+        "paragraphs": [
+          {
+            "text": "OpenCode implemented the transaction API, added tests and worked through two failing test runs. After correcting the added expectations, it passed the suite and exercised the CLI. It finished cleanly in 559.0 seconds.",
+            "actions": [
+              "action-7",
+              "action-12",
+              "action-15",
+              "action-16",
+              "action-18",
+              "action-20"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "deepseek-local-27b.json",
+      "bytes": 78118,
+      "sha256": "bb13cd3f2aef3aec8844a395bfbaa2e6452f4ee4e9cdf4b555e7c986faec70e3",
+      "arm": "deepseek-local-27b",
+      "wallMs": 600005,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "Working edits, unfinished delivery.",
+        "paragraphs": [
+          {
+            "text": "DeepSeek implemented the transaction tool and added a test suite, then revised that suite through several edits. Its final recorded test command was still part of verification.",
+            "actions": [
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-11",
+              "action-14"
+            ]
+          },
+          {
+            "text": "Both the project suite and all five independent groups passed at the boundary. The harness did not finish within ten minutes: accepted output, OUTPUT_ONLY.",
+            "actions": [
+              "action-14"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "hermes.json",
+      "bytes": 84684,
+      "sha256": "6f3e68f79bab9410543bf87b0d59b1891ce08b2b0b3058ae3b3c1957581c7f14",
+      "arm": "hermes",
+      "wallMs": 600005,
+      "outcome": "TIMEOUT",
+      "accepted": false,
+      "completed": false,
+      "publicExit": 1,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 16,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "The extra tests became unfinished work.",
+        "paragraphs": [
+          {
+            "text": "Hermes implemented the transaction API and added tests. The project test command failed, and its next two actions returned to the added test file. The time limit arrived before a repair or clean finish.",
+            "actions": [
+              "action-8",
+              "action-9",
+              "action-14",
+              "action-15",
+              "action-16"
+            ]
+          },
+          {
+            "text": "The transaction implementation passed all five independent groups, but the full delivered project still had a failing test suite. That is why this workspace was not accepted.",
+            "actions": [
+              "action-14"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

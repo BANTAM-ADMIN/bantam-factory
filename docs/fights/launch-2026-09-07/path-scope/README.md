@@ -18,6 +18,8 @@ local 27B was 1.44× quicker than the frontier CLI on this attempt. At 75.1
 seconds it is the second quickest recorded pass in the gallery, behind context
 packet at 58.1 s.
 
+**Inside each contender:** a short explanation, the recorded actions and their results, delivered files with before/after changes, and the acceptance output.
+
 <details>
 <summary>Token receipts, run conditions & provenance</summary>
 
@@ -56,11 +58,6 @@ CPU vision projection, not the recommended DavidAU download. Local inference
 was serial. No manual repairs, teacher requests or post-result changes to the
 candidates were made.
 
-These are different models on one development task: an individual observation,
-not a ranking or a held-out reliability study. Public exports contain
-allowlisted measurements and replay counters, not private source, prompts or
-machine paths. Raw evidence remains private. Package hashes check generated
-assets, excluding this README; they do not attest authorship or authorize
-execution.
+These are different models on the same development work order. The work views include recorded actions, checks and delivered files. Asset hashes cover the generated files; this explanatory note is separate.
 
 </details>

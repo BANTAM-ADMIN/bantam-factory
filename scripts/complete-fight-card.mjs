@@ -18,8 +18,8 @@ function matchResult(row, result) {
       || row.accepted !== result.candidatePass || row.completed !== result.processCompleted
       || row.publicExit !== result.publicExit || row.hiddenExit !== result.hiddenExit
       || row.protectedChanges !== result.tampered?.length
-      || row.groupsTotal !== result.grade?.groups?.length
-      || row.groupsPassed !== result.grade?.groups?.filter(group => group.pass === true).length)
+      || row.groupsTotal !== (result.grade?.groups?.length ?? null)
+      || row.groupsPassed !== (result.grade?.groups?.filter(group => group.pass === true).length ?? null))
     throw Error('Public outcome does not match its recorded result');
 }
 

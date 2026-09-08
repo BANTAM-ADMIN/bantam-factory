@@ -69,6 +69,14 @@ test('Pi follow-ups retain the baseline and appear in the same-model scoreboard'
   assert.equal(score.systems.find(s=>s.arm==='pi').completed,0);
 });
 
+test('a failed grader remains unknown group coverage when a timed-out follow-up is composed', () => {
+  const f=fixture();
+  Object.assign(f.incoming.results[0],{outcome:'TIMEOUT',candidatePass:false,publicExit:1,hiddenExit:1,grade:null});
+  Object.assign(f.followupSource.series[0].cards[0].rows[0],{outcome:'TIMEOUT',accepted:false,publicExit:1,hiddenExit:1,groupsTotal:null,groupsPassed:null});
+  const row=compose(f).series[0].cards[0].rows.at(-1);
+  assert.equal(row.outcome,'TIMEOUT');assert.equal(row.groupsTotal,null);assert.equal(row.groupsPassed,null);
+});
+
 test('composition refuses different weights, material, grading or limits', () => {
   for (const change of [
     f => {f.incoming.modelFileSha256 = 'b'.repeat(64);},

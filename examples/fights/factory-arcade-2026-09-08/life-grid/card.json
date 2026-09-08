@@ -1,0 +1,1 @@
+{"id":"life-grid","title":"Life grid","shape":"extend","deliverables":["life-grid.js"],"protected":["package.json","test/public.test.js"],"groups":["preserved-parser-and-bounded-neighbours","step-rules-and-immutability","early-stability-versus-oscillation","generation-accounting-and-population","validation-and-cli-contract"]}

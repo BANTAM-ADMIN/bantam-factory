@@ -1,0 +1,1 @@
+{"id":"csv-record","title":"CSV record","shape":"build","deliverables":["csv-record.js"],"protected":["package.json","test/public.test.js"],"groups":["quoting-escapes-and-embedded-delimiters","line-endings-and-blank-records","header-mode-and-field-names","ragged-records-and-validation","cli-and-error-contract"]}

@@ -1,0 +1,1 @@
+{"id":"poker-hand","title":"Poker hand","shape":"build","deliverables":["poker-hand.js"],"protected":["package.json","test/public.test.js"],"groups":["categories-and-ranking","wheel-and-straight-boundaries","tiebreak-groups-and-kickers","comparison-and-exact-ties","validation-and-cli-contract"]}

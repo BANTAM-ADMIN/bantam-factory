@@ -1,0 +1,1 @@
+{"id":"bowling-score","title":"Bowling score","shape":"build","deliverables":["bowling-score.js"],"protected":["package.json","test/public.test.js"],"groups":["open-frames-spares-and-strikes","tenth-frame-and-bonus-rolls","incomplete-games-and-null-scores","illegal-frames-and-validation","cli-and-error-contract"]}

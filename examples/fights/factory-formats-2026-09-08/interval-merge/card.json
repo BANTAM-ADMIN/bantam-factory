@@ -1,0 +1,1 @@
+{"id":"interval-merge","title":"Interval merge","shape":"build","deliverables":["interval-merge.js"],"protected":["package.json","test/public.test.js"],"groups":["overlap-and-touching-coalescence","ordering-and-disjoint-output","coverage-accounting-and-large-spans","validation-and-immutability","cli-and-error-contract"]}

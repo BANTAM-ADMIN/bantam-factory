@@ -1,0 +1,1 @@
+{"id":"arg-parser","title":"Arg parser","shape":"build","deliverables":["arg-parser.js"],"protected":["package.json","test/public.test.js"],"groups":["long-options-and-value-forms","short-options-and-bundling","terminator-and-positionals","spec-validation-and-literal-keys","cli-and-error-contract"]}

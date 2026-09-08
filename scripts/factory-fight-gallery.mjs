@@ -19,7 +19,11 @@ function readBounded(file,max=4*1024*1024){
   return fs.readFileSync(file);
 }
 
-const LAUNCH_CARDS=[...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06'],...FACTORY_KITS['factory-controls-2026-09-07']];
+// Explicit publication list. Registering a kit in the catalog does not put its
+// work orders on the public page; adding one here does, and the all-recorded
+// gate then holds publication until every listed card is a reviewed package.
+export const LAUNCH_CARDS=Object.freeze([...FACTORY_KITS['factory-2026-09-07'],...FACTORY_KITS['factory-2026-09-06'],
+  ...FACTORY_KITS['factory-controls-2026-09-07'],...FACTORY_KITS['factory-selection-2026-09-08']]);
 
 // One reviewed public card package: a single-work-order showcase whose share
 // package hashes match it byte for byte. Used for launch cards and references.

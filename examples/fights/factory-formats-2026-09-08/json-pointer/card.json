@@ -1,0 +1,1 @@
+{"id":"json-pointer","title":"JSON pointer","shape":"build","deliverables":["json-pointer.js"],"protected":["package.json","test/public.test.js"],"groups":["token-escaping-and-whole-document","object-keys-and-own-property-discipline","array-indices-and-canonical-form","miss-receipts-and-depth","validation-and-cli-contract"]}

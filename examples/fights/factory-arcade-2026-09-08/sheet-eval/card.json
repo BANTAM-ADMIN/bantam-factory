@@ -1,0 +1,1 @@
+{"id":"sheet-eval","title":"Sheet eval","shape":"repair","deliverables":["sheet-eval.js"],"protected":["package.json","test/public.test.js"],"groups":["arithmetic-precedence-and-references","cycle-detection-without-recursion","error-kinds-and-propagation","resolution-order-and-deep-chains","validation-and-cli-contract"]}

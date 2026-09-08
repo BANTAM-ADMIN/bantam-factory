@@ -1,0 +1,1 @@
+{"id":"ansi-wrap","title":"ANSI wrap","shape":"build","deliverables":["ansi-wrap.js"],"protected":["package.json","test/public.test.js"],"groups":["zero-width-escapes-and-widths","space-breaking-and-forced-newlines","wide-characters-never-straddle","style-carried-across-lines","validation-and-cli-contract"]}

@@ -1,0 +1,1 @@
+{"id":"turtle-canvas","title":"Turtle canvas","shape":"build","deliverables":["turtle-canvas.js"],"protected":["package.json","test/public.test.js"],"groups":["movement-heading-and-canvas","clipping-at-the-boundary","pen-state-and-mark-characters","distinct-cell-accounting","validation-and-cli-contract"]}

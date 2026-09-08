@@ -45,7 +45,7 @@ export function renderShowcaseHighlights(data){
       ||!Number.isFinite(factory.wallMs)||!Number.isFinite(peer.wallMs)||factory.wallMs<=0||peer.wallMs/factory.wallMs<1.05)return [];
     const hash=new URLSearchParams({card:id,view:'results',layout:'compare',left:factory.arm,right:peer.arm});
     rigs.push(performanceView(factory.performance)?.hardware??null);
-    return [`<a class="proof-fight" href="${id}/share/index.html#${E(hash)}"><strong>${(peer.wallMs/factory.wallMs).toFixed(1)}<span>×</span></strong><span class="proof-peer">faster than ${E(peer.label)}</span><span class="proof-job">${E(card.title)} <span aria-hidden="true">↗</span></span><span class="proof-times">Factory ${seconds(factory.wallMs)} · ${E(peer.label)} ${seconds(peer.wallMs)}</span></a>`];
+    return [`<a class="proof-fight" href="${id}/share/index.html#${E(hash)}"><strong>${(peer.wallMs/factory.wallMs).toFixed(1)}<span>×</span></strong><span class="proof-peer">faster than ${E(peer.label)}</span><span class="proof-job">${E(card.title)} <span aria-hidden="true">↗</span></span><span class="proof-times"><span>Factory ${seconds(factory.wallMs)}</span><span>${E(peer.label)} ${seconds(peer.wallMs)}</span></span></a>`];
   });
   if(!highlights.length)return '';
   const rig=rigs.every(r=>r&&r===rigs[0])?`${E(rigs[0])} · `:'';

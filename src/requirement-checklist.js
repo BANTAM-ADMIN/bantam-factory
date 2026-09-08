@@ -32,7 +32,23 @@ const REJECT_SENTENCE_RE = /[^.!?\n]*\b(?:must\s+(?:not\s+)?(?:throw|reject|erro
 // verb rather than any modal, so ordinary advisory prose stays out.
 const PROHIBITION_RE=/[^.!?\n]*\b(?:may|must|can|shall)\s*(?:not|never)\b[^.!?\n]*[.!?]?/gi;
 
-// 4. collection shape demands: a named input's element preconditions. Their
+// 4. conditional restrictions, overrides and stated alternatives: what the
+// code must DO, as opposed to what makes its input invalid. Every family above
+// this one describes rejection, so an assignment's behavioural rules produced
+// no quote at all. Measured 2026-09-08 on turtle-canvas: the checklist quoted
+// four validation rules, the candidate failed three behavioural ones, and none
+// of the three was quoted although all three are stated plainly. Anchored on
+// the words that mark a restriction or an override, which is where a plausible
+// implementation diverges from the assignment: across the 21 published work
+// orders this adds 0.67 quotes per card and every one of them is load-bearing.
+const CONDITIONAL_RE = /[^.!?\n]*\b(?:only\s+(?:when|while|if)|instead\s+of|rather\s+than|except\s+that|is\s+already\s+\w+|already\s+(?:active|marked|exceeds)|or\s+\w+\s+when)\b[^.!?\n]*[.!?]?/gi;
+
+// A flowed markdown table matches almost any prose pattern and is never a
+// requirement sentence. Neither is a statement of what the starter already
+// provides: that is context, not a rule the candidate has to satisfy.
+const NOT_A_REQUIREMENT_RE = /\||already exports/;
+
+// 5. collection shape demands: a named input's element preconditions. Their
 // violations are rejection cases that visible tests routinely never touch.
 // Measured 2026-09-08 on glob-select: a candidate implemented six of the seven
 // constraints in one such sentence, dropped "unique", ticked the requirement
@@ -40,7 +56,7 @@ const PROHIBITION_RE=/[^.!?\n]*\b(?:may|must|can|shall)\s*(?:not|never)\b[^.!?\n
 // Gated on a shape word so ordinary "must be" prose stays out.
 const COLLECTION_SHAPE_RE = /[^.!?\n]*\bmust\s+be\s+(?:an?\s+)?[^.!?\n]*?\b(?:dense|unique|distinct|nonempty|non-empty|non-null|non-array)\b[^.!?\n]*[.!?]?/gi;
 
-// 4. short quoted literals: task-named inputs/outputs, not prose quotations.
+// 6. short quoted literals: task-named inputs/outputs, not prose quotations.
 // Double quotes only: single quotes double as apostrophes in prose, and the
 // pair ("it's ... don't") captures garbage fragments (measured 2026-08-15:
 // say's checklist quoted ["s fine to stop at"]).
@@ -64,6 +80,7 @@ export function extractRequirements(task) {
     const item = clip(s);
     const key = item.toLowerCase();
     if (!item || seen.has(key) || out.length >= MAX_ITEMS) return;
+    if (NOT_A_REQUIREMENT_RE.test(item)) return;
     seen.add(key);
     out.push(item);
   };
@@ -78,6 +95,10 @@ export function extractRequirements(task) {
   // collection shape demands: the precondition sentence names several element
   // constraints at once, and dropping one of them still leaves tests green.
   for (const m of source.matchAll(COLLECTION_SHAPE_RE)) push(m[0]);
+
+  // conditional restrictions and overrides: the behavioural rules a candidate
+  // can implement plausibly and wrongly without any test going red.
+  for (const m of source.matchAll(CONDITIONAL_RE)) push(m[0]);
 
   // numeric bounds — prefer comparator phrases, then unit-attached numbers.
   for (const m of source.matchAll(BOUND_PREFIX_RE)) {

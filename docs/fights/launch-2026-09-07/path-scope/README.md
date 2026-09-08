@@ -13,8 +13,8 @@ outside it; the root itself is inside it.
 | BANTAM · local 27B | PASS | 5/5 | 75.1 s |
 
 One system is recorded on this work order so far. BANTAM completed accepted
-work and passed every acceptance group. At 75.1 seconds this is the quickest
-recorded pass in the gallery.
+work and passed every acceptance group. At 75.1 seconds it is the second
+quickest recorded pass in the gallery, behind context packet at 58.1 s.
 
 ## Tokens and prefix reuse
 

@@ -14,15 +14,15 @@ export function unresolvedPreviewObjection(
   } = {},
 ) {
   if (!latestPreview || alreadyRejected >= maxRejections) return null;
+  const entry = String(latestPreview.entry ?? "").trim();
+  const command = ['preview', entry, requireInteraction || latestPreview.mode === 'interact' ? 'interact' : ''].filter(Boolean).join(' ');
 
   if (latestPreview.generation !== workspaceGeneration) {
-    return "You called done after changing web files since your last preview. That rendered evidence is stale. Run `query \"preview\"` again against the current files, fix anything it reports, and only then finish.";
+    return `You called done after workspace changes since your last preview. That rendered evidence is stale. Run \`query "${command}"\` against the current entry (choose the deliverable if that preview was a temporary check), fix anything it reports, and only then finish.`;
   }
 
   if (latestPreview.status === "pass") {
     if (requireInteraction && latestPreview.mode !== "interact") {
-      const entry = String(latestPreview.entry ?? "").trim();
-      const command = entry ? `preview ${entry} interact` : "preview interact";
       return `You called done after only a load-only preview, but this task asks for an interactive web experience. A clean initial render does not prove its advertised controls or state transitions work. Run \`query "${command}"\`, fix any interaction issues it reports, and repeat that interactive preview on the current files before finishing.`;
     }
     return null;
@@ -31,7 +31,7 @@ export function unresolvedPreviewObjection(
     return "You called done, but the current preview is blocked by an external browser dependency while preview networking is disabled. This does NOT mean the CDN URL is bad, and changing CDN providers cannot help. Vendor/preinstall the dependency locally, or tell the operator to restart Bantam with --shell-network; then preview the current page again before claiming it works.";
   }
   if (latestPreview.status === "empty") {
-    return "You called done, but the current preview rendered an essentially empty page. Fix the render and run `query \"preview\"` again before finishing.";
+    return `You called done, but the current preview rendered an essentially empty page. Fix the render and run \`query "${command}"\` again before finishing.`;
   }
   if (latestPreview.status === "visual-fail") {
     const review = latestPreview.visualReview ?? {};
@@ -40,7 +40,7 @@ export function unresolvedPreviewObjection(
       .filter(Boolean)
       .slice(0, 4)
       .join(" ");
-    return `You called done, but the screenshot reviewer found a clear visual defect${details ? `: ${details}` : "."} Fix the rendered page and run \`query \"preview\"\` again before finishing.`;
+    return `You called done, but the screenshot reviewer found a clear visual defect${details ? `: ${details}` : "."} Fix the rendered page and run \`query "${command}"\` again before finishing.`;
   }
   if (latestPreview.status === "pointer-obstruction") {
     const details = (latestPreview.pointerOcclusions ?? [])
@@ -51,7 +51,7 @@ export function unresolvedPreviewObjection(
         return `${control} is covered by ${blocker}`;
       })
       .join("; ");
-    return `You called done, but Chromium's pointer hit-test found a visible control obstruction${details ? `: ${details}.` : "."} Fix the stacking or pointer-events defect and run \`query "preview"\` again before finishing.`;
+    return `You called done, but Chromium's pointer hit-test found a visible control obstruction${details ? `: ${details}.` : "."} Fix the stacking or pointer-events defect and run \`query "${command}"\` again before finishing.`;
   }
   if (latestPreview.status === "interaction-inconclusive") {
     return "You called done, but the requested interaction smoke did not complete, so the controls remain unverified. Run `query \"preview interact\"` again and only finish after it completes cleanly.";
@@ -72,7 +72,7 @@ export function unresolvedPreviewObjection(
       .join(" ");
     return `You called done, but the interaction preview found working-behavior defects${details ? `: ${details}` : "."} Fix them, then run \`query "preview interact"\` again against the current files before finishing.`;
   }
-  return "You called done, but the current preview still reports browser errors or failed resources. Fix those concrete problems and run `query \"preview\"` again before finishing.";
+  return `You called done, but the current preview still reports browser errors or failed resources. Fix those concrete problems and run \`query "${command}"\` again before finishing.`;
 }
 
 /**

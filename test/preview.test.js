@@ -235,3 +235,48 @@ test("interaction smoke retains a real advertised P-to-pause failure", { skip: c
   assert.match(answer, /Pause is advertised/);
   assert.equal(tool.lastResult.interactionIssues.length, 1);
 });
+
+test('interactive pause checks recognize a shared overlay by its changing text', { skip: compositeSkipReason(_chromiumSkip, _networkSkip) }, (t) => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-preview-shared-overlay-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  for (const stuck of [false, true]) {
+    fs.writeFileSync(path.join(workspace, 'index.html'), `<main>
+      <p>Press P to pause.</p><button id="start">Start</button>
+      <div class="overlay" id="overlay" hidden><h2>Flight paused.</h2><p>Resume flight</p></div>
+      </main><script>
+      let playing = false, paused = false;
+      document.querySelector('#start').onclick = function(){ playing = true; this.blur(); };
+      document.addEventListener('keydown', e => { if (e.key === 'p' && playing) {
+        paused = ${stuck ? 'true' : '!paused'}; document.querySelector('#overlay').hidden = !paused;
+      }});
+      </script>`);
+    const report = runPreviewSync(workspace, 'index.html', { interact: true, realtimeProbe: false });
+    assert.equal(report.interaction.completed, true);
+    if (stuck) assert.match(report.interaction.issues.join('\n'), /second P did not close/);
+    else assert.deepEqual(report.interaction.issues, []);
+  }
+});
+
+test('preview accepts bounded viewport options and reports unsupported options accurately', async () => {
+  const { parsePreviewRequest } = await import('../src/logic/preview.js');
+  assert.deepEqual(parsePreviewRequest('preview arcade.html interact --width=390 --height=844'), {
+    entry: 'arcade.html', interact: true, viewport: { width: 390, height: 844 },
+  });
+  assert.deepEqual(parsePreviewRequest('preview --width 320 --height 800 arcade.html'), {
+    entry: 'arcade.html', interact: false, viewport: { width: 320, height: 800 },
+  });
+  for (const query of ['preview arcade.html --width=-1', 'preview --width=999999', 'preview --width=320 --width=400', 'preview --unknown']) {
+    assert.throws(() => parsePreviewRequest(query), /preview option|must be|duplicate/);
+  }
+});
+
+test('phone previews measure the requested CSS viewport below the Chromium window minimum', { skip: compositeSkipReason(_chromiumSkip, _networkSkip) }, (t) => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-preview-exact-phone-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(workspace, 'index.html'), '<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}main{width:100vw;height:100vh}</style><main>Phone layout</main>');
+  const report = runPreviewSync(workspace, 'index.html', { viewport: { width: 320, height: 844 }, realtimeProbe: false });
+  assert.equal(report.previewStatus, 'pass');
+  assert.deepEqual(report.layout.viewport, { w: 320, h: 844 });
+  assert.deepEqual(report.layout.page, { w: 320, h: 844 });
+  assert.ok(report.screenshotBytes > 0);
+});

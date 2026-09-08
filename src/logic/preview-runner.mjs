@@ -16,6 +16,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { runViewportBrowser } from "./preview-viewport.mjs";
 
 const [workspaceArg, entryArg, optsArg] = process.argv.slice(2);
 const workspace = path.resolve(workspaceArg ?? ".");
@@ -344,7 +345,8 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
     checkpointInteraction();
   };
   const pauseOverlays = (snap) => (snap?.overlays || []).filter((el) =>
-    /paus/i.test([el.id, el.cls].filter(Boolean).join(" ")));
+    /paus/i.test([el.id, el.cls].filter(Boolean).join(" "))
+      || /\\b(?:paused|resume)\\b/i.test(el.text || ""));
   // A classic-script game often keeps its state in global lexical bindings
   // (top-level let/const), which are intentionally absent from window. Direct
   // eval from this early classic script can still feature-detect those bindings
@@ -582,6 +584,14 @@ function baseArgs({ virtualTime = true } = {}) {
 }
 
 function runBrowser(args, capMs = timeoutMs) {
+  if (opts.viewport) {
+    const url = args.at(-1);
+    const screenshotArg = args.find(a => a.startsWith('--screenshot='));
+    return runViewportBrowser({ chromium: opts.chromium || 'chromium',
+      args: args.slice(0, -1).filter(a => a !== '--dump-dom' && !a.startsWith('--screenshot=')), url,
+      ...opts.viewport, timeoutMs: capMs, interact: Boolean(opts.interact),
+      screenshot: screenshotArg?.slice('--screenshot='.length), realtime: url.includes('__bantam_rt=1') });
+  }
   return new Promise((resolve, reject) => {
     const browser = spawn(opts.chromium || "chromium", args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";

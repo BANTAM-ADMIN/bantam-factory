@@ -821,6 +821,37 @@ describe('prompt-resident source recovery', () => {
     for (const name of names) assert.match(model.prompts[1], new RegExp(`# ${name}\\.js \\(current`));
   });
 
+  it('automatic game preview requests the interaction evidence required by done', async (t) => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-auto-preview-context-'));
+    t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+    const calls = [];
+    const preview = { name: 'preview', description: 'fixture preview', verbs: ['preview'],
+      answer(query) { calls.push(query); this.lastResult = { status: 'pass', mode: 'interact', entry: 'index.html' }; return 'PREVIEW STATUS: pass'; } };
+    const model = scriptedPromptModel([
+      JSON.stringify({ a: 'write_file', p: 'index.html', content: '<main>Playable game</main>' }),
+      JSON.stringify({ a: 'done', summary: 'Built the game.' }),
+      JSON.stringify({ a: 'done', summary: 'Built and previewed the game.' }),
+    ]);
+    const result = await runAgent({ task: 'Make a playable HTML game.', workspace, model, maxTurns: 3,
+      useGrammar: false, grounding: true, extraTools: [preview], shellSandbox: 'host',
+      verificationPolicy: 'after_edit' });
+    assert.deepEqual(calls, ['interact']); // Registry consumes the leading tool verb.
+    assert.match(model.prompts[2], /preview interact/);
+    assert.doesNotMatch(model.prompts[2], /then run "preview" to confirm/);
+    assert.equal(result.turns[1].doneAccepted, false);
+  });
+
+  it('delivers the enforced wall deadline in the literal model prompt', async (t) => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-wall-context-'));
+    t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+    const model = scriptedPromptModel([JSON.stringify({ a: 'respond', text: 'Ready.' })]);
+    await runAgent({ task: 'Say ready.', workspace, model, maxTurns: 60,
+      interactive: true, useGrammar: false, grounding: false, wallDeadlineMs: 600000,
+      shellSandbox: 'host' });
+    assert.match(model.prompts[0], /\[budget\] wall clock:.*of 10m/);
+    assert.match(model.prompts[0], /killed on TIME/);
+  });
+
   it('reanchors the exact task near the action boundary by default', async (t) => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-agent-goal-reanchor-default-'));
     t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));

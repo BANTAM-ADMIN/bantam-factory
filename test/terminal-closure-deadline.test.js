@@ -57,12 +57,13 @@ test('a reached deadline does not bypass any existing completion gate', () => {
   }
 });
 
-test('the local BANTAM lane is told the wall budget the runner will enforce', async () => {
+test('both BANTAM lanes are told the wall budget the runner will enforce', async () => {
   const {freshCommand} = await import('../scripts/factory-fights.mjs');
   const base = {task: 'T', workspace: '/tmp/ws', dir: '/tmp/d', endpoint: 'http://127.0.0.1:9999', model: 'm'};
-  const local = freshCommand({...base, arm: 'bantam-local-27b', timeoutMs: 600000});
-  assert.equal(local.env.BANTAM_DEADLINE_MS, '600000');
-  for (const arm of ['hermes', 'opencode', 'deepseek-local-27b', 'codex-astra', 'bantam-codex-astra']) {
+  for (const arm of ['bantam-local-27b', 'bantam-codex-astra']) {
+    assert.equal(freshCommand({...base, arm, timeoutMs: 600000}).env.BANTAM_DEADLINE_MS, '600000');
+  }
+  for (const arm of ['hermes', 'opencode', 'deepseek-local-27b', 'codex-astra']) {
     assert.equal(freshCommand({...base, arm, timeoutMs: 600000}).env.BANTAM_DEADLINE_MS, undefined, arm);
   }
 });

@@ -124,6 +124,7 @@ export function runPreviewSync(workspace, entryRel, {
   chromium = chromiumBinary(),
   network = previewNetworkEnabled(),
   interact = false,
+  viewport = null,
   captureInteractiveScreenshot = false,
   pointerHitTest = previewPointerHitTestEnabled(),
   timeoutMs = interact ? 8000 : 25000,
@@ -143,6 +144,7 @@ export function runPreviewSync(workspace, entryRel, {
       chromium,
       network,
       interact,
+      viewport,
       captureInteractiveScreenshot,
       pointerHitTest,
       timeoutMs,
@@ -297,7 +299,7 @@ export function previewProof(report) {
   };
 }
 
-const DESCRIBE_UI = "This is a screenshot of a web page being built, rendered at 1280x800. " +
+const DESCRIBE_UI = "This is a screenshot of a web page being built. " +
   "Describe exactly what is visible: overall layout, every piece of text (verbatim), colors, " +
   "components, and especially anything WRONG — blank or empty regions, overlapping or clipped " +
   "elements, unstyled raw-looking content, visible error text. If the page looks empty or " +
@@ -536,7 +538,7 @@ export function previewTool(workspace, {
     description: "render an HTML page headlessly and report runtime errors, failed loads, blank-page checks" +
       (screenshotVision ? ", plus a vision description of a screenshot" : "") +
       ` — browser network is ${network ? "ENABLED by operator opt-in" : "OFF by policy; external CDN/import failures are expected and do not prove a URL is bad. Use local assets or operator opt-in --shell-network"}. ` +
-      "`preview` / `preview <path.html>` is load-only; add `interact` or `--interact` for a bounded primary-button and keyboard smoke. Use after building or changing web UI, before calling it done.",
+      "`preview` / `preview <path.html>` is load-only; add `interact` or `--interact` for a bounded primary-button and keyboard smoke. Add `--width=390 --height=844` to check an exact phone viewport. Use after building or changing web UI, before calling it done.",
     verbs: ["preview"],
     lastResult: null,
     async answer(q) {
@@ -555,6 +557,7 @@ export function previewTool(workspace, {
         const report = runPreviewSync(workspace, entry, {
           network,
           interact: request.interact,
+          viewport: request.viewport ?? null,
           captureInteractiveScreenshot: screenshotVision,
         });
         let description = null;
@@ -584,9 +587,21 @@ export function previewTool(workspace, {
 /** Accept `preview [path] interact` and the flag spelling without treating either as a path. */
 export function parsePreviewRequest(q) {
   let arg = String(q ?? "").trim().replace(/^preview\b\s*/i, "");
+  const dimensions = {};
+  arg = arg.replace(/(?:^|\s)--(width|height)(?:=|\s+)(\d+)(?=\s|$)/gi, (_, name, value) => {
+    name = name.toLowerCase();
+    if (Object.hasOwn(dimensions, name)) throw new Error(`duplicate --${name}`);
+    const n = Number(value);
+    if (!Number.isSafeInteger(n) || n < 240 || n > 3840) throw new Error(`--${name} must be 240..3840 CSS pixels`);
+    dimensions[name] = n;
+    return ' ';
+  });
   const interact = /(?:^|\s)(?:--interact|interact)(?=\s|$)/i.test(arg);
   if (interact) arg = arg.replace(/(?:^|\s)(?:--interact|interact)(?=\s|$)/ig, " ").trim();
-  return { entry: arg, interact };
+  const unknown = arg.match(/(?:^|\s)(--\S+)/);
+  if (unknown) throw new Error(`unsupported preview option ${unknown[1]}; use interact, --width=390 and --height=844`);
+  const viewport = Object.keys(dimensions).length ? { width: dimensions.width ?? 1280, height: dimensions.height ?? 800 } : null;
+  return { entry: arg.trim(), interact, ...(viewport ? { viewport } : {}) };
 }
 
 function externalUrls(text) {

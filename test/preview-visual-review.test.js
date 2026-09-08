@@ -99,3 +99,9 @@ test("a first interaction timeout asks for confirmation before source edits", ()
   assert.match(message, /rerun.*once before editing/i);
   assert.doesNotMatch(message, /Treat .* likely non-terminating/i);
 });
+
+test('stale interactive evidence asks for an interactive rerun', () => {
+  const note = unresolvedPreviewObjection({ status: 'pass', mode: 'interact', entry: 'arcade.html', generation: 2 }, 3);
+  assert.match(note, /preview arcade\.html interact/);
+  assert.doesNotMatch(note, /query "preview"/);
+});

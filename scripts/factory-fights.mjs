@@ -75,19 +75,14 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
   else {
     command.args.push('--context-mode','extension','--factory','--factory-home',path.join(dir,'factory'));
     command.env={...command.env,BANTAM_SAVE_PROMPTS:'1',BANTAM_PROBE:probeEnabled?'1':'0',BANTAM_STREAM:'1',
-      BANTAM_TEACHER:'0',BANTAM_DEEPRESEARCH:'0',BANTAM_PROMPT_TRAJECTORY:'extension',BANTAM_IMMUTABLE_HISTORY:'1'};
+      BANTAM_TEACHER:'0',BANTAM_DEEPRESEARCH:'0',BANTAM_PROMPT_TRAJECTORY:'extension',BANTAM_IMMUTABLE_HISTORY:'1',
+      BANTAM_DEADLINE_MS:String(timeoutMs),BANTAM_REQUIREMENT_CHECKLIST:'1'};
     if(arm==='bantam-local-27b'){
       command.args[command.args.indexOf('--endpoint')+1]=endpoint;command.env.BANTAM_ENDPOINT=endpoint;
       // The inspected window, so history eviction follows the served context
       // instead of a constant. Only this lane uses the inspected local server.
       if(Number.isInteger(contextTokens)&&contextTokens>0)command.env.BANTAM_CONTEXT_TOKENS=String(contextTokens);
-      // The wall budget this runner actually enforces, so verified-green work
-      // can close out instead of being killed mid-turn at the limit.
-      command.env.BANTAM_DEADLINE_MS=String(timeoutMs);
-      // Quote the work order's own named requirements back at completion. The
-      // generic audit fires and is bypassed when a candidate re-reads a
-      // precondition, ticks it off and ships on green starter tests.
-      command.env.BANTAM_REQUIREMENT_CHECKLIST='1';
+
     }
     if(verificationWorkspaceReadOnly){command.args.push('--verify-workspace-read-only');command.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY='1';}
     if(terminalClosure)command.env.BANTAM_TERMINAL_CLOSURE='1';

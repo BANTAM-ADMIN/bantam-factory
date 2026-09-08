@@ -208,7 +208,7 @@ import { forgetOpenFile, noteOpenFile, renderOpenFiles } from "./open-files.js";
 import { evaluateDoneGates } from "./done-gates.js";
 import { unresolvedRunFailure } from "./logic/evidence-guard.js";
 import { verificationVerdict } from "./done-guard.js";
-import { taskRequiresVisualPreview } from "./logic/preview-evidence.js";
+import { taskRequiresVisualPreview, taskRequiresInteractivePreview } from "./logic/preview-evidence.js";
 import { deliveryFor, BLOCK, WARN } from "./gate-policy.js";
 import { detectSpecGap, formatSpecGap } from "./logic/spec-gap-detector.js";
 import { workspaceExports } from "./logic/workspace-exports.js";
@@ -2042,7 +2042,7 @@ async function runAgentCore({
   const requiredOutputs = requiredOutputPaths(task);
   // The wall-clock budget this run is actually killed on. Harbor enforces it and
   // BANTAM never knew it existed; the adapter passes it in.
-  const wallBudgetMs = positiveInt(process.env.BANTAM_WALL_BUDGET_MS, 0);
+  const wallBudgetMs = positiveInt(process.env.BANTAM_WALL_BUDGET_MS, wallDeadlineMs ?? 0);
   const runStartedAtMs = Date.now();
   let deliverableNotices = 0;
   let providedOracleNoticed = false;
@@ -6155,7 +6155,8 @@ async function runAgentCore({
       autoPreviewFired = true;
       webEditedUnpreviewed = false;
       metrics.autoPreviews = (metrics.autoPreviews ?? 0) + 1;
-      const previewReport = await tools.answer("preview");
+      const autoPreviewQuery = taskRequiresInteractivePreview(task) ? "preview interact" : "preview";
+      const previewReport = await tools.answer(autoPreviewQuery);
       const autoProof = tools?.lastOutcome?.proof ?? tools?.get("preview")?.lastResult ?? null;
       if (autoProof) {
         latestPreviewProof = { ...autoProof, generation: workspaceEditGeneration };
@@ -6171,7 +6172,7 @@ async function runAgentCore({
         "",
         previewReport,
         "",
-        'If this matches what the task asked for, emit "done" again. If it shows problems — errors, a blank render, wrong layout — fix them first, then run "preview" to confirm before finishing.',
+        `Fix any reported defects, then run query "${autoPreviewQuery}" on the current files. A passing preview is a bounded smoke check; finish any remaining task requirements and focused behavior checks before emitting done.`,
       ].join("\n");
       onEvent({ type: "auto_preview" });
     }

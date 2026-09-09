@@ -213,3 +213,35 @@ test("a source edit triggers measured API-reference diagnostics even while the c
   assert.equal(fs.readFileSync(path.join(workspace, "package.json"), "utf8"), packageText);
   assert.equal(fs.readFileSync(path.join(workspace, "tool.mjs"), "utf8"), GOOD);
 });
+
+test('Codex omits extra model stations by default but configured red verification still blocks completion', {
+  skip: process.env.BANTAM_LIVE_SANDBOX_TEST !== '1', timeout: 90000,
+}, async t => {
+  const prior = process.env.BANTAM_CODEX_EXTRA_STATIONS;
+  t.after(() => {if (prior === undefined) delete process.env.BANTAM_CODEX_EXTRA_STATIONS; else process.env.BANTAM_CODEX_EXTRA_STATIONS = prior;});
+  for (const [flag, extra] of [['codex', false], ['codexBacked', false], ['codex', true]]) {
+    process.env.BANTAM_CODEX_EXTRA_STATIONS = extra ? '1' : '0';
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-codex-stations-'));
+    t.after(() => fs.rmSync(workspace, {recursive: true, force: true}));
+    fs.writeFileSync(path.join(workspace, 'tool.mjs'), GOOD);
+    fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({type: 'module', scripts: {test: 'node -e "process.exit(1)"'}}));
+    const events = [], calls = [];
+    const actions = [{a: 'shell', c: 'npm test'}, {a: 'done', summary: 'Claim complete despite red check.'}];
+    const result = await runAgent({workspace, task: TASK, maxTurns: 2, maxInvalidPerTurn: 0,
+      model: {[flag]: true, assistantPrefill: '', async complete(prompt, options) {
+        calls.push(options.recordLabel);
+        if (options.recordLabel === 'contract-cli-assertion') return {content: JSON.stringify({json: JSON.stringify(SPEC)}), tokens: 1};
+        assert.equal(prompt.includes('[public CLI verification]'), extra);
+        return {content: JSON.stringify(actions.shift()), tokens: 1};
+      }}, onEvent: event => events.push(event),
+      useGrammar: true, interactive: false, grounding: false, shellSandbox: 'docker', shellNetwork: false, probeEnabled: true,
+      verificationScript: 'npm test', verificationWorkspaceReadOnly: true, contractStateAudit: 'off', contractAssertionStation: 'off',
+      completionAudit: false, stateAudit: 'off', testFocus: false, regressionGuard: false,
+      autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
+    });
+    assert.equal(result.reachedDone, false);
+    assert.equal(events.some(e => e.type === 'cli_contract'), extra);
+    assert.match(result.turns.map(turn => turn.observation).join('\n'), /(?:exit.?1|fail|red)/i);
+    if (!extra) assert.ok(calls.every(label => !label), 'no model-designed cases');
+  }
+});

@@ -111,3 +111,8 @@ function assertStrictObjects(schema) {
     else assertStrictObjects(value);
   }
 }
+
+test('structured data responses preserve meaningful null object values', () => {
+  const raw = '{"args":[{"optional":null}],"expect":{"kind":"throws","value":null}}';
+  assert.equal(normalizeCodexStructuredContent(raw, { type: 'object' }), raw);
+});

@@ -50,8 +50,9 @@ export class ChatSessionPlanner {
     return `${this.prefix}-${randomBytes(4).toString("hex")}`;
   }
 
-  plan(prompt) {
+  plan(prompt, { isolated = false } = {}) {
     const text = String(prompt ?? "");
+    if (isolated) return this._pend({ sessionId: null, delta: false, kind: "ephemeral", messages: chatMessagesFromPrompt(text) });
     if (this.run && typeof this.run.lastPrompt === "string") {
       const base = withoutOpenAssistant(this.run.lastPrompt);
       const acknowledged = this.run.lastCompletion;

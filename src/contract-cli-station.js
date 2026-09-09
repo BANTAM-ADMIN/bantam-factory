@@ -1,3 +1,4 @@
+import { declarativeJsonOutput } from './declarative-json-output.js';
 // A bounded branch of the existing assertion/probe workflow, not a new runner.
 // The model proposes data only; the measured API return is a coherence reference.
 import fs from 'node:fs';
@@ -15,6 +16,7 @@ const same=(a,b)=>canonicalEncode(a)===canonicalEncode(b);
 const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const HASH=/^[a-f0-9]{64}$/;
 const TOKENS=1800;
+const outputFor = model => declarativeJsonOutput(model, { schema: CLI_ASSERTION_SPEC_SCHEMA, grammar: CLI_ASSERTION_SPEC_GRAMMAR });
 // Invocation-owned opaque token. Cache proposal bytes only; each station still
 // copies current inputs and executes every probe stage and project check anew.
 const proposalCaches=new WeakMap();
@@ -32,7 +34,7 @@ function promptFor({model,task,documents,sources,contract}){
   const content=[`PUBLIC TASK:\n${scrub(task)}`,...documents.map(d=>`SUPPLIED DOCUMENT ${scrub(d.path)}:\n${scrub(d.text)}`),
     ...sources.map(s=>`CURRENT SOURCE ${scrub(s.path)}:\n${scrub(s.text)}`)].join('\n\n');
   const markers=model.thinkMarkers??model.profile?.think;
-  return `${template.open('system')}${system}\n${template.close}${template.open('user')}${instruction}\n\n${content}\n${template.close}`
+  return `${template.open('system')}${system}${outputFor(model).instruction}\n${template.close}${template.open('user')}${instruction}\n\n${content}\n${template.close}`
     +template.open(template.assistantRole??'assistant')
     +(typeof markers?.open==='string'&&typeof markers?.close==='string'?`${markers.open}${markers.close}\n\n`:'');
 }
@@ -44,7 +46,7 @@ export async function runContractCliStation({workspace,model,task,documents=[],s
     contract:null,contractSha256:null,sources:[],tokens:null,candidateVerified:false,scope:'declared-cli-api-coherence',
     authority:'public-process-contract-and-measured-api-reference',promptSha256:null,
     promptDataTransform:'profile-control-token-neutralization',grammarSha256:sha(CLI_ASSERTION_SPEC_GRAMMAR),
-    jsonSchemaSha256:sha(JSON.stringify(CLI_ASSERTION_SPEC_SCHEMA))};
+    jsonSchemaSha256:sha(JSON.stringify(outputFor(model).schema))};
   const unavailable=reason=>({...receipt,status:'unavailable',reason:String(reason).slice(0,240)});
   try{
     if(!Number.isSafeInteger(generation)||generation<0||typeof model?.complete!=='function'
@@ -78,7 +80,7 @@ export async function runContractCliStation({workspace,model,task,documents=[],s
     let output,onAbort;
     try{
       const canceled=new Promise((_,reject)=>{onAbort=()=>reject(callSignal.reason);callSignal.addEventListener('abort',onAbort,{once:true});if(callSignal.aborted)onAbort();});
-      output=cached ? {content:cached.content,tokens:0} : await Promise.race([model.complete(prompt,{grammar:CLI_ASSERTION_SPEC_GRAMMAR,jsonSchema:CLI_ASSERTION_SPEC_SCHEMA,
+      output=cached ? {content:cached.content,tokens:0} : await Promise.race([model.complete(prompt,{isolated:true,grammar:outputFor(model).grammar,jsonSchema:outputFor(model).schema,
         nPredict:TOKENS,temperature:0,retries:0,signal:callSignal,recordLabel:'contract-cli-assertion'}),canceled]);
       callSignal.throwIfAborted();
     }finally{clearTimeout(timer);if(onAbort)callSignal.removeEventListener('abort',onAbort);}
@@ -87,7 +89,7 @@ export async function runContractCliStation({workspace,model,task,documents=[],s
     receipt.designReused=Boolean(cached);
     if(cached)receipt.designOrigin={generation:cached.generation,responseSha256:cached.responseSha256,promptSha256:receipt.promptSha256};
     if(output?.stoppedLimit||output?.truncated||receipt.tokens>=TOKENS)return unavailable('CLI assertion proposal was truncated');
-    const spec=parseCliAssertionSpec(output?.content,{contract:derived,sourcePaths:sources.map(s=>s.path)});
+    const spec=parseCliAssertionSpec(outputFor(model).decode(output?.content),{contract:derived,sourcePaths:sources.map(s=>s.path)});
     if(!spec)return unavailable('no valid bounded CLI data assertion returned');
     receipt.spec=spec;receipt.specSha256=sha(canonicalEncode(spec));
     if(!same(readBoundInputs(root,sources),inputs))return unavailable('source changed while designing the CLI assertion');

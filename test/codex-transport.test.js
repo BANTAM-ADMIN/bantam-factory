@@ -444,6 +444,30 @@ test("auxiliary image calls do not replace the acknowledged run context", async 
   codex.endRun(token);
 });
 
+test('successful and rejected auxiliary stations retain the main Codex context', async t => {
+  const codex = server({ threadMode: 'run', promptMode: 'delta' });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = '<|im_start|>system\n' + 'worker instructions\n'.repeat(300)
+    + '<|im_end|>\n<|im_start|>user\nimplement the task<|im_end|>\n';
+  const first = await codex.complete(base);
+  const auxiliary = await codex.complete('<|im_start|>system\nDesign one test case.<|im_end|>\n<|im_start|>user\nsource<|im_end|>');
+  assert.equal(auxiliary.codexThread.threadMode, 'ephemeral');
+  assert.notEqual(auxiliary.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(codex.runLastPrompt, base);
+  await assert.rejects(codex.complete('failed turn', { isolated: true }), /synthetic turn failure/);
+  assert.equal(codex.runLastPrompt, base);
+  const request = codex.request.bind(codex);
+  codex.request = (method, params) => method === 'turn/start'
+    ? Promise.reject(new Error('400 invalid output schema')) : request(method, params);
+  await assert.rejects(codex.complete('another isolated station', { isolated: true }), /invalid output schema/);
+  codex.request = request;
+  const next = await codex.complete(base + 'new worker observation');
+  assert.equal(next.codexThread.threadId, first.codexThread.threadId);
+  assert.equal(next.codexPromptDelivery.mode, 'delta');
+  codex.endRun(token);
+});
+
 test("a lost runtime forgets its cursor and resumes from the full canonical prompt", async (t) => {
   const codex = server({ threadMode: "run", promptMode: "delta" });
   t.after(() => codex.close());

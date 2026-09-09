@@ -1,3 +1,4 @@
+import { declarativeJsonOutput } from './declarative-json-output.js';
 // One model-designed declarative assertion, executed by the existing isolated
 // probe machinery. Passing means this case passed, not that its oracle is right.
 import fs from "node:fs";
@@ -15,6 +16,7 @@ const sha = value => crypto.createHash("sha256").update(value).digest("hex");
 const digest = value => `sha256:${sha(canonicalEncode(value))}`;
 const HASH = /^[a-f0-9]{64}$/;
 const TOKEN_LIMIT = 1800;
+const outputFor = model => declarativeJsonOutput(model, { schema: ASSERTION_SPEC_SCHEMA, grammar: ASSERTION_SPEC_GRAMMAR });
 const PROMPT_BYTE_LIMIT = 56000;
 const INPUT_BYTE_LIMIT = 65536;
 const record = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -79,7 +81,7 @@ function assertionPrompt({ model, task, documents, sources, audit }) {
   const advice = typeof audit?.report === "string" && audit.report.trim()
     ? `\n\nOPTIONAL REVIEW (unverified advice, not an oracle):\n${scrub(audit.report.slice(0, 1500))}${audit.report.length > 1500 ? "\n[review excerpt only]" : ""}` : "";
   const markers = model.thinkMarkers ?? model.profile?.think;
-  return `${template.open("system")}${system}\n${template.close}`
+  return `${template.open("system")}${system}${outputFor(model).instruction}\n${template.close}`
     + `${template.open("user")}${instruction}\n\n${contract}\n\n${code}${advice}\n${template.close}`
     + template.open(template.assistantRole ?? "assistant")
     + (typeof markers?.open === "string" && typeof markers?.close === "string" ? `${markers.open}${markers.close}\n\n` : "");
@@ -112,7 +114,7 @@ export async function runContractAssertionStation({ workspace, model, task, docu
     auditPromptSha256: audit?.promptSha256 ?? null, taskSha256: sha(String(task ?? "")),
     sources: [], promptSha256: null, promptDataTransform: "profile-control-token-neutralization", tokens: null, candidateVerified: false,
     scope: "declared-assertion-only", authority: "model-designed-case",
-    grammarSha256: sha(ASSERTION_SPEC_GRAMMAR), jsonSchemaSha256: sha(JSON.stringify(ASSERTION_SPEC_SCHEMA)) };
+    grammarSha256: sha(ASSERTION_SPEC_GRAMMAR), jsonSchemaSha256: sha(JSON.stringify(outputFor(model).schema)) };
   let root, inputs;
   const unavailable = reason => ({ ...receipt, status: "unavailable", reason });
   try {
@@ -147,7 +149,7 @@ export async function runContractAssertionStation({ workspace, model, task, docu
         callSignal.addEventListener("abort", onAbort, { once: true });
         if (callSignal.aborted) onAbort();
       });
-      output = await Promise.race([model.complete(prompt, { grammar: ASSERTION_SPEC_GRAMMAR, jsonSchema: ASSERTION_SPEC_SCHEMA,
+      output = await Promise.race([model.complete(prompt, { isolated: true, grammar: outputFor(model).grammar, jsonSchema: outputFor(model).schema,
         nPredict: TOKEN_LIMIT, temperature: 0, retries: 0, signal: callSignal, recordLabel: "contract-assertion" }), canceled]);
       callSignal.throwIfAborted();
     } finally {
@@ -157,7 +159,7 @@ export async function runContractAssertionStation({ workspace, model, task, docu
     receipt.tokens = Number.isSafeInteger(output?.tokens) && output.tokens >= 0 ? output.tokens : null;
     receipt.responseSha256 = sha(String(output?.content ?? ""));
     if (output?.stoppedLimit || output?.truncated || receipt.tokens >= TOKEN_LIMIT) return unavailable("assertion proposal was truncated or reached its output limit");
-    const spec = parseAssertionSpec(output?.content, { sourcePaths: sources.map(source => source.path) });
+    const spec = parseAssertionSpec(outputFor(model).decode(output?.content), { sourcePaths: sources.map(source => source.path) });
     if (!spec) return unavailable("no valid bounded declarative assertion returned");
     receipt.spec = spec; receipt.specSha256 = sha(canonicalEncode(spec));
     if (!same(readBoundInputs(root, sources), inputs)) return unavailable("source inputs changed while designing the assertion");

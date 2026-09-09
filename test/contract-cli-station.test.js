@@ -76,6 +76,28 @@ test('proposal reuse avoids only the model call, never a fresh execution or its 
   assert.equal(worker.calls.length,1);assert.equal(runner.calls.length,1);assert.equal(failedRunner.calls.length,1);
 });
 
+test('Codex CLI cases use a closed string envelope and still validate the decoded case', async t => {
+  for (const flag of ['codex', 'codexBacked']) {
+    const worker = model(JSON.stringify({json: JSON.stringify(SPEC)}));
+    worker[flag] = true;
+    const r = await runContractCliStation({...fixture(t), model: worker, runExperiment: experiment().run});
+    assert.equal(r.status, 'complete', r.reason);
+    assert.deepEqual(r.spec, SPEC);
+    assert.deepEqual(worker.calls[0].options.jsonSchema, {
+      type: 'object', additionalProperties: false, required: ['json'], properties: {json: {type: 'string'}},
+    });
+    assert.equal(worker.calls[0].options.isolated, true);
+    assert.match(worker.calls[0].prompt, /Wire format/);
+    assert.equal(r.jsonSchemaSha256, sha(JSON.stringify(worker.calls[0].options.jsonSchema)));
+  }
+  const worker = model(JSON.stringify({json: '{"module":"convert.js","input":{"value":1,"value":2}}'}));
+  worker.codex = true;
+  const runner = experiment();
+  const r = await runContractCliStation({...fixture(t), model: worker, runExperiment: runner.run});
+  assert.equal(r.status, 'unavailable');
+  assert.equal(runner.calls.length, 0);
+});
+
 test('proposal reuse is invocation/model/input/policy bound',async t=>{
   const args=fixture(t),worker=model(),runner=experiment(),proposalCache=createCliProposalCache();
   const run=patch=>runContractCliStation({...args,model:worker,runExperiment:runner.run,proposalCache,...patch});

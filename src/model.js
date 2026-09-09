@@ -262,6 +262,12 @@ export class ModelClient {
   // the direct app-server transport. Keep capability and transport separate.
   get codexBacked() { return this.codex || this.chatSessions !== null; }
 
+  get codexToolIdentity() {
+    // codexapi accepts model:effort; native vision tools accept them separately.
+    const match = this.codexBacked && this.modelName?.match(/^(.*):(low|medium|high|xhigh|max|ultra)$/);
+    return { model: match ? match[1] : this.modelName, effort: match ? match[2] : this.codexEffort };
+  }
+
   async detectChatSessions() {
     if (!this.apiMode || !this.chatDialect || this.deepseek || this.chatSessions
       || /^(0|false|no|off)$/i.test(String(process.env.BANTAM_CHAT_SESSIONS ?? ""))) return;
@@ -427,6 +433,7 @@ export class ModelClient {
         jsonMode: Boolean(opts.grammar),
         outputSchema: opts.jsonSchema ?? null,
         adaptiveRebase: opts.codexAdaptiveRebase !== false,
+        isolated: opts.isolated === true,
       };
     } else if (this.apiMode) {
       const sampling = { temperature, topP: this.topP, topK: this.topK, nPredict, stop, seed,
@@ -445,7 +452,7 @@ export class ModelClient {
         });
       } else if (this.chatDialect) {
         url = `${this.apiUrl}/chat/completions`;
-        const plan = this.chatSessions ? this.chatSessions.plan(prompt) : null;
+        const plan = this.chatSessions ? this.chatSessions.plan(prompt, { isolated: opts.isolated === true }) : null;
         body = buildChatCompletionsBody({
           prompt,
           sampling,
@@ -570,6 +577,7 @@ export class ModelClient {
         model: body.model || this.modelName,
         effort: body.effort || this.codexEffort,
         adaptiveRebase: body.adaptiveRebase !== false,
+        isolated: body.isolated === true,
       });
       exchange.response = {
         status: 200,

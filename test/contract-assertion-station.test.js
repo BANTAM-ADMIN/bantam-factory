@@ -15,6 +15,17 @@ const TASK = "Export function collect(items): reject non-array input. For an emp
 const SOURCE = "export function collect(items) { if (!Array.isArray(items)) throw Error('array'); return items; }\n";
 const SPEC = { module: "api.mjs", export: "collect", fixtures: [], args: [[]], expect: { kind: "equals", value: [] } };
 
+test('Codex assertion envelope preserves nested JSON and a throws expectation with null', async t => {
+  const spec = {...SPEC, args: [{nested: [null, {"arbitrary key": null}]}], expect: {kind: 'throws', value: null}};
+  const worker = model({content: JSON.stringify({json: JSON.stringify(spec)}), tokens: 91});
+  worker.codex = true;
+  const result = await runContractAssertionStation({...fixture(t), model: worker, runExperiment: experiment().run});
+  assert.equal(result.status, 'assertion_passed', result.reason);
+  assert.deepEqual(result.spec, spec);
+  assert.equal(worker.calls[0].options.isolated, true);
+  assert.deepEqual(worker.calls[0].options.jsonSchema.required, ['json']);
+});
+
 function fixture(t) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-assertion-station-"));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));

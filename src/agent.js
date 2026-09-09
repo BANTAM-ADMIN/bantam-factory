@@ -940,8 +940,8 @@ async function runAgentCore({
     visualTask,
     onEvent,
     codex: model?.codex === true || model?.codexBacked === true,
-    codexModel: model?.modelName,
-    codexEffort: model?.codexEffort,
+    codexModel: model?.codexToolIdentity?.model ?? model?.modelName,
+    codexEffort: model?.codexToolIdentity?.effort ?? model?.codexEffort,
     signal,
     onExternalUsage: (usage, meta) => model?.recordExternalUsage?.(usage, meta),
   }) : null;
@@ -999,11 +999,16 @@ async function runAgentCore({
   const bareTurnPrefill = bareTemplate.open(bareTemplate.assistantRole);
   const taskNamedPaths = taskNamedSourcePaths(task, workspace);
   const taskOutputPaths = extractTaskOutputPaths(task);
-  const cliContract = !interactive && !advisoryMode && probeEnabled
+  // These additional model-designed cases are useful for local workers, but
+  // duplicate Codex's own investigation by default. Explicit configured
+  // verification and all ordinary completion gates still apply to Codex.
+  const extraModelStations = !(model?.codex === true || model?.codexBacked === true)
+    || process.env.BANTAM_CODEX_EXTRA_STATIONS === "1";
+  const cliContract = extraModelStations && !interactive && !advisoryMode && probeEnabled
     && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker"
     && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")
     ? deriveCliContract(task) : null;
-  const streamStationEnabled = !interactive && !advisoryMode && probeEnabled && Boolean(verificationScript)
+  const streamStationEnabled = extraModelStations && !interactive && !advisoryMode && probeEnabled && Boolean(verificationScript)
     && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? 'docker') === 'docker'
     && !callerExcludedActions.includes('probe') && !callerExcludedActions.includes('shell')
     && streamObligations(task).length > 0;

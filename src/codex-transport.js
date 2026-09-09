@@ -309,11 +309,19 @@ export class CodexAppServer {
     adaptiveRebase = true,
     baseInstructions = BASE_INSTRUCTIONS,
     inputItems = [],
+    isolated = false,
   } = {}) {
     await this.start();
     if (signal?.aborted) throw abortedError();
 
-    const reuseRunThread = this.threadMode === "run" && Boolean(this.activeRun);
+    // Auditors/stations have their own system prompt. They must never replace
+    // the worker's acknowledged conversation, including when their call fails.
+    const systemHead = (text) => typeof text === "string"
+      ? text.match(/^<\|im_start\|>system\n[\s\S]*?<\|im_end\|>/)?.[0] : null;
+    const previousSystem = systemHead(this.runLastPrompt);
+    const auxiliary = isolated || (previousSystem && systemHead(String(prompt))
+      && previousSystem !== systemHead(String(prompt)));
+    const reuseRunThread = this.threadMode === "run" && Boolean(this.activeRun) && !auxiliary;
     if (reuseRunThread && this.runThreadId && this.runThreadModel !== model) {
       throw new Error("cannot change Codex models inside one run-scoped thread");
     }
@@ -891,7 +899,9 @@ function modelFromThread(_turn, fallback) {
 }
 
 export function normalizeCodexStructuredContent(content, outputSchema) {
-  if (!outputSchema) return content;
+  // Nullable optional fields belong to our action envelope. Arbitrary data
+  // outputs (fixtures, expected values, reviews) must preserve literal nulls.
+  if (!Array.isArray(outputSchema?.properties?.a?.enum)) return content;
   try {
     const parsed = JSON.parse(content);
     return JSON.stringify(removeNullProperties(parsed));

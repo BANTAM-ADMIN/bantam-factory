@@ -40,6 +40,23 @@ test('an altered or unacknowledged assistant reply is never silently dropped', (
   }
 });
 
+test('explicit auxiliary calls never capture or replace a bridge run session', () => {
+  const client = new ModelClient({apiUrl: 'http://bridge/v1', apiDialect: 'chat', model: 'gpt-6-astra:medium'});
+  const planner = client.enableChatSessions();
+  assert.deepEqual(client.codexToolIdentity, {model: 'gpt-6-astra', effort: 'medium'});
+  let request = client.buildRequest(P0, {isolated: true});
+  assert.equal(planner.pending.kind, 'ephemeral');
+  assert.equal(JSON.parse(request.body).session_id ?? null, null);
+  planner.commit(planner.pending, P0, REPLY);
+  assert.equal(planner.run, null);
+  const first = planner.plan(P0); planner.commit(first, P0, REPLY);
+  request = client.buildRequest(P1, {isolated: true});
+  assert.equal(planner.pending.kind, 'ephemeral');
+  planner.commit(planner.pending, P1, 'auxiliary reply');
+  assert.equal(planner.plan(P1).sessionId, first.sessionId);
+  assert.equal(planner.pending.kind, 'delta');
+});
+
 test('a startup grammar probe cannot capture the main run session', async () => {
   const client = new ModelClient({apiUrl:'http://bridge/v1', apiDialect:'chat'});
   client.enableChatSessions(); const planner=client.chatSessions;

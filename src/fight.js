@@ -765,6 +765,7 @@ export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
     const measured = calls?.filter(call => {
       const usage = call?.response?.normalized?.usage;
       return call?.status === 'ok' && !(call.attempts?.length > 1)
+        && usage?.complete !== false
         && Number.isSafeInteger(usage?.inputTokens) && usage.inputTokens > 0
         && ['outputTokens','cacheHitTokens'].every(key => Number.isSafeInteger(usage?.[key]) && usage[key] >= 0)
         && usage.cacheHitTokens <= usage.inputTokens;

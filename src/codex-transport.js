@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import readline from "node:readline";
 import { ActionSchema, parseAction } from "./actions.js";
+import { CodexUsageAccumulator, emptyCodexUsage } from "./codex-usage.js";
 
 const DEFAULT_COMMAND = process.env.BANTAM_CODEX_COMMAND || "codex";
 const DEFAULT_CONTROL_TIMEOUT_MS = 30000;
@@ -140,6 +141,7 @@ export class CodexAppServer {
     this.nextId = 1;
     this.pending = new Map();
     this.turns = new Map();
+    this.usageCursors = new Map();
     this.ready = null;
     this.stderr = "";
   }
@@ -160,6 +162,7 @@ export class CodexAppServer {
   endRun(token) {
     if (this.threadMode !== "run") return false;
     if (!this.activeRun || token !== this.activeRun) return false;
+    this.usageCursors.delete(this.runThreadId);
     this.activeRun = null;
     this.runThreadId = null;
     this.runThreadModel = null;
@@ -385,9 +388,11 @@ export class CodexAppServer {
 
     const state = {
       threadId,
+      model,
       turnId: null,
       content: "",
       usage: null,
+      usageAccumulator: new CodexUsageAccumulator(this.usageCursors.get(threadId)),
       images: [],
       onProgress,
       outputSchema,
@@ -410,6 +415,7 @@ export class CodexAppServer {
     const failTurn = (error, { recycle = false } = {}) => {
       if (!this.turns.has(threadId)) return;
       this.turns.delete(threadId);
+      if (!reuseRunThread || this.runThreadId !== threadId) this.usageCursors.delete(threadId);
       state.reject(error);
       if (recycle) this.close(error);
     };
@@ -505,6 +511,7 @@ export class CodexAppServer {
       clearTimeout(idleTimer);
       signal?.removeEventListener("abort", onAbort);
       this.turns.delete(threadId);
+      if (!reuseRunThread || this.runThreadId !== threadId) this.usageCursors.delete(threadId);
     }
   }
 
@@ -526,6 +533,7 @@ export class CodexAppServer {
   }
 
   _clearRunThreadBinding() {
+    this.usageCursors.delete(this.runThreadId);
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
@@ -606,6 +614,7 @@ export class CodexAppServer {
     });
     const threadId = started?.thread?.id;
     if (!threadId) throw new Error("Codex app-server did not return a thread id");
+    this.usageCursors.set(threadId, emptyCodexUsage());
     return threadId;
   }
 
@@ -689,7 +698,10 @@ export class CodexAppServer {
       return;
     }
     if (method === "thread/tokenUsage/updated") {
-      state.usage = params.tokenUsage?.last ?? state.usage;
+      state.usageAccumulator.add(params.tokenUsage);
+      const accumulated = state.usageAccumulator.snapshot();
+      state.usage = accumulated.raw;
+      this.usageCursors.set(state.threadId, accumulated.cursor);
       return;
     }
     if (method !== "turn/completed") return;
@@ -706,14 +718,16 @@ export class CodexAppServer {
       finalMessage?.text ?? state.content,
       state.outputSchema,
     );
+    const accumulated = state.usageAccumulator.snapshot();
     state.resolve({
       content,
       tokens: Number(state.usage?.outputTokens ?? 0),
       stoppedEos: true,
       stoppedLimit: false,
       timings: {},
-      usage: codexUsage(state.usage, modelFromThread(turn, this.model)),
+      usage: codexUsage(state.usage, state.model, accumulated),
       rawUsage: state.usage,
+      codexUsageEvidence: accumulated.evidence,
       images: state.images,
     });
   }
@@ -723,6 +737,7 @@ export class CodexAppServer {
     for (const state of this.turns.values()) state.reject(error);
     this.pending.clear();
     this.turns.clear();
+    this.usageCursors.clear();
     this.child = null;
     this.ready = null;
     this.runThreadId = null;
@@ -958,32 +973,28 @@ function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
-function codexUsage(raw, model) {
+function codexUsage(raw, model, {requests = 0, complete = false} = {}) {
   const inputTokens = positive(raw?.inputTokens);
   const outputTokens = positive(raw?.outputTokens);
   const cached = positive(raw?.cachedInputTokens);
   return {
     provider: "codex",
     model,
-    requests: 1,
+    requests: Math.max(1, requests),
+    complete,
     inputTokens,
     outputTokens,
-    totalTokens: positive(raw?.totalTokens) || inputTokens + outputTokens,
+    totalTokens: positive(raw?.totalTokens) ?? (inputTokens === null || outputTokens === null ? null : inputTokens + outputTokens),
     cacheHitTokens: cached,
-    cacheMissTokens: Math.max(0, inputTokens - cached),
+    cacheMissTokens: inputTokens === null || cached === null ? null : Math.max(0, inputTokens - cached),
     reasoningTokens: positive(raw?.reasoningOutputTokens),
     costUsd: 0,
-    codexRequests: 1,
+    codexRequests: Math.max(1, requests),
   };
 }
 
 function positive(value) {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-}
-
-function modelFromThread(_turn, fallback) {
-  return fallback;
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 export function normalizeCodexStructuredContent(content, outputSchema) {

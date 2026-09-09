@@ -58,6 +58,7 @@ test("Codex transport initializes, discovers its model, streams, and reports usa
     provider: "codex",
     model: "gpt-5.6-sol",
     requests: 1,
+    complete: true,
     inputTokens: 120,
     outputTokens: 12,
     totalTokens: 132,
@@ -82,6 +83,36 @@ test("Codex image broker returns a saved path without raw image bytes", async (t
   assert.match(image.savedPath, /fake-codex-image-\d+\.png$/);
   assert.equal(image.revisedPrompt, "synthetic revised image prompt");
   assert.equal(Object.hasOwn(image, "result"), false);
+});
+
+test('multiple native responses are counted once and prior run turns are not charged again', async t => {
+  const codex = server({threadMode:'run',promptMode:'full'});t.after(() => codex.close());
+  const token = codex.beginRun();
+  for (let i=0;i<2;i++) {
+    const result = await codex.complete('native usage sequence');
+    assert.equal(result.usage.inputTokens,300);
+    assert.equal(result.usage.outputTokens,20);
+    assert.equal(result.usage.cacheHitTokens,180);
+    assert.equal(result.usage.requests,2);
+    assert.equal(result.usage.complete,true);
+    assert.equal(result.codexUsageEvidence.receipts.length,2);
+  }
+  codex.endRun(token);assert.equal(codex.usageCursors.size,0);
+  const isolated = await codex.complete('native usage sequence',{model:'gpt-6-astra'});
+  assert.equal(isolated.usage.model,'gpt-6-astra');
+  assert.equal(isolated.usage.inputTokens,300);
+  assert.equal(codex.usageCursors.size,0);
+});
+
+test('completion without a native receipt records unknown tokens and incomplete accounting', async t => {
+  const codex = server();t.after(() => codex.close());
+  const result = await codex.complete('native missing usage');
+  assert.equal(result.usage.complete,false);
+  assert.equal(result.usage.inputTokens,null);
+  assert.equal(result.usage.outputTokens,null);
+  assert.equal(result.usage.cacheHitTokens,null);
+  assert.equal(result.rawUsage,null);
+  assert.deepEqual(result.codexUsageEvidence.gaps,['missing-response-usage']);
 });
 
 test("embedded text workers omit native tool menus while image workers retain generation", async t => {

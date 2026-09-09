@@ -4,6 +4,7 @@ import readline from "node:readline";
 const lines = readline.createInterface({ input: process.stdin });
 let nextThread = 1;
 let nextTurn = 1;
+const usageTotals = new Map();
 
 // Die with the parent. This fixture inherits the test file's stdio, so a
 // survivor holds that pipe open and `node --test` never sees EOF: on 2026-08-16
@@ -70,6 +71,21 @@ lines.on("line", (line) => {
 
   const turnId = `turn-${nextTurn++}`;
   send({ id, result: { turn: { id: turnId } } });
+  if (prompt === 'native usage sequence' || prompt === 'native missing usage') {
+    const total = usageTotals.get(params.threadId) ?? {inputTokens:0,cachedInputTokens:0,outputTokens:0,reasoningOutputTokens:0,totalTokens:0};
+    if (prompt === 'native usage sequence') for (const last of [
+      {inputTokens:120,cachedInputTokens:20,outputTokens:12,reasoningOutputTokens:4,totalTokens:132},
+      {inputTokens:180,cachedInputTokens:160,outputTokens:8,reasoningOutputTokens:2,totalTokens:188},
+    ]) {
+      for (const k of Object.keys(total)) total[k] += last[k];
+      const update = {method:'thread/tokenUsage/updated',params:{threadId:params.threadId,turnId,tokenUsage:{last,total}}};
+      send(update);send(update); // Retransmitted notification, not another model response.
+    }
+    usageTotals.set(params.threadId,total);
+    const item = {type:'agentMessage',phase:'final_answer',text:'native work complete'};
+    send({method:'turn/completed',params:{threadId:params.threadId,turnId,turn:{id:turnId,status:'completed',items:[item]}}});
+    return;
+  }
   if (prompt === "report env") {
     const text = JSON.stringify({
       bantamKeys: Object.keys(process.env).filter((k) => k.startsWith("BANTAM_")),

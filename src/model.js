@@ -1116,6 +1116,7 @@ function normalizedResponseRecord(value) {
     usage: value?.usage ?? null,
     codexThread: value?.codexThread ?? null,
     codexPromptDelivery: value?.codexPromptDelivery ?? null,
+    codexUsageEvidence: value?.codexUsageEvidence ?? null,
   };
 }
 

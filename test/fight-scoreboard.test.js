@@ -178,6 +178,9 @@ test('BANTAM usage is complete only when every request receipt accounts for the 
   const run = {metrics:{modelRequests:1, usage}, modelCalls:[{status:'ok', response:{normalized:{usage}}}]};
   const read = () => {fs.writeFileSync(path.join(armDir,'run.json'),JSON.stringify(run));return cornerUsage('bantam-codex-astra',{armDir});};
   assert.equal(read().complete,true); assert.equal(read().measuredRequests,1);
+  run.modelCalls[0].response.normalized.usage = {...usage, complete:false};
+  assert.equal(read().complete,false,'native accounting gaps cannot become complete fight figures');
+  run.modelCalls[0].response.normalized.usage = usage;
   run.metrics.modelRequests = 2;
   assert.equal(read().complete,false, 'a missing request cannot look fully measured');
   run.metrics.modelRequests = 1; run.modelCalls[0].status = 'error';

@@ -5,10 +5,40 @@ import os from 'node:os';
 import path from 'node:path';
 import { pendingInitialVerifier } from '../src/verification-bootstrap.js';
 import { runAgent } from '../src/agent.js';
+import { QWEN_ASSISTANT_PREFILL } from '../src/profiles.js';
 
 const baseline = { complete: true, initialPaths: ['package.json', 'test'], excludedPaths: [] };
 const options = { command: 'npm test', provenance: baseline,
   readFile: () => JSON.stringify({ scripts: { test: 'node test/smoke.js' } }), exists: () => false };
+
+test('a premature completion names the missing check and invokes reasoning before the next action', async t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-missing-check-response-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ scripts: { test: 'node test/smoke.js' } }));
+  fs.mkdirSync(path.join(workspace, 'src')); fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'src/add.cjs'), 'module.exports = (a, b) => a + b;\n');
+  const actions = [
+    { a: 'respond', text: 'The complete implementation is ready for testing.' },
+    { a: 'write_file', p: 'test/smoke.js', content: "const assert = require('node:assert/strict'); assert.equal(require('../src/add.cjs')(2, 3), 5);\n" },
+  ];
+  const calls = []; let observed = 0;
+  const result = await runAgent({ workspace, task: 'Build and verify the addition implementation.',
+    maxTurns: Infinity, shouldAbort: () => observed >= 2, thinkMode: 'auto',
+    useGrammar: true, grounding: false, preGate: false, shellSandbox: 'host',
+    verificationScript: 'npm test', autoVerifyBlindEdits: 1, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
+    completionAudit: false, progressAwareness: false,
+    model: { assistantPrefill: QWEN_ASSISTANT_PREFILL, stop: [], async complete(prompt, options) {
+      calls.push({ prompt, thought: !options.grammar });
+      return { content: options.grammar ? JSON.stringify(actions.shift()) : 'The implementation needs meaningful executable checks before completion.', tokens: 12, stoppedEos: true };
+    } }, onEvent: event => { if (event.type === 'observation') observed++; },
+  });
+  assert.match(result.turns[0].observation, /^\[implementation-response\] Completion is blocked: npm test cannot run because test\/smoke.js is still missing/);
+  assert.equal(result.reachedDone, false);
+  assert.deepEqual(calls.map(call => call.thought), [true, false, true, false]);
+  assert.match(calls[2].prompt, /test\/smoke\.js is still missing/);
+  assert.equal(result.turns[1].editApplied, true);
+  assert.equal(result.turns[1].verificationEvidence.status, 'pass', 'the new actual check runs; the earlier claim supplies no proof');
+});
 
 test('defer a proven absent starter entrypoint until it exists, preserving removed checks and changed scripts', () => {
   assert.equal(pendingInitialVerifier(options), 'test/smoke.js');

@@ -382,8 +382,10 @@ export function isChangeShapedRequest(task) {
 // possible, bounced off; the next turn was done("Blocked:") on an untouched
 // tree. When the respond text claims inability, rebut the belief by name
 // before repeating the instruction.
-export function implementationResponseObservation(text = "") {
-  const base = "[implementation-response] This is an autonomous implementation task, so there is no user to answer with `respond`. Do not describe a bug, plan, or next step: make the required edit now, run the configured verification after your latest edit, then emit `done` only when the implementation is complete.";
+export function implementationResponseObservation(text = "", { pendingVerifier = null, verificationScript = null } = {}) {
+  const missingCheck = pendingVerifier
+    ? ` Completion is blocked: ${verificationScript} cannot run because ${pendingVerifier} is still missing. Create its meaningful checks, execute them and repair failures before claiming completion.` : '';
+  const base = `[implementation-response]${missingCheck} This is an autonomous implementation task, so there is no user to answer with \`respond\`. Do not describe a bug, plan, or next step: make the required edit now, run the configured verification after your latest edit, then emit \`done\` only when the implementation is complete.`;
   if (/\b(?:can['’]?t|cannot|unable to|no way to|not able to)\b[^.!?]{0,60}\b(?:inspect|read|modify|edit|access|change|run|execute|see)\b/i.test(String(text))) {
     return base + " You DO have workspace access: the Workspace section of your prompt is the real tree, and your actions — inspect, write_file, replace, shell — ARE that access; no other channel is coming. Emit an inspect action now and the file contents will be in your next observation.";
   }
@@ -6077,7 +6079,9 @@ async function runAgentCore({
       result.done = false;
       result.summary = undefined;
       result.responded = false;
-      result.observation = implementationResponseObservation(String(action.text ?? ""));
+      result.observation = implementationResponseObservation(String(action.text ?? ""), {
+        pendingVerifier: pendingVerifierEntrypoint(), verificationScript,
+      });
       forceBuildEdit = true;
       onEvent({ type: "implementation_respond_rejected" });
     } else if (action.a === "done" && result.done) {

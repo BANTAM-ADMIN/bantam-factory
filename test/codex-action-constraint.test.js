@@ -19,3 +19,25 @@ test('schema opt-out affects only Codex actions; data schemas and other provider
   const local = new ModelClient({}); t.after(() => local.close());
   assert.equal(JSON.parse(local.buildRequest('local action', { grammar: 'original grammar', jsonSchema: schema }).body).grammar, 'original grammar');
 });
+
+test('bridge action opt-out preserves normalized acknowledgements and session reuse', async t => {
+  const old = process.env.BANTAM_CODEX_ACTION_SCHEMA, fetch = globalThis.fetch;
+  process.env.BANTAM_CODEX_ACTION_SCHEMA = 'off';
+  t.after(() => { globalThis.fetch = fetch; if (old === undefined) delete process.env.BANTAM_CODEX_ACTION_SCHEMA; else process.env.BANTAM_CODEX_ACTION_SCHEMA = old; });
+  const bodies = [];
+  globalThis.fetch = async (_url, options) => {
+    if (options.method === 'DELETE') return new Response('{}');
+    bodies.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({choices:[{message:{content:'{"a":"read_file","limit":10,"p":"main.js"}'}}],usage:{prompt_tokens:100,completion_tokens:20}}));
+  };
+  const model = new ModelClient({ apiUrl: 'http://bridge/v1', apiDialect: 'chat' });
+  model.enableChatSessions(); t.after(() => model.close());
+  const first = '<|im_start|>system\nUse actions.<|im_end|>\n<|im_start|>user\nInspect.<|im_end|>\n<|im_start|>assistant\n';
+  const schema = actionJsonSchema();
+  const result = await model.complete(first, { grammar:'action grammar', jsonSchema:schema });
+  assert.equal(result.content, '{"a":"read_file","p":"main.js","limit":10}');
+  await model.complete(first + result.content + '<|im_end|>\n<|im_start|>user\nFile contents.<|im_end|>\n<|im_start|>assistant\n', { grammar:'action grammar', jsonSchema:schema });
+  assert.ok(bodies.every(body => !body.response_format));
+  assert.equal(bodies[0].session_id, bodies[1].session_id);
+  assert.equal(bodies[1].messages.length, 1);
+});

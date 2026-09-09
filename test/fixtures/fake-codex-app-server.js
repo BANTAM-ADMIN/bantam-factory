@@ -157,7 +157,7 @@ lines.on("line", (line) => {
     : "plain response";
   send({
     method: "item/agentMessage/delta",
-    params: { threadId: params.threadId, turnId, delta: text.slice(0, 8) },
+    params: { threadId: params.threadId, turnId, delta: promptText === 'quoted whitespace' ? text : text.slice(0, 8) },
   });
   send({
     method: "thread/tokenUsage/updated",

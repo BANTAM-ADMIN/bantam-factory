@@ -186,7 +186,8 @@ export async function runFrontierSidecar({output,timeoutMs=600000}={}){
       if(grading)for(const [label,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
         fs.writeFileSync(path.join(dir,`${label}.stdout.log`),record.stdout,{mode:0o600});fs.writeFileSync(path.join(dir,`${label}.stderr.log`),record.stderr,{mode:0o600});
       }
-      const modelIdentity=nativeModelIdentity(sessions,model),usage=codexSessionUsage(sessions);
+      const modelIdentity=nativeModelIdentity(sessions,model),usage=codexSessionUsage(sessions,
+        {processCompleted:result.code===0&&!result.timedOut&&!result.aborted&&!result.bufferExceeded&&!executionError});
       const finalIntegrity=integrity&&unchanged();
       const outcome=sidecarOutcome({result,grading,tampered,modelIdentity,integrity:finalIntegrity});
       if(executionError||gradingError){outcome.outcome='ATTEMPT_ERROR';outcome.pass=false;outcome.scoreEligible=false;}

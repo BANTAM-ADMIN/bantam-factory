@@ -9,6 +9,10 @@ test('native Codex sums unique response records, not repeated cumulative token e
   const row={type:'token_usage_record',timestamp:'2026-09-06T00:00:00Z',payload:{response_id:'one',usage:{input_tokens:100,cached_input_tokens:80,output_tokens:5}}};
   fs.writeFileSync(path.join(dir,'one.jsonl'),[row,row,{type:'event_msg',payload:{info:{total_token_usage:row.payload.usage}}}].map(JSON.stringify).join('\n'));
   const u=codexSessionUsage(dir);assert.equal(u.requests,1);assert.equal(u.inputTokens,100);assert.equal(u.freshInputTokens,20);assert.equal(u.outputTokens,5);
+  const interrupted=codexSessionUsage(dir,{processCompleted:false});
+  assert.equal(interrupted.complete,false);assert.equal(interrupted.requests,null);
+  assert.equal(interrupted.measuredRequests,1);assert.equal(interrupted.inputTokens,100);
+  assert.match(interrupted.errors[0],/unfinished request usage is unknown/);
   fs.appendFileSync(path.join(dir,'one.jsonl'),'\n'+JSON.stringify({...row,payload:{...row.payload,usage:{...row.payload.usage,output_tokens:6}}}));
   assert.equal(codexSessionUsage(dir).complete,false);
 });

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const count=value=>Number.isSafeInteger(value)&&value>=0;
-export function codexSessionUsage(directory){
+export function codexSessionUsage(directory,{processCompleted}={}){
   const calls=new Map(),errors=[];
   function walk(dir){
     if(!fs.existsSync(dir))return;
@@ -29,9 +29,11 @@ export function codexSessionUsage(directory){
   }
   walk(directory);
   if(!calls.size)return null;
+  if(processCompleted===false)errors.push('Run did not finish cleanly; counters cover recorded responses only, and unfinished request usage is unknown.');
   const sum=key=>[...calls.values()].reduce((n,r)=>n+r.usage[key],0);
   const input=sum('inputTokens'),cache=sum('cacheHitTokens');
-  return {source:'codex-native-response-records',complete:errors.length===0,requests:calls.size,inputTokens:input,cacheHitTokens:cache,
+  return {source:'codex-native-response-records',complete:errors.length===0,
+    requests:processCompleted===false?null:calls.size,measuredRequests:calls.size,inputTokens:input,cacheHitTokens:cache,
     freshInputTokens:input-cache,outputTokens:sum('outputTokens'),reasoningTokens:sum('reasoningTokens'),prefixReuse:input?cache/input:null,errors,
     calls:[...calls.values()]};
 }

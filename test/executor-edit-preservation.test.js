@@ -34,6 +34,21 @@ test('a whole-file implementation and its tests replace a throw-only starter in 
   assert.ok(fs.existsSync(path.join(workspace, 'test/new.test.mjs')));
 });
 
+test('an atomic extension can rebind an existing call without regenerating the same patch', async t => {
+  const { workspace, executor } = fixture(t);
+  const source = "function inspect(root) { const stat = fs.lstatSync(root); return stat; }\n// extension\n";
+  fs.writeFileSync(path.join(workspace, 'source.mjs'), source);
+  const edits = [
+    {p:'source.mjs',old:'const stat = fs.lstatSync(root);',new:"const entry = root.replace(/\\/+$/, '') || '/'; const stat = fs.lstatSync(entry);"},
+    {p:'source.mjs',old:'// extension',new:'export function verify(root) { return inspect(root); }'},
+  ];
+  const result = await executor.execute({a:'patch',edits});
+  assert.equal(result.editOutcome.applied, true, result.observation);
+  assert.equal(result.editOutcome.preservationReviews, undefined);
+  assert.equal(fs.readFileSync(path.join(workspace, 'source.mjs'), 'utf8'),
+    edits.reduce((text, edit) => text.replace(edit.old, edit.new), source));
+});
+
 for (const action of [
   { a: "replace", p: "source.mjs", old: before, new: after },
   { a: "replace", p: "source.mjs", old: before, new: after, line: 1 },

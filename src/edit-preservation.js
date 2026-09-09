@@ -109,6 +109,43 @@ function replacesPlaceholder(statement, afterOwner) {
     && /\bnot (?:yet )?implemented\b/i.test(thrown.arguments[0].value));
 }
 
+// An existing call assigned to the same variable can change which identifier
+// it receives without deleting that call. Keep the exact before/after evidence,
+// but do not demand a second copy of the edit merely because helpers were added
+// elsewhere. This deliberately excludes changed callees, nested argument calls,
+// destructuring, duplicate bindings and moved declarations.
+function callBinding(statement) {
+  const node = statement.node;
+  if (node.type !== 'VariableDeclaration' || node.declarations.length !== 1) return null;
+  const declaration = node.declarations[0], call = declaration.init;
+  if (declaration.id.type !== 'Identifier' || call?.type !== 'CallExpression'
+      || call.optional || !call.arguments.length || call.arguments.some(arg => arg.type !== 'Identifier')) return null;
+  return {name: declaration.id.name, kind: node.kind, call};
+}
+
+function callArgumentRebindings(oldTree, newTree, removed, remaining, retainedOwner) {
+  const result = new Map();
+  if (removed.length > MAX_CHAIN_CANDIDATES) return result;
+  for (const statement of removed) {
+    const owner = retainedOwner(statement), binding = callBinding(statement);
+    if (!owner || !binding || !statement.owner.node.body?.body?.includes(statement.node)) continue;
+    const sameBinding = candidate => candidate.node.type === 'VariableDeclaration'
+      && candidate.node.declarations.some(declaration => declaration.id.type === 'Identifier'
+        && declaration.id.name === binding.name);
+    if (oldTree.statements.filter(candidate => candidate.owner === statement.owner && sameBinding(candidate)).length !== 1
+        || newTree.statements.filter(candidate => candidate.owner === owner && sameBinding(candidate)).length !== 1) continue;
+    const candidates = remaining.filter(candidate => {
+      const after = callBinding(candidate);
+      return candidate.owner === owner && owner.node.body?.body?.includes(candidate.node)
+        && after?.name === binding.name && after.kind === binding.kind
+        && after.call.arguments.length === binding.call.arguments.length
+        && fingerprint(after.call.callee) === fingerprint(binding.call.callee);
+    });
+    if (candidates.length === 1) result.set(statement, candidates[0]);
+  }
+  return result;
+}
+
 function location(node) {
   return { startLine: node.loc.start.line, startColumn: node.loc.start.column + 1,
     endLine: node.loc.end.line, endColumn: node.loc.end.column + 1 };
@@ -275,7 +312,9 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
   const placeholders = new Set(retainedRemovals.filter(statement => replacesPlaceholder(statement, retainedOwner(statement))));
   const operations = removedChainOperations(oldTree, newTree, removed,
     [...remaining.values()].flat(), retainedOwner, before, after);
-  const additiveReplacementRisk = retainedRemovals.some(statement => !placeholders.has(statement)) && additions.length > 0;
+  const rebindings = callArgumentRebindings(oldTree, newTree, retainedRemovals,
+    [...remaining.values()].flat(), retainedOwner);
+  const additiveReplacementRisk = retainedRemovals.some(statement => !placeholders.has(statement) && !rebindings.has(statement)) && additions.length > 0;
   const details = removed.slice(0, MAX_REMOVED).map((statement) => {
     const afterOwner = retainedOwner(statement);
     const nearby = oldTree.statements.filter((candidate) => candidate.owner === statement.owner
@@ -297,6 +336,10 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
     removedStatementCount: removed.length,
     removedFromRetainedFunctions: retainedRemovals.length,
     ...(placeholders.size ? { replacedPlaceholderCount: placeholders.size } : {}),
+    ...(rebindings.size ? { callArgumentRebindingCount: rebindings.size,
+      callArgumentRebindings: [...rebindings].slice(0, MAX_REMOVED).map(([old, current]) => ({
+        before: statementLocation(old, before), after: statementLocation(current, after),
+      })) } : {}),
     addedTopLevelFunctionCount: additions.length,
     additiveReplacementRisk,
     chainRemovalRisk: operations.length > 0,
@@ -326,7 +369,8 @@ export function formatEditPreservationWitness(witness) {
   const chainHeading = witness.chainRemovalRisk
     ? `A retained call chain loses ${witness.removedOperations.map(row => `${row.method}()${row.removedArrayCopy ? " plus its array-copy wrapper" : ""}`).join(", ").slice(0, 200)}; its downstream call, arguments and enclosing statement otherwise match. This is a structural change, NOT proof of a bug.\n`
     : "";
-  const heading = `[edit-preservation] ${chainHeading}${witness.phase === "applied" ? "Applied" : "Staged"} bytes remove ${witness.removedStatementCount} executable statement(s) by AST comparison; ${witness.addedTopLevelFunctionCount} new top-level function(s).\n`
+  const heading = `[edit-preservation] ${chainHeading}${witness.phase === "applied" ? "Applied" : "Staged"} bytes ${witness.callArgumentRebindingCount === witness.removedStatementCount ? 'replace' : 'remove'} ${witness.removedStatementCount} executable statement(s) by AST comparison; ${witness.addedTopLevelFunctionCount} new top-level function(s).\n`
+    + (witness.callArgumentRebindingCount ? `${witness.callArgumentRebindingCount} call argument rebinding(s) retain the same declared variable and callee; these are changes, not missing calls. This does not establish equivalent behavior.\n` : '')
     + (witness.additiveReplacementRisk ? "An existing function loses statements while new top-level functions are added.\n" : "")
     + (witness.addedFunctions.length ? `Added functions: ${witness.addedFunctions.map((fn) => `${fn.name} (AFTER L${fn.startLine})`).join(", ")}.\n` : "");
   const footer = "This is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. "

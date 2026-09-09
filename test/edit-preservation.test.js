@@ -49,6 +49,38 @@ test("identifies executable statements lost while appending a separate feature",
   assert.equal(receipt.candidateVerified, false);
 });
 
+test('a direct variable call can change identifier arguments without being classified as a missing call', () => {
+  const old = 'function inspect(root) { const stat = fs.lstatSync(root); validate(stat); return stat; }';
+  const current = old.replace('const stat = fs.lstatSync(root);',
+    "const entry = root.replace(/\\/+$/, '') || '/'; const stat = fs.lstatSync(entry);");
+  const receipt = witness(old, current + added);
+  assert.equal(receipt.removedStatementCount, 1, 'the exact old statement is still in the structural record');
+  assert.equal(receipt.callArgumentRebindingCount, 1);
+  assert.equal(receipt.callArgumentRebindings[0].after.excerpt, 'const stat = fs.lstatSync(entry);');
+  assert.equal(receipt.reviewRequired, false);
+  assert.equal(receipt.candidateVerified, false, 'new arguments can still be incorrect');
+  assert.match(formatEditPreservationWitness(receipt), /changes, not missing calls/);
+  assert.equal(formatEditPreservationReview(receipt), '');
+  const mixed = witness(old, current.replace('validate(stat); ', '') + added);
+  assert.equal(mixed.callArgumentRebindingCount, 1);
+  assert.equal(mixed.reviewRequired, true, 'the rebinding must not hide another removed operation');
+});
+
+test('changed callees, nested argument operations, scope moves and duplicate bindings still require review', () => {
+  for (const [old, current] of [
+    ['const stat = fs.lstatSync(root);', 'const stat = fs.statSync(entry);'],
+    ['const stat = fs.lstatSync(validate(root));', 'const stat = fs.lstatSync(entry);'],
+    ['const stat = fs.lstatSync(root);', 'const stat = root;'],
+    ['const stat = fs.lstatSync(root);', 'if (root) { const stat = fs.lstatSync(entry); }'],
+    ['if (root) { const stat = fs.lstatSync(root); }', 'const stat = fs.lstatSync(entry);'],
+    ['var stat = fs.lstatSync(root); var stat = fs.lstatSync(other);', 'var stat = fs.lstatSync(entry); var stat = fs.lstatSync(other);'],
+  ]) {
+    const receipt = witness(`function inspect(root) { ${old} }`, `function inspect(root) { ${current} }` + added);
+    assert.equal(receipt.callArgumentRebindingCount, undefined, old + ' → ' + current);
+    assert.equal(receipt.reviewRequired, true);
+  }
+});
+
 test("unchanged bodies and genuinely additive replacements stay silent", () => {
   assert.equal(witness(before, before), null);
   assert.equal(witness(before, before + added), null);

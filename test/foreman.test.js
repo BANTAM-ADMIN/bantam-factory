@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, waitForForemanUpdate, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, foremanWorkerCommand, cleanupForemanContainers, foremanObservation } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, foremanWorkerCommand, cleanupForemanContainers, foremanObservation, foremanWorkerReport } from '../src/foreman.js';
 import { runProcess } from '../src/process-runner.js';
 import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
 import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
@@ -15,6 +15,32 @@ const action = (kind, fields = {}) => ({ action: kind, jobs: [], target: '', tex
 const job = (id, worker = 'local') => ({ id, worker, task: 'build the module', context: 'preserve the API contract', verify: 'npm test', dependsOn: [] });
 function model(actions) { const prompts = []; return { prompts, complete: async prompt => { prompts.push(prompt); return { content: JSON.stringify(actions.shift() ?? action('wait')), rawUsage: usage }; } }; }
 function fixture(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-foreman-test-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; }
+test('settled worker findings survive progress replacement and reach the supervisor and successor context', async () => {
+  const finding='Runtime probe disproved the requested digest repair. Existing validation rejects every tested line terminator.';
+  const workerReport=foremanWorkerReport({result:{summary:finding}});
+  const m=model([action('dispatch',{jobs:[job('core','sol')]}),action('finish')]);
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['sol'],maxDecisions:2,
+    execute:async(j,deps,signal,progress)=>{progress({observation:{text:'Earlier diagnostic still in flight'}});return {pass:true,workerReport,verification:{pass:true,code:0,stdout:'tests pass',stderr:''}};},
+    inspect:async()=>({}),verify:async()=>({pass:true})});
+  assert.equal(result.pass,true);
+  assert.ok(m.prompts[1].includes(finding));
+  assert.ok(!m.prompts[1].includes('Earlier diagnostic still in flight'));
+  assert.match(m.prompts[1],/"verification":\{"pass":true/);
+  assert.ok(foremanWorkerContext(job('next'),result.jobs,'build').includes(finding));
+});
+test('worker final reports are bounded, labeled and never substitute for failed verification', async () => {
+  assert.equal(foremanWorkerReport(null),null);
+  assert.equal(foremanWorkerReport({result:{summary:'   '}}),null);
+  const report=foremanWorkerReport({result:{summary:'OBSERVED START '+ 'x'.repeat(6000)+' OBSERVED END'}});
+  assert.equal(report.source,'worker-final-report');assert.equal(report.truncated,true);
+  assert.ok(report.text.length<2100);assert.ok(report.text.startsWith('OBSERVED START'));assert.ok(report.text.endsWith('OBSERVED END'));
+  const m=model([action('dispatch',{jobs:[job('core','terra')]}),action('finish')]);let checks=0;
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:2,
+    execute:async()=>({pass:false,workerReport:foremanWorkerReport({result:{summary:'Everything is complete.'}}),verification:{pass:false,code:1,stdout:'failed',stderr:''}}),
+    inspect:async()=>({}),verify:async()=>{checks++;return {pass:true};}});
+  assert.equal(result.pass,false);assert.equal(checks,0);assert.match(m.prompts[1],/Everything is complete/);
+  assert.match(m.prompts[1],/"verification":\{"pass":false/);
+});
 test('diagnostic reproduction paths do not become binding worker deliverables', () => {
   const j = { ...job('repair'), task: 'Write test/boundary.test.js with regression assertions.',
     context: "Review: Object.create(Array.prototype); process.argv[1]='/tmp/example-importer.js'; await import(realModuleURL) wrongly runs the CLI." };

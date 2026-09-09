@@ -33,6 +33,15 @@ export function foremanObservation(r, stdoutLimit = 8000) {
 }
 const brief = foremanObservation;
 
+export function foremanWorkerReport(artifact) {
+  const text = artifact?.result?.summary;
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const limit = 2000, truncated = text.length > limit;
+  return { source: 'worker-final-report', text: truncated
+    ? text.slice(0, 1400) + '\n[excerpt; complete report in run.json]\n' + text.slice(-600) : text,
+    truncated };
+}
+
 export const FOREMAN_HELP = `BANTAM FACTORY · experimental Astra supervisor
 
 bantamfactory foreman --task "..." --verify "npm test" --endpoint http://127.0.0.1:8085
@@ -161,7 +170,8 @@ export function foremanWorkerContext(job, dependencies, task = '') {
   // and integrated paths, not token coverage arrays or process-control keys.
   const outcomes = dependencies.map(j => ({ id: j.id, status: j.status,
     verified: j.result?.verification?.pass === true, integrated: j.result?.integrated === true,
-    changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null }));
+    changedFiles: j.result?.changedFiles ?? [], snapshot: j.result?.snapshot ?? null,
+    ...(j.result?.workerReport ? { workerReport: j.result.workerReport } : {}) }));
   return `${task ? `OVERALL OPERATOR BRIEF (project context):\n${task}\n\nYour assigned milestone contributes to this full goal. Preserve its applicable constraints; do not deliver unrelated milestones or claim the whole project is done. The supervisor owns final integration and full-task acceptance.\n\n` : ''}${job.resumeFrom ? `RECOVERY: Your workspace already contains the retained, UNVERIFIED work from ${job.resumeFrom}. Inspect it here; no sibling-job or host paths are accessible. Repair and verify it before completion. Other jobs may have integrated since this snapshot; conflicts are checked at integration.\n\n` : ''}SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
 }
 export function foremanWorkerTask(task, job, dependencies = null) {
@@ -266,11 +276,13 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       if (usage) usage = {...usage, freshInputTokens: usage.inputTokens - usage.cacheHitTokens};
       if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'worker process did not complete; recorded responses may omit in-flight usage' };
     }
-    const accepted = acceptedBantamCompletion(readJson(path.join(dir, 'run.json')));
+    const workerArtifact = readJson(path.join(dir, 'run.json'));
+    const accepted = acceptedBantamCompletion(workerArtifact);
     const after = store.capture(ws, {message: `settled ${job.id}`});
     const checked = await check(ws, job.verify, signal); write(path.join(dir, 'verification.json'), checked);
     const verification = brief(checked);
-    const record = { pass: clean(result) && accepted && verification.pass, acceptedCompletion: accepted, verification, usage, integrated: false, snapshot: snapshot.commit,
+    const record = { pass: clean(result) && accepted && verification.pass, acceptedCompletion: accepted,
+      workerReport: foremanWorkerReport(workerArtifact), verification, usage, integrated: false, snapshot: snapshot.commit,
       recoverySnapshot: after.commit, recoveredFrom: snapshot.recoveredFrom ?? null,
       process: { code: result.code, timedOut: Boolean(result.timedOut), aborted: Boolean(result.aborted), bufferExceeded: Boolean(result.bufferExceeded) } };
     if (record.pass && !signal.aborted && !ac.signal.aborted) {

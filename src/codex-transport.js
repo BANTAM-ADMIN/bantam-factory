@@ -610,7 +610,11 @@ export class CodexAppServer {
       environments: [],
       config,
       baseInstructions,
-      developerInstructions: baseInstructions,
+      // Codex sends base instructions with the provider request and appends
+      // developer instructions as a separate message. Copying the same policy
+      // into both doubled it (7,155 redundant characters for the supervisor).
+      // Clear inherited developer prose unless the caller supplies an override.
+      developerInstructions: this.threadConfig?.developer_instructions ?? "",
     });
     const threadId = started?.thread?.id;
     if (!threadId) throw new Error("Codex app-server did not return a thread id");

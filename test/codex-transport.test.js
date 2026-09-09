@@ -23,6 +23,23 @@ function server(options = {}) {
   });
 }
 
+test('the worker policy is supplied once and explicit additional developer instructions remain available', async t => {
+  for (const additional of [undefined, 'Caller-specific operating instruction.']) {
+    const codex = server({ threadConfig: additional ? { developer_instructions: additional } : {} });
+    t.after(() => codex.close());
+    const starts = [], request = codex.request.bind(codex);
+    codex.request = (method, params) => {
+      if (method === 'thread/start') starts.push(params);
+      return request(method, params);
+    };
+    await codex.complete('plain action', { baseInstructions: 'The complete worker policy.' });
+    assert.equal(starts[0].baseInstructions, 'The complete worker policy.');
+    assert.equal(starts[0].developerInstructions, additional ?? '');
+    assert.equal(starts[0].sandbox, 'read-only');
+    assert.equal(starts[0].approvalPolicy, 'never');
+  }
+});
+
 test('Codex can omit the sampling schema while retaining the action contract', async t => {
   const codex = server(), starts = [], request = codex.request.bind(codex);
   t.after(() => codex.close());

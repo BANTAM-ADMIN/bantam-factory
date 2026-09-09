@@ -5,6 +5,7 @@
 | You want to… | Start here |
 | --- | --- |
 | Give BANTAM FACTORY its first job | [Getting started](GETTING-STARTED.md) |
+| Put Astra inside the factory with your Codex account | [Use Astra](GETTING-STARTED.md#use-astra-with-your-codex-account) |
 | Connect a model or choose a local setup | [Models & hardware](FIRST-RUN-SETUP.md) |
 | Build a candidate and review it before applying | [Build, inspect, apply](FACTORY-GETTING-STARTED.md) |
 | Run your own fight cards | [Put it in the ring](BRING-YOUR-OWN-COMPARISONS.md) |

@@ -23,6 +23,22 @@ NVIDIA GPU, it also offers a guided local model download.
 installation's commands, use this checkout's absolute `bin/bantamfactory` path
 instead.
 
+## Use Astra with your Codex account
+
+Already signed in to the Codex CLI? From your project, run:
+
+```bash
+bantamfactory --codex --model gpt-6-astra
+```
+
+Astra works inside BANTAM FACTORY, with the factory's tools, sandbox, and
+checks. No local model or GPU is needed. Ask for the work in plain language.
+
+[See Astra's fight cards](https://bantam-admin.github.io/bantam-factory/fights.html#codex)
+to compare the delivered work, time, input, output, and prefix-cache tokens
+against native Codex. Cached tokens are part of input, not an extra charge
+on top of it.
+
 ## Give it a job
 
 Open a project with its dependencies installed:

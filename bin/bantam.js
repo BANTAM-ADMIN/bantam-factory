@@ -1340,6 +1340,10 @@ function applyImageProvider(provider) {
   imageProviderState.provider = provider;
 }
 applyImageProvider(imageProviderState.provider);
+// Headless `run` does not take the interactive health/startup path. Discover
+// held-open bridge sessions before any probe or agent policy is selected,
+// including when the caller has already confirmed grammar support.
+await model.detectChatSessions();
 // Grammar is not optional for BANTAM — the action grammar is what keeps a small
 // model emitting valid actions. A base OpenAI endpoint that ignores GBNF will
 // produce malformed actions, so probe once and warn LOUDLY. (Skip if doctor

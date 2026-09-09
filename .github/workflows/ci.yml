@@ -27,7 +27,9 @@ jobs:
       # The shell sandbox pulls its base image on first use; do it here so a
       # registry hiccup is a named step rather than 9 mystery test failures.
       - run: docker pull alpine:3
-      - run: node --test test/
+      # Several files launch real Chromium processes. Bound file concurrency
+      # so shared runners can capture screenshots within the tool's deadlines.
+      - run: node --test --test-concurrency=2 test/
 
   canary:
     # A live-model pulse check: one sealed task through the whole factory.

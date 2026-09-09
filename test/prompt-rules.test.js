@@ -2,6 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { activeCandidateRules, composeRulesBlock, promptVersion, BASE_RULES, CANDIDATE_RULES } from "../src/prompt-rules.js";
 
+test('compact wording keeps each obligation and explicitly selected candidate attributable', () => {
+  const baseline = { BANTAM_RULES: 'fable.visual-composition' };
+  const compact = { ...baseline, BANTAM_COMPACT_RULES: '1' };
+  const full = composeRulesBlock(baseline), short = composeRulesBlock(compact);
+  assert.equal(short.split('\n').length, full.split('\n').length);
+  assert.ok(short.length < full.length * 0.6);
+  assert.match(short, /passing checks after the latest edit/);
+  assert.match(short, /exit code, stdout and stderr/);
+  assert.match(short, /Report only observed success/);
+  assert.ok(short.includes(CANDIDATE_RULES.find(r => r.id === 'fable.visual-composition').text));
+  assert.notEqual(promptVersion(baseline), promptVersion(compact));
+  assert.equal(promptVersion(baseline), promptVersion({ ...compact, BANTAM_COMPACT_RULES: '0' }));
+  assert.doesNotMatch(composeRulesBlock({ ...compact, BANTAM_RULES_OFF: 'fable.report-shape' }), /Finish with the observed outcome/);
+});
+
 test("visual composition rule is opt-in and changes the measured prompt version", () => {
   const baseline = { BANTAM_RULES: "", BANTAM_RULES_OFF: "" };
   const treatment = { BANTAM_RULES: "fable.visual-composition", BANTAM_RULES_OFF: "" };

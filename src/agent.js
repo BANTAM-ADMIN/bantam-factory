@@ -232,6 +232,7 @@ import { RepourSentinel } from "./logic/repour.js";
 import { ContractArbitrationPin } from "./logic/contract-arbitration.js";
 import { WalledGardenGauge } from "./logic/walled-garden.js";
 import { taskNamedSourcePaths, untouchedNamedPaths } from "./logic/task-context.js";
+import { workspaceListing } from "./workspace-listing.js";
 import { panelRedirectReadTargets } from "./panel-read-redirect.js";
 import {
   artifactVerificationGateRejection,
@@ -7892,6 +7893,9 @@ function formatVerifyRedDone({ command, detail, unchanged, remaining }) {
 }
 
 function safeListing(workspace) {
+  if (process.env.BANTAM_WORKSPACE_TREE === "1") {
+    return workspaceListing(workspace, { depth: 1 });
+  }
   try {
     const entries = fs.readdirSync(workspace, { withFileTypes: true })
       .filter((e) => e.name !== "node_modules" && e.name !== ".git" && e.name !== ".bantam")

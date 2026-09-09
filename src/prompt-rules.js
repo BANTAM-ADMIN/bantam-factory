@@ -339,9 +339,42 @@ export function activeCandidateRules(env = process.env) {
   return CANDIDATE_RULES.filter((r) => active.has(r.id));
 }
 
-/** The "Rules:" block body — BASE_RULES verbatim plus any env-activated candidates. */
-export function composeRulesBlock(env = process.env) {
+// Same obligations, fewer words for workers that do not need the small-model
+// explanations. Opt-in during qualification; preserve rule ids and include the
+// actual selected text in promptVersion so comparisons remain attributable.
+const COMPACT_TEXT = {
+  "investigate-first": "Read relevant existing files before editing; use evidence already supplied without rereading it.",
+  "inspect-batch": 'Batch independent reads with "inspect"; use the supplied file listing to read related source, configuration and tests together.',
+  "no-shell-cat": "Inspect files with read_file/search/list_dir/inspect, not shell cat/head/tail/sed/grep/rg.",
+  "relative-paths": "Use workspace-relative paths; shell already starts there.",
+  "page-large-files": "Page large files with read_file start/limit.",
+  "raw-test-output": "Run tests directly, without head/tail or masking their exit status.",
+  "async-rejection-tests": "Use await assert.rejects for async rejection, assert.throws for synchronous throws. Keep the API contract intact. Construct invalid fixtures explicitly: helper defaults can silently turn an invalid input into a valid one.",
+  "replace-exact": 'For "replace", old must match current bytes exactly; disambiguate with surrounding text or its numbered starting line.',
+  "prefer-line": 'Use "line" for repeated short matches; it is where "old" starts.',
+  "prefer-replace": "Use replace for targeted edits; whole-file writes are for new files or intentional rewrites.",
+  "open-files-live": "<open_files> contains current numbered source; use its bytes and line numbers for edits.",
+  "verify-habit": "After changing code, run the checks that prove it works and inspect their results.",
+  "behavior-is-more-than-stdout": "For CLI behavior, assert exit code, stdout and stderr on normal, missing and invalid arguments. Expected failures belong in assertions whose own exit status reports success.",
+  "answer-vs-build": 'For questions or reviews, investigate only enough to answer, then "respond".',
+  "build-means-code": "Build requests require working deliverables. Start after focused inspection and complete the requested work. Deliver a coherent small task in one implementation; divide large tasks into runnable slices. Ask only when a material decision blocks progress.",
+  "done-verified": '"done" requires passing checks after the latest edit. Repair failures before finishing.',
+  "ground-facts": "Establish critical external constants, formats and API contracts from the task or tools; resolve uncertainty before building on it. Testing your own assumption does not establish its truth.",
+  "correctness-before-constraint": "Make the program work before optimizing size or speed. Apply mechanical transformations with scripts, then recheck both behavior and the constraint.",
+  "fable.state-assumption": "Resolve ordinary ambiguity reasonably, state material assumptions in the summary, and continue. Ask when the choice blocks correct work.",
+  "fable.no-hedge": "Report only observed success. Label unverified work. Explain contradictory requirements instead of gaming checks or silently violating constraints.",
+  "fable.report-shape": "Finish with the observed outcome, what changed and the verification evidence. Complete necessary work before summarizing; name any remaining blocker explicitly.",
+};
+
+function activeRules(env) {
   const rules = [...BASE_RULES, ...activeCandidateRules(env)];
+  if (env.BANTAM_COMPACT_RULES !== "1") return rules;
+  return rules.map(rule => ({ ...rule, text: COMPACT_TEXT[rule.id] ?? rule.text }));
+}
+
+/** The "Rules:" block body, including the explicitly selected wording. */
+export function composeRulesBlock(env = process.env) {
+  const rules = activeRules(env);
   return rules.map((r) => `- ${r.text}`).join("\n");
 }
 
@@ -351,7 +384,7 @@ export function composeRulesBlock(env = process.env) {
  * same promptVersion across arms proves the prompt was not the variable.
  */
 export function promptVersion(env = process.env) {
-  const rules = [...BASE_RULES, ...activeCandidateRules(env)];
+  const rules = activeRules(env);
   const payload = JSON.stringify(rules.map((r) => [r.id, r.text]));
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 8);
 }

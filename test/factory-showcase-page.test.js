@@ -3,12 +3,44 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {renderFactoryShowcase,renderShowcaseResults,renderShowcaseHighlights,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
+import {renderFactoryShowcase,renderShowcaseResults,renderShowcaseHighlights,renderCodexEfficiency,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
 
 const gallery=()=>({cards:[{id:'context-packet',recorded:true,rows:[
   {arm:'bantam-local-27b',model:'Qwen 27B · same local weights',wallMs:58123,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5},
   {arm:'hermes',model:'Qwen 27B · same local weights',wallMs:512194,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5},
 ]}]});
+
+test('Codex comparison sums its fixed paired repeats and keeps a slower round in the result',()=>{
+  const row=(factory,input,wall)=>({arm:factory?'bantam-codex-astra':'codex-astra',
+    model:`GPT-6 Astra · ${factory?'wrapped':'native'} CLI`,passed:true,accountingComplete:true,
+    wallMs:wall,tokens:{inputTokens:input,outputTokens:100,cacheHitTokens:1000}});
+  const data={codex:{cards:[
+    {id:'context-packet-astra-context-1',workOrder:'context-packet',recorded:true,rows:[row(true,2000,2000),row(false,4000,4000)]},
+    {id:'context-packet-astra-context-2',workOrder:'context-packet',recorded:true,rows:[row(true,3000,6000),row(false,6000,5000)]},
+  ]}},before=structuredClone(data),html=renderCodexEfficiency(data);
+  assert.match(html,/50<span>%/);assert.match(html,/1\.1× faster/);
+  assert.match(html,/>5,000</);assert.match(html,/>10,000</);
+  assert.match(html,/8\.0 s/);assert.match(html,/9\.0 s/);
+  assert.match(html,/2 paired runs/);assert.match(html,/Round 1/);assert.match(html,/Round 2/);
+  assert.deepEqual(data,before);
+  data.codex.cards[1].rows[0].passed=false;
+  const failure=renderCodexEfficiency(data);
+  assert.match(failure,/Completion differs/);assert.match(failure,/1<span>\/2<\/span>/);
+  assert.doesNotMatch(failure,/faster|less input/);
+  data.codex.cards[1].rows[0].accountingComplete=false;
+  assert.equal(renderCodexEfficiency(data),'','partial usage cannot become a full comparison');
+});
+
+test('Codex comparison rejects missing pairs, different models and impossible cache totals',()=>{
+  const row=arm=>({arm,model:'GPT-5.6 Terra · native CLI',passed:true,accountingComplete:true,
+    wallMs:1000,tokens:{inputTokens:2000,outputTokens:100,cacheHitTokens:1000}});
+  const card={id:'context-packet',recorded:true,rows:[row('bantam-codex-terra'),row('codex-terra')]};
+  const data={codex:{cards:[card]}};
+  assert.match(renderCodexEfficiency(data),/Terra/);
+  card.rows[0].tokens.cacheHitTokens=2001;assert.equal(renderCodexEfficiency(data),'');
+  card.rows[0].tokens.cacheHitTokens=1000;card.rows[0].model='GPT-6 Astra · wrapped CLI';
+  assert.equal(renderCodexEfficiency(data),'');card.rows.pop();assert.equal(renderCodexEfficiency(data),'');
+});
 
 test('front-page results use recorded times and outcomes, and missing competitors remain absent attempts',()=>{
   const data=gallery(),before=structuredClone(data);

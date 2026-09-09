@@ -1,0 +1,69 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "patch-transaction",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 44596,
+      "sha256": "1ea342406d1b075b159e860b10fa4917655598a79302aad72c1980eecdfad237",
+      "arm": "bantam-codex-astra",
+      "wallMs": 89841,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "Astra’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Astra used the native CLI’s tools to inspect the project, make changes and run checks. This attempt completed with all five independent acceptance groups passing. The full 5-action sequence and delivered files are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 38570,
+      "sha256": "929aecadf5f83e74e9ba0499ef5912a4b360fabd5099ec025161b4be3b138925",
+      "arm": "codex-astra",
+      "wallMs": 85498,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "03718eee97f2dcd962654c684d225771be42af45a775cd36d5b69a8dcb2ce7f0",
+      "explanation": {
+        "title": "Astra’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Astra used the native CLI’s tools to inspect the project, make changes and run checks. This attempt completed with all five independent acceptance groups passing. The full 4-action sequence and delivered files are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -39,6 +39,43 @@ export function showcaseAssets(){
   return SHOWCASE_STATIC_FILES.map(name=>['assets/showcase/'+name,read(name)]);
 }
 const seconds=ms=>Number.isFinite(ms)&&ms>=0?(ms/1000).toFixed(1)+' s':'Time not recorded';
+// Explicit reviewed cohorts, not a search for each model's fastest attempt.
+const CODEX_PAIRS=[
+  {id:'astra',name:'Astra',model:'GPT-6 Astra',cards:['context-packet-astra-context-1','context-packet-astra-context-2']},
+  {id:'sol',name:'Sol',model:'GPT-5.6 Sol',cards:['context-packet-sol-1','context-packet-sol-2']},
+  {id:'terra',name:'Terra',model:'GPT-5.6 Terra',cards:['context-packet']},
+];
+export function renderCodexEfficiency(data){
+  const number=n=>n.toLocaleString('en-US');
+  const panels=CODEX_PAIRS.flatMap(selection=>{
+    const cards=selection.cards.map(id=>data.codex?.cards?.find(c=>c.id===id));
+    if(cards.some(c=>!c?.recorded))return [];
+    const pairs=cards.map(card=>['bantam-codex-','codex-'].map(prefix=>card.rows.find(r=>r.arm===prefix+selection.id)));
+    if(pairs.flat().some(r=>!r||!r.accountingComplete||!r.model?.startsWith(selection.model+' · ')
+      ||!Number.isFinite(r.wallMs)||r.wallMs<=0||!['inputTokens','outputTokens','cacheHitTokens'].every(k=>Number.isSafeInteger(r.tokens?.[k])&&r.tokens[k]>=0)
+      ||r.tokens.inputTokens===0||r.tokens.cacheHitTokens>r.tokens.inputTokens))return [];
+    const sums=[0,1].map(lane=>pairs.reduce((a,pair)=>{
+      const r=pair[lane];for(const k of ['inputTokens','outputTokens','cacheHitTokens'])a[k]+=r.tokens[k];
+      a.wallMs+=r.wallMs;a.passed+=Number(r.passed);return a;
+    },{inputTokens:0,outputTokens:0,cacheHitTokens:0,wallMs:0,passed:0}));
+    const [factory,native]=sums,change=1-factory.inputTokens/native.inputTokens;
+    const completed=pairs.flat().every(r=>r.passed),ratio=native.wallMs/factory.wallMs;
+    const clock=completed?(ratio>=1.05?`${ratio.toFixed(1)}× faster`:ratio<=.95?`${(1/ratio).toFixed(1)}× longer`:'Similar wall time'):'Completion differs';
+    const badge=completed?`${Math.round(Math.abs(change)*100)}<span>%</span>`:`${factory.passed}<span>/${pairs.length}</span>`;
+    const label=completed?`${change>=0?'less':'more'} input`:'factory completions';
+    const max=Math.max(factory.inputTokens,native.inputTokens);
+    const bars=sums.map((r,i)=>`<div class="codex-input-row"><div><b>${i?'Native CLI':'BANTAM FACTORY'}</b><span>${number(r.inputTokens)}</span></div><div class="codex-input-track"><span class="${i?'native':'factory'}" style="width:${(r.inputTokens/max*100).toFixed(2)}%"></span></div></div>`).join('');
+    const metrics=[['Output tokens','outputTokens'],['Prefix cache tokens','cacheHitTokens'],['Wall clock','wallMs']]
+      .map(([label,key])=>`<tr><th scope="row">${label}</th>${sums.map(r=>`<td>${key==='wallMs'?seconds(r[key]):number(r[key])}</td>`).join('')}</tr>`).join('');
+    const links=cards.map((card,i)=>{
+      const hash=new URLSearchParams({card:card.workOrder??'context-packet',view:'results',layout:'compare',left:'bantam-codex-'+selection.id,right:'codex-'+selection.id});
+      return `<a href="codex/${E(card.id)}/share/index.html#${E(hash)}">${cards.length===1?'Open the fight':`Round ${i+1}`} ↗</a>`;
+    }).join('');
+    return [`<article class="codex-result"><header><h3>${selection.name}</h3><span>${pairs.length} paired ${pairs.length===1?'run':'runs'}</span></header><div class="codex-saving"><strong>${badge}</strong><div><b>${label}</b><span>${clock}</span></div></div><div class="codex-inputs" aria-label="Total input tokens">${bars}</div><table><caption class="sr-only">${selection.name}: recorded totals across ${pairs.length} paired runs</caption><thead><tr><th scope="col">Recorded totals</th><th scope="col">Factory</th><th scope="col">CLI</th></tr></thead><tbody>${metrics}<tr><th scope="row">Jobs completed</th><td>${factory.passed}/${pairs.length}</td><td>${native.passed}/${pairs.length}</td></tr></tbody></table><footer>${links}</footer></article>`];
+  });
+  if(!panels.length)return '';
+  return `<section class="band codex-efficiency" id="codex" aria-labelledby="codex-heading"><p class="codex-eyebrow">SAME MODEL. SAME JOB. DIFFERENT HARNESS.</p><h2 id="codex-heading">Give Codex<br><span>a factory.</span></h2><p class="codex-lede">Put Astra, Sol or Terra to work with the Codex account you already have. The factory keeps the next step focused and checks the result. Here’s the same work in both harnesses.</p><div class="codex-results">${panels.join('')}</div><p class="fine codex-accounting">Context Packet · medium effort · identical starting files and independent checks. Repeats are summed. Prefix cache tokens are included in input tokens.</p><a class="codex-build-link" href="assets/showcase/examples/arcade/index.html">What about the work itself? Play the two Astra builds ↗</a></section>`;
+}
 export function renderShowcaseHighlights(data){
   const selections=[['hermes','context-packet'],['opencode','patch-transaction'],['pi','context-packet'],['deepseek-local-27b','receipt-reducer']];
   const cards=showcaseRows(data),sameModel=/^Qwen 27B · same local (?:model|weights)$/,rigs=[];
@@ -97,6 +134,7 @@ export function renderFactoryShowcase(data,{intro=false}={}){
   insert('FIGHT_RESULTS',renderShowcaseResults(data));
   insert('FIGHT_HIGHLIGHTS',renderShowcaseHighlights(data));
   insert('FIGHT_SPEEDS',renderShowcaseSpeeds(data));
+  insert('CODEX_EFFICIENCY',renderCodexEfficiency(data));
   const hardware=JSON.parse(read('hardware.json'));
   insert('FIGHT_PREVIEW',`<script id="fight-preview" type="application/json">${JSON.stringify(preview).replace(/</g,'\\u003c')}</script><script id="hardware-preview" type="application/json">${JSON.stringify(hardware).replace(/</g,'\\u003c')}</script>`);
   insert('INTRO_LINK',intro?'<a class="intro-link" href="assets/motion/player.html">Meet your factory · 18-second film ↗</a>':'');

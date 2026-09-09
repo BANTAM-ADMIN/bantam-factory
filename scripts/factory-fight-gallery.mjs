@@ -53,6 +53,11 @@ const CODEX_RECORDINGS=Object.freeze([
     title:`${model==='astra'?'Astra':'Sol'} · efficiency round ${repeat}`,
     description:'The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.',
   }))),
+  ...['context-packet','patch-transaction'].flatMap(workOrder=>[1,2].map(repeat=>({
+    id:`${workOrder}-astra-context-${repeat}`,workOrder,
+    title:`Astra · ${workOrder==='context-packet'?'context packer':'patch transaction'} · round ${repeat}`,
+    description:'Astra with a leaner factory context, against native Codex. The same task and checks, with both paired rounds published.',
+  }))),
 ]);
 
 // One reviewed public card package: a single-work-order showcase whose share
@@ -80,6 +85,8 @@ function readCardPackage(dir,id){
   return {sourceSha256:sha(source),...(demo?{reviewedDemo:true}:{}),...(work?{reviewedWork:true}:{}),rows:card.rows.map(row=>({label:row.label,model:row.model,
     arm:row.arm,outcome:row.outcome,passed:passed(row),wallMs:row.wallMs,groupsPassed:row.groupsPassed,
     groupsTotal:row.groupsTotal,accountingComplete:row.accounting.complete,
+    tokens:row.accounting.complete?Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens']
+      .map(key=>[key,row.accounting.full?.[key]??null])):null,
     ...(row.performance?{performance:publicPerformance(row.performance)}:{})}))};
 }
 

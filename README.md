@@ -74,11 +74,14 @@ inside the factory. Same models, same Context Packet work order:
 | --- | --- | --- |
 | **Terra** | **2.3× faster · 73% fewer input tokens** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra) |
 | **Sol** | **1.8× faster · 44% fewer input tokens** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html) |
-| **Astra** | **28% fewer input tokens · similar elapsed time** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-2/share/index.html) |
+| **Astra** | **1.2× faster · 46% fewer input tokens** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
 
 Every run above passed all five independent check groups. Astra and Sol figures
 combine two paired repeats; Terra is one pair. Cards show wall clock, input,
 output and prefix-cache tokens, plus the complete work.
+
+Astra also used **39% fewer input tokens** on Patch Transaction across two paired
+runs: [round 1](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-1/share/index.html) · [round 2](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-2/share/index.html).
 
 **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two playable games. Every recorded action and the delivered files.

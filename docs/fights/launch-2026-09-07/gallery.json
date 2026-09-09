@@ -24,6 +24,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 109586,
+            "outputTokens": 4206,
+            "cacheHitTokens": 93590
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -55,6 +60,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -85,7 +91,12 @@
           "wallMs": 110560,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 75196,
+            "outputTokens": 2835,
+            "cacheHitTokens": 62336
+          }
         },
         {
           "label": "DeepSeek Harness",
@@ -97,6 +108,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -128,6 +140,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -159,6 +172,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 415127,
+            "outputTokens": 25365,
+            "cacheHitTokens": 408879
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -201,7 +219,12 @@
           "wallMs": 90337,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 74840,
+            "outputTokens": 2269,
+            "cacheHitTokens": 66304
+          }
         },
         {
           "label": "BANTAM · local",
@@ -213,6 +236,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 117752,
+            "outputTokens": 5018,
+            "cacheHitTokens": 99749
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -244,6 +272,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 429797,
+            "outputTokens": 35018,
+            "cacheHitTokens": 379806
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -275,6 +308,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -306,6 +340,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -337,6 +372,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 768576,
+            "outputTokens": 28979,
+            "cacheHitTokens": 752342
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -380,6 +420,7 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -410,7 +451,12 @@
           "wallMs": 160651,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 94116,
+            "outputTokens": 3998,
+            "cacheHitTokens": 78976
+          }
         },
         {
           "label": "BANTAM · local",
@@ -422,6 +468,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 945746,
+            "outputTokens": 29812,
+            "cacheHitTokens": 887131
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -453,6 +504,11 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 28177,
+            "outputTokens": 32924,
+            "cacheHitTokens": 18167
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -484,6 +540,7 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -515,6 +572,7 @@
           "groupsPassed": 1,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -558,6 +616,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 277539,
+            "outputTokens": 8942,
+            "cacheHitTokens": 251257
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -589,6 +652,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 527511,
+            "outputTokens": 29270,
+            "cacheHitTokens": 497530
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -620,6 +688,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -650,7 +719,12 @@
           "wallMs": 114133,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 74320,
+            "outputTokens": 2907,
+            "cacheHitTokens": 65664
+          }
         },
         {
           "label": "Codex · Sol",
@@ -661,7 +735,12 @@
           "wallMs": 166661,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 88711,
+            "outputTokens": 4477,
+            "cacheHitTokens": 62720
+          }
         },
         {
           "label": "Codex · Terra",
@@ -672,7 +751,12 @@
           "wallMs": 107185,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 108074,
+            "outputTokens": 4531,
+            "cacheHitTokens": 90368
+          }
         },
         {
           "label": "OpenCode",
@@ -684,6 +768,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 351593,
+            "outputTokens": 30930,
+            "cacheHitTokens": 285432
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -715,6 +804,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 246971,
+            "outputTokens": 23094,
+            "cacheHitTokens": 243323
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -758,6 +852,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -788,7 +883,12 @@
           "wallMs": 146163,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 98851,
+            "outputTokens": 3822,
+            "cacheHitTokens": 87552
+          }
         },
         {
           "label": "Codex · Sol",
@@ -799,7 +899,12 @@
           "wallMs": 513418,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 116959,
+            "outputTokens": 5663,
+            "cacheHitTokens": 87296
+          }
         },
         {
           "label": "Codex · Terra",
@@ -810,7 +915,12 @@
           "wallMs": 106217,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 145342,
+            "outputTokens": 4101,
+            "cacheHitTokens": 106752
+          }
         },
         {
           "label": "BANTAM · local",
@@ -822,6 +932,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 409391,
+            "outputTokens": 8124,
+            "cacheHitTokens": 377438
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -853,6 +968,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 485350,
+            "outputTokens": 28346,
+            "cacheHitTokens": 470652
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -884,6 +1004,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 265821,
+            "outputTokens": 25282,
+            "cacheHitTokens": 224796
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -915,6 +1040,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -958,6 +1084,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 321420,
+            "outputTokens": 16718,
+            "cacheHitTokens": 286516
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -989,6 +1120,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 497535,
+            "outputTokens": 32153,
+            "cacheHitTokens": 483833
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1020,6 +1156,7 @@
           "groupsPassed": 2,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1050,7 +1187,12 @@
           "wallMs": 118397,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 75897,
+            "outputTokens": 3169,
+            "cacheHitTokens": 52992
+          }
         },
         {
           "label": "Codex · Sol",
@@ -1061,7 +1203,12 @@
           "wallMs": 240866,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 143400,
+            "outputTokens": 6641,
+            "cacheHitTokens": 119296
+          }
         },
         {
           "label": "Codex · Terra",
@@ -1072,7 +1219,12 @@
           "wallMs": 119274,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 110847,
+            "outputTokens": 4997,
+            "cacheHitTokens": 69376
+          }
         },
         {
           "label": "OpenCode",
@@ -1084,6 +1236,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 350184,
+            "outputTokens": 20854,
+            "cacheHitTokens": 331725
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1115,6 +1272,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 464650,
+            "outputTokens": 32097,
+            "cacheHitTokens": 459162
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1158,6 +1320,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 289442,
+            "outputTokens": 10210,
+            "cacheHitTokens": 257976
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1189,6 +1356,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 380741,
+            "outputTokens": 24252,
+            "cacheHitTokens": 353605
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1220,6 +1392,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1250,7 +1423,12 @@
           "wallMs": 116972,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 74253,
+            "outputTokens": 3148,
+            "cacheHitTokens": 65408
+          }
         },
         {
           "label": "Codex · Sol",
@@ -1261,7 +1439,12 @@
           "wallMs": 241160,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 125291,
+            "outputTokens": 6545,
+            "cacheHitTokens": 87680
+          }
         },
         {
           "label": "Codex · Terra",
@@ -1272,7 +1455,12 @@
           "wallMs": 134275,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 178901,
+            "outputTokens": 5293,
+            "cacheHitTokens": 152832
+          }
         },
         {
           "label": "OpenCode",
@@ -1284,6 +1472,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 267712,
+            "outputTokens": 22322,
+            "cacheHitTokens": 248757
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1327,6 +1520,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 304594,
+            "outputTokens": 9969,
+            "cacheHitTokens": 273649
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1358,6 +1556,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 397922,
+            "outputTokens": 27046,
+            "cacheHitTokens": 384287
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1389,6 +1592,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1419,7 +1623,12 @@
           "wallMs": 137291,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 90451,
+            "outputTokens": 3684,
+            "cacheHitTokens": 67072
+          }
         },
         {
           "label": "Codex · Sol",
@@ -1430,7 +1639,12 @@
           "wallMs": 231835,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 127218,
+            "outputTokens": 6251,
+            "cacheHitTokens": 96768
+          }
         },
         {
           "label": "Codex · Terra",
@@ -1441,7 +1655,12 @@
           "wallMs": 143182,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 163987,
+            "outputTokens": 5762,
+            "cacheHitTokens": 137728
+          }
         },
         {
           "label": "OpenCode",
@@ -1453,6 +1672,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 433649,
+            "outputTokens": 22979,
+            "cacheHitTokens": 384597
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1496,6 +1720,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 503914,
+            "outputTokens": 19280,
+            "cacheHitTokens": 459965
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1526,7 +1755,12 @@
           "wallMs": 155782,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 77389,
+            "outputTokens": 4409,
+            "cacheHitTokens": 63104
+          }
         },
         {
           "label": "DeepSeek Harness",
@@ -1538,6 +1772,11 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 37704,
+            "outputTokens": 33057,
+            "cacheHitTokens": 27370
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1569,6 +1808,7 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1600,6 +1840,7 @@
           "groupsPassed": 0,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1643,6 +1884,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 125827,
+            "outputTokens": 5025,
+            "cacheHitTokens": 96652
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1673,7 +1919,12 @@
           "wallMs": 107931,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 103844,
+            "outputTokens": 2423,
+            "cacheHitTokens": 90240
+          }
         },
         {
           "label": "OpenCode",
@@ -1685,6 +1936,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 296314,
+            "outputTokens": 25649,
+            "cacheHitTokens": 231804
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1716,6 +1972,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 329497,
+            "outputTokens": 19084,
+            "cacheHitTokens": 314409
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1747,6 +2008,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1790,6 +2052,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 1701335,
+            "outputTokens": 24787,
+            "cacheHitTokens": 1568845
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1820,7 +2087,12 @@
           "wallMs": 136165,
           "groupsPassed": 5,
           "groupsTotal": 5,
-          "accountingComplete": true
+          "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 97141,
+            "outputTokens": 3665,
+            "cacheHitTokens": 86016
+          }
         },
         {
           "label": "Hermes",
@@ -1832,6 +2104,7 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1863,6 +2136,7 @@
           "groupsPassed": null,
           "groupsTotal": null,
           "accountingComplete": false,
+          "tokens": null,
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1894,6 +2168,11 @@
           "groupsPassed": 5,
           "groupsTotal": 5,
           "accountingComplete": true,
+          "tokens": {
+            "inputTokens": 607405,
+            "outputTokens": 33632,
+            "cacheHitTokens": 571355
+          },
           "performance": {
             "source": "saved-server-timings",
             "generation": {
@@ -1941,7 +2220,12 @@
             "wallMs": 106601,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 90278,
+              "outputTokens": 2867,
+              "cacheHitTokens": 71296
+            }
           },
           {
             "label": "Codex · Astra",
@@ -1952,7 +2236,12 @@
             "wallMs": 106267,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 74857,
+              "outputTokens": 2946,
+              "cacheHitTokens": 66048
+            }
           },
           {
             "label": "Codex · Sol",
@@ -1963,7 +2252,12 @@
             "wallMs": 329403,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 227259,
+              "outputTokens": 9487,
+              "cacheHitTokens": 207232
+            }
           },
           {
             "label": "BANTAM · Sol",
@@ -1974,7 +2268,8 @@
             "wallMs": 221772,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": false
+            "accountingComplete": false,
+            "tokens": null
           },
           {
             "label": "BANTAM · Terra",
@@ -1985,7 +2280,12 @@
             "wallMs": 52816,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 50313,
+              "outputTokens": 1931,
+              "cacheHitTokens": 35072
+            }
           },
           {
             "label": "Codex · Terra",
@@ -1996,7 +2296,12 @@
             "wallMs": 123392,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 188100,
+              "outputTokens": 5548,
+              "cacheHitTokens": 168192
+            }
           }
         ]
       },
@@ -2020,7 +2325,12 @@
             "wallMs": 99218,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 54352,
+              "outputTokens": 2710,
+              "cacheHitTokens": 37888
+            }
           },
           {
             "label": "Codex · Astra",
@@ -2031,7 +2341,12 @@
             "wallMs": 107536,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 75566,
+              "outputTokens": 3123,
+              "cacheHitTokens": 66432
+            }
           }
         ]
       },
@@ -2055,7 +2370,12 @@
             "wallMs": 97965,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 74621,
+              "outputTokens": 2743,
+              "cacheHitTokens": 62080
+            }
           },
           {
             "label": "BANTAM · Astra",
@@ -2066,7 +2386,12 @@
             "wallMs": 104949,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 54348,
+              "outputTokens": 2706,
+              "cacheHitTokens": 27264
+            }
           }
         ]
       },
@@ -2090,7 +2415,12 @@
             "wallMs": 225343,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 129475,
+              "outputTokens": 6314,
+              "cacheHitTokens": 114048
+            }
           },
           {
             "label": "BANTAM · Sol",
@@ -2101,7 +2431,12 @@
             "wallMs": 138812,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 86321,
+              "outputTokens": 3678,
+              "cacheHitTokens": 52224
+            }
           }
         ]
       },
@@ -2125,7 +2460,12 @@
             "wallMs": 106838,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 68618,
+              "outputTokens": 2856,
+              "cacheHitTokens": 50944
+            }
           },
           {
             "label": "Codex · Sol",
@@ -2136,7 +2476,192 @@
             "wallMs": 219696,
             "groupsPassed": 5,
             "groupsTotal": 5,
-            "accountingComplete": true
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 148243,
+              "outputTokens": 6307,
+              "cacheHitTokens": 127104
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · context packer · round 1",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Astra with a leaner factory context, against native Codex. The same task and checks, with both paired rounds published.",
+        "id": "context-packet-astra-context-1",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "33a139f4f2588327121d2ff43b26e9912cb04dfde250663702ddf9012c24ee87",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 112789,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 75705,
+              "outputTokens": 3217,
+              "cacheHitTokens": 62336
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 86910,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 40399,
+              "outputTokens": 2368,
+              "cacheHitTokens": 19072
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · context packer · round 2",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Astra with a leaner factory context, against native Codex. The same task and checks, with both paired rounds published.",
+        "id": "context-packet-astra-context-2",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "4b8358c3829d05529f54a100160c542d7d0b9df7dd47cf3fc49903ccfbb1bf26",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 89286,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 40553,
+              "outputTokens": 2458,
+              "cacheHitTokens": 19200
+            }
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 103028,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 74951,
+              "outputTokens": 2694,
+              "cacheHitTokens": 66176
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · patch transaction · round 1",
+        "kind": "EXTEND",
+        "number": "02",
+        "description": "Astra with a leaner factory context, against native Codex. The same task and checks, with both paired rounds published.",
+        "id": "patch-transaction-astra-context-1",
+        "workOrder": "patch-transaction",
+        "recorded": true,
+        "sourceSha256": "3ba3f4c178c0734102191d5decee2bd9f626f28654d2ad816ee3a637fe8ef110",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 98841,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 90395,
+              "outputTokens": 2522,
+              "cacheHitTokens": 56960
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 86412,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 49891,
+              "outputTokens": 2261,
+              "cacheHitTokens": 31488
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · patch transaction · round 2",
+        "kind": "EXTEND",
+        "number": "02",
+        "description": "Astra with a leaner factory context, against native Codex. The same task and checks, with both paired rounds published.",
+        "id": "patch-transaction-astra-context-2",
+        "workOrder": "patch-transaction",
+        "recorded": true,
+        "sourceSha256": "079b3a1739704fcd2543ae47b6532df2640e974f0b428dbc9aa59ea46593b84f",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 89841,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 50058,
+              "outputTokens": 2310,
+              "cacheHitTokens": 28544
+            }
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 85498,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 74473,
+              "outputTokens": 2222,
+              "cacheHitTokens": 34048
+            }
           }
         ]
       }

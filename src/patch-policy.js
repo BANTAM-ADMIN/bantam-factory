@@ -4,9 +4,9 @@ const OFF_VALUES = new Set(["", "0", "false", "no", "off"]);
 /**
  * Decide whether the model should see the atomic patch action for this task.
  *
- * `auto` is deliberately conservative. Patch is useful when edits are already
- * declared to be mechanical or independent; it can encourage costly overreach
- * when several failures are symptoms of one coupled state bug.
+ * Local `auto` routing is deliberately conservative: patch can encourage
+ * costly overreach when several failures share one coupled state bug. Codex
+ * receives the guarded action from the start; explicit settings take priority.
  */
 import { decideSeamSteer } from "./seam-steer.js";
 

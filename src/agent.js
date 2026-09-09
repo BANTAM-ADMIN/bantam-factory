@@ -772,8 +772,8 @@ async function runAgentCore({
   if (interactive) { progressAwareness = false; requirementLedgerMax = 0; }
   // Source-file count for repo-scaled budgets; one directory walk, done once.
   const workspaceSourceFiles = workspace ? sourceFileCount(workspace) : 0;
-  // Feature-integration patch exposure only on real codebases (>30 source
-  // files), so fixture-measured auto-policy behavior is unchanged.
+  // Preserve local task-shape routing; Codex can batch guarded edits on small
+  // projects too, without spending one model request per replacement.
   const patchActionPolicy = decidePatchAction(task, patchAction, {
     largeRepo: workspaceSourceFiles > 30,
     codex: model?.codex === true || model?.codexBacked === true,

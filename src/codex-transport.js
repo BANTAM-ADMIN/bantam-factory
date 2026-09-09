@@ -46,6 +46,11 @@ const EMBEDDED_CONFIG = {
 // Astra calibration removed 2,759 input tokens with the same requested action.
 // Image generation keeps native guidance; caller configuration takes priority.
 const TEXT_WORKER_CONFIG = {
+  // BANTAM supplies its own tools. Suppressing app instructions alone still
+  // left native app discovery/tool schemas in the embedded worker's context.
+  // Disabling apps removed 2,369 first-request input tokens in Astra calibration
+  // with the same requested action. Native image workers keep their app setup.
+  'features.apps': false,
   'skills.include_instructions': false, 'skills.bundled.enabled': false,
   include_permissions_instructions: false,
   // Native collaboration modes and apps do not control this text worker.

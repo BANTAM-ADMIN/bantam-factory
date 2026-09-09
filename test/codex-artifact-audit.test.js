@@ -90,6 +90,32 @@ test("observation audit binds omitted code to the previous successful completion
   assert.ok(report.failures.some(f => f.code === "acknowledged_completion"));
 });
 
+test('accepted-action deltas bind the exact parsed action and retain the following observation chain', () => {
+  const base = 'instructions\n'.repeat(420) + '<|im_start|>assistant\n';
+  const action = JSON.stringify({ a: 'write_file', p: 'app.js', content: 'implementation' });
+  const reply = 'I will write the implementation.\n' + action;
+  const canonical = base + action + '<|im_end|>\n<|im_start|>user\nWrote file.\n<|im_end|>\n<|im_start|>assistant\n';
+  const first = call(0, base, buildCodexPromptDelivery(base), false);
+  first.response.normalized.content = reply;
+  const second = call(1, canonical, buildCodexPromptDelivery(canonical, {
+    mode: 'delta', baseReference: 'previous', basePrompt: base, acknowledgedCompletion: reply,
+  }), true);
+  const next = JSON.stringify({ a: 'shell', c: 'npm test' });
+  second.response.normalized.content = next;
+  const thirdPrompt = canonical + next + '<|im_end|>\n<|im_start|>user\nPassed.\n<|im_end|>\n<|im_start|>assistant\n';
+  const third = call(2, thirdPrompt, buildCodexPromptDelivery(thirdPrompt, {
+    mode: 'delta', baseReference: 'previous', basePrompt: canonical, acknowledgedCompletion: next,
+  }), true);
+  const artifact = { modelCalls: [first, second, third] };
+  assert.equal(auditCodexPromptDelivery(artifact).status, 'pass');
+  assert.equal(auditCodexPromptDelivery(artifact).exactCalls, 3);
+  for (const key of ['baseSha256', 'completionSha256', 'acceptedActionSha256', 'omittedAssistantChars']) {
+    const changed = structuredClone(artifact);
+    changed.modelCalls[1].response.normalized.codexPromptDelivery[key] = key === 'omittedAssistantChars' ? 1 : '0'.repeat(64);
+    assert.ok(auditCodexPromptDelivery(changed).failures.some(f => f.callIndex === 1 && f.code === 'acknowledged_completion'), key);
+  }
+});
+
 test("Codex artifact audit fails closed on missing evidence and ignores local artifacts", () => {
   const missing = exactArtifact();
   delete missing.modelCalls[0].response.normalized.codexPromptDelivery;

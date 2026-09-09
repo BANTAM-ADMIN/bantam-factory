@@ -9,6 +9,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { reconstructCodexPromptDelivery } from "./codex-transport.js";
+import { parseAction } from "./actions.js";
 
 const MAX_FAILURES = 32;
 
@@ -102,7 +103,8 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
     } else if (delivery.mode === "delta") {
       deltaCalls++;
       const observation = Boolean(delivery.deliveredText?.startsWith("BANTAM_OBSERVATION_V1\n"));
-      const incremental = observation || Boolean(delivery.deliveredText?.startsWith("BANTAM_PROMPT_DELTA_V2\n"));
+      const actionObservation = Boolean(delivery.deliveredText?.startsWith("BANTAM_ACTION_OBSERVATION_V1\n"));
+      const incremental = observation || actionObservation || Boolean(delivery.deliveredText?.startsWith("BANTAM_PROMPT_DELTA_V2\n"));
       if (incremental !== (delivery.baseReference === "previous")) {
         fail("delta_reference", callIndex, "delta reference evidence disagrees with its versioned wire envelope");
         return;
@@ -118,10 +120,16 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
       }
       try {
         const acknowledgedCompletion = previousCompletions.get(threadId);
-        if (observation && (delivery.baseSha256 !== sha256(base)
+        const parsed = actionObservation && typeof acknowledgedCompletion === "string"
+          ? parseAction(acknowledgedCompletion) : null;
+        const acceptedAction = parsed?.ok && !parsed.repairedJson ? JSON.stringify(parsed.action) : null;
+        if ((observation || actionObservation) && (delivery.baseSha256 !== sha256(base)
             || typeof acknowledgedCompletion !== "string"
             || delivery.completionSha256 !== sha256(acknowledgedCompletion)
-            || delivery.omittedAssistantChars !== acknowledgedCompletion.length)) {
+            || (actionObservation
+              ? acceptedAction === null || delivery.acceptedActionSha256 !== sha256(acceptedAction)
+                || delivery.omittedAssistantChars !== acceptedAction.length
+              : delivery.omittedAssistantChars !== acknowledgedCompletion.length))) {
           fail("acknowledged_completion", callIndex, "observation delta does not match its recorded base and previous completion");
           return;
         }

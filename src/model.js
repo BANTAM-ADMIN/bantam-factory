@@ -11,7 +11,7 @@ import { resolveProfile } from "./profiles.js";
 import { ChatSessionPlanner } from "./chat-sessions.js";
 import { grammarFieldFor, buildOpenAiBody, buildChatCompletionsBody, buildDeepSeekBody, extractCompletionText, extractStreamDelta, isStreamDone } from "./openai-transport.js";
 import { addModelUsage, emptyModelUsage, usageFromResponse } from "./model-usage.js";
-import { CodexAppServer } from "./codex-transport.js";
+import { CodexAppServer, normalizeCodexStructuredContent } from "./codex-transport.js";
 import { activeProfile, recordSample } from "./logic/model-cards.js";
 import { buildChatBody, chatTransportFidelity, decomposeRenderedPrompt } from "./chat-transport.js";
 
@@ -640,6 +640,8 @@ export class ModelClient {
       }
       if (onProgress) {
         const streamed = await this._readStream(res, onProgress);
+        if (request.chatSession) streamed.result.content = normalizeCodexStructuredContent(
+          streamed.result.content, JSON.parse(request.body).response_format?.json_schema?.schema);
         exchange.response = responseRecord(res, streamed.rawBody, streamed.result);
         return streamed.result;
       }
@@ -664,6 +666,11 @@ export class ModelClient {
           model: data.model || this.modelName,
         }),
       };
+      // The action history omits nullable optional fields. A bridge must
+      // acknowledge that same normalized action, just like direct Codex, or
+      // every next turn looks rewritten and loses its held-open session.
+      if (request.chatSession) result.content = normalizeCodexStructuredContent(
+        result.content, JSON.parse(request.body).response_format?.json_schema?.schema);
       exchange.response = responseRecord(res, rawBody, result);
       return result;
     } catch (e) {

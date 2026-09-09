@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { ChatSessionPlanner } from "../src/chat-sessions.js";
 import { ModelClient } from "../src/model.js";
+import { actionJsonSchema } from '../src/grammar.js';
 
 // codexapi sessions (2026-08-24): a reused session sends ONLY the newest message
 // and the thread keeps its own replies, so a warm turn costs ~1.7 s instead of
@@ -213,5 +214,31 @@ test("run end awaits the session deletion, so a process that exits right after c
     assert.equal(deleteResolved, true, "endAgentRun resolved before the DELETE finished");
   } finally {
     globalThis.fetch = realFetch;
+  }
+});
+
+test('nullable Codex action fields retain bridge reuse for streamed and buffered responses', async t => {
+  const fetch = globalThis.fetch;
+  t.after(() => {globalThis.fetch = fetch;});
+  for (const streaming of [false, true]) {
+    const seen = [];
+    const raw = '{"a":"list_dir","p":"src","start":null,"q":null}';
+    globalThis.fetch = async (_url, init) => {
+      if (init.method === 'DELETE') return new Response('{}');
+      seen.push(JSON.parse(init.body));
+      return streaming
+        ? new Response('data: ' + JSON.stringify({choices: [{delta: {content: raw}, finish_reason: 'stop'}]}) + '\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}})
+        : new Response(JSON.stringify({choices: [{message: {content: raw}, finish_reason: 'stop'}]}));
+    };
+    const client = new ModelClient({apiUrl: 'http://bridge/v1', apiDialect: 'chat', retries: 0});
+    client.enableChatSessions(); client.beginAgentRun();
+    const opts = {jsonSchema: actionJsonSchema(), ...(streaming ? {onProgress: () => {}} : {})};
+    const result = await client.complete(P0, opts);
+    assert.equal(result.content, REPLY);
+    await client.complete(P1, opts);
+    assert.equal(seen[1].session_id, seen[0].session_id);
+    assert.deepEqual(seen[1].messages.map(m => m.role), ['user']);
+    assert.equal(client.chatSessions.stats.rebases, 0);
+    await client.endAgentRun(null);
   }
 });

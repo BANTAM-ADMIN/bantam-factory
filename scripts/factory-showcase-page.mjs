@@ -74,7 +74,7 @@ export function renderCodexEfficiency(data){
     return [`<article class="codex-result"><header><h3>${selection.name}</h3><span>${pairs.length} paired ${pairs.length===1?'run':'runs'}</span></header><div class="codex-saving"><strong>${badge}</strong><div><b>${label}</b><span>${clock}</span></div></div><div class="codex-inputs" aria-label="Total input tokens">${bars}</div><table><caption class="sr-only">${selection.name}: recorded totals across ${pairs.length} paired runs</caption><thead><tr><th scope="col">Recorded totals</th><th scope="col">Factory</th><th scope="col">CLI</th></tr></thead><tbody>${metrics}<tr><th scope="row">Jobs completed</th><td>${factory.passed}/${pairs.length}</td><td>${native.passed}/${pairs.length}</td></tr></tbody></table><footer>${links}</footer></article>`];
   });
   if(!panels.length)return '';
-  const latest=['context-packet','stream-framer','snapshot-drift'].map(workOrder=>data.codex?.cards?.find(c=>c.id===workOrder+'-qualified-'+(workOrder==='snapshot-drift'?3:1)&&c.recorded)).filter(Boolean);
+  const latest=['context-packet','stream-framer','snapshot-drift'].map(workOrder=>data.codex?.cards?.find(c=>c.id===workOrder+'-qualified-'+(workOrder==='snapshot-drift'?4:1)&&c.recorded)).filter(Boolean);
   const supervised=data.codex?.cards?.find(c=>c.id==='context-packet-supervised-1'&&c.recorded);
   const reviews=latest.find(c=>c.id==='stream-framer-qualified-1')?.testReviews??[];
   const reviewedArms=['codex-astra','bantam-codex-astra','bantam-astra-terra','bantam-astra-sol'];

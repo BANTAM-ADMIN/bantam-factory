@@ -4,8 +4,8 @@
   "files": [
     {
       "path": "codex-astra.json",
-      "bytes": 68929,
-      "sha256": "ab8bfc07493ee2e242a535c7ba77e68a481e2a953a7f2e304c488227c92500c9",
+      "bytes": 68743,
+      "sha256": "95c0d67ae0cea1df73e99aca664803586c5c69847c985392ec524a9f297adad2",
       "arm": "codex-astra",
       "wallMs": 143097,
       "outcome": "PASS",
@@ -39,8 +39,8 @@
     },
     {
       "path": "bantam-codex-astra.json",
-      "bytes": 70681,
-      "sha256": "d682497cefa5386f4e45f425aa52145930f07278b394a5c234cdae958393b1e2",
+      "bytes": 70488,
+      "sha256": "4e81334ab66595fdc7378bd28cf5fe45f29e2b0eb13165cdffe37cf3de7984f5",
       "arm": "bantam-codex-astra",
       "wallMs": 138597,
       "outcome": "PASS",
@@ -113,8 +113,8 @@
     },
     {
       "path": "bantam-astra-sol.json",
-      "bytes": 170213,
-      "sha256": "9f81a0c678c1cbdf44e860353dc45fd396078678c830bc2a819942bcd484f24d",
+      "bytes": 170042,
+      "sha256": "6137b8937fb4d0763e0a79d85a4291dcf351463eae2685ba0b9482e1ca0fec40",
       "arm": "bantam-astra-sol",
       "wallMs": 486474,
       "outcome": "PASS",

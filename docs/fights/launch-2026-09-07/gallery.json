@@ -2205,42 +2205,42 @@
         "kind": "EXTEND",
         "number": "02",
         "description": "The updated factory extends a real file checker. Compare native Astra, factory Astra, and Astra supervising Terra or Sol, with every result and both roles counted.",
-        "id": "snapshot-drift-qualified-3",
+        "id": "snapshot-drift-qualified-4",
         "workOrder": "snapshot-drift",
         "recorded": true,
-        "sourceSha256": "2511116ef7e937308d782337bfcc8e8c4150c8ec6347ba0bf260da45b4a32fb4",
+        "sourceSha256": "7f1e538e333f5f5afe368810cd5b139564dfefc2aae945b0e77a87631d654593",
         "reviewedWork": true,
         "rows": [
-          {
-            "label": "Codex · Astra",
-            "model": "GPT-6 Astra · native CLI",
-            "arm": "codex-astra",
-            "outcome": "PASS",
-            "passed": true,
-            "wallMs": 143097,
-            "groupsPassed": 5,
-            "groupsTotal": 5,
-            "accountingComplete": true,
-            "tokens": {
-              "inputTokens": 135940,
-              "outputTokens": 3973,
-              "cacheHitTokens": 123136
-            }
-          },
           {
             "label": "BANTAM · Astra",
             "model": "GPT-6 Astra · wrapped CLI",
             "arm": "bantam-codex-astra",
             "outcome": "PASS",
             "passed": true,
-            "wallMs": 138597,
+            "wallMs": 122801,
             "groupsPassed": 5,
             "groupsTotal": 5,
             "accountingComplete": true,
             "tokens": {
-              "inputTokens": 80398,
-              "outputTokens": 3556,
-              "cacheHitTokens": 54144
+              "inputTokens": 64802,
+              "outputTokens": 3374,
+              "cacheHitTokens": 53376
+            }
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 139496,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 99456,
+              "outputTokens": 3916,
+              "cacheHitTokens": 83712
             }
           },
           {
@@ -2249,14 +2249,14 @@
             "arm": "bantam-astra-terra",
             "outcome": "PASS",
             "passed": true,
-            "wallMs": 470046,
+            "wallMs": 199017,
             "groupsPassed": 5,
             "groupsTotal": 5,
             "accountingComplete": true,
             "tokens": {
-              "inputTokens": 801736,
-              "outputTokens": 19644,
-              "cacheHitTokens": 692096
+              "inputTokens": 223723,
+              "outputTokens": 6054,
+              "cacheHitTokens": 177152
             }
           },
           {
@@ -2265,14 +2265,14 @@
             "arm": "bantam-astra-sol",
             "outcome": "PASS",
             "passed": true,
-            "wallMs": 486474,
+            "wallMs": 313253,
             "groupsPassed": 5,
             "groupsTotal": 5,
             "accountingComplete": true,
             "tokens": {
-              "inputTokens": 408909,
-              "outputTokens": 13266,
-              "cacheHitTokens": 329856
+              "inputTokens": 215524,
+              "outputTokens": 8273,
+              "cacheHitTokens": 153728
             }
           }
         ]
@@ -2539,7 +2539,7 @@
         ]
       },
       {
-        "title": "Snapshot checker · batch-edit round",
+        "title": "Snapshot checker · batch edit round",
         "kind": "EXTEND",
         "number": "02",
         "description": "Four complete recorded workflows from an earlier factory revision. Follow the edits, reviews and tests that led to the next improvement.",
@@ -2611,6 +2611,83 @@
               "inputTokens": 442967,
               "outputTokens": 11902,
               "cacheHitTokens": 360576
+            }
+          }
+        ]
+      },
+      {
+        "title": "Snapshot checker · root review round",
+        "kind": "EXTEND",
+        "number": "02",
+        "description": "Four complete recorded workflows from an earlier factory revision. Follow the edits, reviews and tests that led to the next improvement.",
+        "id": "snapshot-drift-qualified-3",
+        "workOrder": "snapshot-drift",
+        "recorded": true,
+        "sourceSha256": "2511116ef7e937308d782337bfcc8e8c4150c8ec6347ba0bf260da45b4a32fb4",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 143097,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 135940,
+              "outputTokens": 3973,
+              "cacheHitTokens": 123136
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 138597,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 80398,
+              "outputTokens": 3556,
+              "cacheHitTokens": 54144
+            }
+          },
+          {
+            "label": "BANTAM · Astra → Terra",
+            "model": "GPT-6 Astra → GPT-5.6 Terra · supervised factory",
+            "arm": "bantam-astra-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 470046,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 801736,
+              "outputTokens": 19644,
+              "cacheHitTokens": 692096
+            }
+          },
+          {
+            "label": "BANTAM · Astra → Sol",
+            "model": "GPT-6 Astra → GPT-5.6 Sol · supervised factory",
+            "arm": "bantam-astra-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 486474,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 408909,
+              "outputTokens": 13266,
+              "cacheHitTokens": 329856
             }
           }
         ]

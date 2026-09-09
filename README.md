@@ -80,8 +80,8 @@ Every run above passed all five independent check groups. Astra and Sol figures
 combine two paired repeats; Terra is one pair. Cards show wall clock, input,
 output and prefix-cache tokens, plus the complete work.
 
-**Astra’s latest snapshot checker: 41% less input, 10% less output, 3% less wall time.**
-Both attempts passed all five acceptance groups. [Watch the complete fight →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-3/share/index.html)
+**Astra’s latest snapshot checker: 35% less input, 14% less output, 12% less wall time.**
+Both attempts passed all five acceptance groups. [Watch the complete fight →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html)
 
 Explore the [context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
 and [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html)

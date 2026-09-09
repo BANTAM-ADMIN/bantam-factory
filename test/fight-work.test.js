@@ -88,6 +88,25 @@ test('additional source checks retain their real outcome and bind the exact prob
   ]) {const copy=structuredClone(value);mutate(copy);assert.throws(()=>validateFightWork(copy,row,'context-packet'),/Source review/);}
 });
 
+test('JSONL work extraction preserves Unicode separators and reports only an actual truncated record', () => {
+  const script=String.raw`
+import importlib.util,json,pathlib,tempfile
+spec=importlib.util.spec_from_file_location('work',pathlib.Path('scripts/fight-work-export.py'))
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory() as temp:
+ root=pathlib.Path(temp);file=root/'journal.jsonl'
+ expected=[{'output':'line\u2028paragraph\u2029next\u0085end'},{'output':'ordinary\nembedded newline'}]
+ original=('\r\n'.join(json.dumps(r,ensure_ascii=False) for r in expected)+'\r\n{"unfinished').encode('utf8')
+ file.write_bytes(original)
+ e=m.Extractor(root,{'startedAt':1000},{'kitId':'factory-2026-09-07'},b'{}',root)
+ assert e.lines(file,'supervisor-action-journal')==list(enumerate(expected,1))
+ assert [r for r in e.sources if r['kind']=='incomplete-jsonl-record']==[{'kind':'incomplete-jsonl-record','line':3}]
+ assert file.read_bytes()==original
+ print('Unicode JSONL preserved')
+`;
+  assert.match(execFileSync('python3',['-c',script],{cwd:path.resolve(import.meta.dirname,'..'),encoding:'utf8'}),/Unicode JSONL preserved/);
+});
+
 test('native work extraction retains original Hermes tool history across compaction and excludes private Claude records', () => {
   const script=String.raw`
 import importlib.util,json,pathlib,sqlite3,tempfile

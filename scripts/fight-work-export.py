@@ -144,7 +144,10 @@ class Extractor:
 
     def lines(self, file, kind):
         rows = []
-        for number, line in enumerate(self.source(file, kind).decode('utf8').splitlines(), 1):
+        # JSONL records end at LF. Unicode line/paragraph separators are legal
+        # JSON string content; str.splitlines() split those successful probe
+        # results apart and silently dropped valid supervisor events as gaps.
+        for number, line in enumerate(self.source(file, kind).decode('utf8').split('\n'), 1):
             if not line.strip():
                 continue
             try:

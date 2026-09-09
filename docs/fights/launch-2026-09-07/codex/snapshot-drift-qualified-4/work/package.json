@@ -1,0 +1,142 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 66664,
+      "sha256": "fe10305d4f36cd51acb57fecd1c6d2435ef77dd748bb4e1e77e559bbd2f839ca",
+      "arm": "bantam-codex-astra",
+      "wallMs": 122801,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "A finished checker. Less context.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the source and tests together, patched the verifier and CLI, added retained behavior tests, and ran the suite before finishing. The same model in BANTAM FACTORY used 35% less input, 14% less output and 12% less wall time than the native CLI attempt.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          },
+          {
+            "text": "Both passed all five original acceptance groups. This run used 11,426 input tokens beyond prefix-cache hits, compared with 15,744 in native Codex. Both delivered programs passed five of the six additional root-path and CLI checks; the shared root-identity miss is visible in Tests.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 64121,
+      "sha256": "a49d4533f4931992814453edf26ce82358e2465506814eb06b8b0b9477b14f58",
+      "arm": "codex-astra",
+      "wallMs": 139496,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "The native CLI’s finished tool.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the starter, implemented the verifier and CLI, added tests, and completed after six model requests. It passed all five original acceptance groups in 139.5 seconds, using 99,456 input and 3,916 output tokens.",
+            "actions": []
+          },
+          {
+            "text": "The delivered program passed five of the six additional root-path and CLI checks. Like the other three programs in this round, a root containing an ancestor symlink followed by .. selected the lexical directory instead of the directory reached by the filesystem. The complete probe and result are in Tests.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 106839,
+      "sha256": "ce508b00c5862dc5e4e19ee41e6a5bf3c96737264fe33943ed7a291d2f5af94b",
+      "arm": "bantam-astra-terra",
+      "wallMs": 199017,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 18,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "One worker. A focused review.",
+        "paragraphs": [
+          {
+            "text": "Astra assigned one complete implementation-and-test job to Terra. After reviewing the result, Astra checked its suspicion about digest line terminators against the actual program. Every case was already rejected correctly, so it finished without commissioning a repair.",
+            "actions": [
+              "action-3",
+              "action-16",
+              "action-17",
+              "action-18"
+            ]
+          },
+          {
+            "text": "The workflow passed all five original acceptance groups in 199.0 seconds. Astra used 84,290 input tokens; Terra used 139,433. The combined total is 223,723. The unchanged product passed five of the six additional checks, with the same root-identity miss as the other three programs.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 121559,
+      "sha256": "146c0eff8123e3bcff9fb69d829e77eb440a87b1a37d4811cde37e97ccfdee8e",
+      "arm": "bantam-astra-sol",
+      "wallMs": 313253,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 18,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Check the suspicion. Keep the working code.",
+        "paragraphs": [
+          {
+            "text": "Sol built the extension and retained tests in one worker job. Astra reviewed the source and exercised five line-terminator cases through the delivered API. The program rejected every one; Astra accepted that evidence and finished without another worker job.",
+            "actions": [
+              "action-2",
+              "action-16",
+              "action-17",
+              "action-18"
+            ]
+          },
+          {
+            "text": "The workflow passed all five original acceptance groups in 313.3 seconds. Astra used 85,381 input tokens; Sol used 130,143. The combined total is 215,524. The unchanged product passed five of the six additional checks; the root-identity miss and complete probe are in Tests.",
+            "actions": []
+          }
+        ]
+      }
+    }
+  ]
+}

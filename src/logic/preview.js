@@ -166,6 +166,7 @@ export function runPreviewSync(workspace, entryRel, {
   // (vision review, the operator, a see-your-work gate) need the pixels' path.
   report.screenshotPath = fs.existsSync(screenshot) ? screenshot : null;
   report.networkEnabled = Boolean(network);
+  if (viewport) report.requestedViewport = { ...viewport };
   report.externalReferences = findDeclaredExternalReferences(workspace, entryRel);
   report.previewStatus = classifyPreviewReport(report);
   return report;
@@ -287,6 +288,7 @@ export function previewProof(report) {
     status: report?.previewStatus ?? classifyPreviewReport(report),
     mode: interactionRequested ? "interact" : "load",
     entry: String(report?.entry ?? ""),
+    ...(report?.requestedViewport ? { viewport: { ...report.requestedViewport } } : {}),
     networkEnabled: Boolean(report?.networkEnabled),
     problemCount: previewProblemCount(report),
     externalReferences: [...(report?.externalReferences ?? [])].slice(0, 12),
@@ -305,10 +307,11 @@ const DESCRIBE_UI = "This is a screenshot of a web page being built. " +
   "elements, unstyled raw-looking content, visible error text. If the page looks empty or " +
   "broken, say so plainly. Do not speculate about code; describe only what is rendered.";
 
-export function previewVisionPrompt(taskContext = "", { taskAware = false } = {}) {
+export function previewVisionPrompt(taskContext = "", { taskAware = false, viewport = null } = {}) {
   if (!taskAware || !String(taskContext).trim()) return DESCRIBE_UI;
   const contract = String(taskContext).replace(/\s+/g, " ").trim().slice(0, 4000);
-  return "This is the actual 1280x800 Chromium rendering of a web coding task. " +
+  const dimensions = viewport ? `${viewport.width}x${viewport.height}` : '1280x800';
+  return `This is the actual ${dimensions} Chromium rendering of a web coding task. ` +
     "Review the pixels against the task below. Judge only requirements that can genuinely be " +
     "seen in this screenshot; do not claim that hidden behavior or source-level accessibility " +
     "is proven. Start with exactly `RESULT: REPAIR` when a concrete visible requirement is " +
@@ -530,6 +533,7 @@ export function previewTool(workspace, {
   describeScreenshot = null,
   taskContext = "",
   taskAwareReview = false,
+  previewRunner = runPreviewSync,
 } = {}) {
   const screenshotVision = vision || typeof describeScreenshot === "function";
   const network = previewNetworkEnabled();
@@ -538,7 +542,7 @@ export function previewTool(workspace, {
     description: "render an HTML page headlessly and report runtime errors, failed loads, blank-page checks" +
       (screenshotVision ? ", plus a vision description of a screenshot" : "") +
       ` — browser network is ${network ? "ENABLED by operator opt-in" : "OFF by policy; external CDN/import failures are expected and do not prove a URL is bad. Use local assets or operator opt-in --shell-network"}. ` +
-      "`preview` / `preview <path.html>` is load-only; add `interact` or `--interact` for a bounded primary-button and keyboard smoke. Add `--width=390 --height=844` to check an exact phone viewport. Use after building or changing web UI, before calling it done.",
+      "`preview` / `preview <path.html>` is load-only; add `interact` or `--interact` for a bounded primary-button and keyboard smoke. For desktop and phone work, batch up to 3 sizes in one action: `preview <path.html> interact --viewports=1280x900,390x844,320x740`. Each size gets an independent render and smoke; all must pass. Use `--width=390 --height=844` for one exact viewport. Use after building or changing web UI, before calling it done.",
     verbs: ["preview"],
     lastResult: null,
     async answer(q) {
@@ -554,28 +558,52 @@ export function previewTool(workspace, {
         if (!fs.existsSync(abs)) {
           return `[preview] no file at ${entry}. HTML entries here: ${entries.join(", ") || "(none)"}`;
         }
-        const report = runPreviewSync(workspace, entry, {
-          network,
-          interact: request.interact,
-          viewport: request.viewport ?? null,
-          captureInteractiveScreenshot: screenshotVision,
-        });
-        let description = null;
-        if (report.screenshotBytes > 0 && screenshotVision) {
-          try {
-            const prompt = previewVisionPrompt(taskContext, { taskAware: taskAwareReview });
-            description = typeof describeScreenshot === "function"
-              ? await describeScreenshot(report.screenshot, prompt)
-              : describeImage(endpoint, report.screenshot, { prompt });
-            if (taskAwareReview) {
-              report.visualReview = parseTaskAwarePreviewReview(description);
-              report.previewStatus = classifyPreviewReport(report);
-            }
+        const views = [];
+        for (const viewport of request.viewports ?? [request.viewport ?? null]) {
+          let report;
+          try { report = previewRunner(workspace, entry, {
+            network,
+            interact: request.interact,
+            viewport,
+            captureInteractiveScreenshot: screenshotVision,
+          }); } catch (error) {
+            if (!request.viewports) throw error;
+            const message = String(error.message || error).slice(0, 300);
+            views.push({ proof: { entry, viewport, mode: request.interact ? 'interact' : 'load', status: 'runner-error', error: message },
+              text: `[preview] runner error: ${message}` });
+            continue;
           }
-          catch { /* vision is additive; the error report stands on its own */ }
+          if (viewport) report.requestedViewport = { ...viewport };
+          let description = null;
+          if (report.screenshotBytes > 0 && screenshotVision) {
+            try {
+              const prompt = previewVisionPrompt(taskContext, { taskAware: taskAwareReview, viewport });
+              description = typeof describeScreenshot === "function"
+                ? await describeScreenshot(report.screenshot, prompt)
+                : describeImage(endpoint, report.screenshot, { prompt });
+              if (taskAwareReview) {
+                report.visualReview = parseTaskAwarePreviewReview(description);
+                report.previewStatus = classifyPreviewReport(report);
+              }
+            }
+            catch { /* vision is additive; the error report stands on its own */ }
+          }
+          views.push({ proof: previewProof(report), text: formatPreviewReport(report, description) });
         }
-        tool.lastResult = previewProof(report);
-        return formatPreviewReport(report, description);
+        if (!request.viewports) {
+          tool.lastResult = views[0].proof;
+          return views[0].text;
+        }
+        // A later green viewport must never erase an earlier failure. Keep
+        // every result and lead the observation with failures before clipping.
+        const failure = views.find(view => view.proof.status !== 'pass');
+        tool.lastResult = { ...(failure ?? views[0]).proof, views: views.map(view => view.proof) };
+        const label = view => `${view.proof.viewport.width}x${view.proof.viewport.height}`;
+        return [`[preview] ${entry}: ${views.length} viewports; overall ${tool.lastResult.status}.`,
+          ...views.map(view => `  ${label(view)}: ${view.proof.status}${view.proof.error ? ` — ${view.proof.error}` : ''}`),
+          ...[...views].sort((a, b) => Number(a.proof.status === 'pass') - Number(b.proof.status === 'pass'))
+            .map(view => `\nVIEWPORT ${label(view)}\n${view.text}`),
+        ].join('\n');
       } catch (e) {
         return `[preview] error: ${String(e.message || e).slice(0, 300)}`;
       }
@@ -588,6 +616,26 @@ export function previewTool(workspace, {
 export function parsePreviewRequest(q) {
   let arg = String(q ?? "").trim().replace(/^preview\b\s*/i, "");
   const dimensions = {};
+  let viewports = null;
+  arg = arg.replace(/(?:^|\s)--viewports(?:=|\s+)(\S+)/gi, (_, value) => {
+    if (viewports) throw new Error('duplicate --viewports');
+    const sizes = value.split(',');
+    if (sizes.length < 1 || sizes.length > 3 || new Set(sizes).size !== sizes.length) {
+      throw new Error('--viewports must contain 1..3 distinct WIDTHxHEIGHT sizes');
+    }
+    viewports = sizes.map(size => {
+      const match = size.match(/^(\d+)x(\d+)$/i);
+      const [width, height] = match ? match.slice(1).map(Number) : [];
+      if (![width, height].every(n => Number.isSafeInteger(n) && n >= 240 && n <= 3840)) {
+        throw new Error('--viewports dimensions must be 240..3840 CSS pixels');
+      }
+      return { width, height };
+    });
+    if (new Set(viewports.map(v => `${v.width}x${v.height}`)).size !== viewports.length) {
+      throw new Error('--viewports must contain distinct sizes');
+    }
+    return ' ';
+  });
   arg = arg.replace(/(?:^|\s)--(width|height)(?:=|\s+)(\d+)(?=\s|$)/gi, (_, name, value) => {
     name = name.toLowerCase();
     if (Object.hasOwn(dimensions, name)) throw new Error(`duplicate --${name}`);
@@ -601,7 +649,8 @@ export function parsePreviewRequest(q) {
   const unknown = arg.match(/(?:^|\s)(--\S+)/);
   if (unknown) throw new Error(`unsupported preview option ${unknown[1]}; use interact, --width=390 and --height=844`);
   const viewport = Object.keys(dimensions).length ? { width: dimensions.width ?? 1280, height: dimensions.height ?? 800 } : null;
-  return { entry: arg.trim(), interact, ...(viewport ? { viewport } : {}) };
+  if (viewports && viewport) throw new Error('--viewports cannot be combined with --width or --height');
+  return { entry: arg.trim(), interact, ...(viewport ? { viewport } : {}), ...(viewports ? { viewports } : {}) };
 }
 
 function externalUrls(text) {

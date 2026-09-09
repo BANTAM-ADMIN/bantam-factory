@@ -7,6 +7,7 @@
 // preview is rerun and the queue is rebuilt from current evidence.
 
 const SOURCE_LOCUS_RE = /\b([A-Za-z0-9_./-]+\.[A-Za-z0-9]+):(\d+):\s*/g;
+import { previewRecheckCommand } from './logic/preview-evidence.js';
 
 /**
  * Split structured preview issues at their file:line anchors. The preview can
@@ -88,9 +89,7 @@ export function formatPreviewFailureReanchor(sequence) {
 function normalizedPreviewQuery(query, preview) {
   const exact = String(query ?? "").trim();
   if (exact) return exact;
-  const entry = String(preview?.entry ?? "").trim();
-  const base = entry ? `preview ${entry}` : "preview";
-  return preview?.mode === "interact" ? `${base} interact` : base;
+  return previewRecheckCommand(preview);
 }
 
 function addItem(items, seen, item) {

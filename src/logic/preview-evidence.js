@@ -4,6 +4,14 @@
 // must not turn that evidence into prose claiming the page was verified. Edits
 // after a preview invalidate it and require a fresh render.
 
+export function previewRecheckCommand(preview, { requireInteraction = false } = {}) {
+  const command = ['preview', String(preview?.entry ?? '').trim(),
+    requireInteraction || preview?.mode === 'interact' ? 'interact' : ''].filter(Boolean);
+  const sizes = preview?.views?.map(view => view.viewport) ?? (preview?.viewport ? [preview.viewport] : []);
+  if (sizes.length) command.push(`--viewports=${sizes.map(v => `${v.width}x${v.height}`).join(',')}`);
+  return command.join(' ');
+}
+
 export function unresolvedPreviewObjection(
   latestPreview,
   workspaceGeneration,
@@ -14,8 +22,7 @@ export function unresolvedPreviewObjection(
   } = {},
 ) {
   if (!latestPreview || alreadyRejected >= maxRejections) return null;
-  const entry = String(latestPreview.entry ?? "").trim();
-  const command = ['preview', entry, requireInteraction || latestPreview.mode === 'interact' ? 'interact' : ''].filter(Boolean).join(' ');
+  const command = previewRecheckCommand(latestPreview, { requireInteraction });
 
   if (latestPreview.generation !== workspaceGeneration) {
     return `You called done after workspace changes since your last preview. That rendered evidence is stale. Run \`query "${command}"\` against the current entry (choose the deliverable if that preview was a temporary check), fix anything it reports, and only then finish.`;
@@ -54,7 +61,7 @@ export function unresolvedPreviewObjection(
     return `You called done, but Chromium's pointer hit-test found a visible control obstruction${details ? `: ${details}.` : "."} Fix the stacking or pointer-events defect and run \`query "${command}"\` again before finishing.`;
   }
   if (latestPreview.status === "interaction-inconclusive") {
-    return "You called done, but the requested interaction smoke did not complete, so the controls remain unverified. Run `query \"preview interact\"` again and only finish after it completes cleanly.";
+    return `You called done, but the requested interaction smoke did not complete, so the controls remain unverified. Run \`query "${command}"\` again and only finish after it completes cleanly.`;
   }
   if (latestPreview.status === "interaction-timeout") {
     const details = (latestPreview.interactionIssues ?? [])
@@ -62,7 +69,7 @@ export function unresolvedPreviewObjection(
       .map((issue) => String(issue).trim())
       .filter(Boolean)
       .join(" ");
-    return `You called done, but the bounded interaction preview timed out${details ? `: ${details}` : "."} A single timeout is inconclusive: rerun the same \`query "preview interact"\` once before editing. If it repeats at the same control, investigate that handler, fix any confirmed defect, and preview again before finishing.`;
+    return `You called done, but the bounded interaction preview timed out${details ? `: ${details}` : "."} A single timeout is inconclusive: rerun the same \`query "${command}"\` once before editing. If it repeats at the same control, investigate that handler, fix any confirmed defect, and preview again before finishing.`;
   }
   if (latestPreview.status === "interaction-problems") {
     const details = (latestPreview.interactionIssues ?? [])
@@ -70,7 +77,7 @@ export function unresolvedPreviewObjection(
       .map((issue) => String(issue).trim())
       .filter(Boolean)
       .join(" ");
-    return `You called done, but the interaction preview found working-behavior defects${details ? `: ${details}` : "."} Fix them, then run \`query "preview interact"\` again against the current files before finishing.`;
+    return `You called done, but the interaction preview found working-behavior defects${details ? `: ${details}` : "."} Fix them, then run \`query "${command}"\` again against the current files before finishing.`;
   }
   return `You called done, but the current preview still reports browser errors or failed resources. Fix those concrete problems and run \`query "${command}"\` again before finishing.`;
 }

@@ -67,6 +67,7 @@ The model can work, review, and build tests. Reusable tools become the factory's
 jigs; guards catch recurring mistakes before they spread.
 
 - **Build it. Check it. Improve it.** Actual test results guide the next step.
+- **Check desktop and phone together.** One browser-preview action can exercise three screen sizes and return each result, so Astra can fix the layout with fewer trips back and forth.
 - **Keep the work contained.** Project file boundaries and Docker shell isolation; shell networking is off by default.
 - **Improve the machinery.** The experimental [self-improvement loop](docs/SELF-IMPROVEMENT.md) studies recorded friction, builds changes, and tests them before eligible promotion. You choose when to run it.
 

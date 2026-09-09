@@ -22,6 +22,24 @@ function server(options = {}) {
   });
 }
 
+test('Codex can omit the sampling schema while retaining the action contract', async t => {
+  const codex = server(), starts = [], request = codex.request.bind(codex);
+  t.after(() => codex.close());
+  codex.request = (method, params) => { if (method === 'turn/start') starts.push(params); return request(method, params); };
+  const result = await codex.complete('plain action', { outputSchema: actionJsonSchema(), constrainOutput: false });
+  assert.equal(Object.hasOwn(starts[0], 'outputSchema'), false);
+  assert.equal(result.content, 'plain response', 'unexpected text reaches the ordinary parser without being invented or repaired');
+});
+
+test('Codex retires degenerate JSON whitespace but permits long whitespace inside source strings', async t => {
+  const codex = server(); t.after(() => codex.close());
+  await assert.rejects(codex.complete('stalled JSON whitespace', { outputSchema: actionJsonSchema() }), error =>
+    error.code === 'degenerate_output' && error.whitespaceChars > 4096);
+  assert.equal(codex.child, null);
+  const result = await codex.complete('quoted whitespace', { outputSchema: actionJsonSchema() });
+  assert.equal(JSON.parse(result.content).content, ' '.repeat(6000) + '"\\end');
+});
+
 test("Codex transport initializes, discovers its model, streams, and reports usage", async (t) => {
   const codex = server();
   t.after(() => codex.close());

@@ -412,6 +412,12 @@ export class ModelClient {
     const nPredict = opts.nPredict ?? this.nPredict;
     const stop = opts.stop ?? this.stop;
     const seed = (opts.seed !== null && opts.seed !== undefined) ? opts.seed : undefined;
+    // Frontier workers can emit the ordinary action protocol without forcing
+    // every unrelated action field through one nullable sampling schema. The
+    // runtime parser and checkpoint authority still validate the actual action.
+    const unconstrainedAction = (this.codex || this.codexBacked)
+      && process.env.BANTAM_CODEX_ACTION_SCHEMA === 'off'
+      && Array.isArray(opts.jsonSchema?.properties?.a?.enum);
 
     // OpenAI-compatible transport: raw-prompt /v1/completions, grammar passed
     // through, so a user's existing OpenAI-spec server (llama.cpp /v1, vLLM, …)
@@ -432,6 +438,7 @@ export class ModelClient {
         effort: opts.codexEffort || this.codexEffort,
         jsonMode: Boolean(opts.grammar),
         outputSchema: opts.jsonSchema ?? null,
+        ...(unconstrainedAction ? { constrainOutput: false } : {}),
         adaptiveRebase: opts.codexAdaptiveRebase !== false,
         isolated: opts.isolated === true,
       };
@@ -458,8 +465,8 @@ export class ModelClient {
           sampling,
           model: this.modelName,
           stream: Boolean(onProgress),
-          outputSchema: opts.jsonSchema ?? null,
-          jsonMode: Boolean(opts.grammar),
+          outputSchema: unconstrainedAction ? null : opts.jsonSchema ?? null,
+          jsonMode: !unconstrainedAction && Boolean(opts.grammar),
           messages: plan?.messages ?? null,
           sessionId: plan?.sessionId ?? null,
         });
@@ -531,6 +538,7 @@ export class ModelClient {
       url,
       method: "POST",
       ...(chatSession ? { chatSession } : {}),
+      ...(unconstrainedAction ? { actionSchema: opts.jsonSchema } : {}),
       headers,
       body: serializedBody,
       bodySha256: sha256(serializedBody),
@@ -574,6 +582,7 @@ export class ModelClient {
         signal: externalSignal,
         onProgress,
         outputSchema: body.outputSchema,
+        constrainOutput: body.constrainOutput !== false,
         model: body.model || this.modelName,
         effort: body.effort || this.codexEffort,
         adaptiveRebase: body.adaptiveRebase !== false,
@@ -641,7 +650,7 @@ export class ModelClient {
       if (onProgress) {
         const streamed = await this._readStream(res, onProgress);
         if (request.chatSession) streamed.result.content = normalizeCodexStructuredContent(
-          streamed.result.content, JSON.parse(request.body).response_format?.json_schema?.schema);
+          streamed.result.content, request.actionSchema ?? JSON.parse(request.body).response_format?.json_schema?.schema);
         exchange.response = responseRecord(res, streamed.rawBody, streamed.result);
         return streamed.result;
       }
@@ -670,7 +679,7 @@ export class ModelClient {
       // acknowledge that same normalized action, just like direct Codex, or
       // every next turn looks rewritten and loses its held-open session.
       if (request.chatSession) result.content = normalizeCodexStructuredContent(
-        result.content, JSON.parse(request.body).response_format?.json_schema?.schema);
+        result.content, request.actionSchema ?? JSON.parse(request.body).response_format?.json_schema?.schema);
       exchange.response = responseRecord(res, rawBody, result);
       return result;
     } catch (e) {

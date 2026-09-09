@@ -137,7 +137,16 @@ lines.on("line", (line) => {
     }, 20);
     return;
   }
-  const text = params.outputSchema
+  const promptText = params.input?.find(item => item.type === 'text')?.text ?? '';
+  if (promptText === 'stalled JSON whitespace') {
+    for (const delta of ['{"a":"read_file","p":"test.js","limit":250', ' '.repeat(3000), '\n\t'.repeat(700)]) {
+      send({ method: 'item/agentMessage/delta', params: { threadId: params.threadId, turnId, delta } });
+    }
+    return;
+  }
+  const text = promptText === 'quoted whitespace'
+    ? JSON.stringify({ a: 'write_file', p: 'large.txt', content: ' '.repeat(6000) + '"\\end' })
+    : params.outputSchema
     ? JSON.stringify({
       a: "respond",
       text: "schema received",

@@ -305,6 +305,7 @@ export class CodexAppServer {
     signal = null,
     onProgress = null,
     outputSchema = null,
+    constrainOutput = true,
     model = this.model,
     effort = this.effort,
     adaptiveRebase = true,
@@ -376,6 +377,7 @@ export class CodexAppServer {
       images: [],
       onProgress,
       outputSchema,
+      jsonProgress: outputSchema ? { inString: false, escaped: false, whitespace: 0 } : null,
       resolve: null,
       reject: null,
       touch: null,
@@ -436,7 +438,7 @@ export class CodexAppServer {
         ],
         model,
         effort,
-        ...(outputSchema ? { outputSchema } : {}),
+        ...(outputSchema && constrainOutput ? { outputSchema } : {}),
       });
       const response = await Promise.race([
         turnStart,
@@ -615,6 +617,19 @@ export class CodexAppServer {
     if (method === "item/agentMessage/delta") {
       const delta = typeof params.delta === "string" ? params.delta : "";
       state.content += delta;
+      // A live stream is not necessarily useful progress. A recorded strict
+      // action stalled after `limit:250` and emitted 166k whitespace characters.
+      // Count only whitespace OUTSIDE strings; indentation inside generated
+      // source, escapes and legitimate long reasoning must never trip this.
+      if (state.jsonProgress && stalledJsonWhitespace(state.jsonProgress, delta)) {
+        const error = new Error('Codex action generation stalled in JSON whitespace');
+        Object.assign(error, { code: 'degenerate_output', provider: 'codex', retryable: false,
+          outputChars: state.content.length, whitespaceChars: state.jsonProgress.whitespace });
+        if (state.turnId) this.request('turn/interrupt', { threadId: state.threadId, turnId: state.turnId }).catch(() => {});
+        state.reject(error);
+        this.close(error);
+        return;
+      }
       try {
         state.onProgress?.({ content: state.content, tokens: 0 });
       } catch { /* progress is advisory */ }
@@ -984,4 +999,20 @@ function codexTimeoutError(message, timeoutKind) {
 function positiveTimeout(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : fallback;
+}
+
+function stalledJsonWhitespace(state, delta) {
+  for (const char of delta) {
+    if (state.inString) {
+      if (state.escaped) state.escaped = false;
+      else if (char === '\\') state.escaped = true;
+      else if (char === '"') state.inString = false;
+      state.whitespace = 0;
+    } else if (char === '"') {
+      state.inString = true; state.whitespace = 0;
+    } else if (/\s/.test(char)) {
+      if (++state.whitespace > 4096) return true;
+    } else state.whitespace = 0;
+  }
+  return false;
 }

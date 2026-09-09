@@ -1,0 +1,410 @@
+{
+  "schema": "bantam.playable-preview.v1",
+  "title": "ASHWORTH ST \u2014 Last Stop",
+  "status": "playable-preview",
+  "model": "GPT-6 Astra",
+  "harness": "BANTAM FACTORY",
+  "reasoningEffort": "medium",
+  "snapshotAt": "2026-09-09T19:11:53.060108+00:00",
+  "harnessCommit": "6c8d1c7fd54661c4c0b512839e4b99037efb61be",
+  "description": "A procedural Three.js subway-station survival FPS built from a detailed game design. The published runtime is an unchanged snapshot of the factory-built game.",
+  "runtimeEditsForPublication": 0,
+  "comparisonStatus": "Native Astra comparison has not started; this preview has no comparative timing or token claim.",
+  "library": {
+    "name": "Three.js",
+    "version": "0.185.0",
+    "license": "MIT",
+    "licenseFile": "game/vendor/three/LICENSE"
+  },
+  "files": [
+    {
+      "path": "game/index.html",
+      "bytes": 4549,
+      "sha256": "69e251e508620ce07610a0b641e5b6943f2abf4fc7706ed3b32264b41b8db9f7"
+    },
+    {
+      "path": "game/src/audio-recipes.js",
+      "bytes": 9696,
+      "sha256": "f4fe3c1a335400a9732de12759765c918038d2772dc013a3654abe0d779a9ace"
+    },
+    {
+      "path": "game/src/audio.js",
+      "bytes": 16132,
+      "sha256": "0a2135fcd277615952e26f6dfca3c4b38ee41280595c1c007121adaaee58e306"
+    },
+    {
+      "path": "game/src/bus.js",
+      "bytes": 1120,
+      "sha256": "27023a471b6dd61bc94118cc9c7504810e8a72593e94a4de00a11326861b087a"
+    },
+    {
+      "path": "game/src/collision.js",
+      "bytes": 4604,
+      "sha256": "5df274e9ace342dcad9de13ec4afc9221874532ce4b6bf29537ac063619714ce"
+    },
+    {
+      "path": "game/src/constants.js",
+      "bytes": 18590,
+      "sha256": "60c2a0abd0c3004ff79bdc88845676132d798de7e114ac5c1fdfce6f820c3e65"
+    },
+    {
+      "path": "game/src/debug.js",
+      "bytes": 11386,
+      "sha256": "89e547085f5e3be2c9003639cc09cc8f8f1fb0186a021691a153e4fff52f26ef"
+    },
+    {
+      "path": "game/src/decals.js",
+      "bytes": 5757,
+      "sha256": "a9d0e1c1cfd9721c48cbbac6a556d8a62563a2d84df1a75d6fde6ecc752c9c4f"
+    },
+    {
+      "path": "game/src/enemies.js",
+      "bytes": 24417,
+      "sha256": "72ca3b5dc25e596dca617255f5014ee748810fef6e327ae3a447db759e425bcf"
+    },
+    {
+      "path": "game/src/hud.js",
+      "bytes": 8819,
+      "sha256": "b829f4212548baa5be3e775548382e41a38973eeb41efa6c331355ce844a563b"
+    },
+    {
+      "path": "game/src/input.js",
+      "bytes": 5554,
+      "sha256": "238cfb104de48f2dc9661d32c880b2b0a4051ea28a8621d23108678c24f83654"
+    },
+    {
+      "path": "game/src/lighting.js",
+      "bytes": 14327,
+      "sha256": "def3e650a85fa5de5117ac1899288b057a8338c023b7e52e5bcec08364e6b069"
+    },
+    {
+      "path": "game/src/main.js",
+      "bytes": 11130,
+      "sha256": "94130d0d862b2fbb07c3a5fb5227f04af1e153751aeb15056d196d71a7ba191c"
+    },
+    {
+      "path": "game/src/materials.js",
+      "bytes": 8511,
+      "sha256": "f862cd8fabb1ad92e789fc9600a373773136457147fc229a0f35dd3508a7fc9f"
+    },
+    {
+      "path": "game/src/nav.js",
+      "bytes": 9931,
+      "sha256": "e83cd9e0e37c34102307dd6a45e4277140d2bcfc7f7fbb6ab07138b3253b689e"
+    },
+    {
+      "path": "game/src/package.json",
+      "bytes": 18,
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "path": "game/src/particles.js",
+      "bytes": 21037,
+      "sha256": "1dc86c9fa233c66b1b288687c1ea8676dce8782fb7e44013855985eee217acd4"
+    },
+    {
+      "path": "game/src/player.js",
+      "bytes": 11229,
+      "sha256": "08204ba2654c4156a4540a08f2ee9658193102c7e1d3db7170472372ded0eec1"
+    },
+    {
+      "path": "game/src/post.js",
+      "bytes": 7507,
+      "sha256": "fb925759ee5788c45801c754ba9436b80cd5dfca90063c1f8be42346fd917456"
+    },
+    {
+      "path": "game/src/props.js",
+      "bytes": 16928,
+      "sha256": "c8989203e656d6ed288ec555a1c904b2ffbeef49a6da5d0c0b5f8386f80f21cb"
+    },
+    {
+      "path": "game/src/rig.js",
+      "bytes": 16755,
+      "sha256": "6e877b17c17153e5f557d4fd429dcabbe047fe2fecd6f0171a9c280c619a9287"
+    },
+    {
+      "path": "game/src/station.js",
+      "bytes": 25601,
+      "sha256": "3a260f6558d2303c9fe6ebffc424328cc88b7cdf6a1cee573bc6e8aca6f0ca41"
+    },
+    {
+      "path": "game/src/textures.js",
+      "bytes": 53606,
+      "sha256": "a2317e0e3e1a648230304dc21362c946b5cc042c817e8c370c042c65bc5f9396"
+    },
+    {
+      "path": "game/src/train.js",
+      "bytes": 19902,
+      "sha256": "03cca00a4387eff628b5677e4b3f5934bded3c93c994516c640839f5b15c821d"
+    },
+    {
+      "path": "game/src/utils.js",
+      "bytes": 11987,
+      "sha256": "184f74de370d9d87704c57db1d0d24763728b4ed7b20b5907cf2c7efb5a073a6"
+    },
+    {
+      "path": "game/src/viewmodels.js",
+      "bytes": 11171,
+      "sha256": "34e027fb1c45a4b02aa8730c22ab9eff18159af4b4ac0b86b8721712dbeef3ab"
+    },
+    {
+      "path": "game/src/waves.js",
+      "bytes": 10847,
+      "sha256": "4504e4aecae2e0701f0fabb911d9c57eeec623626d66013dd6f695fdb2d584d1"
+    },
+    {
+      "path": "game/src/weapons.js",
+      "bytes": 14206,
+      "sha256": "87a96a8889a2ce8131360ceaeffa87b8b542aa6d38a82edc80d5a1f292ede999"
+    },
+    {
+      "path": "game/style.css",
+      "bytes": 9055,
+      "sha256": "3385c36a5a85097e6dc89f72dd96345e39f8218fac65036a8e5b374a4321ed3e"
+    },
+    {
+      "path": "game/vendor/three/LICENSE",
+      "bytes": 1081,
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    },
+    {
+      "path": "game/vendor/three/addons/controls/OrbitControls.js",
+      "bytes": 40504,
+      "sha256": "faabb4e8dfd9235ee4a9fd7c9a3d75f90f1689dbd4944bd6fd32117dacec5f93"
+    },
+    {
+      "path": "game/vendor/three/addons/geometries/RoundedBoxGeometry.js",
+      "bytes": 6476,
+      "sha256": "c1b7c9bd2cddff2e3f3a0723f618a3d364a47450e3d25771d21faed88410bec8"
+    },
+    {
+      "path": "game/vendor/three/addons/math/SimplexNoise.js",
+      "bytes": 15148,
+      "sha256": "4b1455617135e6b477de76244de07547d95570643379b72f4758e50161b06072"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/EffectComposer.js",
+      "bytes": 8501,
+      "sha256": "4e079a5886152d7e529a59aef644e968ab4d32c6a33ce016b36bf29b2eac26f7"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/MaskPass.js",
+      "bytes": 4694,
+      "sha256": "7cd08eee9d5d6f5578beaddbdcbe9c384f6873810af27f22ab7db3ceeb127aa3"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/OutputPass.js",
+      "bytes": 4184,
+      "sha256": "02e4a261af34de71338185e9e87f0cbe5cba9115608d984363e1269dec1d2272"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/Pass.js",
+      "bytes": 4218,
+      "sha256": "444b409c235ead986893c472e720da1b779a56985c7d10b279c7944b52bd61c5"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/RenderPass.js",
+      "bytes": 4280,
+      "sha256": "817f6c3cdcd0fd41515d112359ea0532568eefb5aabd3b33903957ebca1b8a6a"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/SMAAPass.js",
+      "bytes": 50379,
+      "sha256": "1a96804b8cb33ba76a67f9a8e77f2d5e2bf47b1a5c9a8476901aa75e24acb85c"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/ShaderPass.js",
+      "bytes": 3228,
+      "sha256": "e2500a5913b26bbf5148ceaae644c6edcff06a18b01494ee37bf856353d2ab9d"
+    },
+    {
+      "path": "game/vendor/three/addons/postprocessing/UnrealBloomPass.js",
+      "bytes": 14921,
+      "sha256": "1158bb02f6467889aba19c1a788b9107054d7f6a558498b5e2152db5873bb859"
+    },
+    {
+      "path": "game/vendor/three/addons/shaders/CopyShader.js",
+      "bytes": 729,
+      "sha256": "a33057d5ac91c43304c186ac0e8816e62bb2ed471d3a00ff3018dfd5c0389718"
+    },
+    {
+      "path": "game/vendor/three/addons/shaders/LuminosityHighPassShader.js",
+      "bytes": 1291,
+      "sha256": "5044f780b6e6cf863947f64c36fe1587132f7fbe395ada863cd1e5f0388dcf1e"
+    },
+    {
+      "path": "game/vendor/three/addons/shaders/OutputShader.js",
+      "bytes": 1876,
+      "sha256": "353479f77a8d7e2629d49ccac9fc2f5dbfdda5442e0adf867b00377a2fcb0cb2"
+    },
+    {
+      "path": "game/vendor/three/addons/shaders/SMAAShader.js",
+      "bytes": 15002,
+      "sha256": "48ce320a6bf5c33806c4fa13ade7e3ab199f7856838d36b05ae82204db8a1c15"
+    },
+    {
+      "path": "game/vendor/three/addons/utils/BufferGeometryUtils.js",
+      "bytes": 37621,
+      "sha256": "5c552223a9309883743b80538d6e9cdb45e3227f30d3ec56fb2c39b46e78d595"
+    },
+    {
+      "path": "game/vendor/three/three.core.js",
+      "bytes": 1443059,
+      "sha256": "78b2c4218834ca8670547ed2315bfc21a00ff4dc3403bbffc8c31493d31d14de"
+    },
+    {
+      "path": "game/vendor/three/three.module.js",
+      "bytes": 650153,
+      "sha256": "bbf5ed13fe4373f5bd38b14ea8e62e9f157327da5638edc6d3863e08b167c9c7"
+    }
+  ],
+  "checks": [
+    {
+      "report": "independent-review.json",
+      "pass": true,
+      "groups": [
+        {
+          "name": "real renderer, required modules, fixed lights and debug surface",
+          "pass": true
+        },
+        {
+          "name": "manual stepping stays still between explicit calls",
+          "pass": true
+        },
+        {
+          "name": "independent stair, mezzanine and track navigation probes",
+          "pass": true
+        },
+        {
+          "name": "world movement ignores facing and track barriers contain the player",
+          "pass": true
+        },
+        {
+          "name": "real enemy rig and pistol torso/head hits",
+          "pass": true
+        },
+        {
+          "name": "rifle automatic fire, recoil recovery and shotgun pellets",
+          "pass": true
+        },
+        {
+          "name": "reload preserves ammunition across weapon switches",
+          "pass": true
+        },
+        {
+          "name": "train choreography on both tracks, stable real shader programs",
+          "pass": true
+        },
+        {
+          "name": "death and restart return to a playable fresh session",
+          "pass": true
+        },
+        {
+          "name": "no browser errors, external assets or black frame",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "report": "independent-after-rebuild.json",
+      "pass": true,
+      "groups": [
+        {
+          "name": "real renderer, required modules, fixed lights and debug surface",
+          "pass": true
+        },
+        {
+          "name": "manual stepping stays still between explicit calls",
+          "pass": true
+        },
+        {
+          "name": "independent stair, mezzanine and track navigation probes",
+          "pass": true
+        },
+        {
+          "name": "world movement ignores facing and track barriers contain the player",
+          "pass": true
+        },
+        {
+          "name": "real enemy rig and pistol torso/head hits",
+          "pass": true
+        },
+        {
+          "name": "rifle automatic fire, recoil recovery and shotgun pellets",
+          "pass": true
+        },
+        {
+          "name": "reload preserves ammunition across weapon switches",
+          "pass": true
+        },
+        {
+          "name": "train choreography on both tracks, stable real shader programs",
+          "pass": true
+        },
+        {
+          "name": "death and restart return to a playable fresh session",
+          "pass": true
+        },
+        {
+          "name": "no browser errors, external assets or black frame",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "report": "independent-controls.json",
+      "pass": true,
+      "groups": [
+        {
+          "name": "required visible start screen and title",
+          "pass": true
+        },
+        {
+          "name": "normal click starts real-time play and acquires pointer lock",
+          "pass": true
+        },
+        {
+          "name": "keyboard movement and mouse aim affect actual player state",
+          "pass": true
+        },
+        {
+          "name": "mouse fire, number keys and R control weapons with visible HUD updates",
+          "pass": true
+        },
+        {
+          "name": "losing pointer lock pauses, clicking resumes normal play",
+          "pass": true
+        },
+        {
+          "name": "death overlay and keyboard restart support a second real-time session",
+          "pass": true
+        },
+        {
+          "name": "normal play has no console errors or external asset requests",
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "station.jpg",
+      "sha256": "d79eda959a5064054525608211de44183d4292279d34454e792a821f77e59978",
+      "width": 1600,
+      "height": 900,
+      "source": "Unedited browser capture of this snapshot, software rendering."
+    },
+    {
+      "path": "train.jpg",
+      "sha256": "4f612ff5e50ef3c4cb47a3372f101976c26618af6d54a1ecf22d0c997bd97eb9",
+      "width": 1600,
+      "height": 900,
+      "source": "Unedited browser capture of this snapshot, software rendering."
+    }
+  ],
+  "download": {
+    "path": "ashworth-st.zip",
+    "bytes": 625700,
+    "sha256": "fbd229b31e560ca08cca84620ed77d59e6f2e384fd653f35f799723fc103d50a"
+  }
+}

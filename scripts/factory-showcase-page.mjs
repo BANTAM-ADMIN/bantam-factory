@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import {PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 import {performanceView} from './fight-performance.mjs';
+import {ASHWORTH_SHOWCASE_FILES} from './ashworth-showcase-files.mjs';
 
 const E=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROOT=new URL('../site/',import.meta.url);
@@ -14,6 +15,7 @@ export const SHOWCASE_STATIC_FILES=Object.freeze([
   'examples/arcade/index.html','examples/arcade/arcade.css','examples/arcade/arcade.js','examples/arcade/builds.json',
   'examples/arcade/astra-cli.html','examples/arcade/astra-cli.json',
   'examples/arcade/astra-factory-refresh.html','examples/arcade/astra-factory-refresh.json',
+  ...ASHWORTH_SHOWCASE_FILES,
 ]);
 const ARMS=Object.freeze([
   ['bantam-local-27b','BANTAM FACTORY','Qwen 27B, local'],
@@ -26,11 +28,17 @@ const ARMS=Object.freeze([
 const showcaseArms=data=>ARMS.filter(([arm])=>arm!=='pi'||data.cards.some(c=>c.rows?.some(r=>r.arm==='pi')));
 function read(name){
   const file=new URL(name,ROOT),stat=fs.lstatSync(file);
-  if(!stat.isFile()||stat.isSymbolicLink()||stat.size>1024*1024)throw Error('Expected bounded showcase source');
+  const limit=name==='examples/ashworth/game/vendor/three/three.core.js'?2*1024*1024:1024*1024;
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size>limit)throw Error('Expected bounded showcase source');
   return fs.readFileSync(file);
 }
 export function showcaseAssets(){
-  for(const name of ['.','fonts','img','examples','examples/tetris','examples/arcade']){
+  const directories=new Set(['.']);
+  for(const file of SHOWCASE_STATIC_FILES){
+    const parts=file.split('/');parts.pop();
+    while(parts.length){directories.add(parts.join('/'));parts.pop();}
+  }
+  for(const name of directories){
     const stat=fs.lstatSync(new URL(name,ROOT));
     if(!stat.isDirectory()||stat.isSymbolicLink())throw Error('Expected plain showcase directory');
   }

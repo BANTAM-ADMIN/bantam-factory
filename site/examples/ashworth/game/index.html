@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101813"><title>ASHWORTH ST — Last Stop</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+</head>
+<body>
+<canvas id="c" aria-label="Ashworth Street station survival game"></canvas>
+<div id="hud">
+  <div id="crosshair"><span class="ch-bar ch-t"></span><span class="ch-bar ch-b"></span><span class="ch-bar ch-l"></span><span class="ch-bar ch-r"></span><span id="ch-dot"></span></div>
+  <div id="hitmarker"><span></span><span></span><span></span><span></span></div>
+  <div id="sprint-glyph" class="hidden">»</div><div id="prompt"></div>
+  <div id="banner"><div id="banner-text"></div><div id="banner-sub"></div></div>
+  <div id="wave-box"><div class="eyebrow">ASHWORTH ST <span class="line-bullet small">6</span></div><div id="wave-label">WAVE 1</div><div id="wave-sub"></div></div>
+  <div id="kills-box"><span id="kills-icon">☠</span><span id="kills-num">0</span><span class="eyebrow">ELIMINATED</span></div>
+  <div id="health-box"><div class="eyebrow">VITAL SIGNS</div><div id="health-bar"><div id="health-ghost"></div><div id="health-fill"></div></div><div id="health-num">100</div></div>
+  <div id="ammo-box"><div id="ammo-name">PISTOL</div><div id="ammo-line"><span id="ammo-mag">15</span><span id="ammo-sep">/</span><span id="ammo-reserve">90</span></div><div id="reload-bar"><div id="reload-fill"></div></div><div id="ammo-pips"><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i><i class="pip"></i></div><div id="reload-label" class="hidden">RELOAD</div></div>
+  <div id="damage-arcs"><i class="arc"></i><i class="arc"></i><i class="arc"></i><i class="arc"></i><i class="arc"></i><i class="arc"></i></div>
+  <div id="vignette"></div><div id="toast"></div><div id="fps" class="hidden">60</div>
+</div>
+<div id="overlay">
+  <div id="start" class="screen">
+    <div class="service-strip"><span>METROPOLITAN TRANSIT AUTHORITY</span><span>NIGHT SERVICE / 02:17</span></div>
+    <div class="title-sign"><div class="station-code">LOWER PLATFORM · DOWNTOWN</div><h1>ASHWORTH ST<span class="line-bullet">6</span></h1><div class="destination"><span>LAST STOP</span><span aria-hidden="true">↗</span></div></div>
+    <p class="sub">The last train isn't empty.</p>
+    <button id="start-hint" type="button" disabled>PREPARING STATION…</button>
+    <ul id="controls"><li><b>W A S D</b> MOVE <span>SHIFT · SPRINT</span></li><li><b>MOUSE</b> AIM <span>LMB · FIRE &nbsp; R · RELOAD</span></li><li><b>1 / 2 / 3</b> WEAPONS <span>WHEEL · CYCLE &nbsp; E · INTERACT</span></li></ul>
+    <div class="service-footer"><span class="status-dot"></span> SERVICE SUSPENDED UNTIL FURTHER NOTICE <span>HEADPHONES RECOMMENDED</span></div>
+  </div>
+  <div id="pause" class="screen hidden"><div class="eyebrow">ASHWORTH ST / SERVICE INTERRUPTED</div><h2>PAUSED</h2><button id="resume-button" type="button">CLICK TO RESUME</button><p id="pause-hint">Your station is waiting.</p></div>
+  <div id="gameover" class="screen hidden"><div class="eyebrow">END OF THE LINE</div><h1 id="go-title">YOU DIED</h1><p id="go-reason"></p><table id="go-stats"><tbody><tr><th>Wave reached</th><td id="stat-wave">1</td></tr><tr><th>Eliminated · shambler / runner / brute</th><td id="stat-types">0 / 0 / 0</td></tr><tr><th>Headshots</th><td id="stat-headshots">0</td></tr><tr><th>Accuracy</th><td id="stat-accuracy">0%</td></tr><tr><th>Damage dealt</th><td id="stat-damage">0</td></tr><tr><th>Time survived</th><td id="stat-time">0:00</td></tr><tr><th>Shots fired</th><td id="stat-shots">0</td></tr><tr><th>Best streak</th><td id="stat-streak">0</td></tr><tr class="score-row"><th>Score</th><td id="stat-score">0</td></tr></tbody></table><button id="go-hint" type="button">PRESS R OR CLICK TO RESTART</button></div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body></html>

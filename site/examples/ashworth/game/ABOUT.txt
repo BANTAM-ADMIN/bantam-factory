@@ -1,0 +1,15 @@
+ASHWORTH ST — Last Stop
+Built by GPT-6 Astra inside BANTAM FACTORY.
+Playable preview captured 2026-09-09.
+
+To play locally, run a static HTTP server in this folder:
+  python3 -m http.server 8000 --bind 127.0.0.1
+Then open http://127.0.0.1:8000 in a desktop browser.
+
+WASD: move. Mouse: aim/fire. Shift: sprint.
+R: reload. 1/2/3: weapons. E: interact. Esc: pause.
+
+Game source: Apache-2.0 (see LICENSE).
+Three.js r185: MIT (see vendor/three/LICENSE).
+
+https://github.com/BANTAM-ADMIN/bantam-factory

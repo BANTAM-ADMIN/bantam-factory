@@ -12,7 +12,7 @@
 <p align="center">
   <a href="#get-started"><strong>Get started</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/fights.html"><strong>Watch the fights</strong></a> ·
-  <a href="https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html"><strong>Play the builds</strong></a> ·
+  <a href="https://bantam-admin.github.io/bantam-factory/#builds"><strong>Play the builds</strong></a> ·
   <a href="docs/README.md">Docs</a>
 </p>
 
@@ -43,6 +43,24 @@ are included in input; each card shows the complete counters and conditions.
 action, read the tests, and inspect what each harness delivered.
 
 ## Don't just watch. Play it.
+
+**A design becomes a world you can walk into.**
+
+[![ASHWORTH ST — a detailed subway survival game built by GPT-6 Astra inside BANTAM FACTORY.](site/examples/ashworth/station.jpg)](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/index.html)
+
+**ASHWORTH ST · Last Stop.** Astra inside BANTAM FACTORY built a 3D subway
+survival game from a detailed design: a moving train, animated enemies,
+three weapons, procedural textures and sound. Explore the station. Survive
+the passengers. Play the preview in your browser.
+
+**[Play ASHWORTH ST →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/index.html)**
+· [Explore the source](site/examples/ashworth/game)
+· [Download the game](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/ashworth-st.zip)
+
+Desktop · keyboard + mouse. The factory is still refining this build;
+the published preview includes its snapshot and browser-check record.
+
+**Same Astra. Same puzzle brief. Two harnesses.**
 
 > Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file.
 

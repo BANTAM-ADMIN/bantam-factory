@@ -17,6 +17,8 @@
 // answer to a decidable question, produced without executing anything that could
 // have decided it, is a guess wearing an argument's clothes.
 
+import { turnEditApplied } from "../edit-actions.js";
+
 // The task wants one distinguished element, or all of them, out of a space.
 // Deliberately requires a SELECTION word: "write the config" is not a search.
 const SELECTION_RE = /\b(?:earliest|latest|best|optimal|shortest|longest|cheapest|fastest|smallest|largest|maximum|minimum|most|fewest|all (?:valid|possible|such)|every (?:valid|possible)|that satisf(?:y|ies)|satisfying all)\b/i;
@@ -25,6 +27,10 @@ const SELECTION_RE = /\b(?:earliest|latest|best|optimal|shortest|longest|cheapes
 const SPACE_RE = /\b(?:slot|schedule|combination|permutation|arrangement|assignment|route|path|move|solution|candidate|subset|ordering|placement|allocation)s?\b/i;
 
 const act = (turn) => (turn && (turn.action || turn.parsedAction)) || null;
+// A word boundary after "for " misses JavaScript's "for (" because both the
+// space and opening parenthesis are non-word characters. Recognize both loop
+// spellings and keep function-call punctuation outside the word boundary.
+const SEARCH_CODE_RE = /\b(?:for|while)\s+(?=\w)|\b(?:for|while|range|sorted|min|max)\s*\(|\b(?:itertools|solve|search|enumerate)\b/;
 
 /**
  * Does the task pose a decidable SEARCH — pick the extreme, or enumerate every
@@ -51,7 +57,8 @@ export function ranASearch(turns, isCompute) {
     if (a.a === "shell" && isCompute(String(a.c ?? ""))) return true;
     // A script authored and then run counts; the source names the search even
     // when the shell line is just its filename.
-    if (typeof a.content === "string" && /\b(?:for |while |itertools|range\(|sorted\(|min\(|max\(|solve|search|enumerate)\b/.test(a.content)) {
+    const contents = a.a === "write_batch" ? (a.files ?? []).map(file => file?.content) : [a.content];
+    if (turnEditApplied(turn) && contents.some(content => typeof content === "string" && SEARCH_CODE_RE.test(content))) {
       return true;
     }
   }

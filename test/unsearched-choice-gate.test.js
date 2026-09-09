@@ -63,6 +63,25 @@ test("a search written to a file and run also counts", () => {
   assert.equal(ranASearch(turns, isComputeShellCommand), true);
 });
 
+test("JavaScript loops count with either spacing and through an applied batch", () => {
+  for (const content of [
+    'for (const candidate of candidates) { if (valid(candidate)) out.push(candidate); }',
+    'for(const candidate of candidates) { visit(candidate); }',
+    'while (ready.length) { visit(ready.shift()); }',
+  ]) for (const a of [
+    { a: 'write_file', p: 'planner.js', content },
+    { a: 'write_batch', files: [{ p: 'planner.js', content }, { p: 'notes.txt', content: 'Built.' }] },
+  ]) {
+    const turns = [{ action: a, observation: 'wrote source', editApplied: true }, sh('npm test')];
+    assert.equal(unsearchedChoiceObjection(turns, 0, opts), null);
+    turns[0].editApplied = false;
+    assert.ok(unsearchedChoiceObjection(turns, 0, opts), 'a refused proposal is not authored code');
+    delete turns[0].editApplied;
+    turns[0].observation = '[edit-preservation] No files changed.';
+    assert.ok(unsearchedChoiceObjection(turns, 0, opts), 'legacy refusals must not count either');
+  }
+});
+
 test("bounded to one bounce", () => {
   const turns = [sh("cat /app/alice_calendar.ics")];
   assert.ok(unsearchedChoiceObjection(turns, 0, opts));

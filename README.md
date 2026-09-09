@@ -83,6 +83,10 @@ output and prefix-cache tokens, plus the complete work.
 Astra also used **39% fewer input tokens** on Patch Transaction across two paired
 runs: [round 1](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-1/share/index.html) · [round 2](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-2/share/index.html).
 
+**[Let Astra run the floor →](https://bantam-admin.github.io/bantam-factory/codex/context-packet-supervised-1/share/index.html)**
+Watch Astra supervise Terra or Sol inside the factory. Eight fresh runs compare
+native Codex, BANTAM workers, and supervised teams—with both roles counted.
+
 **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two playable games. Every recorded action and the delivered files.
 

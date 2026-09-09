@@ -2664,6 +2664,147 @@
             }
           }
         ]
+      },
+      {
+        "title": "Context packer · solo and supervised",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Native Codex, BANTAM workers, and Astra supervising Terra or Sol. The same assignment and independent checks; both roles included in supervised totals.",
+        "id": "context-packet-supervised-1",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "ec063715fbbe5acbcea6f03541cf3de198f83df4a5cb82faf2553d2f88315739",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 105424,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 74624,
+              "outputTokens": 2779,
+              "cacheHitTokens": 66048
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 97159,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 41197,
+              "outputTokens": 2751,
+              "cacheHitTokens": 28160
+            }
+          },
+          {
+            "label": "Codex · Terra",
+            "model": "GPT-5.6 Terra · native CLI",
+            "arm": "codex-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 99070,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 144581,
+              "outputTokens": 4575,
+              "cacheHitTokens": 127744
+            }
+          },
+          {
+            "label": "BANTAM · Terra",
+            "model": "GPT-5.6 Terra · wrapped CLI",
+            "arm": "bantam-codex-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 83273,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 64171,
+              "outputTokens": 3486,
+              "cacheHitTokens": 46848
+            }
+          },
+          {
+            "label": "Codex · Sol",
+            "model": "GPT-5.6 Sol · native CLI",
+            "arm": "codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 241066,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 150673,
+              "outputTokens": 6981,
+              "cacheHitTokens": 110208
+            }
+          },
+          {
+            "label": "BANTAM · Sol",
+            "model": "GPT-5.6 Sol · wrapped CLI",
+            "arm": "bantam-codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 165078,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 104592,
+              "outputTokens": 4343,
+              "cacheHitTokens": 76928
+            }
+          },
+          {
+            "label": "BANTAM · Astra → Terra",
+            "model": "GPT-6 Astra → GPT-5.6 Terra · supervised factory",
+            "arm": "bantam-astra-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 190422,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 215228,
+              "outputTokens": 6223,
+              "cacheHitTokens": 149760
+            }
+          },
+          {
+            "label": "BANTAM · Astra → Sol",
+            "model": "GPT-6 Astra → GPT-5.6 Sol · supervised factory",
+            "arm": "bantam-astra-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 203070,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 170587,
+              "outputTokens": 5275,
+              "cacheHitTokens": 126976
+            }
+          }
+        ]
       }
     ]
   }

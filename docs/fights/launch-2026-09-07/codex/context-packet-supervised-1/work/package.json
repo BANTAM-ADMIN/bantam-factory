@@ -1,0 +1,272 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 42113,
+      "sha256": "86cb3b3c88020fd8366e031941a4355b3fc3a02551213c2362aa0772fc76c1f4",
+      "arm": "codex-astra",
+      "wallMs": 105424,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Codex · Astra inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 4-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 48541,
+      "sha256": "dc21112cb854a46e76781c3dffc3030c57a2327c2140297e2b7adafcc03030ee",
+      "arm": "bantam-codex-astra",
+      "wallMs": 97159,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The factory’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "BANTAM FACTORY · Astra inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 4-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 43990,
+      "sha256": "3d63e760d9f2a4622d29ceaff35b7aa22254b842c87e8d48904426195e0f5376",
+      "arm": "codex-terra",
+      "wallMs": 99070,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Codex · Terra inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 8-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-terra.json",
+      "bytes": 40224,
+      "sha256": "a7141b6e775b28e3637e0a36fb8e74a119ef93199499c10344e2eac9594d9aff",
+      "arm": "bantam-codex-terra",
+      "wallMs": 83273,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The factory’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "BANTAM FACTORY · Terra inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 6-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 47214,
+      "sha256": "fcf073bf625e7761210f2080ceec8368b538beb993689184a7b1145b5092196c",
+      "arm": "codex-sol",
+      "wallMs": 241066,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Codex · Sol inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 8-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-sol.json",
+      "bytes": 41572,
+      "sha256": "b04475dc851cb4dca13079bebef2619163e8bb538f5e286d4eb35787510d588e",
+      "arm": "bantam-codex-sol",
+      "wallMs": 165078,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 9,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The factory’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "BANTAM FACTORY · Sol inspected the supplied project, implemented the assignment and ran its checks. This attempt passed all five independent acceptance groups and completed. Its complete 9-action record and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 100528,
+      "sha256": "2ba67b50c3dce607143c3f9c0ee2eaf5e94c556850e691613ce8836eb218736c",
+      "arm": "bantam-astra-terra",
+      "wallMs": 190422,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 20,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Astra directs. Terra builds.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter, assigned work to a BANTAM worker, and reviewed the delivered result. The worker built and checked the code in its own sandbox. This lane includes both models’ input, output and prefix-cache tokens.",
+            "actions": [
+              "action-2",
+              "action-10"
+            ]
+          },
+          {
+            "text": "The integrated project passed all five independent acceptance groups and completed. Open Actions to follow supervision and worker execution together; open Files for the exact integrated product.",
+            "actions": [
+              "action-8",
+              "action-18",
+              "action-20"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 83224,
+      "sha256": "ce1a80eac3817e6834bf0d0ee8863de1b3be899e58db2700d2b0d09e275bc003",
+      "arm": "bantam-astra-sol",
+      "wallMs": 203070,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 14,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Astra directs. Sol builds.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter, assigned work to a BANTAM worker, and reviewed the delivered result. The worker built and checked the code in its own sandbox. This lane includes both models’ input, output and prefix-cache tokens.",
+            "actions": [
+              "action-2"
+            ]
+          },
+          {
+            "text": "The integrated project passed all five independent acceptance groups and completed. Open Actions to follow supervision and worker execution together; open Files for the exact integrated product.",
+            "actions": [
+              "action-10",
+              "action-14"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

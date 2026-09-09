@@ -23,9 +23,9 @@ export function isJavaScriptPath(filePath) {
  * Parse JavaScript using the source modes the path can legally represent.
  *
  * `.mjs` and `.cjs` have fixed Node source modes. For executor calls a plain
- * `.js` follows its nearest package.json when one exists. With no package
- * boundary it may be either a classic browser script or a browser module, so
- * the syntax gate accepts either source mode.
+ * `.js` follows an explicit type in its nearest package.json. A manifest
+ * without a type also describes browser projects and syntax-detected Node
+ * modules, so the syntax gate accepts either source mode at that boundary.
  */
 export function parseJavaScript(source, filePath = "file.js", { runtimePath = null, stagedFiles = null } = {}) {
   const text = String(source ?? "");
@@ -100,8 +100,8 @@ export function validateSourceTransition({
 function sourceModesForJs(runtimePath, stagedFiles = null) {
   // Library callers which only have a content/path specimen use the neutral
   // dual-mode parser. A real target path follows an explicit Node package
-  // boundary, but a package-less web workspace remains genuinely ambiguous:
-  // `<script type="module" src="game.js">` is valid without package.json.
+  // boundary. A web workspace remains ambiguous with no package.json OR one
+  // without a type: npm scripts do not make browser imports CommonJS.
   if (!runtimePath || !path.isAbsolute(runtimePath)) return ["module", "script"];
   let directory = path.dirname(runtimePath);
   while (true) {
@@ -112,7 +112,10 @@ function sourceModesForJs(runtimePath, stagedFiles = null) {
       // are submitted together, even though the committed pair is valid.
       const parsed = JSON.parse(stagedFiles?.has(manifest)
         ? stagedFiles.get(manifest) : fs.readFileSync(manifest, "utf8"));
-      return parsed?.type === "module" ? ["module"] : ["script"];
+      if (parsed?.type === "module") return ["module"];
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          && !Object.hasOwn(parsed, "type")) return ["module", "script"];
+      return ["script"];
     } catch (error) {
       if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) return ["script"];
       // Invalid package JSON makes Node fail before source execution; for this

@@ -66,9 +66,42 @@ describe("JavaScript source parsing", () => {
       { runtimePath: path.join(scriptDir, "file.js") },
     ).ok, false);
   });
+
+  it("a package with npm scripts and no type permits browser modules and classic scripts", () => {
+    const root = workspace();
+    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node test/smoke.js" } }));
+    const options = { runtimePath: path.join(root, "src", "constants.js") };
+    assert.equal(parseJavaScript("export const PLAYER = { radius: 0.35 };", "constants.js", options).sourceType, "module");
+    assert.equal(parseJavaScript("with (object) { value = 1; }", "classic.js", options).sourceType, "script");
+    assert.equal(parseJavaScript("export const PLAYER = ;", "constants.js", options).ok, false);
+    fs.mkdirSync(path.join(root, "test"));
+    fs.writeFileSync(path.join(root, "test", "package.json"), '{"type":"commonjs"}');
+    assert.equal(parseJavaScript("export const value = 1;", "smoke.js",
+      { runtimePath: path.join(root, "test", "smoke.js") }).ok, false);
+  });
+
+  it("a staged untyped package stops a parent's explicit CommonJS boundary", () => {
+    const root = workspace();
+    fs.writeFileSync(path.join(root, "package.json"), '{"type":"commonjs"}');
+    const runtimePath = path.join(root, "web", "game.js");
+    const stagedFiles = new Map([[path.join(root, "web", "package.json"), '{"private":true}']]);
+    assert.equal(parseJavaScript("export const game = 1;", "game.js", { runtimePath }).ok, false);
+    assert.equal(parseJavaScript("export const game = 1;", "game.js", { runtimePath, stagedFiles }).ok, true);
+    stagedFiles.set(path.join(root, "web", "package.json"), '{broken');
+    assert.equal(parseJavaScript("export const game = 1;", "game.js", { runtimePath, stagedFiles }).ok, false);
+  });
 });
 
 describe("transactional source transitions", () => {
+  it("creates an ES module in an untyped project while still rejecting syntax damage", () => {
+    const root = workspace();
+    fs.writeFileSync(path.join(root, "package.json"), '{"name":"browser-game","private":true}');
+    const executor = new Executor(root), content = "export const PLAYER = { radius: 0.35 };\n";
+    assert.doesNotMatch(executor.writeFile({ p: "src/constants.js", content }), /ERROR:|refused/);
+    assert.equal(fs.readFileSync(path.join(root, "src/constants.js"), "utf8"), content);
+    assert.match(executor.replace({ p: "src/constants.js", old: "radius: 0.35", new: "radius:" }), /valid JavaScript would become invalid/);
+    assert.equal(fs.readFileSync(path.join(root, "src/constants.js"), "utf8"), content);
+  });
   it("rejects new invalid JavaScript and valid-to-invalid transitions", () => {
     const created = validateSourceTransition({
       path: "new.js",

@@ -5,7 +5,7 @@ import path from 'node:path';
 
 test('supervisor exports include worker actions and receipt-bound products while excluding raw model evidence',()=>{
   const script=String.raw`
-import importlib.util,json,pathlib,tempfile,hashlib
+import importlib.util,json,pathlib,tempfile,hashlib,shutil
 spec=importlib.util.spec_from_file_location('foreman',pathlib.Path('scripts/foreman-work-export.py'))
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 sha=lambda s:hashlib.sha256(s.encode()).hexdigest()
@@ -25,7 +25,10 @@ with tempfile.TemporaryDirectory() as temp:
  tx={'kind':'bantam.workspace-transaction','id':'build','state':'committed','changes':[{'path':'tool.js',
   'before':{'sha256':sha('stub\n')},'after':{'sha256':sha('export const ready = true;\n')}}]}
  write(d/'integrations/build/manifest.json',tx)
- write(d/'jobs/build/run.json',{'modelCalls':[{'completedAt':'2026-09-09T00:00:00.500Z','request':{'prompt':'PRIVATE_PROMPT'}}],
+ write(d/'jobs/build/run.json',{'modelCalls':[{'completedAt':'2026-09-09T00:00:00.500Z','request':{'prompt':'PRIVATE_PROMPT'},
+  'attempts':[{'status':'error','startedAt':'2026-09-09T00:00:00.100Z','completedAt':'2026-09-09T00:00:00.300Z',
+   'error':{'code':'model_timeout','timeoutKind':'idle','outputChars':0,'message':'PRIVATE_PROVIDER_ERROR'}},
+   {'status':'ok','response':{'rawBody':'PRIVATE_RESPONSE'}}]}],
   'turns':[{'i':0,'modelCallIndex':0,'parsedAction':{'a':'write_file','p':'tool.js','content':'export const ready = true;\n'},
    'rawObservation':'File written.\n[guidance]\nPRIVATE_GUIDANCE','reasoning':'PRIVATE_THINKING'}]})
  journal=[]
@@ -44,9 +47,23 @@ with tempfile.TemporaryDirectory() as temp:
  assert value['files'][0]['after']=='export const ready = true;\n'
  assert any(a['source']=='factory-worker-terra' and a['request']['job']=='build' for a in value['actions'])
  assert any(a['name']=='supervisor-dispatch' for a in value['actions'])
+ timeout=next(a for a in value['actions'] if a['name']=='provider-timeout')
+ assert timeout['atMs']==100 and timeout['endedMs']==300
+ assert timeout['state']=='timed-out' and timeout['source']=='factory-worker-terra'
+ assert timeout['request']=={'job':'build','action':{'modelRequest':1,'attempt':1}}
+ assert timeout['output']=={'code':'model_timeout','timeoutKind':'idle','outputChars':0,'usageReceiptRecorded':False}
  assert any(s['kind']=='committed-integration' for s in value['sources'])
  assert value['checks'][1]['stdout']=='Acceptance passed'
  assert value['finalResponse']=='Delivered.'
+ alternate=repo/'examples/fights/factory-2026-09-06/context-packet'
+ shutil.copytree(kit,alternate)
+ other=m.export_foreman(base/'manifest.json','context-packet','terra',root/'other-kit.json',repo,kit='factory-2026-09-06')
+ assert other['files']==value['files']
+ (alternate/'starter/tool.js').write_text('different starter\n')
+ try:m.export_foreman(base/'manifest.json','context-packet','terra',root/'bad-kit.json',repo,kit='factory-2026-09-06');raise AssertionError('wrong kit bytes accepted')
+ except ValueError as e:assert 'seal mismatch' in str(e)
+ try:m.export_foreman(base/'manifest.json','context-packet','terra',root/'traversal.json',repo,kit='../outside');raise AssertionError('kit traversal accepted')
+ except ValueError as e:assert 'kit identity' in str(e)
  (d/'candidate/tool.js').write_text('maintainer repair\n')
  try:m.export_foreman(base/'manifest.json','context-packet','terra',root/'bad.json',repo);raise AssertionError('unsealed repair accepted')
  except ValueError as e:assert 'seal mismatch' in str(e)

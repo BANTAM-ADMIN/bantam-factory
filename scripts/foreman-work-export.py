@@ -96,6 +96,8 @@ class ForemanExtractor(work.Extractor):
 
 def export_foreman(manifest_file, card, worker, output, repo, kit='factory-2026-09-07'):
     manifest_file, output, repo = Path(manifest_file).resolve(), Path(output).resolve(), Path(repo).resolve()
+    if not isinstance(kit, str) or not re.fullmatch(r'factory-[a-z0-9-]{1,64}', kit):
+        raise ValueError('Expected a bounded factory kit identity')
     if worker not in ['terra', 'sol'] or not re.fullmatch(r'[a-z0-9-]{1,80}', card) or output.exists():
         raise ValueError('Expected Terra/Sol and a fresh output file')
     manifest_bytes = work.read(manifest_file, 8 * 1024 * 1024)
@@ -157,6 +159,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('manifest'); parser.add_argument('card'); parser.add_argument('worker', choices=['terra', 'sol'])
     parser.add_argument('output'); parser.add_argument('--repo', default=str(Path(__file__).resolve().parent.parent))
+    parser.add_argument('--kit', default='factory-2026-09-07')
     args = parser.parse_args()
-    result = export_foreman(args.manifest, args.card, args.worker, args.output, args.repo)
+    result = export_foreman(args.manifest, args.card, args.worker, args.output, args.repo, args.kit)
     print(json.dumps({'arm': result['arm'], 'actions': len(result['actions']), 'files': len(result['files'])}))

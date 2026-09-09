@@ -171,6 +171,23 @@ class Extractor:
     def bantam(self):
         run = json.loads(self.source(self.directory / 'run.json', 'factory-turn-record'))
         calls = run.get('modelCalls', [])
+        # A recovered provider stall is part of the recorded workflow. Select
+        # typed timeout facts only; raw errors can contain private provider data.
+        for index, call in enumerate(calls):
+            for number, attempt in enumerate(call.get('attempts', []), 1):
+                error = attempt.get('error') or {}
+                if attempt.get('status') != 'error' or error.get('code') != 'model_timeout':
+                    continue
+                if error.get('timeoutKind') not in ['idle', 'hard', 'control']:
+                    continue
+                count = error.get('outputChars')
+                count = count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+                self.action('provider-timeout', {'modelRequest': index + 1, 'attempt': number},
+                    {'code': 'model_timeout', 'timeoutKind': error['timeoutKind'],
+                     'outputChars': count,
+                     'usageReceiptRecorded': bool((attempt.get('response') or {}).get('normalized', {}).get('usage'))},
+                    at=attempt.get('startedAt'), end=attempt.get('completedAt'),
+                    state='timed-out', source='factory-model-transport')
         for turn in run.get('turns', []):
             action = turn.get('parsedAction') or {}
             index = turn.get('modelCallIndex')

@@ -13,6 +13,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { stringifyChunked } from "@discoveryjs/json-ext";
 
 import { snapshotWorkspace } from "./workspace-snapshot.js";
 
@@ -266,7 +267,11 @@ export class RunCheckpoint {
         // the files instead of only replaying the dialogue against an empty cursor.
         ...(this._workspaceSnapshot ? { workspaceSnapshot: this._workspaceSnapshot } : {}),
       };
-      fs.writeFileSync(tmp, JSON.stringify(body, null, 2));
+      // Keep signal-time writes synchronous, but never make one giant string.
+      const descriptor = fs.openSync(tmp, "w");
+      try {
+        for (const chunk of stringifyChunked(body, null, 2)) fs.writeFileSync(descriptor, chunk, "utf8");
+      } finally { fs.closeSync(descriptor); }
       fs.renameSync(tmp, this.dest);
       return true;
     } catch {

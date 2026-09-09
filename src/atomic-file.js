@@ -1,8 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { stringifyChunked } from "@discoveryjs/json-ext";
+import { snapshotJsonValue } from "./json-file.js";
 
 export function writeTextAtomic(filePath, text) {
+  return writeChunksAtomic(filePath, [String(text)]);
+}
+
+function writeChunksAtomic(filePath, chunks) {
   if (typeof filePath !== "string" || filePath.length === 0 || filePath.includes("\0")) {
     throw new TypeError("atomic file path must be a non-empty string without NUL bytes");
   }
@@ -21,7 +27,7 @@ export function writeTextAtomic(filePath, text) {
 
   try {
     if (preserveMode) fs.fchmodSync(openDescriptor, mode);
-    fs.writeFileSync(openDescriptor, String(text), "utf8");
+    for (const chunk of chunks) fs.writeFileSync(openDescriptor, chunk, "utf8");
     fs.fsyncSync(openDescriptor);
     fs.closeSync(openDescriptor);
     openDescriptor = null;
@@ -52,11 +58,14 @@ export function writeTextAtomic(filePath, text) {
 }
 
 export function writeJsonAtomic(filePath, value) {
-  const serialized = JSON.stringify(value, null, 2);
-  if (typeof serialized !== "string") {
+  const snapshot = snapshotJsonValue(value);
+  if (snapshot === undefined) {
     throw new TypeError("atomic JSON value must be serializable");
   }
-  return writeTextAtomic(filePath, serialized + "\n");
+  return writeChunksAtomic(filePath, (function* () {
+    yield* stringifyChunked(snapshot, null, 2);
+    yield "\n";
+  })());
 }
 
 function destinationMetadata(destination) {

@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { writeJsonAtomic } from "./atomic-file.js";
+import { snapshotJsonValue } from "./json-file.js";
 import { auditCodexPromptDelivery } from "./codex-artifact-audit.js";
 import { attachPromptTelemetry, summarizePromptTelemetry } from "./prompt-telemetry.js";
 import { buildContextFlightRecorder } from "./context-flight-recorder.js";
@@ -962,16 +963,15 @@ function requireLedgerRow(row) {
 
 function serializableRecordSnapshot(value, label) {
   requireRecord(value, label);
-  let serialized;
+  let snapshot;
   try {
-    serialized = JSON.stringify(value);
+    snapshot = snapshotJsonValue(value);
   } catch (error) {
     throw new TypeError(`${label} must be JSON-serializable: ${error.message}`);
   }
-  if (typeof serialized !== "string") {
+  if (snapshot === undefined) {
     throw new TypeError(`${label} must be JSON-serializable`);
   }
-  const snapshot = JSON.parse(serialized);
   requireRecord(snapshot, label);
   return snapshot;
 }

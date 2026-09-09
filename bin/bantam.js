@@ -6,6 +6,7 @@
 //   bantam health                     check the local model endpoint
 //   bantam strut [anim]               let the rooster loose (idle·peck·flap·crow·walk·all)
 
+import { readJsonFile } from "../src/json-file.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -1537,7 +1538,7 @@ if (cmd === undefined || cmd === "chat") {
   }
   const { distillDistress, suspectsMajorError, requireConsent } = await import("../src/logic/escalation-policy.js");
   const { newBudget, estimateEscalationCost, authorizeAutonomous, recordSpend } = await import("../src/logic/escalation-budget.js");
-  const artifact = JSON.parse(fs.readFileSync(path.resolve(artifactPath), "utf8"));
+  const artifact = await readJsonFile(path.resolve(artifactPath));
   const snapshot = distillDistress(artifact.turns ?? []);
   const suspicion = suspectsMajorError(snapshot);
   console.log(`distress snapshot: ${JSON.stringify(snapshot)}`);
@@ -1615,7 +1616,7 @@ if (cmd === undefined || cmd === "chat") {
   const { analyze, formatReport } = await import("../src/logic/runlens.js");
   let artifact;
   try {
-    artifact = JSON.parse(fs.readFileSync(path.resolve(artifactPath), "utf8"));
+    artifact = await readJsonFile(path.resolve(artifactPath));
   } catch (e) {
     console.error(`runlens: cannot read ${artifactPath}: ${e.message}`);
     process.exit(2);
@@ -1658,7 +1659,7 @@ if (cmd === undefined || cmd === "chat") {
     process.stderr.write('usage: bantam replay <artifact.json> --turn N [--inject "text"] [--endpoint url]\n');
     process.exit(2);
   }
-  const artifact = JSON.parse(fs.readFileSync(path.resolve(artifactPath), "utf8"));
+  const artifact = await readJsonFile(path.resolve(artifactPath));
   const replay = prepareReplay(artifact, turnIndex, { inject: args.inject });
   const { prompt, recorded, sampling, endpoint: recordedEndpoint } = replay;
   const runtimeOptions = replayRuntimeOptions(artifact, { transportOverride: Boolean(args.endpoint) });
@@ -1755,7 +1756,7 @@ if (cmd === undefined || cmd === "chat") {
     process.stderr.write('usage: bantam diagnose <artifact.json> [--turn N] [--samples 3] [--inject "<fact>"] [--repo <dir>]\n');
     process.exit(2);
   }
-  const artifact = JSON.parse(fs.readFileSync(path.resolve(artifactPath), "utf8"));
+  const artifact = await readJsonFile(path.resolve(artifactPath));
   const problems = witnessProblems(artifact);
   const summary = summarizeProblems(artifact);
 
@@ -1921,7 +1922,7 @@ if (cmd === undefined || cmd === "chat") {
   // explicit flags still win.
   if (!args.task && typeof args["resume-run"] === "string") {
     try {
-      const early = JSON.parse(fs.readFileSync(path.resolve(args["resume-run"]), "utf8"));
+      const early = await readJsonFile(path.resolve(args["resume-run"]));
       if (typeof early.task === "string" && early.task.trim()) args.task = early.task;
       if (!args.workspace && typeof early.workspace === "string" && early.workspace) {
         args.workspace = early.workspace;
@@ -1952,12 +1953,11 @@ if (cmd === undefined || cmd === "chat") {
     let artifactSha256 = null;
     if (args["resume-run"]) {
       artifactPath = path.resolve(args["resume-run"]);
-      let serialized;
-      try { serialized = fs.readFileSync(artifactPath, "utf8"); }
-      catch (error) { fail(`cannot read --resume-run ${artifactPath}: ${error.message}`); }
-      try { artifact = JSON.parse(serialized); }
-      catch (error) { fail(`cannot parse --resume-run ${artifactPath}: ${error.message}`); }
-      artifactSha256 = sha256(serialized);
+      try {
+        const loaded = await readJsonFile(artifactPath, {withHash: true});
+        artifact = loaded.value;
+        artifactSha256 = loaded.sha256;
+      } catch (error) { fail(`cannot read or parse --resume-run ${artifactPath}: ${error.message}`); }
     }
 
     let reviewText = null;

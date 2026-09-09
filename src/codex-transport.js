@@ -32,9 +32,21 @@ const MIN_DELTA_PREFIX_CHARS = 2048;
 // image-generation capability. Caller thread configuration remains explicit.
 const EMBEDDED_CONFIG = {
   'features.shell_tool': false, 'features.multi_agent': false,
+  // Model metadata can select the newer agent runtime independently of the
+  // legacy feature switch. Disable it explicitly: BANTAM owns its workers.
+  'agents.enabled': false,
   'features.view_image': false, 'features.image_generation': false,
   'features.sleep_tool': false, 'features.skill_search': false,
   'features.goals': false, web_search: 'disabled',
+};
+// The text worker cannot use native skills or native shell approvals. Suppress
+// their prompt scaffolding, not their enforcement: thread/start still denies
+// approvals, keeps a read-only sandbox and exposes no environments. The live
+// Astra calibration removed 2,759 input tokens with the same requested action.
+// Image generation keeps native guidance; caller configuration takes priority.
+const TEXT_WORKER_CONFIG = {
+  'skills.include_instructions': false, 'skills.bundled.enabled': false,
+  include_permissions_instructions: false,
 };
 const BASE_INSTRUCTIONS = [
   "You are the model runtime embedded inside the BANTAM agent harness.",
@@ -577,9 +589,10 @@ export class CodexAppServer {
   }
 
   async _startThread(model, { baseInstructions = BASE_INSTRUCTIONS } = {}) {
-    const imageWorker = baseInstructions === IMAGE_INSTRUCTIONS || baseInstructions === IMAGE_EDIT_INSTRUCTIONS;
+    const imageWorker = baseInstructions === IMAGE_INSTRUCTIONS || baseInstructions === IMAGE_EDIT_INSTRUCTIONS
+      || this.threadConfig?.['features.image_generation'] === true;
     const config = { ...EMBEDDED_CONFIG,
-      ...(imageWorker ? {'features.image_generation': true} : {}), ...this.threadConfig };
+      ...(imageWorker ? {'features.image_generation': true} : TEXT_WORKER_CONFIG), ...this.threadConfig };
     const started = await this.request("thread/start", {
       model,
       cwd: this.cwd,

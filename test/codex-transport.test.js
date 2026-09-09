@@ -92,12 +92,35 @@ test("embedded text workers omit native tool menus while image workers retain ge
   await codex.generateImage('synthetic image');
   for (const start of starts) {
     assert.equal(start.sandbox, 'read-only');
+    assert.equal(start.approvalPolicy, 'never');
+    assert.deepEqual(start.environments, []);
     assert.equal(start.config['features.shell_tool'], false);
     assert.equal(start.config['features.multi_agent'], false);
+    assert.equal(start.config['agents.enabled'], false);
     assert.equal(start.config.web_search, 'disabled');
   }
   assert.equal(starts[0].config['features.image_generation'], false);
+  assert.equal(starts[0].config['skills.include_instructions'], false);
+  assert.equal(starts[0].config['skills.bundled.enabled'], false);
+  assert.equal(starts[0].config.include_permissions_instructions, false);
   assert.equal(starts[1].config['features.image_generation'], true);
+  assert.equal(Object.hasOwn(starts[1].config, 'skills.include_instructions'), false);
+  assert.equal(Object.hasOwn(starts[1].config, 'include_permissions_instructions'), false);
+});
+
+test('caller native image workers retain guidance and explicit context configuration wins', async t => {
+  const codex = server({threadConfig: {'features.image_generation': true}});
+  t.after(() => codex.close());
+  const starts = [], request = codex.request.bind(codex);
+  codex.request = (method, params) => { if (method === 'thread/start') starts.push(params); return request(method, params); };
+  await codex.complete('native image caller');
+  assert.equal(Object.hasOwn(starts[0].config, 'skills.bundled.enabled'), false);
+  codex.threadConfig = {'skills.include_instructions': true, 'skills.bundled.enabled': true,
+    include_permissions_instructions: true};
+  await codex.complete('explicit native guidance');
+  assert.equal(starts[1].config['skills.include_instructions'], true);
+  assert.equal(starts[1].config['skills.bundled.enabled'], true);
+  assert.equal(starts[1].config.include_permissions_instructions, true);
 });
 
 test("run-scoped Codex mode reuses one thread only inside an explicit run", async (t) => {

@@ -132,7 +132,7 @@ const FONT_EXT = /\.(?:ttf|otf|ttc)$/i;
 
 /**
  * Font files reachable on this machine, off-system paths first. Bounded walk:
- * this runs on every view_image, so it may never become a filesystem crawl.
+ * a glyph-reading view_image may request it, so it may never become a filesystem crawl.
  */
 export function systemFonts({ limit = 10, maxDepth = 4, dirs = FONT_DIRS } = {}) {
   const found = [];
@@ -173,7 +173,21 @@ function fontFacts() {
     + ` If this image was drawn from a font, do NOT judge a glyph by its shape, size, or fill ratio — render each candidate yourself with PIL (\`ImageFont.truetype(path, size)\` + \`ImageDraw.text\`) and match masks against the image. Crop each mask to its bounding box and scale both to a common size first, and then you need to know neither the font size nor the draw offset. Build the result as a DATA STRUCTURE and serialize it programmatically — never retype your findings into a string by hand — then check that the number of cells you found equals the number of items you emitted. Assign pixels to the NEAREST exact color in the palette above — never a per-channel threshold, which misreads exactly the lowest-contrast cell (a white glyph on a light background) and leaves every other cell looking fine. Finally RE-RENDER what you decoded and diff it against this image: that is the only check that catches a mislabel, since a wrong label leaves the count unchanged.`;
 }
 
-function deterministicImageFacts(absPath) {
+// Glyph matching is useful for decoding a rendered board, but its font paths
+// and reconstruction procedure are noise in a lighting/layout review. A
+// specific question takes precedence over incidental text in the description.
+// This selects advisory context only; it never changes the visual answer.
+function needsGlyphFacts({ question = "", description = "" } = {}) {
+  if (question.trim()) {
+    return /\b(?:ocr|fen|checkmate|chess(?:board)?|glyphs?|transcrib\w*|decod\w*|best move)\b/i.test(question)
+      || /\b(?:read|extract|identify|recognize|recognise|match)\b[^.!?\n]{0,100}\b(?:text|characters?|symbols?|pieces?|fonts?)\b/i.test(question)
+      || /\b(?:which|what)\s+font\b/i.test(question);
+  }
+  return /\b(?:chess(?:board)?|checkmate|fen|glyphs?|sudoku|crossword)\b/i.test(description)
+    || /\b(?:letter|number|digit|symbol)[ -](?:grid|puzzle)\b/i.test(description);
+}
+
+function deterministicImageFacts(absPath, context) {
   if (!imagePixelFactsEnabled()) return "";
   let pixels = "";
   if (path.extname(absPath).toLowerCase() === ".png") {
@@ -190,7 +204,9 @@ function deterministicImageFacts(absPath) {
     }
   }
   let fonts = "";
-  try { fonts = fontFacts(); } catch { fonts = ""; }
+  if (needsGlyphFacts(context)) {
+    try { fonts = fontFacts(); } catch { fonts = ""; }
+  }
   return `${pixels}${fonts}`;
 }
 
@@ -297,7 +313,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
           return `[view_image] the vision model returned no description for ${rel}.`;
         }
         tool.lastOutcome = { status: "pass", path: rel };
-        return `${rel}:\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs)}`;
+        return `${rel}:\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { description: c })}`;
       } catch (e) {
         tool.lastOutcome = {
           status: "error",
@@ -399,7 +415,7 @@ export function codexViewImageTool(workspace, {
               : failedVisionOutcome("empty_vision_response", `Codex returned no description for ${rel}`, true);
           }
           if (!content) return `[view_image:codex] Codex returned no description for ${rel}.`;
-          return `[view_image:codex ${model}/${effort}] ${rel}:\n${content.length > 6000 ? `${content.slice(0, 6000)}\n… [clipped]` : content}${deterministicImageFacts(abs)}`;
+          return `[view_image:codex ${model}/${effort}] ${rel}:\n${content.length > 6000 ? `${content.slice(0, 6000)}\n… [clipped]` : content}${deterministicImageFacts(abs, { question, description: content })}`;
         } finally {
           runtime.close();
         }

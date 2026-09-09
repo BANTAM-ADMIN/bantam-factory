@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { systemFonts, viewImageTool } from "../src/logic/vision.js";
+import { codexViewImageTool, systemFonts, viewImageTool } from "../src/logic/vision.js";
 
 function scratch() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "bantam-fonts-"));
@@ -66,8 +66,50 @@ test("SEAM: a failed vision call still does not fabricate facts", () => {
 test("the hint demands emitting from a structure, and count conservation", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-fonts-"));
   fs.writeFileSync(path.join(root, "board.png"), "x");
-  const tool = viewImageTool(root, "http://127.0.0.1:0", { describe: () => "a board" });
+  const tool = viewImageTool(root, "http://127.0.0.1:0", { describe: () => "a chess board" });
   const out = tool.answer("view_image board.png");
   assert.match(out, /DATA STRUCTURE/, "never retype findings into a string by hand");
   assert.match(out, /number of cells you found equals the number of items you emitted/);
+});
+
+test("ordinary image inspection keeps pixel facts without a glyph reconstruction tutorial", t => {
+  const root = scratch();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.copyFileSync(path.resolve("creative-suite/assets/dispatch-card.png"), path.join(root, "station.png"));
+  const tool = viewImageTool(root, "http://unused.invalid", {
+    describe: () => "A subway platform with bright fluorescent lights, posters and an ammo HUD.",
+  });
+  const out = tool.answer("view_image station.png");
+  assert.match(out, /subway platform/);
+  assert.match(out, /Deterministic image facts/);
+  assert.doesNotMatch(out, /Fonts on this machine|ImageFont|DATA STRUCTURE/);
+});
+
+test("Codex image review scopes glyph guidance to the requested task", async t => {
+  const root = scratch();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.copyFileSync(path.resolve("creative-suite/assets/dispatch-card.png"), path.join(root, "board.png"));
+  let closed = 0;
+  const tool = codexViewImageTool(root, {
+    runtimeFactory: () => ({
+      async describeImage() { return { content: "A chessboard with small white glyphs and warm overhead lights." }; },
+      close() { closed++; },
+    }),
+  });
+  for (const question of [
+    "Score the lighting, shadows and restrained bloom.",
+    "Review layout and material fidelity; identify concrete defects.",
+  ]) {
+    const out = await tool.answer(`view_image board.png | ${question}`);
+    assert.match(out, /A chessboard/);
+    assert.match(out, /Deterministic image facts/);
+    assert.doesNotMatch(out, /Fonts on this machine|ImageFont/);
+  }
+  for (const question of ["Decode the pieces as FEN.", "Extract the text.", "Which font is this?", "What is the best move?"]) {
+    const out = await tool.answer(`view_image board.png | ${question}`);
+    assert.match(out, /Fonts on this machine/);
+    assert.match(out, /ImageFont\.truetype/);
+  }
+  assert.match(await tool.answer("view_image board.png"), /Fonts on this machine/);
+  assert.equal(closed, 7, "all image workers close regardless of advisory selection");
 });

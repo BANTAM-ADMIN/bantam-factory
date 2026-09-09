@@ -46,13 +46,15 @@ action, read the tests, and inspect what each harness delivered.
 
 > Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file.
 
-Factory Astra built **Afterglow in 6m 21s**: hold, ghost landing, combos,
-levels, saved best score, and keyboard and touch controls. It previewed the
-interface, improved the layout, and left **14 passing tests**.
+Factory Astra built **Moonstack in 5m 57s**: hold, ghost landing, combos,
+levels, saved best score, and keyboard and touch controls. One preview action
+checked desktop and two phone sizes, caught a keyboard-focus bug, and sent
+Astra back to repair it. The finished game has **13 passing tests**.
 
-Against the saved native Astra baseline: **49% less input, 7% less output,
-and 6% less time**. Both delivered playable games. The native build retained
-10 passing tests; the page includes both recordings and browser playtests.
+Against the saved native Astra baseline: **78% less input, 9% less output,
+and 12% less time**, with **5% less uncached input**. Eight Astra calls in
+the factory; 19 in native Codex. Both delivered playable games. The page
+includes both recordings, retained tests, and independent browser playtests.
 
 **[Play factory Astra · native Astra · local 27B →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 

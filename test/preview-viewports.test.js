@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { parsePreviewRequest, previewTool, previewVisionPrompt } from '../src/logic/preview.js';
+import { formatPreviewReport, parsePreviewRequest, previewTool, previewVisionPrompt } from '../src/logic/preview.js';
 import { unresolvedPreviewObjection } from '../src/logic/preview-evidence.js';
 import { refreshPreviewFailureSequence } from '../src/preview-failure-sequence.js';
 import { chromiumSkipReason, networkSkipReason, compositeSkipReason } from './helpers/env-guards.js';
@@ -76,6 +76,22 @@ test('single phone proof and screenshot review retain their actual viewport', as
   assert.deepEqual(tool.lastResult.viewport,sizes[1]);
   assert.match(unresolvedPreviewObjection({...tool.lastResult,generation:1},2),/390x844/);
   assert.match(previewVisionPrompt('Build a phone page.',{taskAware:true,viewport:sizes[1]}),/actual 390x844/);
+});
+
+test('compact batch reports retain defects, coverage limits and measured layout', () => {
+  const r=report(sizes[1],true);
+  r.pageErrors=['phone failed at index.html:27'];
+  r.interaction.notes=['Hold was not exercised'];
+  r.layout.blocks=[{tag:'main',x:0,y:0,w:410,h:800,text:'Board'}];
+  const compact=formatPreviewReport(r,null,{compact:true});
+  for(const fact of ['phone failed at index.html:27','phone control is blocked','Hold was not exercised',
+    'viewport 390x844','w=410','click-primary'])assert.ok(compact.includes(fact),fact);
+  assert.doesNotMatch(compact,/Visible text starts|No interaction conflicts|WARNING: interaction smoke did not complete/);
+  assert.ok(compact.length<formatPreviewReport(r).length);
+  r.interaction.completed=false;
+  assert.match(formatPreviewReport(r,null,{compact:true}),/phone control is blocked/);
+  r.interaction.issues=[];
+  assert.match(formatPreviewReport(r,null,{compact:true}),/interaction smoke did not complete/);
 });
 
 test('real browser batch catches a phone-only error and checks every requested size', {skip:browserSkip}, async t => {

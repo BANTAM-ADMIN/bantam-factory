@@ -313,7 +313,7 @@
   };
   window.DEMOS.job = {
   "title": "Astra · BANTAM FACTORY · build me a game",
-  "caption": "Latest factory Astra build · 6m 21s · 14 passing tests. <a href=\"assets/showcase/examples/arcade/index.html?build=astra-factory-refresh\">Play the delivered game ↗</a>",
+  "caption": "Recorded factory Astra build · 5m 57s · 13 passing tests. <a href=\"assets/showcase/examples/arcade/index.html?build=astra-factory-refresh\">Play Moonstack ↗</a>",
   "end": "pass",
   "steps": [
     {
@@ -321,7 +321,7 @@
       "wait": 500
     },
     {
-      "working": "building",
+      "working": "building Moonstack",
       "ms": 2000
     },
     {
@@ -333,46 +333,40 @@
       "wait": 600
     },
     {
-      "working": "previewing on a phone",
+      "working": "checking desktop and phone together",
       "ms": 1000
     },
     {
       "out": [
-        "  [g]preview the game at 390 × 844[/]",
-        "  [g]write gameplay and input tests[/]"
+        "  [g]preview 1280 × 900 · 390 × 844 · 320 × 740[/]",
+        "  [bad]Start button keeps focus — Space can activate it again.[/]"
       ],
       "every": 180,
-      "wait": 600
+      "wait": 800
+    },
+    {
+      "working": "repairing and adding regression checks",
+      "ms": 1100
     },
     {
       "out": [
+        "  [g]release focus when play starts · reset restart state[/]",
+        "  [g]write gameplay and interface tests[/]",
         "  [ok]13 tests passed[/]"
       ],
+      "every": 180,
       "wait": 600
     },
     {
-      "working": "refining the layout",
-      "ms": 1200
-    },
-    {
-      "out": [
-        "  [d]fit the board to the screen height[/]",
-        "  [g]add a touch-control regression test[/]",
-        "  [ok]14 tests passed[/]"
-      ],
-      "every": 180,
-      "wait": 500
-    },
-    {
-      "working": "checking desktop and phone",
+      "working": "rechecking all three sizes",
       "ms": 1000
     },
     {
       "out": [
-        "  [ok]Desktop and 320 px phone previews passed[/]",
+        "  [ok]Desktop and both phone previews passed[/]",
         "",
-        "  [g]Astra in BANTAM FACTORY · 15 actions · 6m 21s[/]",
-        "  [d]232,784 input · 10,124 output · 194,304 prefix-cache tokens[/]"
+        "  [g]Astra in BANTAM FACTORY · 8 actions · 5m 57s[/]",
+        "  [d]101,549 input · 9,856 output · 76,672 prefix-cache tokens[/]"
       ],
       "every": 150,
       "wait": 400
@@ -383,7 +377,7 @@
   ]
 };
   window.JOB_DEMOS = [
-    {label:'Build a game',demo:window.DEMOS.job,summary:'Astra inside BANTAM FACTORY. A complete offline arcade in 6m 21s, with 14 passing tests and desktop/phone previews.',link:'assets/showcase/examples/arcade/index.html?build=astra-factory-refresh',action:'Play the latest Astra build ↗'},
+    {label:'Build a game',demo:window.DEMOS.job,summary:'Astra inside BANTAM FACTORY. Moonstack in 5m 57s, with 13 passing tests. 78% less input and 12% less time than the saved native Astra build.',link:'assets/showcase/examples/arcade/index.html?build=astra-factory-refresh',action:'Play the latest Astra build ↗'},
     {label:'Make a tool',summary:'Project notes that fit an AI’s context budget. Keep complete sections, preserve required evidence, and see exactly what was included. Built and checked in 58.1 seconds.',link:'context-packet/share/index.html#try-it',action:'Try the tool it built ↗',demo:{
       title:'Local 27B · BANTAM FACTORY · make a tool',caption:'Context packet · 58.1 seconds. <a href="context-packet/share/index.html#try-it">Try the recorded tool ↗</a>',end:'pass',steps:[
         {prompt:'Build a tool that fits my project notes into an AI context budget without cutting sections in half.',wait:400},

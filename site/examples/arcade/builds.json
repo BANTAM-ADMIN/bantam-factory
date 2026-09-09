@@ -3,38 +3,38 @@
   "versions": [
     {
       "id": "astra-factory-refresh",
-      "label": "Latest · 6m 21s",
+      "label": "Latest · 5m 57s",
       "selectionLabel": "Astra · BANTAM FACTORY",
-      "title": "Afterglow",
+      "title": "Moonstack",
       "model": "GPT-6 Astra · inside BANTAM FACTORY",
       "file": "astra-factory-refresh.html",
       "record": "astra-factory-refresh.json",
-      "wallMs": 380513,
-      "actionCount": 15,
+      "wallMs": 356612,
+      "actionCount": 8,
       "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
-      "features": "The latest factory build. A midnight arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra refined the desktop and phone layouts after browser previews and retained 14 passing tests.",
-      "recordedAt": "2026-09-09T13:20:47.888Z"
+      "features": "Moonstack: a midnight orbital arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra checked three screen sizes together, repaired a keyboard-focus bug and retained 13 passing tests.",
+      "recordedAt": "2026-09-09T14:36:50.509Z"
     }
   ],
   "comparisons": [
     {
       "id": "astra-factory-refresh",
       "label": "Astra · BANTAM FACTORY",
-      "title": "Afterglow",
+      "title": "Moonstack",
       "model": "GPT-6 Astra · medium",
       "file": "astra-factory-refresh.html",
       "record": "astra-factory-refresh.json",
-      "wallMs": 380513,
-      "result": "Complete · 14 tests · browser playtested",
+      "wallMs": 356612,
+      "result": "Complete · 13 tests · browser playtested",
       "processCompleted": true,
-      "review": "Compact midnight panels with mint and peach accents. The board adapts to screen height, and touch controls fit on both phone widths. Astra used browser previews to refine the layout and added a touch-input regression test. Fourteen retained tests and our independent desktop/phone playtest pass.",
+      "review": "A midnight orbital arcade with mint and warm yellow accents. The phone layout keeps the board, hold, next pieces and touch controls together. One three-size preview found a keyboard-focus bug; Astra repaired it and added regression coverage. Thirteen project tests and our independent desktop/phone playtest pass.",
       "usage": {
-        "inputTokens": 232784,
-        "outputTokens": 10124,
-        "cacheHitTokens": 194304,
-        "freshInputTokens": 38480,
+        "inputTokens": 101549,
+        "outputTokens": 9856,
+        "cacheHitTokens": 76672,
+        "freshInputTokens": 24877,
         "complete": true,
-        "astraCalls": 15
+        "astraCalls": 8
       }
     },
     {
@@ -64,30 +64,30 @@
   },
   "comparisonNote": "One shared brief. Identical starting files. Astra at medium effort in both harnesses. These are the files each delivered.",
   "sharedBrief": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
-  "conditions": "Fresh BANTAM FACTORY build against the saved, completed native Astra baseline. Same creative brief and starting files; GPT-6 Astra at medium effort. The native baseline was recorded on September 8 in 404.9 seconds; this factory run on September 9 in 380.5 seconds. The runs used maximum windows of ten and thirty minutes respectively and both finished naturally. The earlier native run overlapped other local work. Fourteen factory tests and ten native tests pass; both unedited games pass independent browser playtests.",
+  "conditions": "Fresh BANTAM FACTORY build against the saved, completed native Astra baseline. Same creative brief and starting files; GPT-6 Astra at medium effort. The native baseline was recorded on September 8 in 404.9 seconds; this factory run on September 9 in 356.6 seconds, using commit 5d65012. The runs used maximum windows of ten and thirty minutes respectively and both finished naturally. The earlier native run overlapped other local work. Thirteen factory tests and ten native tests pass; both unedited games pass independent browser playtests. All eight factory usage receipts reconcile with the retained native provider trace. Previous builds remain privately archived.",
   "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. All requests in these two completed builds have usage receipts. The local 27B game uses a different, shorter brief and is shown separately.",
   "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
   "contextReuse": {
-    "percentCached": 83,
-    "inputTokens": 232784,
-    "cacheHitTokens": 194304,
-    "description": "194,304 of 232,784 factory input tokens came from prefix cache. The game finished in 6m 21s with 14 passing tests. Against the saved native baseline: 49% less input, 7% less output and 6% less time.",
+    "percentCached": 76,
+    "inputTokens": 101549,
+    "cacheHitTokens": 76672,
+    "description": "76,672 of 101,549 factory input tokens came from prefix cache. Moonstack finished in 5m 57s with 13 passing tests. Against the saved native baseline: 78% less input, 9% less output, 12% less time and 5% less uncached input. Eight Astra calls; two preview actions checked three sizes each.",
     "record": "astra-factory-refresh.json"
   },
   "featured": [
     {
       "id": "astra-factory-refresh",
-      "label": "Latest · 6m 21s",
+      "label": "Latest · 5m 57s",
       "selectionLabel": "Astra · BANTAM FACTORY",
-      "title": "Afterglow",
+      "title": "Moonstack",
       "model": "GPT-6 Astra · inside BANTAM FACTORY",
       "file": "astra-factory-refresh.html",
       "record": "astra-factory-refresh.json",
-      "wallMs": 380513,
-      "actionCount": 15,
+      "wallMs": 356612,
+      "actionCount": 8,
       "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
-      "features": "The latest factory build. A midnight arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra refined the desktop and phone layouts after browser previews and retained 14 passing tests.",
-      "recordedAt": "2026-09-09T13:20:47.888Z"
+      "features": "Moonstack: a midnight orbital arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra checked three screen sizes together, repaired a keyboard-focus bug and retained 13 passing tests.",
+      "recordedAt": "2026-09-09T14:36:50.509Z"
     },
     {
       "id": "astra-cli",

@@ -396,7 +396,7 @@ export function reviewScreenshot(endpoint, screenshot) {
 }
 
 /** Render the report as the observation the model reads. Problems first, then the pixels. */
-export function formatPreviewReport(report, description = null) {
+export function formatPreviewReport(report, description = null, { compact = false } = {}) {
   const lines = [`[preview] loaded ${report.entry} in headless chromium (exit ${report.browserExit}).`];
   // Realtime health rides its own no-virtual-time pass: virtual time makes a
   // saturated page look healthy by construction (measured: a sim whose first
@@ -412,12 +412,12 @@ export function formatPreviewReport(report, description = null) {
       lines.push(`PREVIEW REALTIME: ${fr.late} fps sustained (${fr.early} fps at load) — healthy under the real clock.`);
     }
   }
-  if (report.interaction?.requested) {
+  if (!compact && report.interaction?.requested) {
     lines.push("PREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).");
-  } else {
+  } else if (!compact) {
     lines.push("PREVIEW MODE: LOAD-ONLY. This checks initial render only; use `preview <path.html> interact` (or `--interact`) to exercise the primary control and common keyboard inputs.");
   }
-  lines.push(`PREVIEW NETWORK: ${report.networkEnabled ? "ENABLED BY OPERATOR OPT-IN." : "DISABLED BY POLICY."}`);
+  if (!compact) lines.push(`PREVIEW NETWORK: ${report.networkEnabled ? "ENABLED BY OPERATOR OPT-IN." : "DISABLED BY POLICY."}`);
   lines.push(`PREVIEW STATUS: ${report.previewStatus ?? classifyPreviewReport(report)}`);
   if (report.interactionTimedOut) {
     lines.push("The browser hit the bounded interaction deadline. A single timeout is inconclusive: rerun the same interactive preview once before changing page code. If it repeats at the same control, investigate that handler.");
@@ -446,7 +446,7 @@ export function formatPreviewReport(report, description = null) {
     lines.push(`PROBLEMS (${problems.length}):`);
     for (const p of problems.slice(0, 25)) lines.push(`  - ${p}`);
     if (problems.length > 25) lines.push(`  … and ${problems.length - 25} more`);
-  } else {
+  } else if (!compact) {
     lines.push("No page errors, console errors, or failed loads detected.");
   }
   if ((report.pointerOcclusions ?? []).length) {
@@ -467,7 +467,7 @@ export function formatPreviewReport(report, description = null) {
     } else {
       lines.push("  primary: no visible start/play/primary control found; keyboard events still dispatched");
     }
-    if (interaction.activeAfterPrimary) {
+    if (interaction.activeAfterPrimary && (!compact || interaction.issues?.length || !interaction.completed)) {
       lines.push(`  focus after primary: ${formatInteractionElement(interaction.activeAfterPrimary)}`);
     }
     lines.push(`  dispatched: ${(interaction.actions ?? []).join(", ") || "(none)"}`);
@@ -480,9 +480,9 @@ export function formatPreviewReport(report, description = null) {
     if (interaction.issues?.length) {
       lines.push(`  INTERACTION ISSUES (${interaction.issues.length}):`);
       for (const issue of interaction.issues.slice(0, 12)) lines.push(`    - ${issue}`);
-    } else if (interaction.completed) {
+    } else if (interaction.completed && !compact) {
       lines.push("  No interaction conflicts detected by this bounded smoke.");
-    } else {
+    } else if (!interaction.completed) {
       lines.push("  WARNING: interaction smoke did not complete.");
     }
     // Shown because they explain what the smoke did and did not reach; labelled
@@ -500,7 +500,7 @@ export function formatPreviewReport(report, description = null) {
     lines.push("The killed browser could not return a final DOM snapshot; no visual/empty-page conclusion is drawn from this timed-out pass.");
   } else if (report.visibleTextLength < 10) {
     lines.push("WARNING: the rendered page is essentially EMPTY (almost no visible text). If content was expected, the page is broken regardless of the absence of errors.");
-  } else {
+  } else if (!compact) {
     lines.push(`Visible text starts: "${report.visibleTextSample.slice(0, 160)}"`);
   }
   // Measured geometry: exact, greppable, and sensitive to defects prose cannot see
@@ -514,7 +514,7 @@ export function formatPreviewReport(report, description = null) {
     }
   }
   if (description) lines.push(`WHAT THE PAGE LOOKS LIKE (vision model): ${description}`);
-  else if (report.screenshotBytes > 0) lines.push("(screenshot captured; no vision model loaded to describe it)");
+  else if (report.screenshotBytes > 0 && !compact) lines.push("(screenshot captured; no vision model loaded to describe it)");
   if (report.visualReview) {
     const review = report.visualReview;
     lines.push(`VISUAL ACCEPTANCE REVIEW: ${String(review.verdict ?? "uncertain").toUpperCase()} — ${review.summary || "no summary"}`);
@@ -588,7 +588,7 @@ export function previewTool(workspace, {
             }
             catch { /* vision is additive; the error report stands on its own */ }
           }
-          views.push({ proof: previewProof(report), text: formatPreviewReport(report, description) });
+          views.push({ proof: previewProof(report), text: formatPreviewReport(report, description, { compact: Boolean(request.viewports) }) });
         }
         if (!request.viewports) {
           tool.lastResult = views[0].proof;
@@ -600,6 +600,8 @@ export function previewTool(workspace, {
         tool.lastResult = { ...(failure ?? views[0]).proof, views: views.map(view => view.proof) };
         const label = view => `${view.proof.viewport.width}x${view.proof.viewport.height}`;
         return [`[preview] ${entry}: ${views.length} viewports; overall ${tool.lastResult.status}.`,
+          `PREVIEW MODE: ${request.interact ? 'INTERACTIVE SMOKE; independent primary-control and keyboard checks at every size.' : 'LOAD-ONLY; controls not exercised.'}`,
+          `PREVIEW NETWORK: ${network ? 'ENABLED BY OPERATOR OPT-IN.' : 'DISABLED BY POLICY.'}`,
           ...views.map(view => `  ${label(view)}: ${view.proof.status}${view.proof.error ? ` — ${view.proof.error}` : ''}`),
           ...[...views].sort((a, b) => Number(a.proof.status === 'pass') - Number(b.proof.status === 'pass'))
             .map(view => `\nVIEWPORT ${label(view)}\n${view.text}`),

@@ -395,6 +395,9 @@ function promptMenuLine(definition, { compact = false } = {}) {
     const { line, ...uniqueMatch } = example;
     example = uniqueMatch;
   }
+  if (compact && definition.verb === "patch") {
+    example = { ...example, edits: example.edits.map(({ line, ...edit }) => edit) };
+  }
   return `- ${JSON.stringify(example)}${definition.prompt.help}`;
 }
 

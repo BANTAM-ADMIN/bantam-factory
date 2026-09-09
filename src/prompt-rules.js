@@ -351,7 +351,7 @@ const COMPACT_TEXT = {
   "raw-test-output": "Run tests directly, without head/tail or masking their exit status.",
   "async-rejection-tests": "Use await assert.rejects for async rejection, assert.throws for synchronous throws. Keep the API contract intact. Construct invalid fixtures explicitly: helper defaults can silently turn an invalid input into a valid one.",
   "replace-exact": 'For "replace", old must match current bytes exactly; disambiguate with surrounding text or its numbered starting line.',
-  "prefer-line": 'For "replace", omit "line" when "old" is unique. Use a current numbered starting line only to disambiguate repeated matches; earlier edits can shift it.',
+  "prefer-line": 'For "replace" and "patch", omit "line" when "old" is unique. Use a current numbered starting line only to disambiguate repeated matches; earlier edits can shift it.',
   "prefer-replace": "Use replace for targeted edits; whole-file writes are for new files or intentional rewrites.",
   "open-files-live": "<open_files> contains current numbered source; use its bytes and line numbers for edits.",
   "verify-habit": "After changing code, run the checks that prove it works and inspect their results.",

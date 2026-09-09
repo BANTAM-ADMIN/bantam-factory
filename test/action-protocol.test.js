@@ -50,6 +50,17 @@ const ALL_VERBS = [
   "query",
 ];
 
+test("compact exact-edit examples omit optional anchors without mutating the ordinary menu", () => {
+  const options={features:[PATCH_ACTION_FEATURE]};
+  const ordinary=actionPromptMenu(options),compact=actionPromptMenu({...options,compact:true});
+  const example=(menu,verb)=>{const line=menu.split('\n').find(line=>line.startsWith(`- {"a":"${verb}"`));return JSON.parse(line.slice(2,line.lastIndexOf('}')+1));};
+  assert.equal(Object.hasOwn(example(compact,'replace'),'line'),false);
+  assert.equal(Object.hasOwn(example(compact,'patch').edits[0],'line'),false);
+  assert.equal(example(ordinary,'replace').line,12);
+  assert.equal(example(ordinary,'patch').edits[0].line,12);
+  assert.equal(actionPromptMenu(options),ordinary);
+});
+
 test("public verb sets are ordered, duplicate-free, and immutable", () => {
   assert.deepEqual(ACTION_VERBS, DEFAULT_VERBS);
   assert.deepEqual(ALL_ACTION_VERBS, ALL_VERBS);

@@ -31,6 +31,10 @@ const artifact = {
   ],
 };
 
+const measuredCall = (index, reused, input, hit, extra = {}) => ({ index,
+  response: { normalized: { codexThread: { threadReused: reused }, codexPromptDelivery: { mode: reused ? 'delta' : 'full' },
+    usage: { inputTokens: input, cacheHitTokens: hit, outputTokens: 20, reasoningTokens: 0, complete: true, ...extra } } } });
+
 describe("summarising a recorded Codex run", () => {
   it("totals cache behaviour across calls", () => {
     const r = codexEfficiency(artifact);
@@ -60,7 +64,7 @@ describe("summarising a recorded Codex run", () => {
   it("names the section whose already-sent bytes changed, not the one that grew", () => {
     const text = formatCodexEfficiency(codexEfficiency(artifact), "run-1");
     assert.match(text, /REWRITES history in: openFiles x2/);
-    assert.match(text, /paid twice/);
+    assert.match(text, /compare delivery and provider cache counters/);
     assert.ok(!/actionHistory/.test(text),
       "a section that merely grew must not be reported as a rewrite");
   });
@@ -80,6 +84,47 @@ describe("summarising a recorded Codex run", () => {
     assert.equal(r.cacheHitRatio, null);
     assert.equal(r.delivery.savedRatio, null);
     assert.equal(r.churn.rewriteRatio, null);
+    assert.equal(r.tokens.input, null);
+    assert.match(formatCodexEfficiency(r), /in unknown/);
     assert.ok(typeof formatCodexEfficiency(r) === "string");
+  });
+
+  it('separates thread startup from ongoing work, including a later thread restart', () => {
+    const r = codexEfficiency({ modelCalls: [measuredCall(0, false, 1000, 0), measuredCall(1, true, 1400, 1000), measuredCall(2, false, 800, 0)] });
+    assert.equal(r.tokens.cacheMiss, 2200);
+    assert.equal(r.phases.initial.calls, 2);
+    assert.equal(r.phases.initial.tokens.cacheMiss, 1800);
+    assert.equal(r.phases.continuation.calls, 1);
+    assert.equal(r.phases.continuation.tokens.cacheMiss, 400);
+    assert.match(formatCodexEfficiency(r), /thread starts\s+2 calls · input 1800 · uncached 1800/);
+  });
+
+  it('identifies a reported zero-cache continuation without inventing its cause', () => {
+    const r = codexEfficiency({ modelCalls: [measuredCall(6, false, 1000, 0), measuredCall(7, true, 1400, 0)] });
+    assert.deepEqual(r.uncachedContinuations, [{ callIndex: 7, inputTokens: 1400, deliveryMode: 'delta' }]);
+    assert.match(formatCodexEfficiency(r), /zero-cache continuations at model call\(s\): 7/);
+    assert.match(formatCodexEfficiency(r), /inspect delivery evidence before assigning a cause/);
+  });
+
+  it('preserves missing and partial counters as unknown instead of treating them as zero', () => {
+    for (const extra of [{ cacheHitTokens: null }, { complete: false }, { cacheHitTokens: 1100 }]) {
+      const r = codexEfficiency({ modelCalls: [measuredCall(0, false, 1000, 0, extra)] });
+      assert.equal(r.tokens.cacheHit, null);
+      assert.equal(r.tokens.cacheMiss, null);
+      assert.equal(r.cacheHitRatio, null);
+      assert.equal(r.perTurn.cacheMiss, null);
+      assert.match(formatCodexEfficiency(r), /hit unknown \/ miss unknown/);
+    }
+    const r = codexEfficiency({ modelCalls: [measuredCall(0, false, 1000, 0), { response: { normalized: { usage: {} } } }] });
+    assert.equal(r.tokens.input, null);
+    assert.equal(r.tokens.output, null);
+  });
+
+  it('does not classify old recordings without thread-reuse evidence as startup', () => {
+    const r = codexEfficiency(artifact);
+    assert.equal(r.phases.initial.calls, 0);
+    assert.equal(r.phases.continuation.calls, 0);
+    assert.equal(r.phases.unknown.calls, 2);
+    assert.equal(r.phases.unknown.tokens.input, 2000);
   });
 });

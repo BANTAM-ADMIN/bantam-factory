@@ -242,3 +242,24 @@ test('nullable Codex action fields retain bridge reuse for streamed and buffered
     await client.endAgentRun(null);
   }
 });
+
+test('a line edit retains its bridge session despite union-schema field order', async t => {
+  const fetch = globalThis.fetch, seen = [];
+  t.after(() => {globalThis.fetch = fetch;});
+  const raw = '{"a":"edit_lines","p":"src/code.js","start":20,"new":"fixed();","end":20}';
+  const canonical = '{"a":"edit_lines","p":"src/code.js","start":20,"end":20,"new":"fixed();"}';
+  globalThis.fetch = async (_url, init) => {
+    if (init.method === 'DELETE') return new Response('{}');
+    seen.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({choices: [{message: {content: raw}, finish_reason: 'stop'}]}));
+  };
+  const client = new ModelClient({apiUrl: 'http://bridge/v1', apiDialect: 'chat', retries: 0});
+  client.enableChatSessions(); client.beginAgentRun();
+  const opts = {jsonSchema: actionJsonSchema({features: ['line_edit']})};
+  assert.equal((await client.complete(P0, opts)).content, canonical);
+  await client.complete(P1.replace(REPLY, canonical), opts);
+  assert.equal(seen[1].session_id, seen[0].session_id);
+  assert.deepEqual(seen[1].messages.map(m => m.role), ['user']);
+  assert.equal(client.chatSessions.stats.rebases, 0);
+  await client.endAgentRun(null);
+});

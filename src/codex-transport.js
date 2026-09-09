@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import readline from "node:readline";
+import { ActionSchema } from "./actions.js";
 
 const DEFAULT_COMMAND = process.env.BANTAM_CODEX_COMMAND || "codex";
 const DEFAULT_CONTROL_TIMEOUT_MS = 30000;
@@ -904,7 +905,12 @@ export function normalizeCodexStructuredContent(content, outputSchema) {
   if (!Array.isArray(outputSchema?.properties?.a?.enum)) return content;
   try {
     const parsed = JSON.parse(content);
-    return JSON.stringify(removeNullProperties(parsed));
+    const cleaned = removeNullProperties(parsed);
+    const action = ActionSchema.safeParse(cleaned);
+    // The union schema orders fields differently from individual actions
+    // (edit_lines.new precedes end). Match the action history's field order,
+    // so that formatting alone never looks like a rewritten conversation.
+    return JSON.stringify(action.success ? action.data : cleaned);
   } catch {
     // The app-server should guarantee schema-valid JSON. Preserve unexpected
     // text so BANTAM's normal protocol repair path can report it precisely.

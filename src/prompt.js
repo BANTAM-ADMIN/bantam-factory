@@ -446,6 +446,9 @@ export function buildPrompt({
   historyPrefill = QWEN_ASSISTANT_PREFILL,     // prefix for prior assistant turns (always the stable closed form)
   skillsText = "", planText = "", contractText = "", reanchorText = "", finalReanchorText = "", openFilesText = "", openPaths = [], readPaths = openPaths,
   renderCache = null,
+  freezeNewest = false,
+  pendingPromptPrelude = "",
+  pendingPromptAttempts = [],
   onRenderedObservation = null,
   repositoryHeadText = "",
   extensionWorkingSet = false,
@@ -502,6 +505,16 @@ export function buildPrompt({
   if (extensionTrajectory) immutableHistory = true;
   const scrub = (s) => scrubWith(template.control, s);
   const userTurn = (body) => `${template.open("user")}${body}${template.close}`;
+  const promptAttempts = (prelude, attempts) => {
+    let text = typeof prelude === "string" && prelude
+      ? userTurn(`<observation>\n${scrub(clipKeepingControllerAnnotation(prelude))}\n</observation>\n`) : "";
+    for (const attempt of Array.isArray(attempts) ? attempts : []) {
+      if (typeof attempt?.rawOutput !== "string" || typeof attempt?.observation !== "string") continue;
+      text += `${historyPrefill}${scrub(attempt.rawOutput)}${template.close}`;
+      text += userTurn(`<observation>\n${scrub(clipKeepingControllerAnnotation(attempt.observation))}\n</observation>\n`);
+    }
+    return text;
+  };
   const interactiveNote = interactive
     ? "\n\nYou are in an INTERACTIVE session: a person is here and steering. Be responsive and concise. Investigate briefly, then act — make the change they asked for, or answer them with \"respond\". Favor acting over exhaustive investigation; they can always give you the next instruction."
       + " ALWAYS end your done summary with a line of the form \"Next: <one concrete step>\" — the single most valuable way to continue or improve from exactly here (a feature to add, a weakness to fix, a test worth writing, a check worth running). Never invent make-work: if the truly best next step is to stop, write \"Next: nothing pressing — this is a good stopping point.\" The person can accept your proposal by just pressing Enter, so make it something you are ready to do."
@@ -637,11 +650,13 @@ export function buildPrompt({
   // 128k prompt, and the checkpoint-or-nothing slot re-prefilled all 43k
   // tokens twice (47.6s). Under the extension invariant a turn's rendered
   // bytes are append-only: the first render is cached by turn id and replayed
-  // verbatim on every later build. The newest turn is never frozen — guidance
-  // folds and decision snapshots may still land on it before its first render.
+  // verbatim on every later build. Callers normally leave the newest turn
+  // mutable until guidance lands. Codex freezes it on first delivery and keeps
+  // rejected generations in separate, durable attempt history.
   for (const [turnIndex, turn] of turns.entries()) {
     const recordedTurn = Number.isInteger(turn.i) ? turn.i + 1 : turnIndex + 1;
-    const freezeKey = renderCache && Number.isInteger(turn?.i) && turnIndex < turns.length - 1 ? turn.i : null;
+    const freezeKey = renderCache && Number.isInteger(turn?.i)
+      && (freezeNewest || turnIndex < turns.length - 1) ? turn.i : null;
     let rebased = null;
     if (freezeKey != null && renderCache.has(freezeKey)) {
       const delivered = frozenObservations.get(freezeKey);
@@ -665,6 +680,7 @@ export function buildPrompt({
       rebased = delivered;
     }
     const fragStart = p.length;
+    p += promptAttempts(turn.promptPrelude, turn.promptAttempts);
     const rawObservation = rebased?.rawObservation ?? turn[RAW_SOURCE_OBSERVATION] ?? turn.observation;
     const shellReplay = slimSuccessfulShellReplay(turn.action, rawObservation, {
       enabled: slimSuccessfulShellActions,
@@ -801,6 +817,7 @@ export function buildPrompt({
   // invariant lived as doctrine, never as a gauge, and the third rewriter
   // cost weeks of silent 40s re-prefills).
   if (renderCache) renderCache.set(FROZEN_STABLE_END, frozenEnd);
+  p += promptAttempts(pendingPromptPrelude, pendingPromptAttempts);
 
   // Skills are re-selected from recent observations and plans can be revised. Keeping these
   // volatile blocks after history preserves llama.cpp's reusable prefix when either changes.

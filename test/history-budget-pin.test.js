@@ -47,3 +47,18 @@ test("typed context updates consume history budget without losing the newest upd
   assert.deepEqual(kept[0].contextUpdates, withUpdates[3].contextUpdates);
   assert.deepEqual(withUpdates.map((turn) => turn.contextUpdates[0].text.length), [2800, 2800, 2800, 2800]);
 });
+
+test('retained rejected attempts count against history budget and stay with their accepted turn', () => {
+  const turns = Array.from({ length: 4 }, (_, i) => ({ i, observation: `unique ${i}`,
+    promptPrelude: 'checkpoint', promptAttempts: [{ rawOutput: String(i).repeat(2800), observation: 'Rejected; nothing executed.' }] }));
+  const kept = budgetTurns(turns, { charBudget: 5000 });
+  assert.deepEqual(kept.map(t => t.i), [3]);
+  assert.deepEqual(kept[0].promptAttempts, turns[3].promptAttempts);
+});
+
+test('larger source delivery is priced at its configured cap', () => {
+  const turns = Array.from({ length: 3 }, (_, i) => ({ i, action: { a: 'read_file', p: `file${i}.js` },
+    observation: String(i).repeat(9000) }));
+  assert.equal(budgetTurns(turns, { charBudget: 15000 }).length, 3);
+  assert.deepEqual(budgetTurns(turns, { charBudget: 15000, readObservationMaxChars: 24000 }).map(t => t.i), [2]);
+});

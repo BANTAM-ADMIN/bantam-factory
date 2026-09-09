@@ -1106,6 +1106,8 @@ async function runAgentCore({
         i: Number.isInteger(t.i) ? t.i : i,
         action: t.action ?? t.parsedAction ?? null,
         observation: t.observation ?? "",
+        ...(typeof t.promptPrelude === "string" ? { promptPrelude: t.promptPrelude } : {}),
+        ...(Array.isArray(t.promptAttempts) ? { promptAttempts: structuredClone(t.promptAttempts) } : {}),
         // Reasoning is not replayed as transcript prose. It is retained as a
         // bounded EAVT working note so a rewind at an audit/read boundary does
         // not forget the conclusion that motivated the next action.
@@ -1909,12 +1911,12 @@ async function runAgentCore({
   // never penalised, because repeated tokens are correct in code.
   let degeneratePenalty = 0;
   const historyWindow = extensionTrajectory ? createHistoryWindow({
-    charBudget: historyCharBudget, pinHead: true,
+    charBudget: historyCharBudget, readObservationMaxChars, pinHead: true,
     onRebase: receipt => {
       if (receipt.overflow) metrics.extensionHistoryRebases = (metrics.extensionHistoryRebases ?? 0) + 1;
       onEvent({ type: "extension_history_rebase", ...receipt });
     },
-  }) : h => budgetTurns(h, { charBudget: historyCharBudget });
+  }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars });
   const capTurns = h => historyWindow(Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h);
   // Count the rendered bytes, not an annotation that might have been clipped.
   // This boundary is the exact prompt passed to ModelClient, NOT evidence that
@@ -2340,6 +2342,19 @@ async function runAgentCore({
     let protocolViolation = false;
     let reasoning = null;      // reasoning that produced the accepted action, if any
     let repairObs = null;
+    // Rejected generations are real conversation history, not executed actions.
+    // Ephemeral retry notes rewrote a Sol observation and then disappeared,
+    // restarting its native Codex thread twice. Keep them before this turn's
+    // eventual accepted action and freeze source observations on first delivery.
+    const preservePromptAttempts = extensionTrajectory && (model?.codex === true || model?.codexBacked === true);
+    const promptAttempts = [];
+    const promptPrelude = preservePromptAttempts ? (terminalClosureTurn ? terminalClosureNote(maxTurns)
+      : forceWrapUp ? (verificationRecoveryTurn
+        ? [recoveryEvidence ? verificationRecoveryNote(recoveryEvidence) : "", contractAuditRecoveryNote(auditRecovery)].filter(Boolean).join("\n\n")
+        : autoForceEdit ? AUTO_EDIT_NOTE_EXTENSION : WRAP_UP_NOTE) : "") : "";
+    const recordRejectedPrompt = out => {
+      if (preservePromptAttempts) promptAttempts.push({ rawOutput: String(out.content ?? ""), observation: repairObs });
+    };
     const prevObs = turns.length ? turns[turns.length - 1].observation : null;
 
     // Retrieve skills relevant to the task + recent observations (symptom-aware).
@@ -2565,7 +2580,7 @@ async function runAgentCore({
     }
 
     for (let attempt = 0; attempt <= (terminalClosureTurn ? 0 : maxInvalidPerTurn); attempt++) {
-      const historyForPrompt = terminalClosureTurn
+      const historyForPrompt = preservePromptAttempts ? turns : terminalClosureTurn
         ? [...turns, { observation: terminalClosureNote(maxTurns) }]
         : repairObs
         ? [...turns, { observation: repairObs }]
@@ -2890,7 +2905,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ compactRules, readObservationMaxChars, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ compactRules, readObservationMaxChars, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -2972,7 +2987,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
           return built;
         },
@@ -3034,6 +3049,7 @@ async function runAgentCore({
             tokens: out.tokens, stoppedLimit: Boolean(out.stoppedLimit) });
           onEvent({ type: "invalid_action", error, raw: out.content });
           repairObs = error;
+          recordRejectedPrompt(out);
           continue;
         }
         if (callerExcludedActions.includes(normalizedAction.a)
@@ -3055,6 +3071,7 @@ async function runAgentCore({
           });
           onEvent({ type: "invalid_action", error, raw: out.content });
           repairObs = error;
+          recordRejectedPrompt(out);
           continue;
         }
         action = normalizedAction;
@@ -3116,6 +3133,7 @@ async function runAgentCore({
       } else {
         repairObs = `Your previous output was rejected: ${parsed.error}. Emit exactly one valid action JSON object.`;
       }
+      recordRejectedPrompt(out);
       onEvent({
         type: "invalid",
         error: parsed.error,
@@ -3163,6 +3181,8 @@ async function runAgentCore({
       rawOutput,
       reasoning,
       protocolViolation,
+      ...(promptPrelude ? { promptPrelude } : {}),
+      ...(promptAttempts.length ? { promptAttempts: structuredClone(promptAttempts) } : {}),
       ...(modelCallIndex !== null ? { modelCallIndex } : {}),
       ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
     };
@@ -3173,6 +3193,8 @@ async function runAgentCore({
     if (terminalClosureTurn && action.a !== "done") {
       const observation = "[terminal-closure] Closing allowance refused: only done was permitted. No tool or mutation executed; completion remains unresolved.";
       turns.push({ i: turns.length, action, parsedAction: action, rawOutput, reasoning, protocolViolation,
+        ...(promptPrelude ? { promptPrelude } : {}),
+        ...(promptAttempts.length ? { promptAttempts: structuredClone(promptAttempts) } : {}),
         observation, verificationEvidence: null, shellExecution: null, tookMs: nowMs() - turnStart,
         ...(savePrompts ? { prompt: lastPromptForTurn } : {}),
         ...(modelCallIndex !== null ? { modelCallIndex } : {}) });
@@ -3748,6 +3770,8 @@ async function runAgentCore({
       markInterrupted(action.a === "shell" ? "shell" : "action");
       turns.push({
         i: turns.length,
+        ...(promptPrelude ? { promptPrelude } : {}),
+        ...(promptAttempts.length ? { promptAttempts: structuredClone(promptAttempts) } : {}),
         rawOutput,
         reasoning,
         action,
@@ -6509,6 +6533,8 @@ async function runAgentCore({
     // replay/debugging/training. `action`+`observation` are kept for prompt reuse.
     turns.push({
       i: turns.length,
+      ...(promptPrelude ? { promptPrelude } : {}),
+      ...(promptAttempts.length ? { promptAttempts: structuredClone(promptAttempts) } : {}),
       rawOutput,
       reasoning,
       action,
@@ -6636,7 +6662,7 @@ async function runAgentCore({
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
         "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
-        "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
+        "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop", "promptPrelude", "promptAttempts",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)

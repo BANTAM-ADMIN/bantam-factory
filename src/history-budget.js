@@ -58,7 +58,7 @@ export function historyCharBudget({ contextTokens, extensionTrajectory = false, 
   return Math.max(HISTORY_MIN_CHAR_BUDGET, tokens * HISTORY_CHARS_PER_TOKEN);
 }
 
-export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
+export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars = 4000, ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
   if (!list.length) return [];
   const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 36000);
@@ -69,12 +69,12 @@ export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
   // after the budget evicted turn N. Window sizes only grow versus the
   // full-list estimate (fewer dedup hits), so slide forward until it fits.
   const pinHead = Boolean(opts.pinHead);
-  let start = firstKeptIndex(compactHistory(list), limit, { pinHead });
+  let start = firstKeptIndex(compactHistory(list), limit, { pinHead, readObservationMaxChars });
   for (;;) {
     const body = list.slice(start);
     const window = compactHistory(pinHead && start > 0 ? [list[0], ...body] : body);
     let total = 0;
-    for (const turn of window) total += turnSize(turn);
+    for (const turn of window) total += turnSize(turn, readObservationMaxChars);
     if (total <= limit || window.length <= (pinHead ? 2 : 1)) return window;
     start += 1;
   }
@@ -86,7 +86,7 @@ export function budgetTurns(turns, { charBudget = 36000, ...opts } = {}) {
 // compactor, and evidence objects are never changed. Rebuild callers retain
 // budgetTurns' existing stateless behavior.
 export function createHistoryWindow({ charBudget = 120000, pinHead = true,
-  retainRatio = 2 / 3, onRebase = null } = {}) {
+  retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000 } = {}) {
   if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
     throw new Error("history retainRatio must be between zero and one");
   }
@@ -126,11 +126,11 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
     if (start < 0) start = list.length - 1;
     const retained = pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start);
     let window = compactHistory(retained);
-    const beforeChars = window.reduce((total, turn) => total + turnSize(turn), 0);
+    const beforeChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
     let afterChars = beforeChars, overflow = false;
     if (beforeChars > limit) {
       overflow = true;
-      window = budgetTurns(retained, { charBudget: target, pinHead });
+      window = budgetTurns(retained, { charBudget: target, pinHead, readObservationMaxChars });
       // budgetTurns keeps a contiguous suffix (plus the optional pinned head).
       // Its views may be new objects, so locate that suffix by count, not object
       // identity; never resurrect turns excluded by the previous boundary.
@@ -144,7 +144,7 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
         window = compactHistory(pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start));
       }
       cutoff = keys[start];
-      afterChars = window.reduce((total, turn) => total + turnSize(turn), 0);
+      afterChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
     }
     const signature = overflow ? `${newest}:${cutoff}:${afterChars}` : null;
     if (typeof onRebase === "function" && (reset || (overflow && signature !== lastOverflow))) {
@@ -162,16 +162,16 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
   };
 }
 
-function firstKeptIndex(compacted, limit, { pinHead = false } = {}) {
+function firstKeptIndex(compacted, limit, { pinHead = false, readObservationMaxChars = 4000 } = {}) {
   // pinHead: never evict turn 0. The first turn is the task's own grounding (the
   // spec read, the repo map) and the least droppable bytes in the run; evicting
   // it both blinds the model and rewrites the prompt right after the system
   // block, which resets the slot cache to the head checkpoint. Price it first so
   // the window behind it is budgeted against what is left.
-  let total = pinHead && compacted.length > 1 ? turnSize(compacted[0]) : 0;
+  let total = pinHead && compacted.length > 1 ? turnSize(compacted[0], readObservationMaxChars) : 0;
   const floor = pinHead && compacted.length > 1 ? 1 : 0;
   for (let i = compacted.length - 1; i >= floor; i -= 1) {
-    const size = turnSize(compacted[i]);
+    const size = turnSize(compacted[i], readObservationMaxChars);
     // Always retain the newest causal turn, even under a nonsensical zero-byte
     // setting. Beyond that, the configured budget is hard: a six-turn floor
     // formerly allowed six large edit bodies to blow straight past it.
@@ -393,22 +393,27 @@ function normalizeSourcePath(value) {
     .replace(/^\/app\//, "");
 }
 
-function turnSize(turn) {
+function turnSize(turn, readObservationMaxChars = 4000) {
   if (!turn || typeof turn !== "object") return 0;
   // Use the same bounded validator/formatter as prompt.js: malformed or
   // oversized state renders nothing, and never requires serializing unchecked
   // metadata here. Valid current-state blocks are outside OBS_MAX, not budget.
   const workflow = verificationWorkflowPromptText(turn.verificationWorkflow);
-  // buildPrompt replays the parsed action and clips each observation to 4K;
+  // buildPrompt replays the parsed action and bounded source/command views;
   // raw model output and private reasoning are evidence-only fields. Price the
   // intermediate replay view, not arbitrary raw artifact fields. This is not
   // an exact bound on final prompt bytes: annotation-aware/frozen rendering may
   // restore a source range whose apparent origin was clipped. That rescue
-  // remains inside the same final 4K observation cap; system/context blocks and
+  // remains inside the configured final observation cap; system/context blocks and
   // previously frozen fragments are also accounted separately by the caller.
   const action = turn.action ?? turn.parsedAction ?? null;
   return (action ? JSON.stringify(action).length : 0)
-    + clipObservation(turn.observation).length
+    + clipObservation(turn.observation, action?.a === "read_file" || action?.a === "inspect"
+      ? Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)) : 4000).length
+    + (typeof turn.promptPrelude === "string" && turn.promptPrelude ? clipObservation(turn.promptPrelude).length + 96 : 0)
+    + (Array.isArray(turn.promptAttempts) ? turn.promptAttempts.reduce((size, attempt) => size
+      + (typeof attempt?.rawOutput === "string" && typeof attempt?.observation === "string"
+        ? attempt.rawOutput.length + clipObservation(attempt.observation).length + 128 : 0), 0) : 0)
     // Trusted context is outside observation clipping, not outside the history
     // budget. Metadata pricing is conservative relative to its prompt wrapper.
     + (Array.isArray(turn.contextUpdates) ? JSON.stringify(turn.contextUpdates).length + 300 : 0)

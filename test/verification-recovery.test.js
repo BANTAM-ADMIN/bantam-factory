@@ -392,6 +392,10 @@ for (const backend of ["codex", "codexBacked"]) test(`${backend} keeps its schem
   const policy = calls[2].prompt.slice(calls[2].prompt.lastIndexOf("ACTION POLICY FOR THIS TURN:"));
   assert.doesNotMatch(policy.split(".")[0], /\breplace\b/);
   assert.match(calls[3].prompt, /unavailable at this checkpoint/);
+  for (let i = 1; i < calls.length; i++) {
+    assert.ok(calls[i].prompt.startsWith(calls[i - 1].prompt),
+      `Codex prompt ${i} must append to the preceding prompt, including rejected attempts`);
+  }
   assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
 });
 

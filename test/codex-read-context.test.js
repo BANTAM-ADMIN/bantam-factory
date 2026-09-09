@@ -55,3 +55,37 @@ test('larger source context does not enlarge ordinary shell output', () => {
   assert.doesNotMatch(prompt, /MIDDLE/);
   assert.match(prompt, /chars clipped/);
 });
+
+test('masked and malformed retries preserve the full prefix without executing rejected actions', async t => {
+  const { workspace, ops } = fixture(t);
+  const prompts = [], events = [], outputs = [
+    JSON.stringify({ a: 'inspect', ops }),
+    JSON.stringify({ a: 'shell', c: 'touch forbidden' }),
+    '{"a":"write_file","p":"forbidden","content":',
+    JSON.stringify({ a: 'list_dir', p: '.' }),
+    JSON.stringify({ a: 'respond', text: 'Reviewed.' }),
+  ];
+  const model = { codex: true, assistantPrefill: '', stop: [],
+    async complete(prompt) {
+      prompts.push(String(prompt));
+      return { content: outputs.shift(), tokens: 1, stoppedEos: true, timings: {} };
+    } };
+  const options = { workspace, model, task: 'Review the supplied source.', interactive: true,
+    maxTurns: 4, maxInvalidPerTurn: 2, grounding: false, useGrammar: true,
+    excludeActions: ['shell'], shellSandbox: 'host', promptTrajectory: 'extension',
+    onEvent: event => events.push(event) };
+  const result = await runAgent(options);
+  assert.equal(prompts.length, 5);
+  assert.equal(result.rejectedOutputs.length, 2);
+  assert.equal(result.turns.length, 3, 'invalid attempts do not become executed work or consume action turns');
+  assert.equal(result.turns[1].promptAttempts.length, 2);
+  assert.equal(result.metrics.actions.shell ?? 0, 0);
+  assert.equal(fs.existsSync(path.join(workspace, 'forbidden')), false);
+  for (let i = 1; i < prompts.length; i++) assert.ok(prompts[i].startsWith(prompts[i - 1]), `prompt ${i} preserves its predecessor`);
+  assert.ok(events.some(e => e.type === 'action' && e.promptAttempts?.length === 2));
+  assert.ok(events.some(e => e.type === 'observation' && e.promptAttempts?.length === 2));
+  outputs.push(JSON.stringify({ a: 'respond', text: 'Still reviewed.' }));
+  await runAgent({ ...options, resumeTurns: result.turns.slice(0, 2) });
+  assert.match(prompts.at(-1), /unavailable at this checkpoint|disabled by the caller/);
+  assert.match(prompts.at(-1), /previous output was rejected/);
+});

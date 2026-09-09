@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, waitForForemanUpdate, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, cleanupForemanContainers } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, foremanWorkerCommand, cleanupForemanContainers } from '../src/foreman.js';
 import { runProcess } from '../src/process-runner.js';
 import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
 import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
 import { shellContainerReceiptArgs } from '../src/executor.js';
+import { composeInstructionGuards } from '../src/instruction-guard.js';
 const usage = { inputTokens: 100, outputTokens: 10, cachedInputTokens: 80 };
 const action = (kind, fields = {}) => ({ action: kind, jobs: [], target: '', text: '', ...fields });
 const job = (id, worker = 'local') => ({ id, worker, task: 'build the module', context: 'preserve the API contract', verify: 'npm test', dependsOn: [] });
@@ -75,6 +76,30 @@ test('supervisor can correct a running local worker and still must verify the co
   assert.match(received,/assertions/);assert.equal(result.jobs.length,1);assert.equal(result.jobs[0].status,'passed');
   assert.equal(checks,1);assert.equal(result.pass,false);
 });
+test('supervisor can steer each cloud worker inside BANTAM with the local lane disabled', async () => {
+  for (const worker of ['terra', 'sol']) {
+    let release, received = '';
+    const m = model([action('enqueue', {jobs:[job('core', worker)]}),
+      action('steer', {target:'core', text:'Assert the current state after restart, not the replaced instance.'}),
+      action('wait'), action('finish')]);
+    const result = await driveForeman({task:'complete product', initial:{}, model:m,
+      localEnabled:false, codexWorkers:[worker], maxDecisions:4,
+      execute:async j => {assert.equal(j.worker, worker); await new Promise(r => {release=r;}); return {pass:true};},
+      steer:async (j, text) => {received=text; release(); return {queued:true};},
+      inspect:async()=>({}), verify:async()=>({pass:true})});
+    assert.match(received, /current state/); assert.equal(result.pass, true);
+    assert.match(m.prompts[0], new RegExp(`Enabled workers: ${worker}\\n`));
+  }
+});
+test('worker boilerplate allows generated fixture repairs and keeps explicit test protection', t => {
+  const workspace = fixture(t); fs.mkdirSync(path.join(workspace, 'test'));
+  for (const name of ['generated', 'acceptance']) fs.writeFileSync(path.join(workspace, `test/${name}.test.js`), '// retained assertions');
+  const task = foremanWorkerTask('Improve the game', {...job('repair'),
+    task:'Repair the stale generated fixture. Do not modify test/acceptance.test.js.'});
+  const guards = composeInstructionGuards({workspace, instruction:task});
+  assert.equal(guards.editGuard('test/generated.test.js'), null);
+  assert.ok(guards.editGuard('test/acceptance.test.js'));
+});
 test('dependency process metadata cannot manufacture product lifecycle obligations', () => {
   const task = 'Implement synchronous packContext. Include required sections in original input order. Invalid input throws an Error.';
   const dependency = { id:'previous',status:'passed',result:{verification:{pass:true},integrated:true,changedFiles:['context-packet.js'],process:{aborted:false},usage:{calls:[{receipt:'retain privately'}]}} };
@@ -139,6 +164,31 @@ test('planning and declined consent never invoke a model or create output', asyn
   assert.equal(runs, 0); assert.equal(fs.existsSync(path.join(cwd,'result')), false);
   assert.throws(() => foremanPlan({ ...args, 'with-codex': 'claude' }, cwd));
   assert.throws(() => foremanPlan({ ...args, 'timeout-seconds': -1 }, cwd));
+});
+
+test('Codex-only plans require a cloud worker and omit the local endpoint', t => {
+  const cwd = fixture(t), args = {task:'build',verify:'npm test',out:'result','no-local':true};
+  assert.throws(() => foremanPlan(args, cwd), /requires --with-codex/);
+  const plan = foremanPlan({...args,'with-codex':'terra,sol'}, cwd);
+  assert.equal(plan.localEnabled, false);
+  assert.equal(plan.endpoint, null);
+});
+
+test('Terra and Sol jobs execute the BANTAM loop with scoped context, steering and verification', t => {
+  const dir = fixture(t);
+  for (const worker of ['terra','sol']) {
+    const command = foremanWorkerCommand({task:'Complete project',job:job('build',worker),
+      workspace:path.join(dir,'ws'),dir,timeoutMs:600000});
+    assert.equal(command.exe, process.execPath);
+    assert.match(command.args[0], /bin\/bantam\.js$/);
+    assert.equal(command.args[1], 'run');
+    assert.ok(command.args.includes('--codex'));
+    assert.equal(command.args[command.args.indexOf('--model')+1], `gpt-5.6-${worker}`);
+    assert.equal(command.args[command.args.indexOf('--verify')+1], 'npm test');
+    assert.equal(command.args[command.args.indexOf('--supervisor-control')+1], dir);
+    assert.equal(command.args[command.args.indexOf('--supporting-context-file')+1], path.join(dir,'supporting-context.txt'));
+    assert.ok(!command.args.includes('--endpoint'));
+  }
 });
 test('independent snapshot edits integrate; stale overlapping edits fail without overwriting', t => {
   const dir = fixture(t); const roots = {};

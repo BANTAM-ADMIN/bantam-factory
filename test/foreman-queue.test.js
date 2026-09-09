@@ -57,6 +57,16 @@ test('cloud workers require an operator allowlist; model-authored limits cannot 
   assert.throws(() => q.submit([{ ...job('local'), concurrency: 10 }]), /fields/);
   assert.equal(q.jobs.length, 0);
 });
+
+test('a Codex-only queue cannot admit a local job', async () => {
+  const workers = [], q = new ForemanQueue({localEnabled:false,codexWorkers:['terra','sol'],
+    execute:j => {workers.push(j.worker);return {pass:true};}});
+  assert.throws(() => q.submit([job('local')]), /not enabled/);
+  q.submit([{...job('cloud'),worker:'terra'}]);
+  while(q.pending) await q.wait(1000);
+  assert.deepEqual(workers,['terra']);
+  await q.close();
+});
 test('cross-lane dependencies wait for actual completion before dispatch', async () => {
   let release; const started = [];
   const q = new ForemanQueue({ codexWorkers: ['terra'], execute: async j => {

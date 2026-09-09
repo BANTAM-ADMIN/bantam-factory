@@ -2,12 +2,13 @@
 // The supervisor may keep submitting while the worker executes; never spin up
 // a second local inference lane to make the utilization chart look better.
 export class ForemanQueue {
-  constructor({ execute, maxJobs = 12, codexWorkers = [], signal, emit = () => {} }) {
+  constructor({ execute, maxJobs = 12, codexWorkers = [], localEnabled = true, signal, emit = () => {} }) {
     if (typeof execute !== 'function') throw Error('queue requires an executor');
     if (!Number.isInteger(maxJobs) || maxJobs < 1 || maxJobs > 50) throw Error('invalid job limit');
     if (!Array.isArray(codexWorkers) || codexWorkers.some(w => !['astra','sol','terra'].includes(w)) || new Set(codexWorkers).size !== codexWorkers.length) throw Error('invalid Codex worker allowlist');
     this.execute = execute; this.maxJobs = maxJobs; this.signal = signal; this.emit = emit;
-    this.workers = new Set(['local', ...codexWorkers]);
+    if (typeof localEnabled !== 'boolean' || (!localEnabled && !codexWorkers.length)) throw Error('enable at least one worker lane');
+    this.workers = new Set([...(localEnabled ? ['local'] : []), ...codexWorkers]);
     this.jobs = []; this.active = new Map(); this.controls = new Map(); this.waiters = new Set(); this.closed = false;
   }
   submit(batch) {

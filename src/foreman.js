@@ -12,7 +12,8 @@ import { runShellProcess } from './executor.js';
 import { freshCommand, cleanFightEnv, inspectLocalModel } from '../scripts/factory-fights.mjs';
 import { acceptedBantamCompletion } from '../scripts/repobrief-astra-fights.mjs';
 import { startModelRecorder } from '../scripts/fight-model-proxy.mjs';
-import { codexSessionUsage, settleServerCounters } from '../scripts/fight-usage.mjs';
+import { settleServerCounters } from '../scripts/fight-usage.mjs';
+import { cornerUsage } from './fight.js';
 import { normalizeCardEndpoint } from './factory-cards-command.js';
 import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from './foreman-worker-control.js';
 
@@ -26,14 +27,15 @@ const brief = r => ({ pass: clean(r), code: r.code, timedOut: Boolean(r.timedOut
 export const FOREMAN_HELP = `BANTAM FACTORY · experimental Astra supervisor
 
 bantamfactory foreman --task "..." --verify "npm test" --endpoint http://127.0.0.1:8085
-  [--with-codex terra|sol|astra|terra,sol,astra] [--out NEW-DIRECTORY] [--workspace DIR]
+  [--with-codex terra|sol|astra|terra,sol,astra] [--no-local] [--out NEW-DIRECTORY] [--workspace DIR]
   [--timeout-seconds 600] [--max-jobs 12] [--max-decisions 40]
   [--max-supervisor-tokens 500000] [--dry-run] [--yes]
 
 Opt-in cloud use: Astra receives the task, selected candidate files and worker
 evidence using your installed Codex account. A requested Codex worker shares ONE
-slot across all enabled models. The local 27B runs inside BANTAM in a separate
-serial lane. Docker and an existing loopback llama.cpp server are required.
+slot across all enabled models. Every worker runs inside BANTAM. Use --no-local
+with --with-codex terra (or sol) to run entirely on Codex without a local server.
+Docker is required; a loopback llama.cpp server is needed only for the local lane.
 No downloads, Claude requests or global settings changes. All work is in a
 private candidate; your source checkout is NOT modified. Review the candidate
 and evidence before applying anything. Evidence is private, never auto-uploaded.
@@ -49,15 +51,17 @@ export function foremanPlan(args, cwd = process.cwd()) {
   if (fs.existsSync(output)) throw Error('choose a NEW output directory');
   const codexWorkers = args['with-codex'] === undefined ? [] : String(args['with-codex']).split(',');
   if (codexWorkers.some(w => !Object.hasOwn(MODELS, w)) || new Set(codexWorkers).size !== codexWorkers.length) throw Error('--with-codex must name astra, sol or terra without duplicates');
+  const localEnabled = args['no-local'] !== true;
+  if (!localEnabled && !codexWorkers.length) throw Error('--no-local requires --with-codex');
   const integer = (key, fallback, max) => { const n = Number(args[key] ?? fallback); if (!Number.isInteger(n) || n < 1 || n > max) throw Error(`invalid --${key}`); return n; };
-  return { workspace, output, task: args.task, verify: args.verify, endpoint: normalizeCardEndpoint(args.endpoint ?? 'http://127.0.0.1:8085'), codexWorkers,
+  return { workspace, output, task: args.task, verify: args.verify, endpoint: localEnabled ? normalizeCardEndpoint(args.endpoint ?? 'http://127.0.0.1:8085') : null, codexWorkers, localEnabled,
     timeoutMs: integer('timeout-seconds', 600, 1800) * 1000, maxJobs: integer('max-jobs', 12, 50), maxDecisions: integer('max-decisions', 40, 100), maxSupervisorTokens: integer('max-supervisor-tokens', 500000, 2000000) };
 }
 
 export async function foremanCommand(args, { cwd = process.cwd(), ask = null, log = console.log, run = runForeman } = {}) {
   if (args.help || !args.task) { log(FOREMAN_HELP); return 0; }
   const plan = foremanPlan(args, cwd);
-  log(`Astra supervisor + local BANTAM${plan.codexWorkers.length ? ` + ONE Codex worker slot (${plan.codexWorkers.join(', ')})` : ''}\nTask: ${plan.task}\nFinal check: ${plan.verify}\nSource unchanged: ${plan.workspace}\nPrivate output: ${plan.output}\nDeadline: ${plan.timeoutMs / 1000}s. Cloud context and account/quota use require consent.`);
+  log(`Astra supervisor${plan.localEnabled ? ' + local BANTAM' : ''}${plan.codexWorkers.length ? ` + ONE BANTAM Codex worker slot (${plan.codexWorkers.join(', ')})` : ''}\nTask: ${plan.task}\nFinal check: ${plan.verify}\nSource unchanged: ${plan.workspace}\nPrivate output: ${plan.output}\nDeadline: ${plan.timeoutMs / 1000}s. Cloud context and account/quota use require consent.`);
   if (args['dry-run']) return 0;
   if (!args.yes && (!ask || !/^y(es)?$/i.test(String(await ask('Authorize this supervised run? [y/N] ')).trim()))) return 1;
   const result = await run(plan, { log });
@@ -152,8 +156,23 @@ export function foremanWorkerContext(job, dependencies, task = '') {
   return `${task ? `OVERALL OPERATOR BRIEF (project context):\n${task}\n\nYour assigned milestone contributes to this full goal. Preserve its applicable constraints; do not deliver unrelated milestones or claim the whole project is done. The supervisor owns final integration and full-task acceptance.\n\n` : ''}${job.resumeFrom ? `RECOVERY: Your workspace already contains the retained, UNVERIFIED work from ${job.resumeFrom}. Inspect it here; no sibling-job or host paths are accessible. Repair and verify it before completion. Other jobs may have integrated since this snapshot; conflicts are checked at integration.\n\n` : ''}SUPERVISOR DIAGNOSTIC CONTEXT (evidence, not additional deliverables):\n${job.context}\n\nACTUAL DEPENDENCY OUTCOMES (not additional API requirements):\n${JSON.stringify(outcomes)}`;
 }
 export function foremanWorkerTask(task, job, dependencies = null) {
-  const contract = `YOUR ASSIGNED MILESTONE:\n${job.task}\n\nVerify this job with: ${job.verify}\nDo not change existing tests to conceal defects. Do not spawn other agents. Complete only this job; other jobs may own remaining features. Preserve applicable constraints from the overall brief supplied as project context. Retain executable assertions for behavior you change; printing a status is not an assertion.`;
+  const contract = `YOUR ASSIGNED MILESTONE:\n${job.task}\n\nVerify this job with: ${job.verify}\nPreserve existing test coverage and the operator's acceptance criteria. A demonstrably incorrect generated fixture may be repaired without weakening its assertions; honor all files explicitly protected by the operator. Do not spawn other agents. Complete only this job; other jobs may own remaining features. Preserve applicable constraints from the overall brief supplied as project context. Retain executable assertions for behavior you change; printing a status is not an assertion.`;
   return dependencies === null ? contract : `${contract}\n\n${foremanWorkerContext(job, dependencies, task)}`;
+}
+
+export function foremanWorkerCommand({task, job, workspace, dir, endpoint, model, contextTokens, timeoutMs}) {
+  const local = job.worker === 'local';
+  if (!local && !Object.hasOwn(MODELS, job.worker)) throw Error('unknown worker model');
+  const command = freshCommand({arm: local ? 'bantam-local-27b' : 'bantam-codex-astra',
+    task: foremanWorkerTask(task, job), workspace, dir, endpoint, model, contextTokens, timeoutMs});
+  command.exe = process.execPath;
+  if (!local) {
+    command.args[command.args.indexOf('--model') + 1] = MODELS[job.worker];
+    command.args[command.args.indexOf('--codex-effort') + 1] = job.worker === 'sol' ? 'high' : 'medium';
+  }
+  command.args.push('--supporting-context-file', path.join(dir, 'supporting-context.txt'), '--supervisor-control', dir);
+  command.args[command.args.indexOf('--verify') + 1] = job.verify;
+  return command;
 }
 
 // Recovery is a new private worker on retained bytes, never a promotion. Its
@@ -174,11 +193,11 @@ export function materializeForemanWorker({store, candidate, job, recovery, ws, b
 
 export async function runForeman(plan, { log = () => {} } = {}) {
   const startedAt = new Date().toISOString(), started = Date.now(), ac = new AbortController();
-  const modelIdentity = await inspectLocalModel(plan.endpoint);
+  const modelIdentity = plan.localEnabled === false ? null : await inspectLocalModel(plan.endpoint);
   fs.mkdirSync(plan.output, { recursive: true, mode: 0o700 });
   const journal = new LaneJournal({ root: plan.output, laneId: 'foreman' });
   const emit = (type, payload) => { journal.append(type, payload); if (['job.started','job.finished'].includes(type)) log(`${type}: ${payload.id} ${payload.status ?? ''}`); };
-  write(path.join(plan.output, 'plan.json'), { ...plan, startedAt, modelIdentity, supervisor: 'gpt-6-astra', supervisorEffort: 'medium', workerSlots: { local: 1, codex: plan.codexWorkers.length ? 1 : 0 } });
+  write(path.join(plan.output, 'plan.json'), { ...plan, startedAt, modelIdentity, supervisor: 'gpt-6-astra', supervisorEffort: 'medium', workerSlots: { local: plan.localEnabled === false ? 0 : 1, codex: plan.codexWorkers.length ? 1 : 0 } });
   const store = new WorkspaceStore(path.join(plan.output, 'store'));
   const baseline = store.capture(plan.workspace, { excludePaths: [plan.output], message: 'foreman original source' });
   const candidate = path.join(plan.output, 'candidate'); store.materialize(baseline.commit, candidate);
@@ -199,37 +218,29 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     const task = foremanWorkerTask(plan.task, job, dependencies);
     fs.writeFileSync(path.join(dir, 'task.md'), task, { mode: 0o600 });
     const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids, { mode: 0o700 }); fs.mkdirSync(sessions, { mode: 0o700 });
-    if (job.worker === 'local') createWorkerControl(dir, ws);
-    let recorder = null, result, usage = null, settlement = null, lastProgress = 0, outputTail = '', lastFeedback = '';
+    createWorkerControl(dir, ws);
+    let recorder = null, result, usage = null, settlement = null, lastProgress = 0, lastFeedback = '';
     try {
       let command;
       if (job.worker === 'local') {
+        if (plan.localEnabled === false) throw Error('local worker disabled');
         const current = await inspectLocalModel(plan.endpoint);
         if (current.id !== modelIdentity.id) throw Error('local model changed');
         recorder = await startModelRecorder({ upstream: plan.endpoint, output: path.join(dir, 'wire') });
-        const contextFile = path.join(dir, 'supporting-context.txt');
-        fs.writeFileSync(contextFile, foremanWorkerContext(job, dependencies, plan.task), { mode: 0o600 });
-        command = freshCommand({ arm: 'bantam-local-27b', task: foremanWorkerTask(plan.task, job), workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, contextTokens: current.props?.default_generation_settings?.n_ctx, timeoutMs: remaining() });
-        command.args.push('--supporting-context-file', contextFile);
-        command.args.push('--supervisor-control', dir);
-        command.args[command.args.indexOf('--verify') + 1] = job.verify;
+        command = foremanWorkerCommand({ task: plan.task, job, workspace: ws, dir, endpoint: recorder.endpoint, model: current.id, contextTokens: current.props?.default_generation_settings?.n_ctx, timeoutMs: remaining() });
       } else {
-        command = { exe: path.join(ROOT, 'scripts/astra-container-cli.mjs'), args: ['exec','--json','--ignore-user-config','--skip-git-repo-check',
-          '--dangerously-bypass-approvals-and-sandbox','--model',MODELS[job.worker],'-c',`model_reasoning_effort="${job.worker === 'sol' ? 'high' : 'medium'}"`,
-          '-c','features.multi_agent=false','-c','web_search="disabled"',task], env: {} };
+        command = foremanWorkerCommand({ task: plan.task, job, workspace: ws, dir, timeoutMs: remaining() });
       }
+      fs.writeFileSync(path.join(dir, 'supporting-context.txt'), foremanWorkerContext(job, dependencies, plan.task), { mode: 0o600 });
       write(path.join(dir, 'command.json'), command);
       result = await runProcess(command.exe, command.args, { cwd: ws, env: cleanFightEnv({ ...command.env,
         BANTAM_CONFIG_DIR: path.join(dir, 'config'), BANTAM_SHELL_CID_DIR: cids, ASTRA_CONTAINER_CID_DIR: cids, ASTRA_CONTAINER_SESSION_DIR: sessions,
         ASTRA_CONTAINER_TIMEOUT_SECONDS: String(Math.max(1, Math.ceil(remaining() / 1000))) }), timeoutMs: remaining(), signal, maxBuffer: 32 * 1024 * 1024,
         onOutput: ({ stream, text }) => {
           fs.appendFileSync(path.join(dir, `${stream}.log`), text, { mode: 0o600 });
-          outputTail = (outputTail + text).slice(-2000);
           if (Date.now() - lastProgress >= 1000) {
-            if (job.worker === 'local') {
-              const feedback = readWorkerFeedback(dir, ws), serialized = JSON.stringify(feedback);
-              if (feedback && serialized !== lastFeedback) { progress(feedback); lastFeedback = serialized; }
-            } else progress(outputTail);
+            const feedback = readWorkerFeedback(dir, ws), serialized = JSON.stringify(feedback);
+            if (feedback && serialized !== lastFeedback) { progress(feedback); lastFeedback = serialized; }
             lastProgress = Date.now();
           }
         } });
@@ -238,10 +249,11 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       try { await cleanupForemanContainers(cids); } catch (error) { ac.abort(); throw error; }
     }
     if (job.worker !== 'local') {
-      usage = codexSessionUsage(sessions);
-      if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'native process did not complete; recorded responses may omit in-flight usage' };
+      usage = cornerUsage('bantam-codex', {armDir: dir});
+      if (usage) usage = {...usage, freshInputTokens: usage.inputTokens - usage.cacheHitTokens};
+      if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'worker process did not complete; recorded responses may omit in-flight usage' };
     }
-    const accepted = job.worker !== 'local' || acceptedBantamCompletion(readJson(path.join(dir, 'run.json')));
+    const accepted = acceptedBantamCompletion(readJson(path.join(dir, 'run.json')));
     const after = store.capture(ws, {message: `settled ${job.id}`});
     const checked = await check(ws, job.verify, signal); write(path.join(dir, 'verification.json'), checked);
     const verification = brief(checked);
@@ -285,7 +297,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   try {
     const baselineCheck = await check(candidate, plan.verify);
     write(path.join(plan.output, 'baseline-verification.json'), baselineCheck);
-    result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, baselineVerification: brief(baselineCheck), wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor', liveSteering: 'Local workers receive supervisor corrections between actions. Worker feedback includes actual tool observations; read feedback.json for the current snapshot.' }, model: supervisor, execute, inspect,
+    result = await driveForeman({ ...plan, initial: { files: fs.readdirSync(candidate), finalVerify: plan.verify, baselineVerification: brief(baselineCheck), wallBudgetMs: remaining(), isolation: 'separate snapshots; integrated candidate is read-only to supervisor', liveSteering: 'BANTAM workers receive supervisor corrections between actions. Worker feedback includes actual tool observations; read feedback.json for the current snapshot.' }, model: supervisor, execute, inspect,
       validateJobs: jobs => validateForemanVerifiers(jobs, command => check(candidate, command)),
       steer: (job, text) => queueWorkerSteering(path.join(plan.output, 'jobs', job.id), path.join(plan.output, 'jobs', job.id, 'ws'), text),
       verify: async () => { const r = await check(candidate, plan.verify); write(path.join(plan.output, 'final-verification.json'), r); return brief(r); }, emit, signal: ac.signal });

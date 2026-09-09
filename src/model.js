@@ -46,6 +46,15 @@ function nativeStoppedLimit(data) {
   return Boolean(data?.stopped_limit) || data?.stop_type === "limit";
 }
 
+// The app-server does not take nPredict on turn/start. Its worker still has a
+// generic local profile, but that profile's sampling cap is not a Codex limit.
+// Only advertise (or infer truncation from) a cap this transport actually sends.
+export function modelOutputTokenCap(model) {
+  if (model?.codex === true) return null;
+  const cap = Number(model?.nPredict);
+  return Number.isFinite(cap) && cap > 0 ? cap : null;
+}
+
 export class ModelClient {
   constructor(opts = {}) {
     const explicitProfile = opts.profile ?? process.env.BANTAM_PROFILE;

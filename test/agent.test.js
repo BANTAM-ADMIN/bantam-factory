@@ -840,6 +840,28 @@ describe('prompt-resident source recovery', () => {
     assert.doesNotMatch(prompts[1], /split substantial code into multiple files/);
   });
 
+  for (const stoppedLimit of [false, true]) {
+    it(`Codex recovery uses the provider limit signal, not a local profile cap (${stoppedLimit})`, async t => {
+      const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-codex-output-limit-'));
+      t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+      const prompts = [];
+      const model = { codex: true, nPredict: 8192, assistantPrefill: '', actTemperature: null,
+        async complete(prompt) {
+          prompts.push(String(prompt));
+          return prompts.length === 1
+            ? { content: '{"a":"write_file","p":"game.html","content":"unfinished', tokens: 9000, stoppedLimit }
+            : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>' }), tokens: 20 };
+        } };
+      const result = await runAgent({ task: 'Build a game in one self-contained HTML file.', workspace, model, maxTurns: 1,
+        useGrammar: false, grounding: false, shellSandbox: 'host', verificationPolicy: 'after_edit' });
+      assert.doesNotMatch(prompts[0], /LIMIT:|8,192|6,144/);
+      assert.doesNotMatch(prompts[1], /8,192|6,144/);
+      assert.equal(result.rejectedOutputs[0].kind, stoppedLimit ? 'output_limit' : 'unterminated_json');
+      if (stoppedLimit) assert.match(prompts[1], /\[output-limit\]/);
+      else assert.doesNotMatch(prompts[1], /\[output-limit\]/);
+    });
+  }
+
   it('automatic game preview requests the interaction evidence required by done', async (t) => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-auto-preview-context-'));
     t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));

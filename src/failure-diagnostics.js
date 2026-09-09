@@ -20,8 +20,19 @@ const DIAGNOSTIC_TAG = "[repeated-failure]";
 const OUTCOME_CYCLE_TAG = "[outcome-cycle]";
 const OUTCOME_LINE_RE = /^(?:not ok\b|--- FAIL:|FAIL(?:ED)?(?:\b|:)|AssertionError\b|Traceback\b|Error:|Expected values|Actual values|actual:|expected:|operator:|location:|\+\s|\-\s)/i;
 
+function failureSignalText(observation) {
+  // TAP test names describe behavior, including expected child exits/crashes.
+  // A green "ok 3 - invalid input: exit 2" must not become a failed shell just
+  // because its label mentions a nonzero exit. Keep actual `not ok` results,
+  // diagnostics and process failures, even when they follow passing tests.
+  return String(observation ?? "").replace(/\x1b\[[0-9;]*m/g, "")
+    .split("\n")
+    .filter(line => !/^\s*(?:#\s+Subtest:|ok(?:\s+\d+)?(?:\s|$))/i.test(line))
+    .join("\n");
+}
+
 export function failureFingerprint(observation) {
-  const text = String(observation ?? "");
+  const text = failureSignalText(observation);
   if (!SHELL_FAILURE_RE.test(text)) return null;
 
   // Fingerprint the FAILURE, not the command. The echoed `$ …` line (and any
@@ -56,7 +67,7 @@ export function failureFingerprint(observation) {
  * as `ok 1 - name` cannot match the diff-marker branch.
  */
 export function failureOutcomeFingerprint(observation) {
-  const text = String(observation ?? "");
+  const text = failureSignalText(observation);
   if (!SHELL_FAILURE_RE.test(text)) return null;
   const lines = text
     .split("\n")

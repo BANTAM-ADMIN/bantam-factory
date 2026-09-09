@@ -63,6 +63,7 @@ import { verificationEvidence, verificationShellStatusRisk } from "./verificatio
 import { isFocusedAuditCommand } from "./contract-audit-recovery.js";
 import { validateSourceTransition, introducedDuplicateDefinition, duplicateDefinitionNote } from "./source-validation.js";
 import { createEditPreservationWitness, formatEditPreservationReview } from "./edit-preservation.js";
+import { fixtureDefaultHints } from './fixture-default-hints.js';
 import { editPaths } from "./edit-actions.js";
 import { runProbe } from "./probe.js";
 
@@ -409,7 +410,10 @@ export class Executor {
     // meant a 1,200-line file cost 12+ model turns to see once (the
     // self-hosting runs spent 65 of 100 actions on reads). Big chunks in one
     // turn beat many small turns; history is char-budgeted anyway.
-    return clipText(`${p} (${lines.length} lines, showing ${startLine}-${endIdx}):\n${numbered}${more}`, READ_OBS_MAX);
+    const rendered = `${p} (${lines.length} lines, showing ${startLine}-${endIdx}):\n${numbered}${more}`;
+    const fixtureHint = process.env.BANTAM_FIXTURE_DEFAULT_HINTS === '1' && rendered.length < READ_OBS_MAX - 1000
+      ? fixtureDefaultHints({ path:p, source:text, startLine, endLine:endIdx }) : '';
+    return clipText(rendered + (fixtureHint ? `\n\n${fixtureHint}` : ''), READ_OBS_MAX);
   }
 
   listDir({ p }) {

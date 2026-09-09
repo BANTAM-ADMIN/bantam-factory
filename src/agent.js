@@ -169,7 +169,7 @@ import { assessBulkEdit, createBulkEditState } from "./bulk-edit-gate.js";
 import { degenerateRepairMessage, degenerateTail } from "./logic/degenerate-output.js";
 import { shellSyntaxHint } from "./logic/shell-syntax-guard.js";
 import { blastRadiusNote, dependentsOf } from "./logic/blast-radius.js";
-import { compactActionReasoning, deriveThinkPrefills, shouldThink } from "./thinking.js";
+import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink } from "./thinking.js";
 import { requirementChecklistEnabled } from "./requirement-checklist.js";
 import { loadLibrary, retrieveSkills, formatSkills, distillSkill, saveSkill, promotePlanToSkill } from "./skills.js";
 import { makePlan, formatPlan, isStuck, rePlan } from "./plan.js";
@@ -617,6 +617,9 @@ async function runAgentCore({
   // paths are resident and before the first edit. This moves synthesis to the
   // source-grounded decision boundary without encoding a task family.
   preEditSynthesis = envTruthy(process.env.BANTAM_PREEDIT_SYNTHESIS),
+  // Candidate for long local builds; qualify against recorded runs before
+  // changing the normal fast inspection rail for everyone.
+  inspectionCheckpointAfter = positiveInt(process.env.BANTAM_INSPECTION_CHECKPOINT_AFTER, 0),
   // After the first green test following an edit, ask for one explicit requirement-to-code audit.
   // A paired cohort preserved 8/8 strict passes and improved unseen checks from 8/18 to 14/18.
   completionAudit = completionAuditEnabled(undefined, { codex: model?.codex === true || model?.codexBacked === true }),
@@ -2635,6 +2638,9 @@ async function runAgentCore({
       return Boolean(entry && packetCoversRange(entry.ranges, start, Math.min(end, entry.total)));
     };
     const completeReadPaths = [...completeOpenFiles.keys()];
+    const inspectionCheckpointTurn = thinkMode === 'auto' && thinkingAvailable
+      && !advisoryMode && suppliedSpecPaths.size > 0
+      && inspectionCheckpointDue(turns, inspectionCheckpointAfter);
     const preEditSynthesisTurn = preEditSynthesis
       && !preEditSynthesisSpent
       && turns.length > 0
@@ -2772,7 +2778,8 @@ async function runAgentCore({
         budgetMs: wallBudgetMs,
         elapsedMs: Date.now() - runStartedAtMs,
       });
-      const reanchorText = [budgetText, baseReanchor, documentDraftReanchor, postGreenReanchor, documentRevisionReanchor, editRecoveryReanchor, documentReviewReanchor, externalMutationReanchor, workingNoteReanchor, decHintText]
+      const reanchorText = [budgetText, baseReanchor, documentDraftReanchor, postGreenReanchor, documentRevisionReanchor, editRecoveryReanchor, documentReviewReanchor, externalMutationReanchor, workingNoteReanchor, decHintText,
+        inspectionCheckpointTurn ? inspectionCheckpointText(inspectionCheckpointAfter) : '']
         .filter(Boolean)
         .join("\n\n");
 
@@ -2969,7 +2976,12 @@ async function runAgentCore({
         lastObservation: prevObs,
         lastWasInvalid: attempt > 0,
         preEditSynthesis: synthesisThisAttempt,
+        inspectionCheckpoint: inspectionCheckpointTurn && attempt === 0,
       })) {
+        if (inspectionCheckpointTurn && attempt === 0) {
+          metrics.inspectionCheckpoints = (metrics.inspectionCheckpoints ?? 0) + 1;
+          onEvent({ type: 'inspection_checkpoint', turn: turns.length, interval: inspectionCheckpointAfter, authority: 'reasoning-only' });
+        }
         if (synthesisThisAttempt) {
           preEditSynthesisSpent = true;
           metrics.preEditSynthesisAttempts++;

@@ -95,6 +95,23 @@ const STEER_RE = /\[(open_files|paging|reverted|pipe-guard|api-check|regression-
 // past, finishing code and never starting the docs.
 const GREEN_RE = /^#\s*fail\s+0\s*$/m;
 
+// A long specification can produce a stream of valid next-page actions with
+// no decision boundary. This opt-in checkpoint spends thought, not read or
+// completion authority. Any edit, execution, or intervening thought resets it.
+export function inspectionCheckpointDue(turns, interval = 0) {
+  if (!Number.isInteger(interval) || interval < 2 || turns.length < interval) return false;
+  return turns.slice(-interval).every(turn => {
+    const action = turn.action ?? turn.parsedAction;
+    return ['read_file', 'inspect', 'search', 'list_dir', 'query'].includes(action?.a)
+      && !String(turn.reasoning ?? '').trim()
+      && !/^(?:ERROR:|\[(?:repetition|progress-awareness|paging|grounding)\b)/i.test(String(turn.observation ?? ''));
+  });
+}
+
+export function inspectionCheckpointText(interval) {
+  return `[work-checkpoint]\nYou have made ${interval} inspection actions without reconsidering the milestone. Briefly reconcile the user's deliverable, the current files, and your progress record. Identify what is already built, what remains, and the next small implementation milestone. Preserve necessary decisions in the task's existing progress record when needed. Then implement that milestone, or read the exact missing prerequisite. Respect mandatory prereads; do not restart an entire specification scan just because its older pages left context. This checkpoint neither verifies work nor permits early completion.`;
+}
+
 /**
  * Decide whether to spend a thinking phase on this attempt.
  * @param {"off"|"auto"|"always"} mode
@@ -122,6 +139,7 @@ export function shouldThink(mode, ctx = {}) {
   const trim = typeof ctx.trim === "boolean" ? ctx.trim : flag(env.BANTAM_THINK_TRIM);
   if (ctx.lastWasInvalid) return true;                  // a repair attempt — reason about the miss
   if (ctx.preEditSynthesis) return true;                // source is now present; synthesize before first mutation
+  if (ctx.inspectionCheckpoint) return true;            // reconcile a long inspection sequence with its milestone
   if (ctx.lastObservation && COMPLETION_AUDIT_RE.test(ctx.lastObservation)) return true;
   if (ctx.lastObservation && DOCUMENT_REVIEW_RE.test(ctx.lastObservation)) return true;
   if (ctx.lastObservation && FAILURE_RE.test(ctx.lastObservation)) return true; // an action failed/erred

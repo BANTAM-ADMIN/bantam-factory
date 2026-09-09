@@ -252,7 +252,7 @@ const SUCCESSFUL_INLINE_SHELL_MIN_CHARS = 800;
 // `done-gate`, `progress-awareness`, `grounding` and `open_files`. Several are
 // steers added THIS session that could be clipped away before the model read
 // them. `stderr` stays out deliberately: it is tool output wearing a bracket.
-const CONTROLLER_ANNOTATION_RE = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fixture-defaults|working-checkpoint|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|progress-awareness|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|budget|peer|pipe-guard|cross-file|open_files|implementation-response|done-gate|grounding)\b/im;
+const CONTROLLER_ANNOTATION_RE = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fixture-defaults|work-checkpoint|working-checkpoint|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|progress-awareness|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|budget|peer|pipe-guard|cross-file|open_files|implementation-response|done-gate|grounding)\b/im;
 
 // A read observation is sometimes more than a source snapshot: the controller
 // may append a trusted verification verdict or repair directive after executing

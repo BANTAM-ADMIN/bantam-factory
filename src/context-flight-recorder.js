@@ -304,7 +304,7 @@ function outcomeResidency(turn, prompt) {
 // deleted body reports clean. Measured 2026-09-08 on ansi-wrap turn 7, where a
 // 6,969-character deletion registered as delivered.chars === raw.chars and
 // controllerEvidence.missing === 0. Check them whole.
-const WHOLE_BLOCK_HEAD = /^\[(?:requirement-checklist|fixture-defaults|working-checkpoint)\b/i;
+const WHOLE_BLOCK_HEAD = /^\[(?:requirement-checklist|fixture-defaults|work-checkpoint|working-checkpoint)\b/i;
 
 /** Guidance blocks that must reach the prompt intact, and whether they did. */
 function wholeBlockResidency(observation, prompt) {
@@ -359,7 +359,7 @@ function controllerEvidenceReport(suffix, prompt) {
   };
 }
 
-const CONTROLLER_BLOCK_HEAD = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fixture-defaults|working-checkpoint|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|open_files|peer|cross-file|implementation-response|done-gate)\b/i;
+const CONTROLLER_BLOCK_HEAD = /^\[(?:auto-verify|scoped-verify|completion-audit|requirement-checklist|fixture-defaults|work-checkpoint|working-checkpoint|fix-tests|scope|pre-gate|api-check|paging|repetition|regression-guard|reverted|flaky-suite|diagnosis(?:-falsified)?|teacher diagnosis|progress|artifact verification|document-revision|state-audit|lifecycle-contract|edit-recovery|context-audit|see-your-work|verify-cadence|capability|fs|impact|family|ledger|open_files|peer|cross-file|implementation-response|done-gate)\b/i;
 
 function parseOpenFilesBlock(block) {
   const text = String(block ?? "");

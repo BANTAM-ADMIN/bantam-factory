@@ -1855,13 +1855,15 @@ async function runAgentCore({
     (generation, turn) => generation + (turnChangedWorkspace(turn) ? 1 : 0),
     0,
   );
-  let verificationImplementationStarted = turns.some(turn => turn.sourceEditedByShell
-    || (turnEditApplied(turn) && editPaths(turn.action ?? turn.parsedAction).some(p => !isDocumentArtifactPath(p))));
+  const verificationObservedPaths = new Set(turns.flatMap(turn => [
+    ...(turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []),
+    ...(turn.shellChangedPaths ?? []),
+  ]).map(normalizeWorkspaceRel));
   let verificationBootstrapNoted = false;
   const pendingVerifierEntrypoint = () => pendingInitialVerifier({ command: verificationScript, provenance: initialVerificationFiles,
-    implementationStarted: verificationImplementationStarted,
+    observedPaths: verificationObservedPaths,
     readFile: p => exec.safeReadText(exec.resolveExisting(p)),
-    exists: p => { try { exec.resolveExisting(p); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } },
+    exists: p => { try { exec.resolveExisting(p); verificationObservedPaths.add(p); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } },
   });
   // Restore the same serial browser-defect obligation on rewind/resume. The
   // preview proof is trusted state; later edits merely make it due for a
@@ -3933,7 +3935,7 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
-    if ([...directEditPaths, ...shellChangedPaths].some(p => !isDocumentArtifactPath(p))) verificationImplementationStarted = true;
+    for (const p of [...directEditPaths, ...shellChangedPaths]) verificationObservedPaths.add(normalizeWorkspaceRel(p));
     const pendingVerifier = pendingVerifierEntrypoint();
     if (directEditSucceeded && action.a === "write_batch") {
       onEvent({ type: "write_batch_committed", files: directEditPaths });
@@ -5086,7 +5088,7 @@ async function runAgentCore({
     if ((blindTrigger || probeTrigger || staleTrigger) && pendingVerifier && !verificationBootstrapNoted
         && !interrupted && !result.done) {
       verificationBootstrapNoted = true;
-      result.observation += `\n[auto-verify] ${pendingVerifier} was absent in the supplied starter and is still missing. Planning notes and design reads do not make it runnable. Build the current milestone and its checks; automatic cadence checks begin once implementation starts. Completion still requires the configured verifier to pass.`;
+      result.observation += `\n[auto-verify] ${pendingVerifier} was absent in the supplied starter and is still missing. Build the current milestone and its meaningful checks; automatic cadence checks begin once this entrypoint exists. Creating another source module does not make this command runnable. Completion still requires the configured verifier to pass.`;
       onEvent({ type: 'auto_verify_deferred', reason: 'missing-initial-entrypoint', path: pendingVerifier });
     }
     if ((blindTrigger || probeTrigger || staleTrigger) && verificationScript && !pendingVerifier && !result.scopedVerify

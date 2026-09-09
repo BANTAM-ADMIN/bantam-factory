@@ -105,7 +105,7 @@ export function verificationFailureContext(failure,{facts=[],readSource,workspac
   const c=counts(failure.counts,'fail');
   if(c)text+=` Recorded tests: ${c.passed} passed, ${c.failed} failed, ${c.total} total.`;
   const instruction=typeof pendingEntrypoint==='string' && pendingEntrypoint
-    ? ` The check entrypoint ${quoted(pendingEntrypoint,320).text} was absent from the supplied starter and is still missing; implementation has not begun. Build the current milestone and its meaningful checks from the requirements. Repeating this command before its entrypoint exists cannot validate the implementation. The failed receipt remains recorded; completion still requires the configured verifier to pass.`
+    ? ` The check entrypoint ${quoted(pendingEntrypoint,320).text} was absent from the supplied starter and is still missing. Build the current milestone and its meaningful checks from the requirements. Repeating this command before its entrypoint exists cannot validate the implementation. The failed receipt remains recorded; completion still requires the configured verifier to pass.`
     : ' A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish.';
   let remaining=2400-text.length-instruction.length;
   // Bind the current failure to the actual stack location before adding

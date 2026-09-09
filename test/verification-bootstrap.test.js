@@ -10,11 +10,12 @@ const baseline = { complete: true, initialPaths: ['package.json', 'test'], exclu
 const options = { command: 'npm test', provenance: baseline,
   readFile: () => JSON.stringify({ scripts: { test: 'node test/smoke.js' } }), exists: () => false };
 
-test('defer only a proven absent entrypoint before implementation starts', () => {
+test('defer a proven absent starter entrypoint until it exists, preserving removed checks and changed scripts', () => {
   assert.equal(pendingInitialVerifier(options), 'test/smoke.js');
   assert.equal(pendingInitialVerifier({ ...options, command: 'node test/smoke.js' }), 'test/smoke.js');
+  assert.equal(pendingInitialVerifier({ ...options, observedPaths: new Set(['src/main.js', 'src/utils.js']) }), 'test/smoke.js');
   for (const overrides of [
-    { implementationStarted: true }, { exists: () => true },
+    { observedPaths: new Set(['test/smoke.js']) }, { observedPaths: new Set(['package.json']) }, { exists: () => true },
     { exists: () => { throw Error('access denied'); } },
     { provenance: { ...baseline, complete: false } },
     { provenance: { ...baseline, initialPaths: [...baseline.initialPaths, 'test/smoke.js'] } },
@@ -32,14 +33,15 @@ test('planning in a starter does not produce a phantom failing test; creating th
   const actions = [
     { a: 'write_file', p: 'PROGRESS.md', content: '# Plan\nBuild the first milestone and its smoke check.\n' },
     { a: 'list_dir', p: '.' },
-    { a: 'write_file', p: 'test/smoke.js', content: "const assert = require('node:assert/strict'); assert.equal(1 + 1, 2); console.log('smoke completed');\n" },
+    { a: 'write_file', p: 'src/add.cjs', content: 'module.exports = (a, b) => a + b;\n' },
+    { a: 'write_file', p: 'test/smoke.js', content: "const assert = require('node:assert/strict'); assert.equal(require('../src/add.cjs')(2, 3), 5); console.log('smoke completed');\n" },
     { a: 'respond', text: 'First check passed.' },
   ];
   const events = [];
   const result = await runAgent({ workspace, task: 'Plan a new project and create a first smoke check.',
     model: { assistantPrefill: '', async complete() {
       return { content: JSON.stringify(actions.shift()), tokens: 1, stoppedEos: true, timings: {} };
-    } }, maxTurns: 4, interactive: true, useGrammar: false, grounding: false, preGate: false,
+    } }, maxTurns: 5, interactive: true, useGrammar: false, grounding: false, preGate: false,
     verificationScript: 'npm test', autoVerifyBlindEdits: 1, autoVerifyProbes: 0, autoVerifyStaleTurns: 1,
     shellSandbox: 'host', completionAudit: false, progressAwareness: false,
     onEvent: e => events.push(e) });
@@ -48,9 +50,10 @@ test('planning in a starter does not produce a phantom failing test; creating th
   assert.equal(events.find(e => e.type === 'auto_verify').verdict, 'PASS');
   assert.doesNotMatch(result.turns[0].observation, /verification: fail|MODULE_NOT_FOUND/);
   assert.ok(!result.turns[0].verificationEvidence, 'deferral never fabricates a passing receipt');
+  assert.ok(!result.turns[2].verificationEvidence, 'a source module cannot make an absent verifier runnable');
 });
 
-test('resuming a missing starter check permits building and restores failure guidance once implementation starts', async t => {
+test('resuming a missing starter check permits building and restores failure guidance once the check exists', async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-bootstrap-resume-'));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ scripts: { test: 'node test/smoke.js' } }));
@@ -72,6 +75,8 @@ test('resuming a missing starter check permits building and restores failure gui
   }
   const first = await phase([
     { a: 'write_file', p: 'PROGRESS.md', content: '# Plan\nBuild the initial milestone and its checks.\n' },
+    { a: 'shell', c: 'npm test' },
+    { a: 'write_file', p: 'src/main.js', content: 'export const milestone = 1;\n' },
     { a: 'shell', c: 'npm test' },
   ]);
   assert.equal(first.result.turns[1].verificationEvidence.status, 'fail');

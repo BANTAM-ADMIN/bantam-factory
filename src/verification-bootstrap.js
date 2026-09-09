@@ -1,12 +1,15 @@
 import { splitShellWords } from './shell-lex.js';
 
 // Scheduling only: an empty starter cannot run a test entrypoint that its
-// author has not created yet. Never defer completion checks, an existing
-// verifier, or checks after implementation work has begun.
-export function pendingInitialVerifier({ command, provenance, readFile, exists, implementationStarted = false }) {
-  if (implementationStarted || provenance?.complete !== true) return null;
+// author has not created yet. Source modules do not make that check runnable.
+// Never defer completion checks or a verifier that existed and was removed.
+export function pendingInitialVerifier({ command, provenance, readFile, exists, observedPaths = new Set() }) {
+  if (provenance?.complete !== true) return null;
   let script = command;
   if (/^npm (?:test|run test)$/.test(String(command))) {
+    // A changed script must not turn a runnable project check into a deferred
+    // missing one. Only the unchanged starter command gets this scheduling aid.
+    if (observedPaths.has('package.json')) return null;
     let pkg;
     try { pkg = JSON.parse(readFile('package.json')); } catch { return null; }
     // A lifecycle hook may generate the entrypoint. Let npm execute normally.
@@ -21,6 +24,7 @@ export function pendingInitialVerifier({ command, provenance, readFile, exists, 
   const file = words[1].replace(/^\.\//, '');
   if (!/^[\w.-]+(?:\/[\w.-]+)*\.(?:[cm]?js)$/.test(file)
       || file.split('/').some(part => part === '..')
+      || observedPaths.has(file)
       || !Array.isArray(provenance.initialPaths) || provenance.initialPaths.includes(file)
       || !Array.isArray(provenance.excludedPaths)
       || provenance.excludedPaths.some(p => file === p || file.startsWith(p + '/'))) return null;

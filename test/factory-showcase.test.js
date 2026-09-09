@@ -9,6 +9,7 @@ import {gunzipSync} from 'node:zlib';
 import {spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {buildShowcase,publicShowcaseData,renderShowcase,writeShowcase,showcaseAcceptanceAt,sameModelObservation} from '../scripts/factory-showcase.mjs';
+import {buildLaunchData} from '../scripts/factory-launch.mjs';
 
 const start='2026-09-06T12:00:00.000Z';
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -108,6 +109,18 @@ function fourCornerFixture(t,{missing=false,root:providedRoot=null}={}){
 
 const visibleProse=html=>html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
   .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');
+
+test('wrapped Sol and Terra retain their identity through replay, public projection and launch validation', t => {
+  for (const [arm, model] of [['bantam-codex-sol', 'GPT-5.6 Sol'], ['bantam-codex-terra', 'GPT-5.6 Terra']]) {
+    const f = fixture(t, {arm});
+    const {data} = buildShowcase({roots: [f.root], mode: 'public'});
+    const row = buildLaunchData(Buffer.from(JSON.stringify(data))).series[0].cards[0].rows[0];
+    assert.equal(row.arm, arm);
+    assert.equal(row.model, model + ' · wrapped CLI');
+    assert.equal(row.bantam, true);
+    assert.equal(row.outcome, 'PASS');
+  }
+});
 
 test('separate local variant editions retain true identity and acceptance/completion distinction',t=>{
   const a=fixture(t),b=fixture(t,{variant:true,outcome:'OUTPUT_ONLY'}),before=fs.readFileSync(path.join(b.root,'manifest.json'));

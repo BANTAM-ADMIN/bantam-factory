@@ -35,6 +35,8 @@ const SYSTEMS={
   'claude-opus':['Claude · Opus','astra','Claude Opus · native CLI alias'],
   'claude-fable':['Claude · Fable','astra','Claude Fable · native CLI alias'],
   'bantam-codex-astra':['BANTAM · Astra','astra','GPT-6 Astra · wrapped CLI'],
+  'bantam-codex-sol':['BANTAM · Sol','astra','GPT-5.6 Sol · wrapped CLI'],
+  'bantam-codex-terra':['BANTAM · Terra','astra','GPT-5.6 Terra · wrapped CLI'],
 };
 const LOCAL_DESCRIPTIONS=new Set(['Qwen 27B · same local weights','Qwen 27B · same local model','Tiel 35B-A3B · same local model','Selected local model · same endpoint']);
 function localDescription(modelId){

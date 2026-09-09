@@ -446,7 +446,7 @@ class Extractor:
 
     def export(self):
         arm = self.result['arm']
-        if arm == 'bantam-local-27b':
+        if arm in ['bantam-local-27b', 'bantam-codex-astra', 'bantam-codex-sol', 'bantam-codex-terra']:
             source = self.bantam()
         elif arm == 'hermes':
             source = self.hermes()

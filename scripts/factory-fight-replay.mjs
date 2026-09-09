@@ -10,7 +10,7 @@ import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
-const ARMS = [...LEGACY_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
+const ARMS = [...LEGACY_ARMS,'pi','codex-sol','codex-terra','bantam-codex-sol','bantam-codex-terra','claude-sonnet','claude-opus','claude-fable'];
 const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','pi':'Pi','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','bantam-codex-sol':'BANTAM · Sol','bantam-codex-terra':'BANTAM · Terra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus','claude-fable':'Claude · Fable'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
 const SHA = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -360,10 +360,11 @@ export function buildReplayLane({directory,result,arm,card,repeat,outer='',limit
 
 function advantages(lanes) {
   const results=[];
-  for(const arm of ['bantam-local-27b','bantam-codex-astra']){
+  for(const arm of ['bantam-local-27b','bantam-codex-astra','bantam-codex-sol','bantam-codex-terra']){
     const bantam=lanes.find(l=>l.arm===arm);
     if(!bantam?.result?.pass)continue;
-    const peers=lanes.filter(l=>l.family===bantam.family&&l.arm!==arm&&l.result);
+    const peers=lanes.filter(l=>l.result&&(arm==='bantam-local-27b'
+      ? l.family===bantam.family&&l.arm!==arm : l.arm===arm.slice('bantam-'.length)));
     for(const peer of peers){
       if(!peer.result.pass){
         results.push(`${bantam.label} achieved accepted completion; ${peer.label} recorded ${peer.outcome}${peer.stopReasons.length?' (recorded termination: '+peer.stopReasons.join(', ')+')':''}.${peer.budgetLimited?' That was a budget-limited incomplete run, not evidence of general model incapacity or a general BANTAM superiority claim.':''}`);continue;

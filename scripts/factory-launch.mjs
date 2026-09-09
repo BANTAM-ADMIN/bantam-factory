@@ -27,6 +27,8 @@ const PUBLIC_MODELS = {
   'claude-opus': 'Claude Opus · native CLI alias',
   'claude-fable': 'Claude Fable · native CLI alias',
   'bantam-codex-astra': 'GPT-6 Astra · wrapped CLI',
+  'bantam-codex-sol': 'GPT-5.6 Sol · wrapped CLI',
+  'bantam-codex-terra': 'GPT-5.6 Terra · wrapped CLI',
 };
 const LOCAL_ARMS = new Set(['bantam-local-27b', 'deepseek-local-27b', 'opencode', 'hermes', 'pi']);
 const LOCAL_MODELS = new Set(['Qwen 27B · same local weights', 'Qwen 27B · same local model',

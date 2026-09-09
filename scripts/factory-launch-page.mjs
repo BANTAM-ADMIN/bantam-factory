@@ -55,7 +55,7 @@ function usableComparison(c){return c&&valid(c.lessTimePercent)&&c.lessTimePerce
 
 function legacyComparison(series){
   const cards=['receipt-reducer','snapshot-drift','job-planner'];
-  const arms=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
+  const arms=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra','bantam-codex-sol','bantam-codex-terra'];
   return series?.cards.length===cards.length&&cards.every(id=>series.cards.some(card=>card.card===id&&card.repeat===1
     &&card.rows.length===arms.length&&arms.every(arm=>card.rows.some(row=>row.arm===arm))));
 }
@@ -72,7 +72,7 @@ function comparisonSummary(series){
 
 // Presentation order only: do not reorder the portable evidence or imply rank.
 function shareDisplayRows(rows){
-  const order=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus','claude-fable'];
+  const order=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','bantam-codex-sol','bantam-codex-terra','claude-sonnet','claude-opus','claude-fable'];
   const rank=row=>{const i=order.indexOf(row.arm);return i<0?order.length:i;};
   return rows.map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(x=>x.row);
 }
@@ -296,7 +296,7 @@ function browser(presentation,performanceViews,workViews){
     $('work-kind').textContent=`Work order ${current().number??ci+1} / ${current().kind}`;
     $('work-title').textContent=current().title;$('work-description').textContent=current().description;
     $('lane-list').setAttribute('role','tabpanel');$('lane-list').setAttribute('aria-labelledby',`tab-${current().card}`);
-    const armOrder=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra'];
+    const armOrder=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','bantam-codex-sol','bantam-codex-terra'];
     const rank=r=>{const i=armOrder.indexOf(r.arm);return i<0?armOrder.length:i;};
     // Presentation order is independent of the counterbalanced execution order.
     // Keep each original index for receipt lookup; never reorder the input data.

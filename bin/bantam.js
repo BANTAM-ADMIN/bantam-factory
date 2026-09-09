@@ -3814,6 +3814,9 @@ function activityLabel(activity) {
   const detail = activity && activity.detail;
   const cmd = detail ? (detail.length > 70 ? detail.slice(0, 70) + "…" : detail) : "";
   const phase = activity && activity.label;
+  if (phase === "waiting for local model") {
+    return cmd ? `waiting for local model — ${cmd}` : "waiting for local model…";
+  }
   if (roosterOn) {   // a little rooster flavor on the heartbeat, still saying WHAT it's doing
     switch (phase) {
       case "thinking": return cmd ? `scratching at it… (${cmd})` : "scratching at it…";
@@ -3873,6 +3876,15 @@ function makeInteractiveLogger(emit, activity = {}) {
   let liveShellTruncated = false;
   const LIVE_SHELL_CHAR_LIMIT = 12_000;
   return (e) => {
+    if (e.type === "model_lock_wait") {
+      const detail = Number.isInteger(e.holderPid)
+        ? `another BANTAM session, PID ${e.holderPid}` : "another BANTAM session";
+      const changed = activity.label !== "waiting for local model" || activity.detail !== detail;
+      activity.label = "waiting for local model";
+      activity.detail = detail;
+      if (changed) out(`  ${activityLabel(activity)}`);
+      return;
+    }
     if (e.type === "activity") {   // phase signal for the heartbeat; nothing printed
       activity.label = e.label;
       activity.detail = e.detail || null;

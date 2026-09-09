@@ -389,9 +389,12 @@ export async function runAgent(options = {}) {
   const model = options.model ?? new ModelClient();
   // The local model serves one slot; concurrent runs thrash its KV cache into
   // pure re-prefill. Hold the endpoint's single-flight lock for the whole run
-  // (see src/model-lock.js). Remote/API endpoints return null and never wait.
+  // (see src/model-lock.js). Codex still carries ModelClient's fallback local
+  // endpoint while apiMode is false. Route by the active transport so cloud
+  // sessions never probe or acquire that unrelated local server's lock.
   const lock = await acquireModelLock({
-    endpoint: model.apiMode ? null : model.endpoint,
+    endpoint: model.apiMode || model.codex === true || model.codexBacked === true
+      ? null : model.endpoint,
     onWait: (info) => options.onEvent?.({
       type: "model_lock_wait",
       holderPid: info.holderPid,

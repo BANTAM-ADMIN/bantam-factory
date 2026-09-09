@@ -1447,7 +1447,9 @@ function liveLogger(e) {
   } else if (e.type === "verification") {
     process.stderr.write(`  ⚑ verification: ${e.verification.status}\n`);
   } else if (e.type === "auto_verify") {
-    process.stderr.write(`  ⚙ auto-verify after ${e.streak} blind edit(s): ${e.verdict}\n`);
+    const reason = e.trigger === "stale" ? "turn(s) without the project check"
+      : e.trigger === "probes" ? "inline probe(s)" : "blind edit(s)";
+    process.stderr.write(`  ⚙ auto-verify after ${e.streak} ${reason}: ${e.verdict}\n`);
   } else if (e.type === "scoped_verify") {
     process.stderr.write(`  ⚙ scoped-verify (${e.tests?.length ?? 0} test(s)): ${e.verdict}\n`);
   } else if (e.type === "test_focus") {

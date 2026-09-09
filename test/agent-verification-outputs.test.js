@@ -77,6 +77,23 @@ test('report-looking files receive no exemption without an operator declaration'
   assert.equal(result.turns[0].shellOutputPaths, undefined);
 });
 
+test('a successful project check inside a chain prevents a duplicate automatic run, then later edits rearm it', async t => {
+  const workspace = fixture(t, 0);
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ scripts: { test: 'node test/check.cjs' } }));
+  const events = [];
+  const { result } = await run(workspace, [
+    { a: 'write_file', p: 'src/value.json', content: '1' },
+    shell('node test/check.cjs && npm test'),
+    { a: 'write_file', p: 'src/extra.json', content: '2' },
+    { a: 'read_file', p: 'src/value.json' },
+  ], { verificationScript: 'npm test', autoVerifyStaleTurns: 2, interactive: true, onEvent: event => events.push(event) });
+  assert.deepEqual(result.turns[1].verificationReceipts.entries.map(e => e.verificationEvidence?.source), ['shell'],
+    'the successful chain must not be followed by a duplicate automatic project check');
+  assert.equal(result.turns[1].verificationEvidence.command, 'node test/check.cjs && npm test', 'retain the actual compound receipt');
+  assert.equal(result.turns[3].verificationEvidence.source, 'automatic', 'later source edits still require a fresh project check');
+  assert.equal(events.filter(e => e.type === 'auto_verify').length, 1);
+});
+
 for (const target of ['src/value.json', 'test/fixtures/input.json', 'test/reports/check.js', 'test/reports/package.json']) {
   test(`a passing command that also changes ${target} still invalidates verification`, async t => {
     const { result } = await run(fixture(t), [shell(`node test/check.cjs mutate ${target}`)]);

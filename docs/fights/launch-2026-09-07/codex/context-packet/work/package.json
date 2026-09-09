@@ -1,0 +1,198 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 56424,
+      "sha256": "23d7f2afb51878d6c9b2a4bd956457df0c1b247690c995f19d08c684c96e65b8",
+      "arm": "bantam-codex-astra",
+      "wallMs": 106601,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Implementation and tests, together.",
+        "paragraphs": [
+          {
+            "text": "Astra read the starter and public tests in one inspection, then wrote the implementation and new tests in one transaction. Its first check exposed a defaulted test helper: passing undefined restored the helper default. It corrected that test and finished with all checks passing.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 42751,
+      "sha256": "e7d82f0021dabefe87ee1f2507bb9aa39d8bd107b2d4b9920c68b4b6f0462003",
+      "arm": "codex-astra",
+      "wallMs": 106267,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Read, implement, verify.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the project, implemented the packer and CLI, then added contract tests and verified the result. The delivered work passed all five independent acceptance groups.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-sol.json",
+      "bytes": 65603,
+      "sha256": "864242cda819550d98f0dcb50b5efba475f98ad515e8105596ca5591f6ac7360",
+      "arm": "codex-sol",
+      "wallMs": 329403,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 11,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Several repairs before completion.",
+        "paragraphs": [
+          {
+            "text": "Native Sol made multiple patch attempts before reaching a working implementation. It inspected the resulting source, ran the project suite and extra boundary checks, revised validation and verified again. The final code passed all five independent groups.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-6",
+              "action-7",
+              "action-10",
+              "action-11"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-sol.json",
+      "bytes": 34153,
+      "sha256": "b63d82c1d972d697ab70c859fe12b9a08dc6798985a4d436b42a7b2f683de905",
+      "arm": "bantam-codex-sol",
+      "wallMs": 221772,
+      "outcome": "OUTPUT_ONLY",
+      "accepted": true,
+      "completed": false,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Passing code; interrupted completion.",
+        "paragraphs": [
+          {
+            "text": "Sol implemented the API and CLI, passed the project suite and ran additional API and CLI assertions. Its next model request went silent for two minutes, so the harness stopped before a final response. The delivered code passed all five independent groups; token totals cover only the four completed requests.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-terra.json",
+      "bytes": 29574,
+      "sha256": "bde55cd1fb8c1924b61477fc470276bea574e370300f7668a2d8cedbb0c4496d",
+      "arm": "bantam-codex-terra",
+      "wallMs": 52816,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Four calls to a verified delivery.",
+        "paragraphs": [
+          {
+            "text": "Terra inspected the starter and tests, wrote the complete API and CLI, ran the project suite and delivered its final response. All five independent acceptance groups passed. This recorded build took 52.8 seconds and 50,313 input tokens.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-terra.json",
+      "bytes": 51076,
+      "sha256": "51f9cc0f59b6839f548a6cdcff9c405b5147e15ff8c56f2e17099d9b8bcb78ba",
+      "arm": "codex-terra",
+      "wallMs": 123392,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 10,
+      "files": 3,
+      "changedFiles": 1,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "More patching and verification rounds.",
+        "paragraphs": [
+          {
+            "text": "Native Terra inspected the project, tried a replacement patch and followed with an update. It ran tests, checked the CLI and diff, revised field validation and tested again. All five independent acceptance groups passed. This recorded build took 123.4 seconds and 188,100 input tokens.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-6",
+              "action-8",
+              "action-9",
+              "action-10"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

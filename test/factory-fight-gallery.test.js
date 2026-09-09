@@ -105,6 +105,23 @@ test('Pages workflow is explicit public-only main-branch publication of staged a
   assert.match(yaml,/path: fight-pages/);assert.match(yaml,/stageFightGallery/);
 });
 
+test('reviewed Codex packages get their own gallery links and retain the publication seals', t => {
+  const {root}=fixture(t);
+  for(const id of Object.keys(PUBLIC_FACTORY_CARDS).filter(id=>id!=='context-packet'))fixture(t,{root,id});
+  const cloud=fixture(t,{root:path.join(root,'codex')});
+  const data=buildFightGallery(root),html=renderFightGallery(data);
+  assert.equal(data.codex.cards.length,1);
+  assert.match(html,/Codex, inside the factory/);
+  assert.match(html,/href="codex\/context-packet\/share\/index.html"/);
+  assert.match(html,/href="codex\/context-packet\/share\/fight-card.json"/);
+  const output=path.join(root,'cloud-staged');
+  stageFightGallery({root,output});
+  assert.equal(fs.readFileSync(path.join(output,'codex/context-packet/share/fight-card.json'),'utf8'),
+    fs.readFileSync(path.join(cloud.share,'fight-card.json'),'utf8'));
+  fs.appendFileSync(path.join(cloud.share,'index.html'),'tampered');
+  assert.throws(()=>buildFightGallery(root),/hash mismatch/);
+});
+
 test('gallery page declares its own inline icon so hosting roots never 404 on a favicon request',t=>{
   const html=renderFightGallery(buildFightGallery(fixture(t).root));
   assert.match(html,/<link rel="icon" href="data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+">/);

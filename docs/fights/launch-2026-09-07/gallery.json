@@ -1918,5 +1918,87 @@
       ]
     }
   ],
-  "references": null
+  "references": null,
+  "codex": {
+    "cards": [
+      {
+        "id": "context-packet",
+        "title": "Context packet",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+        "recorded": true,
+        "sourceSha256": "7bb470750238c4cf2c16bc11eff723724b325ab360156ac4ef6eacc2771fcfcf",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 106601,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 106267,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Codex · Sol",
+            "model": "GPT-5.6 Sol · native CLI",
+            "arm": "codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 329403,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "BANTAM · Sol",
+            "model": "GPT-5.6 Sol · wrapped CLI",
+            "arm": "bantam-codex-sol",
+            "outcome": "OUTPUT_ONLY",
+            "passed": false,
+            "wallMs": 221772,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": false
+          },
+          {
+            "label": "BANTAM · Terra",
+            "model": "GPT-5.6 Terra · wrapped CLI",
+            "arm": "bantam-codex-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 52816,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Codex · Terra",
+            "model": "GPT-5.6 Terra · native CLI",
+            "arm": "codex-terra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 123392,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      }
+    ]
+  }
 }

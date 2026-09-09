@@ -1,0 +1,322 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "context-packet",
+  "arm": "codex-terra",
+  "wallMs": 123392,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-09T02:28:58.148Z",
+  "task": "# Context packet: build a bounded evidence packer\n\nImplement `context-packet.js`, using Node.js builtins only. A factory needs to\nchoose complete context sections without silently losing required evidence.\nThis is a deterministic byte-budget packer, not a tokenizer or a claim about\noptimal model context. Export synchronous `packContext(sections, maxBytes)`.\n\nValidate the entire input before packing, even when the budget is zero or a\nsection would be omitted. `maxBytes` is a nonnegative safe integer. `sections`\nis a dense array of non-null, non-array objects; missing array slots are invalid.\nEach object has required fields:\n\n```\n{id: NONEMPTY_STRING, text: STRING, priority: NONNEGATIVE_SAFE_INTEGER,\n required: BOOLEAN}\n```\n\nIDs are unique exact strings, including case. Spaces, Unicode, newlines, NUL\nand names such as `__proto__` are valid IDs. Unknown object fields are ignored.\nDo not coerce values. Invalid input throws an Error. Do not mutate inputs.\n\nThe exact serialized frame for one section is:\n\n```\n'### ' + JSON.stringify(section.id) + '\\n' + section.text + '\\n'\n```\n\nIts cost is `Buffer.byteLength(frame, 'utf8')`, including the framing and both\nnewlines. Frames are indivisible. Do not shorten text, normalize newlines,\ninvent references, or substitute character count for UTF-8 byte count.\n\n1. Include all required sections first, in their original input order. Ignore\n   their priority when ordering them. If their combined cost exceeds maxBytes,\n   throw an Error instead of returning a partial required set.\n2. Visit optional sections by descending priority, breaking ties by original\n   input order. Include a section if its entire frame fits the remaining\n   budget. Otherwise skip it and continue trying later sections.\n3. Output sections in that inclusion order. Report omitted optional IDs in\n   original input order, not priority order.\n\nReturn exactly:\n\n```\n{text: CONCATENATED_FRAMES, bytes: UTF8_BYTE_COUNT,\n included: [ID_IN_OUTPUT_ORDER], omitted: [ID_IN_INPUT_ORDER]}\n```\n\nAn empty input returns `{text:'',bytes:0,included:[],omitted:[]}` for any valid\nbudget. Exact fits are allowed. Neither the source text nor the returned\nframing is trimmed.\n\nCLI: `node context-packet.js INPUT_JSON_FILE`. The UTF-8 JSON file contains\n`{sections, maxBytes}`; extra fields are ignored. Exactly one argument is\nrequired. Success prints exactly one result JSON plus newline, exits 0 and\nhas no stderr. Invalid arguments, unreadable files, invalid JSON or API input,\nand insufficient required-section budget exit 2, with nonempty stderr and no\nstdout. Importing the module must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification runs in a read-only workspace: any test fixtures\nmust be created beneath `os.tmpdir()` and removed afterward. Run `npm test`\nbefore finishing. Hidden acceptance uses this same contract with other values.\n",
+  "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+  "source": "codex-native-session",
+  "actions": [
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"ls -la && rg --files\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "total 8\ndrwxrwxr-x 1 bantam bantam  66 Sep  9 02:28 .\ndrwxr-xr-x 1 root   root     4 Sep  9 02:28 ..\n-rw-rw-r-- 1 bantam bantam 173 Sep  9 02:28 context-packet.js\n-rw-rw-r-- 1 bantam bantam 116 Sep  9 02:28 package.json\ndrwxrwxr-x 1 bantam bantam  28 Sep  9 02:28 test\ntest/public.test.js\npackage.json\ncontext-packet.js\n"
+        }
+      ],
+      "atMs": 6972,
+      "endedMs": 7031,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-1"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"sed -n '1,240p' context-packet.js && sed -n '1,260p' test/public.test.js && sed -n '1,160p' package.json\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":30000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "// Build the public API and CLI described in the supplied work order.\nexport function packContext(sections,maxBytes){\n  throw new Error('packContext is not implemented');\n}\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"雪\"\\né\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('雪','é',1)],bytes),{\n    text:frame,bytes,included:['雪'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n"
+        }
+      ],
+      "atMs": 10678,
+      "endedMs": 10730,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-2"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Delete File: /workspace/context-packet.js\\n*** Add File: /workspace/context-packet.js\\n+import {readFileSync} from 'node:fs';\\n+import {fileURLToPath} from 'node:url';\\n+import path from 'node:path';\\n+\\n+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);\\n+\\n+function invalid(message) {\\n+  throw new Error(message);\\n+}\\n+\\n+/**\\n+ * Pack complete, UTF-8-framed context sections within a byte budget.\\n+ *\\n+ * @param {Array} sections\\n+ * @param {number} maxBytes\\n+ * @returns {{text: string, bytes: number, included: string[], omitted: string[]}}\\n+ */\\n+export function packContext(sections, maxBytes) {\\n+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {\\n+    invalid('maxBytes must be a nonnegative safe integer');\\n+  }\\n+  if (!Array.isArray(sections)) {\\n+    invalid('sections must be an array');\\n+  }\\n+\\n+  const seenIds = new Set();\\n+  const entries = [];\\n+\\n+  // Validate every entry before considering the budget or inclusion order.\\n+  for (let index = 0; index < sections.length; index += 1) {\\n+    if (!hasOwn(sections, index)) {\\n+      invalid('sections must be dense');\\n+    }\\n+\\n+    const section = sections[index];\\n+    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\\n+      invalid('each section must be a non-null, non-array object');\\n+    }\\n+    if (!hasOwn(section, 'id') || typeof section.id !== 'string' || section.id.length === 0) {\\n+      invalid('section id must be a nonempty string');\\n+    }\\n+    if (!hasOwn(section, 'text') || typeof section.text !== 'string') {\\n+      invalid('section text must be a string');\\n+    }\\n+    if (!hasOwn(section, 'priority') || !Number.isSafeInteger(section.priority) || section.priority < 0) {\\n+      invalid('section priority must be a nonnegative safe integer');\\n+    }\\n+    if (!hasOwn(section, 'required') || typeof section.required !== 'boolean') {\\n+      invalid('section required must be a boolean');\\n+    }\\n+    if (seenIds.has(section.id)) {\\n+      invalid('section ids must be unique');\\n+    }\\n+\\n+    seenIds.add(section.id);\\n+    const frame = `### ${JSON.stringify(section.id)}\\\\n${section.text}\\\\n`;\\n+    entries.push({\\n+      id: section.id,\\n+      required: section.required,\\n+      priority: section.priority,\\n+      index,\\n+      frame,\\n+      bytes: Buffer.byteLength(frame, 'utf8'),\\n+    });\\n+  }\\n+\\n+  let remaining = maxBytes;\\n+  const frames = [];\\n+  const included = [];\\n+  const omittedIndexes = new Set();\\n+\\n+  for (const entry of entries) {\\n+    if (!entry.required) continue;\\n+    if (entry.bytes > remaining) {\\n+      invalid('required sections exceed maxBytes');\\n+    }\\n+    remaining -= entry.bytes;\\n+    frames.push(entry.frame);\\n+    included.push(entry.id);\\n+  }\\n+\\n+  const optional = entries.filter((entry) => !entry.required);\\n+  optional.sort((left, right) => right.priority - left.priority || left.index - right.index);\\n+  for (const entry of optional) {\\n+    if (entry.bytes <= remaining) {\\n+      remaining -= entry.bytes;\\n+      frames.push(entry.frame);\\n+      included.push(entry.id);\\n+    } else {\\n+      omittedIndexes.add(entry.index);\\n+    }\\n+  }\\n+\\n+  const text = frames.join('');\\n+  return {\\n+    text,\\n+    bytes: Buffer.byteLength(text, 'utf8'),\\n+    included,\\n+    omitted: entries.filter((entry) => omittedIndexes.has(entry.index)).map((entry) => entry.id),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  if (process.argv.length !== 3) {\\n+    invalid('expected exactly one input JSON file argument');\\n+  }\\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+  const result = packContext(input.sections, input.maxBytes);\\n+  process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+}\\n+\\n+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\\n+  try {\\n+    runCli();\\n+  } catch (error) {\\n+    const message = error instanceof Error && error.message ? error.message : 'invalid input';\\n+    process.stderr.write(`${message}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\napply_patch verification failed: invalid patch: multiple operations target /workspace/context-packet.js"
+        }
+      ],
+      "atMs": 44710,
+      "endedMs": 44741,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-3"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/context-packet.js\\n@@\\n-// Build the public API and CLI described in the supplied work order.\\n-export function packContext(sections,maxBytes){\\n-  throw new Error('packContext is not implemented');\\n-}\\n+import {readFileSync} from 'node:fs';\\n+import {fileURLToPath} from 'node:url';\\n+import path from 'node:path';\\n+\\n+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);\\n+\\n+function invalid(message) {\\n+  throw new Error(message);\\n+}\\n+\\n+/** Pack complete UTF-8-framed sections within a byte budget. */\\n+export function packContext(sections, maxBytes) {\\n+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {\\n+    invalid('maxBytes must be a nonnegative safe integer');\\n+  }\\n+  if (!Array.isArray(sections)) {\\n+    invalid('sections must be an array');\\n+  }\\n+\\n+  const seenIds = new Set();\\n+  const entries = [];\\n+\\n+  // Validate every entry before considering the budget or inclusion order.\\n+  for (let index = 0; index < sections.length; index += 1) {\\n+    if (!hasOwn(sections, index)) invalid('sections must be dense');\\n+\\n+    const section = sections[index];\\n+    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\\n+      invalid('each section must be a non-null, non-array object');\\n+    }\\n+    if (!hasOwn(section, 'id') || typeof section.id !== 'string' || section.id.length === 0) {\\n+      invalid('section id must be a nonempty string');\\n+    }\\n+    if (!hasOwn(section, 'text') || typeof section.text !== 'string') {\\n+      invalid('section text must be a string');\\n+    }\\n+    if (!hasOwn(section, 'priority') || !Number.isSafeInteger(section.priority) || section.priority < 0) {\\n+      invalid('section priority must be a nonnegative safe integer');\\n+    }\\n+    if (!hasOwn(section, 'required') || typeof section.required !== 'boolean') {\\n+      invalid('section required must be a boolean');\\n+    }\\n+    if (seenIds.has(section.id)) invalid('section ids must be unique');\\n+\\n+    seenIds.add(section.id);\\n+    const frame = `### ${JSON.stringify(section.id)}\\\\n${section.text}\\\\n`;\\n+    entries.push({\\n+      id: section.id,\\n+      required: section.required,\\n+      priority: section.priority,\\n+      index,\\n+      frame,\\n+      bytes: Buffer.byteLength(frame, 'utf8'),\\n+    });\\n+  }\\n+\\n+  let remaining = maxBytes;\\n+  const frames = [];\\n+  const included = [];\\n+  const omittedIndexes = new Set();\\n+\\n+  for (const entry of entries) {\\n+    if (!entry.required) continue;\\n+    if (entry.bytes > remaining) invalid('required sections exceed maxBytes');\\n+    remaining -= entry.bytes;\\n+    frames.push(entry.frame);\\n+    included.push(entry.id);\\n+  }\\n+\\n+  const optional = entries.filter((entry) => !entry.required);\\n+  optional.sort((left, right) => right.priority - left.priority || left.index - right.index);\\n+  for (const entry of optional) {\\n+    if (entry.bytes <= remaining) {\\n+      remaining -= entry.bytes;\\n+      frames.push(entry.frame);\\n+      included.push(entry.id);\\n+    } else {\\n+      omittedIndexes.add(entry.index);\\n+    }\\n+  }\\n+\\n+  const text = frames.join('');\\n+  return {\\n+    text,\\n+    bytes: Buffer.byteLength(text, 'utf8'),\\n+    included,\\n+    omitted: entries.filter((entry) => omittedIndexes.has(entry.index)).map((entry) => entry.id),\\n+  };\\n+}\\n+\\n+function runCli() {\\n+  if (process.argv.length !== 3) invalid('expected exactly one input JSON file argument');\\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\\n+  const result = packContext(input.sections, input.maxBytes);\\n+  process.stdout.write(`${JSON.stringify(result)}\\\\n`);\\n+}\\n+\\n+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\\n+  try {\\n+    runCli();\\n+  } catch (error) {\\n+    const message = error instanceof Error && error.message ? error.message : 'invalid input';\\n+    process.stderr.write(`${message}\\\\n`);\\n+    process.exitCode = 2;\\n+  }\\n+}\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 69341,
+      "endedMs": 69387,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-4"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test && task_tmp=$(mktemp -d) && trap 'rm -rf \\\"$task_tmp\\\"' EXIT && printf '%s' '{\\\"sections\\\":[{\\\"id\\\":\\\"a\\\",\\\"text\\\":\\\"x\\\",\\\"priority\\\":0,\\\"required\\\":false}],\\\"maxBytes\\\":12}' > \\\"$task_tmp/input.json\\\" && node context-packet.js \\\"$task_tmp/input.json\\\" > \\\"$task_tmp/out\\\" 2> \\\"$task_tmp/err\\\"; status=$?; printf 'status=%s\\\\nstdout=' \\\"$status\\\"; od -An -tx1 \\\"$task_tmp/out\\\"; printf 'stderr='; od -An -tx1 \\\"$task_tmp/err\\\"; node context-packet.js > \\\"$task_tmp/badout\\\" 2> \\\"$task_tmp/baderr\\\"; badstatus=$?; printf 'bad-status=%s\\\\nbad-stdout=' \\\"$badstatus\\\"; od -An -tx1 \\\"$task_tmp/badout\\\"; printf 'bad-stderr='; od -An -tx1 \\\"$task_tmp/baderr\\\"\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script failed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "Script error:\nexec_command failed: CreateProcess { message: \"Rejected(\\\"`/bin/sh -lc 'npm test && task_tmp=$(mktemp -d) && trap '\\\\\\\"'rm -rf \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp\\\\\\\"'\\\\\\\"' EXIT && printf '%s' '{\\\\\\\\\\\\\\\"sections\\\\\\\\\\\\\\\":[{\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"a\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"text\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"x\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"priority\\\\\\\\\\\\\\\":0,\\\\\\\\\\\\\\\"required\\\\\\\\\\\\\\\":false}],\\\\\\\\\\\\\\\"maxBytes\\\\\\\\\\\\\\\":12}' > \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp/input.json\\\\\\\" && node context-packet.js \\\\\\\"$task…158 chars truncated… \\\\\\\"$task_tmp/out\\\\\\\"; printf '\\\\\\\"'stderr='; od -An -tx1 \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp/err\\\\\\\"; node context-packet.js > \\\\\\\"$task_tmp/badout\\\\\\\" 2> \\\\\\\"$task_tmp/baderr\\\\\\\"; badstatus=$?; printf '\\\\\\\"'bad-status=%s\\\\\\\\\\\\\\\\nbad-stdout=' \\\\\\\\\\\\\\\"\\\\\\\"'$badstatus\\\\\\\"; od -An -tx1 \\\\\\\"$task_tmp/badout\\\\\\\"; printf '\\\\\\\"'bad-stderr='; od -An -tx1 \\\\\\\\\\\\\\\"\\\\\\\"'$task_tmp/baderr\\\\\\\"'` rejected: rm -f style commands are not permitted. Use a safer approach\\\")\" }"
+        }
+      ],
+      "atMs": 77296,
+      "endedMs": 77305,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-5"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.285231\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.161552\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.793357\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.211832\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 41.616133\n"
+        }
+      ],
+      "atMs": 81497,
+      "endedMs": 81765,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-6"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"node context-packet.js /dev/stdin <<'EOF'\\n{\\\"sections\\\":[{\\\"id\\\":\\\"a\\\",\\\"text\\\":\\\"x\\\",\\\"priority\\\":0,\\\"required\\\":false}],\\\"maxBytes\\\":12}\\nEOF\\nnode context-packet.js >/dev/null 2>/dev/null; test \\\"$?\\\" -eq 2\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.1 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{\"text\":\"### \\\"a\\\"\\nx\\n\",\"bytes\":10,\"included\":[\"a\"],\"omitted\":[]}\n"
+        }
+      ],
+      "atMs": 90027,
+      "endedMs": 90102,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-7"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"git diff --check && git diff -- context-packet.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":10000,\"max_output_tokens\":20000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>\n\nDiff output format options\n    -p, --patch           generate patch\n    -s, --no-patch        suppress diff output\n    -u                    generate patch\n    -U, --unified[=<n>]   generate diffs with <n> lines context\n    -W, --[no-]function-context\n                          generate diffs with <n> lines context\n    --raw                 generate the diff in raw format\n    --patch-with-raw      synonym for '-p --raw'\n    --patch-with-stat     synonym for '-p --stat'\n    --numstat             machine friendly --stat\n    --shortstat           output only the last line of --stat\n    -X, --dirstat[=<param1,param2>...]\n                          output the distribution of relative amount of changes for each sub-directory\n    --cumulative          synonym for --dirstat=cumulative\n    --dirstat-by-file[=<param1,param2>...]\n                          synonym for --dirstat=files,param1,param2...\n    --check               warn if changes introduce conflict markers or whitespace errors\n    --summary             condensed summary such as creations, renames and mode changes\n    --name-only           show only names of changed files\n    --name-status         show only names and status of changed files\n    --stat[=<width>[,<name-width>[,<count>]]]\n                          generate diffstat\n    --stat-width <width>  generate diffstat with a given width\n    --stat-name-width <width>\n                          generate diffstat with a given name width\n    --stat-graph-width <width>\n                          generate diffstat with a given graph width\n    --stat-count <count>  generate diffstat with limited lines\n    --[no-]compact-summary\n                          generate compact summary in diffstat\n    --binary              output a binary diff that can be applied\n    --[no-]full-index     show full pre- and post-image object names on the \"index\" lines\n    --[no-]color[=<when>] show colored diff\n    --ws-error-highlight <kind>\n                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff\n    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat\n    --[no-]abbrev[=<n>]   use <n> digits to display object names\n    --src-prefix <prefix> show the given source prefix instead of \"a/\"\n    --dst-prefix <prefix> show the given destination prefix instead of \"b/\"\n    --line-prefix <prefix>\n                          prepend an additional prefix to every line of output\n    --no-prefix           do not show any source or destination prefix\n    --default-prefix      use default prefixes a/ and b/\n    --inter-hunk-context <n>\n                          show context between diff hunks up to the specified number of lines\n    --output-indicator-new <char>\n                          specify the character to indicate a new line instead of '+'\n    --output-indicator-old <char>\n                          specify the character to indicate an old line instead of '-'\n    --output-indicator-context <char>\n                          specify the character to indicate a context instead of ' '\n\nDiff rename options\n    -B, --break-rewrites[=<n>[/<m>]]\n                          break complete rewrite changes into pairs of delete and create\n    -M, --find-renames[=<n>]\n                          detect renames\n    -D, --irreversible-delete\n                          omit the preimage for deletes\n    -C, --find-copies[=<n>]\n                          detect copies\n    --[no-]find-copies-harder\n                          use unmodified files as source to find copies\n    --no-renames          disable rename detection\n    --[no-]rename-empty   use empty blobs as rename source\n    --[no-]follow         continue listing the history of a file beyond renames\n    -l <n>                prevent rename/copy detection if the number of rename/copy targets exceeds given limit\n\nDiff algorithm options\n    --minimal             produce the smallest possible diff\n    -w, --ignore-all-space\n                          ignore whitespace when comparing lines\n    -b, --ignore-space-change\n                          ignore changes in amount of whitespace\n    --ignore-space-at-eol ignore changes in whitespace at EOL\n    --ignore-cr-at-eol    ignore carrier-return at the end of line\n    --ignore-blank-lines  ignore changes whose lines are all blank\n    -I, --[no-]ignore-matching-lines <regex>\n                          ignore changes whose all lines match <regex>\n    --[no-]indent-heuristic\n                          heuristic to shift diff hunk boundaries for easy reading\n    --patience            generate diff using the \"patience diff\" algorithm\n    --histogram           generate diff using the \"histogram diff\" algorithm\n    --diff-algorithm <algorithm>\n                          choose a diff algorithm\n    --anchored <text>     generate diff using the \"anchored diff\" algorithm\n    --word-diff[=<mode>]  show word diff, using <mode> to delimit changed words\n    --word-diff-regex <regex>\n                          use <regex> to decide what a word is\n    --color-words[=<regex>]\n                          equivalent to --word-diff=color --word-diff-regex=<regex>\n    --[no-]color-moved[=<mode>]\n                          moved lines of code are colored differently\n    --[no-]color-moved-ws <mode>\n                          how white spaces are ignored in --color-moved\n\nOther diff options\n    --[no-]relative[=<prefix>]\n                          when run from subdir, exclude changes outside and show relative paths\n    -a, --[no-]text       treat all files as text\n    -R                    swap two inputs, reverse the diff\n    --[no-]exit-code      exit with 1 if there were differences, 0 otherwise\n    --[no-]quiet          disable all output of the program\n    --[no-]ext-diff       allow an external diff helper to be executed\n    --[no-]textconv       run external text conversion filters when comparing binary files\n    --ignore-submodules[=<when>]\n                          ignore changes to submodules in the diff generation\n    --submodule[=<format>]\n                          specify how differences in submodules are shown\n    --ita-invisible-in-index\n                          hide 'git add -N' entries from the index\n    --ita-visible-in-index\n                          treat 'git add -N' entries as real in the index\n    -S <string>           look for differences that change the number of occurrences of the specified string\n    -G <regex>            look for differences that change the number of occurrences of the specified regex\n    --pickaxe-all         show all changes in the changeset with -S or -G\n    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression\n    -O <file>             control the order in which files appear in the output\n    --rotate-to <path>    show the change in the specified path first\n    --skip-to <path>      skip the output to the specified path\n    --find-object <object-id>\n                          look for differences that change the number of occurrences of the specified object\n    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]\n                          select files by diff type\n    --output <file>       output to a specific file\n\n"
+        }
+      ],
+      "atMs": 94401,
+      "endedMs": 94439,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-8"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const patch = \"*** Begin Patch\\n*** Update File: /workspace/context-packet.js\\n@@\\n-    if (!hasOwn(section, 'id') || typeof section.id !== 'string' || section.id.length === 0) {\\n+    if (typeof section.id !== 'string' || section.id.length === 0) {\\n@@\\n-    if (!hasOwn(section, 'text') || typeof section.text !== 'string') {\\n+    if (typeof section.text !== 'string') {\\n@@\\n-    if (!hasOwn(section, 'priority') || !Number.isSafeInteger(section.priority) || section.priority < 0) {\\n+    if (!Number.isSafeInteger(section.priority) || section.priority < 0) {\\n@@\\n-    if (!hasOwn(section, 'required') || typeof section.required !== 'boolean') {\\n+    if (typeof section.required !== 'boolean') {\\n*** End Patch\";\nconst r = await tools.apply_patch(patch);\ntext(typeof r === \"string\" ? r : JSON.stringify(r));",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "{}"
+        }
+      ],
+      "atMs": 109689,
+      "endedMs": 109728,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-9"
+    },
+    {
+      "name": "exec",
+      "category": "command",
+      "request": "const r = await tools.exec_command({\"cmd\":\"npm test && sed -n '1,240p' context-packet.js\",\"workdir\":\"/workspace\",\"yield_time_ms\":30000,\"max_output_tokens\":30000});\ntext(r.output);",
+      "output": [
+        {
+          "type": "input_text",
+          "text": "Script completed\nWall time 0.2 seconds\nOutput:\n"
+        },
+        {
+          "type": "input_text",
+          "text": "\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.273111\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.162071\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.844556\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.214992\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 40.797794\nimport {readFileSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\nimport path from 'node:path';\n\nconst hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);\n\nfunction invalid(message) {\n  throw new Error(message);\n}\n\n/** Pack complete UTF-8-framed sections within a byte budget. */\nexport function packContext(sections, maxBytes) {\n  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {\n    invalid('maxBytes must be a nonnegative safe integer');\n  }\n  if (!Array.isArray(sections)) {\n    invalid('sections must be an array');\n  }\n\n  const seenIds = new Set();\n  const entries = [];\n\n  // Validate every entry before considering the budget or inclusion order.\n  for (let index = 0; index < sections.length; index += 1) {\n    if (!hasOwn(sections, index)) invalid('sections must be dense');\n\n    const section = sections[index];\n    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n      invalid('each section must be a non-null, non-array object');\n    }\n    if (typeof section.id !== 'string' || section.id.length === 0) {\n      invalid('section id must be a nonempty string');\n    }\n    if (typeof section.text !== 'string') {\n      invalid('section text must be a string');\n    }\n    if (!Number.isSafeInteger(section.priority) || section.priority < 0) {\n      invalid('section priority must be a nonnegative safe integer');\n    }\n    if (typeof section.required !== 'boolean') {\n      invalid('section required must be a boolean');\n    }\n    if (seenIds.has(section.id)) invalid('section ids must be unique');\n\n    seenIds.add(section.id);\n    const frame = `### ${JSON.stringify(section.id)}\\n${section.text}\\n`;\n    entries.push({\n      id: section.id,\n      required: section.required,\n      priority: section.priority,\n      index,\n      frame,\n      bytes: Buffer.byteLength(frame, 'utf8'),\n    });\n  }\n\n  let remaining = maxBytes;\n  const frames = [];\n  const included = [];\n  const omittedIndexes = new Set();\n\n  for (const entry of entries) {\n    if (!entry.required) continue;\n    if (entry.bytes > remaining) invalid('required sections exceed maxBytes');\n    remaining -= entry.bytes;\n    frames.push(entry.frame);\n    included.push(entry.id);\n  }\n\n  const optional = entries.filter((entry) => !entry.required);\n  optional.sort((left, right) => right.priority - left.priority || left.index - right.index);\n  for (const entry of optional) {\n    if (entry.bytes <= remaining) {\n      remaining -= entry.bytes;\n      frames.push(entry.frame);\n      included.push(entry.id);\n    } else {\n      omittedIndexes.add(entry.index);\n    }\n  }\n\n  const text = frames.join('');\n  return {\n    text,\n    bytes: Buffer.byteLength(text, 'utf8'),\n    included,\n    omitted: entries.filter((entry) => omittedIndexes.has(entry.index)).map((entry) => entry.id),\n  };\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) invalid('expected exactly one input JSON file argument');\n  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n  const result = packContext(input.sections, input.maxBytes);\n  process.stdout.write(`${JSON.stringify(result)}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    const message = error instanceof Error && error.message ? error.message : 'invalid input';\n    process.stderr.write(`${message}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+        }
+      ],
+      "atMs": 115387,
+      "endedMs": 115560,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "native-tool",
+      "id": "action-10"
+    }
+  ],
+  "stations": [],
+  "events": [],
+  "finalResponse": "Implemented [`context-packet.js`](/workspace/context-packet.js).\n\nIt now validates inputs fully, packs required/optional frames by the specified byte-budget rules, and provides the strict CLI behavior. `npm test` passes (4/4).",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "context-packet.js",
+      "state": "changed",
+      "beforeSha256": "dd5730e6268aa45f6b813d210203429cfd25ecce5e8fc4180424b787a7cf06d3",
+      "afterSha256": "e0c991f4080da5267634f3601bb5dd8ec3b45bf52e57953ed29082a23a99fc9e",
+      "before": "// Build the public API and CLI described in the supplied work order.\nexport function packContext(sections,maxBytes){\n  throw new Error('packContext is not implemented');\n}\n",
+      "after": "import {readFileSync} from 'node:fs';\nimport {fileURLToPath} from 'node:url';\nimport path from 'node:path';\n\nconst hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);\n\nfunction invalid(message) {\n  throw new Error(message);\n}\n\n/** Pack complete UTF-8-framed sections within a byte budget. */\nexport function packContext(sections, maxBytes) {\n  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {\n    invalid('maxBytes must be a nonnegative safe integer');\n  }\n  if (!Array.isArray(sections)) {\n    invalid('sections must be an array');\n  }\n\n  const seenIds = new Set();\n  const entries = [];\n\n  // Validate every entry before considering the budget or inclusion order.\n  for (let index = 0; index < sections.length; index += 1) {\n    if (!hasOwn(sections, index)) invalid('sections must be dense');\n\n    const section = sections[index];\n    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n      invalid('each section must be a non-null, non-array object');\n    }\n    if (typeof section.id !== 'string' || section.id.length === 0) {\n      invalid('section id must be a nonempty string');\n    }\n    if (typeof section.text !== 'string') {\n      invalid('section text must be a string');\n    }\n    if (!Number.isSafeInteger(section.priority) || section.priority < 0) {\n      invalid('section priority must be a nonnegative safe integer');\n    }\n    if (typeof section.required !== 'boolean') {\n      invalid('section required must be a boolean');\n    }\n    if (seenIds.has(section.id)) invalid('section ids must be unique');\n\n    seenIds.add(section.id);\n    const frame = `### ${JSON.stringify(section.id)}\\n${section.text}\\n`;\n    entries.push({\n      id: section.id,\n      required: section.required,\n      priority: section.priority,\n      index,\n      frame,\n      bytes: Buffer.byteLength(frame, 'utf8'),\n    });\n  }\n\n  let remaining = maxBytes;\n  const frames = [];\n  const included = [];\n  const omittedIndexes = new Set();\n\n  for (const entry of entries) {\n    if (!entry.required) continue;\n    if (entry.bytes > remaining) invalid('required sections exceed maxBytes');\n    remaining -= entry.bytes;\n    frames.push(entry.frame);\n    included.push(entry.id);\n  }\n\n  const optional = entries.filter((entry) => !entry.required);\n  optional.sort((left, right) => right.priority - left.priority || left.index - right.index);\n  for (const entry of optional) {\n    if (entry.bytes <= remaining) {\n      remaining -= entry.bytes;\n      frames.push(entry.frame);\n      included.push(entry.id);\n    } else {\n      omittedIndexes.add(entry.index);\n    }\n  }\n\n  const text = frames.join('');\n  return {\n    text,\n    bytes: Buffer.byteLength(text, 'utf8'),\n    included,\n    omitted: entries.filter((entry) => omittedIndexes.has(entry.index)).map((entry) => entry.id),\n  };\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) invalid('expected exactly one input JSON file argument');\n  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n  const result = packContext(input.sections, input.maxBytes);\n  process.stdout.write(`${JSON.stringify(result)}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    const message = error instanceof Error && error.message ? error.message : 'invalid input';\n    process.stderr.write(`${message}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "e0c991f4080da5267634f3601bb5dd8ec3b45bf52e57953ed29082a23a99fc9e",
+      "diff": "--- starter/context-packet.js\n+++ delivered/context-packet.js\n@@ -1,4 +1,106 @@\n-// Build the public API and CLI described in the supplied work order.\n-export function packContext(sections,maxBytes){\n-  throw new Error('packContext is not implemented');\n+import {readFileSync} from 'node:fs';\n+import {fileURLToPath} from 'node:url';\n+import path from 'node:path';\n+\n+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);\n+\n+function invalid(message) {\n+  throw new Error(message);\n }\n+\n+/** Pack complete UTF-8-framed sections within a byte budget. */\n+export function packContext(sections, maxBytes) {\n+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {\n+    invalid('maxBytes must be a nonnegative safe integer');\n+  }\n+  if (!Array.isArray(sections)) {\n+    invalid('sections must be an array');\n+  }\n+\n+  const seenIds = new Set();\n+  const entries = [];\n+\n+  // Validate every entry before considering the budget or inclusion order.\n+  for (let index = 0; index < sections.length; index += 1) {\n+    if (!hasOwn(sections, index)) invalid('sections must be dense');\n+\n+    const section = sections[index];\n+    if (section === null || typeof section !== 'object' || Array.isArray(section)) {\n+      invalid('each section must be a non-null, non-array object');\n+    }\n+    if (typeof section.id !== 'string' || section.id.length === 0) {\n+      invalid('section id must be a nonempty string');\n+    }\n+    if (typeof section.text !== 'string') {\n+      invalid('section text must be a string');\n+    }\n+    if (!Number.isSafeInteger(section.priority) || section.priority < 0) {\n+      invalid('section priority must be a nonnegative safe integer');\n+    }\n+    if (typeof section.required !== 'boolean') {\n+      invalid('section required must be a boolean');\n+    }\n+    if (seenIds.has(section.id)) invalid('section ids must be unique');\n+\n+    seenIds.add(section.id);\n+    const frame = `### ${JSON.stringify(section.id)}\\n${section.text}\\n`;\n+    entries.push({\n+      id: section.id,\n+      required: section.required,\n+      priority: section.priority,\n+      index,\n+      frame,\n+      bytes: Buffer.byteLength(frame, 'utf8'),\n+    });\n+  }\n+\n+  let remaining = maxBytes;\n+  const frames = [];\n+  const included = [];\n+  const omittedIndexes = new Set();\n+\n+  for (const entry of entries) {\n+    if (!entry.required) continue;\n+    if (entry.bytes > remaining) invalid('required sections exceed maxBytes');\n+    remaining -= entry.bytes;\n+    frames.push(entry.frame);\n+    included.push(entry.id);\n+  }\n+\n+  const optional = entries.filter((entry) => !entry.required);\n+  optional.sort((left, right) => right.priority - left.priority || left.index - right.index);\n+  for (const entry of optional) {\n+    if (entry.bytes <= remaining) {\n+      remaining -= entry.bytes;\n+      frames.push(entry.frame);\n+      included.push(entry.id);\n+    } else {\n+      omittedIndexes.add(entry.index);\n+    }\n+  }\n+\n+  const text = frames.join('');\n+  return {\n+    text,\n+    bytes: Buffer.byteLength(text, 'utf8'),\n+    included,\n+    omitted: entries.filter((entry) => omittedIndexes.has(entry.index)).map((entry) => entry.id),\n+  };\n+}\n+\n+function runCli() {\n+  if (process.argv.length !== 3) invalid('expected exactly one input JSON file argument');\n+  const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));\n+  const result = packContext(input.sections, input.maxBytes);\n+  process.stdout.write(`${JSON.stringify(result)}\\n`);\n+}\n+\n+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n+  try {\n+    runCli();\n+  } catch (error) {\n+    const message = error instanceof Error && error.message ? error.message : 'invalid input';\n+    process.stderr.write(`${message}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "afterSha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "before": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-context-packet\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "ec45b290c43f874a8b32347d1ec6e554632ab5342798c80dd6ed1c66411cc31a",
+      "diff": ""
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "afterSha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"雪\"\\né\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('雪','é',1)],bytes),{\n    text:frame,bytes,included:['雪'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {packContext} from '../context-packet.js';\nconst section=(id,text,priority=0,required=false)=>({id,text,priority,required});\ntest('required evidence is included before optional priority',()=>{\n  assert.deepEqual(packContext([section('extra','x',50),section('rule','Do it.',0,true)],100),{\n    text:'### \"rule\"\\nDo it.\\n### \"extra\"\\nx\\n',bytes:32,included:['rule','extra'],omitted:[]});\n});\ntest('whole UTF-8 sections, exact fits, and skip instead of stop',()=>{\n  const frame='### \"雪\"\\né\\n',bytes=Buffer.byteLength(frame);\n  assert.deepEqual(packContext([section('large','x'.repeat(100),10),section('雪','é',1)],bytes),{\n    text:frame,bytes,included:['雪'],omitted:['large']});\n});\ntest('empty selection and required overflow',()=>{\n  assert.deepEqual(packContext([],0),{text:'',bytes:0,included:[],omitted:[]});\n  assert.throws(()=>packContext([section('rule','x',0,true)],0),Error);\n});\ntest('validate omitted entries too and leave input unchanged',()=>{\n  assert.throws(()=>packContext([section('x','x'),section('x','y')],0),Error);\n  assert.throws(()=>packContext(new Array(1),0),Error);\n  const input=[section('b','b',1),section('a','a',1)],before=JSON.stringify(input);\n  assert.deepEqual(packContext(input,100).included,['b','a']);\n  assert.equal(JSON.stringify(input),before);\n});\n",
+      "displaySha256": "a1ed17d34942d3099edf284c162c1e226a100d92578318e7122d0e11476b9c5d",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-context-packet@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: required evidence is included before optional priority\nok 1 - required evidence is included before optional priority\n  ---\n  duration_ms: 1.29669\n  ...\n# Subtest: whole UTF-8 sections, exact fits, and skip instead of stop\nok 2 - whole UTF-8 sections, exact fits, and skip instead of stop\n  ---\n  duration_ms: 0.170051\n  ...\n# Subtest: empty selection and required overflow\nok 3 - empty selection and required overflow\n  ---\n  duration_ms: 0.860907\n  ...\n# Subtest: validate omitted entries too and leave input unchanged\nok 4 - validate omitted entries too and leave input unchanged\n  ---\n  duration_ms: 0.225922\n  ...\n1..4\n# tests 4\n# suites 0\n# pass 4\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43.000942\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"context-packet\",\"pass\":true,\"groups\":[{\"name\":\"required-sections-and-reservation\",\"pass\":true},{\"name\":\"utf8-framing-and-exact-budget\",\"pass\":true},{\"name\":\"optional-priority-skip-and-stable-ties\",\"pass\":true},{\"name\":\"validation-opaque-identities-and-immutability\",\"pass\":true},{\"name\":\"cli-json-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "05ff2b85e4e4aafc4d9b4110d7efbe0119324293b3ababc4d5507ced0cbc9198"
+    },
+    {
+      "kind": "codex-native-session",
+      "sha256": "8455626a3da8153725a04e9a2afb10e7621ad919494d4b5a01615ec082fe04c5"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "3581295443b7e230cf59f6394d63adf986ae83af63fdb7f95cfe43ab8d16cfb0"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "c60d5af38884fb3d732e9b51b1b32a8896dc2fb5a0541a678a1e7d87e2ec1004"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 10,
+    "withResults": 10,
+    "normalizedPathOccurrences": 13,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "More patching and verification rounds.",
+    "paragraphs": [
+      {
+        "text": "Native Terra inspected the project, tried a replacement patch and followed with an update. It ran tests, checked the CLI and diff, revised field validation and tested again. All five independent acceptance groups passed. This recorded build took 123.4 seconds and 188,100 input tokens.",
+        "actions": [
+          "action-3",
+          "action-4",
+          "action-6",
+          "action-8",
+          "action-9",
+          "action-10"
+        ]
+      }
+    ]
+  }
+}

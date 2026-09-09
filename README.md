@@ -68,7 +68,12 @@ action and the files they delivered.
 - **Put your hardware to work.** Run a local model, or bring your Codex account.
 
 Already use Codex? Connect your signed-in CLI during setup and put its model
-inside the factory. **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
+inside the factory. On Context Packet, **the same Terra finished 2.3× faster with
+73% fewer input tokens**: 52.8s / 50,313 tokens in BANTAM FACTORY versus
+123.4s / 188,100 in native Codex. Both passed all five checks.
+**[Replay the same-model Codex fight →](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra)**
+
+**[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two complete games. Every recorded action and the delivered files.
 
 <a id="start-with-what-you-already-have"></a>

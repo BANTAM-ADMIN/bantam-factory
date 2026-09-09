@@ -22,7 +22,15 @@ const MODELS = { astra: 'gpt-6-astra', sol: 'gpt-5.6-sol', terra: 'gpt-5.6-terra
 const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
 const clean = r => r?.code === 0 && !r.timedOut && !r.aborted && !r.bufferExceeded;
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
-const brief = r => ({ pass: clean(r), code: r.code, timedOut: Boolean(r.timedOut), stdout: r.stdout.slice(-8000), stderr: r.stderr.slice(-4000) });
+export function foremanObservation(r, stdoutLimit = 8000) {
+  const excerpt = (text, limit) => text.length <= limit ? text
+    : text.slice(0, Math.floor(limit * .75)) + `\n[${text.length - limit} characters omitted; full output retained in the check record]\n` + text.slice(-Math.ceil(limit * .25));
+  return {pass: clean(r), code: r.code, timedOut: Boolean(r.timedOut),
+    stdout: excerpt(r.stdout, stdoutLimit), stderr: excerpt(r.stderr, 4000),
+    stdoutChars: r.stdout.length, stderrChars: r.stderr.length,
+    stdoutTruncated: r.stdout.length > stdoutLimit, stderrTruncated: r.stderr.length > 4000};
+}
+const brief = foremanObservation;
 
 export const FOREMAN_HELP = `BANTAM FACTORY · experimental Astra supervisor
 
@@ -293,7 +301,10 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     }
     // Verify a snapshot: workers may integrate while this check is running.
     const snap = store.capture(candidate), checkDir = fs.mkdtempSync(path.join(plan.output, 'check-')); store.materialize(snap.commit, path.join(checkDir, 'ws'));
-    const r = await check(path.join(checkDir, 'ws'), action.text); write(path.join(checkDir, 'result.json'), r); return { snapshot: snap.commit, ...brief(r) };
+    // Review commands commonly read implementation + tests together. The old
+    // unmarked 8K tail silently removed the implementation, causing another
+    // full read. Keep small reviews whole; mark any remaining excerpt explicitly.
+    const r = await check(path.join(checkDir, 'ws'), action.text); write(path.join(checkDir, 'result.json'), r); return { snapshot: snap.commit, ...brief(r, 24000) };
   };
   let result;
   let cleanup = { pass: false, status: 'pending' };

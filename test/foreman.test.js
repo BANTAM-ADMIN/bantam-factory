@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { driveForeman, summarizeJobs, waitForForemanUpdate, FOREMAN_SCHEMA, FOREMAN_INSTRUCTIONS } from '../src/foreman-controller.js';
-import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, foremanWorkerCommand, cleanupForemanContainers } from '../src/foreman.js';
+import { foremanPlan, foremanCommand, foremanUsage, validateForemanVerifiers, integrateForemanCandidate, readForemanEvidence, foremanWorkerTask, foremanWorkerContext, foremanWorkerCommand, cleanupForemanContainers, foremanObservation } from '../src/foreman.js';
 import { runProcess } from '../src/process-runner.js';
 import { requiredOutputPaths } from '../src/logic/missing-outputs.js';
 import { deriveCompletionContext } from '../src/logic/derived-failure-context.js';
@@ -23,6 +23,45 @@ test('diagnostic reproduction paths do not become binding worker deliverables', 
   assert.ok(requiredOutputPaths(contract + '\n' + evidence).includes('/tmp/example-importer.js'), 'reproduces flat-context false requirement');
   assert.deepEqual(requiredOutputPaths(contract), ['test/boundary.test.js']);
   assert.match(evidence, /example-importer.js/);
+});
+test('combined source reviews stay whole and oversized observations identify the omitted middle', () => {
+  const output = 'IMPLEMENTATION\n' + 'x'.repeat(6000) + '\nRETAINED TESTS\n' + 'y'.repeat(5000);
+  const r = {code:0,stdout:output,stderr:''};
+  const review = foremanObservation(r,24000);
+  assert.equal(review.stdout,output);assert.equal(review.stdoutTruncated,false);
+  const bounded = foremanObservation(r);
+  assert.match(bounded.stdout,/^IMPLEMENTATION/);assert.match(bounded.stdout,/characters omitted/);
+  assert.ok(bounded.stdout.endsWith('y'.repeat(2000)));
+  assert.equal(bounded.stdoutChars,output.length);assert.equal(bounded.stdoutTruncated,true);
+  assert.equal(r.stdout,output);
+});
+test('dispatch returns settled worker evidence without spending a model turn to say wait', async () => {
+  const m=model([action('dispatch',{jobs:[job('core','terra')]}),action('finish')]);
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:2,
+    execute:async()=>{await new Promise(r=>setTimeout(r,5));return {pass:true};},
+    inspect:async()=>({}),verify:async()=>({pass:true})});
+  assert.equal(result.pass,true);assert.equal(result.calls.length,2);
+  assert.match(m.prompts[1],/"status":"passed"/);assert.match(m.prompts[1],/"waited":true/);
+});
+test('dispatch failures remain visible and cannot acquire a completion receipt', async () => {
+  const m=model([action('dispatch',{jobs:[job('core','sol')]}),action('finish')]);
+  let finalChecks=0;
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['sol'],maxDecisions:2,
+    execute:async()=>({pass:false,error:'broken contract'}),inspect:async()=>({}),verify:async()=>{finalChecks++;return {pass:true};}});
+  assert.equal(result.pass,false);assert.equal(finalChecks,0);
+  assert.match(m.prompts[1],/broken contract/);
+});
+test('dispatch wakes for a live failure so Astra can steer the same worker', async () => {
+  let release, corrections=0;
+  const m=model([action('dispatch',{jobs:[job('core','terra')]}),
+    action('steer',{target:'core',text:'Repair the demonstrated boundary.'}),action('wait'),action('finish')]);
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:4,
+    execute:async(j,deps,signal,progress)=>{
+      await new Promise(r=>{release=r;progress({observation:{turn:1,text:'Shell exit 1\nboundary failed'}});});
+      return {pass:true};
+    },steer:async()=>{corrections++;release();return {queued:true};},inspect:async()=>({}),verify:async()=>({pass:true})});
+  assert.equal(result.pass,true);assert.equal(corrections,1);
+  assert.match(m.prompts[1],/boundary failed/);assert.match(m.prompts[1],/"status":"running"/);
 });
 test('owned cleanup resolves wrapper removal races using exact-ID absence evidence', async t => {
   const dir = fixture(t), id = 'a'.repeat(64), receipt = path.join(dir,'astra-codex-test.cid');

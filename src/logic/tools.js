@@ -853,7 +853,7 @@ export function buildToolRegistry(ground, opts = {}) {
       && chromiumBinary()) {
     reg.register(previewTool(ground.workspace, {
       endpoint: opts.endpoint,
-      vision: localVision,
+      vision: imageProvider === "local",
       taskContext: opts.task,
       taskAwareReview: taskAwarePreviewVisionEnabled(opts.env),
       describeScreenshot: imageProvider === "codex" && codexPreviewVisionEnabled(opts.env)

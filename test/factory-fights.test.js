@@ -21,6 +21,7 @@ test('all arms get exact task or task file and same explicit local endpoint/Astr
     else assert.ok(command.args.includes('http://127.0.0.1:9999'));
     if(arm.startsWith('bantam')){assert.equal(command.env.BANTAM_TEACHER,'0');assert.equal(command.env.BANTAM_PROBE,'1');assert.ok(command.args.includes('--factory'));}
     if(NATIVE_CODEX_MODELS[arm])assert.ok(!command.args.includes('--ephemeral'));
+    if(WRAPPED_CODEX_MODELS[arm])assert.equal(command.env.BANTAM_IMAGE_PROVIDER,'codex');
   }
 });
 test('grade requires complete expected groups, booleans and matching conjunction',()=>{

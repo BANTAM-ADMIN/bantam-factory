@@ -68,7 +68,12 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
   const nativeModel=NATIVE_CODEX_MODELS[arm];
   const wrappedModel=WRAPPED_CODEX_MODELS[arm];
   const command=cardCommand(nativeModel?'codex-astra':wrappedModel?'bantam-codex-astra':arm,task,workspace,dir);
-  if(wrappedModel)command.args[command.args.indexOf('--model')+1]=wrappedModel;
+  if(wrappedModel){
+    command.args[command.args.indexOf('--model')+1]=wrappedModel;
+    // A same-model Codex card must not borrow a local vision model through
+    // the maintainer's saved :eyes preference or a newly available endpoint.
+    command.env.BANTAM_IMAGE_PROVIDER='codex';
+  }
   command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions'),
     ...(arm.includes('codex')&&peerExecutables.codex?{ASTRA_CONTAINER_CODEX_EXECUTABLE:peerExecutables.codex.executable,ASTRA_CONTAINER_CODEX_SHA256:peerExecutables.codex.sha256}:{})};
   if(nativeModel){

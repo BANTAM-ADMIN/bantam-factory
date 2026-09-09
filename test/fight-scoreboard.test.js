@@ -171,6 +171,23 @@ test("cornerUsage reads a BANTAM run artifact: turns, tokens, prefix reuse, pass
   assert.equal(cornerUsage("bantam", { armDir, rawLines: [] }), null, "unfinished checkpoints are not zero-token runs");
 });
 
+test('BANTAM usage is complete only when every request receipt accounts for the totals', t => {
+  const armDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-usage-coverage-'));
+  t.after(() => fs.rmSync(armDir, {recursive:true, force:true}));
+  const usage = {inputTokens:100, outputTokens:20, cacheHitTokens:80};
+  const run = {metrics:{modelRequests:1, usage}, modelCalls:[{status:'ok', response:{normalized:{usage}}}]};
+  const read = () => {fs.writeFileSync(path.join(armDir,'run.json'),JSON.stringify(run));return cornerUsage('bantam-codex-astra',{armDir});};
+  assert.equal(read().complete,true); assert.equal(read().measuredRequests,1);
+  run.metrics.modelRequests = 2;
+  assert.equal(read().complete,false, 'a missing request cannot look fully measured');
+  run.metrics.modelRequests = 1; run.modelCalls[0].status = 'error';
+  assert.equal(read().complete,false); assert.equal(read().measuredRequests,0);
+  run.modelCalls[0].status = 'ok'; run.metrics.usage = {...usage,inputTokens:200};
+  assert.equal(read().complete,false, 'aggregate and receipts must agree');
+  run.metrics.usage = usage; run.modelCalls[0].attempts = [{status:'error'}, {status:'ok'}];
+  assert.equal(read().complete,false, 'unmetered retry work remains unknown');
+});
+
 test("cornerUsage reads the codex CLI's 'tokens used' tail and Claude's stream-json result", () => {
   const codex = cornerUsage("codex-sol", { armDir: null, rawLines: ["+ assert x", "tokens used", "16,416", "Implemented loganalyze.py"] });
   assert.deepEqual(codex, { source: "cli", totalTokens: 16416 });

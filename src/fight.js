@@ -761,8 +761,21 @@ export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
     const u = r.metrics.usage;
     const input = num(u.inputTokens) ?? 0;
     const hit = Math.min(input, num(u.cacheHitTokens) ?? 0);
+    const calls = Array.isArray(r.modelCalls) ? r.modelCalls : null;
+    const measured = calls?.filter(call => {
+      const usage = call?.response?.normalized?.usage;
+      return call?.status === 'ok' && !(call.attempts?.length > 1)
+        && Number.isSafeInteger(usage?.inputTokens) && usage.inputTokens > 0
+        && ['outputTokens','cacheHitTokens'].every(key => Number.isSafeInteger(usage?.[key]) && usage[key] >= 0)
+        && usage.cacheHitTokens <= usage.inputTokens;
+    });
+    const complete = calls && calls.length > 0 && calls.length === num(r.metrics.modelRequests)
+      && measured.length === calls.length
+      && ['inputTokens','outputTokens','cacheHitTokens'].every(key =>
+        measured.reduce((sum, call) => sum + call.response.normalized.usage[key], 0) === u[key]);
     return {
       source: "run.json",
+      ...(calls ? { complete: Boolean(complete), measuredRequests: measured.length } : {}),
       turns: num(r?.metrics?.turns),
       requests: num(r?.metrics?.modelRequests),
       inputTokens: input,

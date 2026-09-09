@@ -44,6 +44,17 @@ export const LAUNCH_SECTIONS=Object.freeze([
 ]);
 export const LAUNCH_CARDS=Object.freeze(LAUNCH_SECTIONS.flatMap(section=>section.cards));
 
+// Reviewed follow-up windows keep their own URLs and complete rosters. Earlier
+// recordings stay inspectable; a later harness revision never replaces them.
+const CODEX_RECORDINGS=Object.freeze([
+  ...LAUNCH_CARDS.map(id=>({id,workOrder:id})),
+  ...['astra','sol'].flatMap(model=>[1,2].map(repeat=>({
+    id:`context-packet-${model}-${repeat}`,workOrder:'context-packet',
+    title:`${model==='astra'?'Astra':'Sol'} · efficiency round ${repeat}`,
+    description:'The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.',
+  }))),
+]);
+
 // One reviewed public card package: a single-work-order showcase whose share
 // package hashes match it byte for byte. Used for launch cards and references.
 function readCardPackage(dir,id){
@@ -95,8 +106,9 @@ export function buildFightGallery(root){
   let codex=null;
   if(fs.existsSync(codexRoot)){
     if(!fs.lstatSync(codexRoot).isDirectory()||fs.lstatSync(codexRoot).isSymbolicLink())throw Error('Codex series must be a plain directory');
-    const found=LAUNCH_CARDS.filter(id=>fs.existsSync(path.join(codexRoot,id)))
-      .map(id=>({id,...PUBLIC_FACTORY_CARDS[id],recorded:true,...readCardPackage(path.join(codexRoot,id),id)}));
+    const found=CODEX_RECORDINGS.filter(({id})=>fs.existsSync(path.join(codexRoot,id)))
+      .map(recording=>({...PUBLIC_FACTORY_CARDS[recording.workOrder],...recording,recorded:true,
+        ...readCardPackage(path.join(codexRoot,recording.id),recording.workOrder)}));
     if(found.length)codex={cards:found};
   }
   return {schema:'bantam.fight-gallery.v1',public:true,rawEvidenceIncluded:false,cards,references,...(codex?{codex}:{})};
@@ -182,7 +194,7 @@ export function renderFightGallery(data){
   const featuredCard=feature?.card??recorded[0];
   const byId=new Map(cards.map(c=>[c.id,c]));
   const panel=(card,index,total,prefix='')=>{
-    const meta=PUBLIC_FACTORY_CARDS[card.id],solo=card.rows.length===1;
+    const meta=card,solo=card.rows.length===1;
     const mode=solo&&card.rows[0].arm==='bantam-local-27b'?'bantam':solo?'single':'comparison';
     const stage=card.recorded?(mode==='bantam'?'BANTAM FACTORY run':solo?'Single-system run':`${card.rows.length} contenders`):'Awaiting publication';
     const href=`${prefix}${card.id}/share/index.html`;
@@ -223,7 +235,7 @@ export function writeFightGallery({root,replace=false}){
 // Publication staging copies explicit reviewed filenames, never the enclosing
 // docs directory or arbitrary files found beside a card. A partial gallery is
 // useful locally but is not the planned launch artifact.
-function stageCardFiles(dir,prefix,files){
+function stageCardFiles(dir,prefix,files,workOrder=prefix.split('/').pop()){
   const manifest=JSON.parse(readBounded(path.join(dir,'package.json')));
   if(manifest.schema!=='bantam.factory-showcase-package.v1'||manifest.private!==false||manifest.redacted!==true)throw Error('Expected public detailed package');
   for(const name of ['index.html','showcase.json']){
@@ -241,7 +253,7 @@ function stageCardFiles(dir,prefix,files){
   const rows=buildLaunchData(readBounded(path.join(dir,'showcase.json'))).series[0].cards[0].rows;
   const demo=readFightDemo(dir,rows);
   if(demo)for(const name of demo.files)files.push([`${prefix}/demo/${name}`,readBounded(path.join(dir,'demo',name))]);
-  const work=readFightWork(dir,prefix.split('/').pop(),rows);
+  const work=readFightWork(dir,workOrder,rows);
   if(work)for(const name of work.files)files.push([`${prefix}/work/${name}`,readBounded(path.join(dir,'work',name))]);
 }
 
@@ -253,7 +265,7 @@ export function stageFightGallery({root,output}){
   const feature=featuredFight(data);
   if(feature)files.push(['assets/motion/index.html',renderFightIntro(feature)],['assets/motion/player.html',renderIntroPlayer(feature)]);
   for(const card of data.cards)stageCardFiles(path.join(root,card.id),card.id,files);
-  for(const card of data.codex?.cards??[])stageCardFiles(path.join(root,'codex',card.id),`codex/${card.id}`,files);
+  for(const card of data.codex?.cards??[])stageCardFiles(path.join(root,'codex',card.id),`codex/${card.id}`,files,card.workOrder);
   if(data.references){
     files.push(['references/README.md',readBounded(path.join(root,'references','README.md'))]);
     for(const card of data.references.cards)stageCardFiles(path.join(root,'references',card.id),`references/${card.id}`,files);

@@ -1922,11 +1922,12 @@
   "codex": {
     "cards": [
       {
-        "id": "context-packet",
         "title": "Context packet",
         "kind": "BUILD",
         "number": "01",
         "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+        "id": "context-packet",
+        "workOrder": "context-packet",
         "recorded": true,
         "sourceSha256": "7bb470750238c4cf2c16bc11eff723724b325ab360156ac4ef6eacc2771fcfcf",
         "reviewedWork": true,
@@ -1993,6 +1994,76 @@
             "outcome": "PASS",
             "passed": true,
             "wallMs": 123392,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "title": "Astra · efficiency round 1",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.",
+        "id": "context-packet-astra-1",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "cc597512f906b47ab7e91681566b1bc5b06de8c97540588fddcae027a72e0002",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 99218,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 107536,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "title": "Astra · efficiency round 2",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.",
+        "id": "context-packet-astra-2",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "3933319b9f59714550f4285ccab978e940ea8c3c58cc43e90fdb0419018f940a",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 97965,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 104949,
             "groupsPassed": 5,
             "groupsTotal": 5,
             "accountingComplete": true

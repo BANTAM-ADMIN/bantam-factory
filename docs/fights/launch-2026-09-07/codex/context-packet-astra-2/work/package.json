@@ -1,0 +1,68 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 41732,
+      "sha256": "a8d91de455cfec0515c28eafa128c8f783d45e452f1c365acd691d1098a6b8e4",
+      "arm": "codex-astra",
+      "wallMs": 97965,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Discover, implement, then add contract tests.",
+        "paragraphs": [
+          {
+            "text": "Native Astra discovered and read the project, implemented the packer and CLI, then added boundary tests and ran the suite. All five independent acceptance groups passed. Its complete recorded actions and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 48300,
+      "sha256": "6d1861346b1d7aa269310c70a57b4cf4b09f3b72d664a2d58b8cf259be6015b9",
+      "arm": "bantam-codex-astra",
+      "wallMs": 104949,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Implementation and tests in one transaction.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter and public tests together, then wrote its implementation and additional contract tests in one batch. It ran the project suite and completed in four model calls. All five independent acceptance groups passed.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

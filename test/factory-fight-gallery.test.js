@@ -109,15 +109,26 @@ test('reviewed Codex packages get their own gallery links and retain the publica
   const {root}=fixture(t);
   for(const id of Object.keys(PUBLIC_FACTORY_CARDS).filter(id=>id!=='context-packet'))fixture(t,{root,id});
   const cloud=fixture(t,{root:path.join(root,'codex')});
+  const round=path.join(root,'codex/context-packet-sol-1');
+  fs.cpSync(cloud.dir,round,{recursive:true});
+  // Unregistered neighbors must never be swept into the public staging tree.
+  fs.mkdirSync(path.join(root,'codex/private-notes'));
+  fs.writeFileSync(path.join(root,'codex/private-notes/secret.txt'),'private');
   const data=buildFightGallery(root),html=renderFightGallery(data);
-  assert.equal(data.codex.cards.length,1);
+  assert.equal(data.codex.cards.length,2);
+  assert.equal(data.codex.cards[1].workOrder,'context-packet');
+  assert.equal(data.codex.cards[1].title,'Sol · efficiency round 1');
   assert.match(html,/Codex, inside the factory/);
   assert.match(html,/href="codex\/context-packet\/share\/index.html"/);
   assert.match(html,/href="codex\/context-packet\/share\/fight-card.json"/);
+  assert.match(html,/href="codex\/context-packet-sol-1\/share\/index.html"/);
   const output=path.join(root,'cloud-staged');
   stageFightGallery({root,output});
   assert.equal(fs.readFileSync(path.join(output,'codex/context-packet/share/fight-card.json'),'utf8'),
     fs.readFileSync(path.join(cloud.share,'fight-card.json'),'utf8'));
+  assert.equal(fs.readFileSync(path.join(output,'codex/context-packet-sol-1/share/fight-card.json'),'utf8'),
+    fs.readFileSync(path.join(cloud.share,'fight-card.json'),'utf8'));
+  assert.equal(fs.existsSync(path.join(output,'codex/private-notes')),false);
   fs.appendFileSync(path.join(cloud.share,'index.html'),'tampered');
   assert.throws(()=>buildFightGallery(root),/hash mismatch/);
 });

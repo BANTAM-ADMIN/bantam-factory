@@ -1,0 +1,68 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 47895,
+      "sha256": "70dce606257072c1d760d16ebd4bdc65b32cd14dbedc6796f0bc9511216e7180",
+      "arm": "bantam-codex-astra",
+      "wallMs": 99218,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Implementation and tests in one transaction.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter and public tests together, then wrote its implementation and additional contract tests in one batch. It ran the project suite and completed in four model calls. All five independent acceptance groups passed.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 43942,
+      "sha256": "34cbeaa1e6726102412f7f2db04b6094618f43f4f84a2cff60cbf097dc24d396",
+      "arm": "codex-astra",
+      "wallMs": 107536,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Discover, implement, then add contract tests.",
+        "paragraphs": [
+          {
+            "text": "Native Astra discovered and read the project, implemented the packer and CLI, then added boundary tests and ran the suite. All five independent acceptance groups passed. Its complete recorded actions and delivered source are below.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

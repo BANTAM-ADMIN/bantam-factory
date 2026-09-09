@@ -24,10 +24,37 @@
 
 Give BANTAM FACTORY a job: build an app, fix a stubborn bug, automate the boring part.
 It brings your model the tools, context, and checks to get the work done.
+Run a local 27B, or put **Codex Astra, Sol, or Terra** inside the factory.
 
 The factory formula: **turn big jobs into chicken problems**. Put the model at
 one station at a time—as worker, reviewer, or test builder. The factory runs
 the checks, feeds back the result, and directs the next repair or delivery.
+
+## Get more from Codex.
+
+**Your Codex account. Same models. A better way to work.**
+Connect your signed-in Codex CLI during setup. The factory gives Astra, Sol,
+or Terra focused context, reusable tools, and checks that guide the next step.
+
+Recorded Context Packet fights against each model's native Codex CLI:
+
+| Same model | Faster completion | Fewer input tokens | See the work |
+| --- | --- | --- | --- |
+| **Astra** | **1.2×** | **46%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
+| **Sol** | **1.8×** | **44%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html) |
+| **Terra** | **2.3×** | **73%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra) |
+
+Same task, starting files, and medium reasoning effort. Every run passed all
+five independent check groups. Astra and Sol combine two paired repeats;
+Terra is one pair. Each replay includes the code, tests, wall clock, input,
+output, and prefix-cache tokens. Cache hits are included in input.
+
+**Another Astra fight: 35% less input, 14% less output, 12% less time.**
+Both snapshot checkers passed all five acceptance groups.
+[Watch Astra inside the factory vs. native Codex →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html#card=snapshot-drift&view=results&layout=compare&left=bantam-codex-astra&right=codex-astra)
+
+**[Play what Astra built →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
+Same brief. Two playable games. Compare the factory and native CLI builds.
 
 <p align="center">
   <img src="docs/brand/chicken-problems.png" alt="A chicken struggles with a square peg, then builds a factory that sorts the pieces and sends the right one to the job." width="100%">
@@ -40,15 +67,16 @@ Same task. Same local Qwen 27B. Both systems passed in each comparison below.
 The local rig: **one RTX 4090 · 24 GB**. BANTAM FACTORY's recorded generation speed
 across the published cards: **82.6–105.2 tokens/second**.
 
-| BANTAM FACTORY vs. | BANTAM FACTORY finished | Watch the fight |
-| --- | --- | --- |
-| **Pi** | **6.0× faster** · 58.1s vs. 350.7s | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
-| **Hermes** | **8.8× faster** · 58.1s vs. 512.2s | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
-| **DeepSeek Harness** | **3.9× faster** · 112.5s vs. 442.7s | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
-| **OpenCode** | **6.8× faster** · 81.8s vs. 559.0s | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
+| BANTAM FACTORY vs. | Faster completion | Fewer input tokens | Watch the fight |
+| --- | --- | --- | --- |
+| **Pi** | **6.0×** | **74%** | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
+| **Hermes** | **8.8×** | **≥69%** | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
+| **DeepSeek Harness** | **3.9×** | **47%** | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
+| **OpenCode** | **6.8×** | **73%** | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
 
 These are highlights from recorded development tasks. Open a card for every
 contender, the checks, and the run conditions.
+Hermes' token saving is a lower bound: 18 of its 19 requests have token counters.
 
 The little model can trade punches with frontier agents, too:
 [Context Packet](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html)
@@ -67,30 +95,10 @@ action and the files they delivered.
 - **Make the next job easier.** Build reusable tools for the work you keep doing.
 - **Put your hardware to work.** Run a local model, or bring your Codex account.
 
-Already use Codex? Connect your signed-in CLI during setup and put its model
-inside the factory. Same models, same Context Packet work order:
-
-| Model | BANTAM FACTORY vs. native Codex | Watch |
-| --- | --- | --- |
-| **Terra** | **2.3× faster · 73% fewer input tokens** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra) |
-| **Sol** | **1.8× faster · 44% fewer input tokens** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html) |
-| **Astra** | **1.2× faster · 46% fewer input tokens** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
-
-Every run above passed all five independent check groups. Astra and Sol figures
-combine two paired repeats; Terra is one pair. Cards show wall clock, input,
-output and prefix-cache tokens, plus the complete work.
-
-**Astra’s latest snapshot checker: 35% less input, 14% less output, 12% less wall time.**
-Both attempts passed all five acceptance groups. [Watch the complete fight →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html)
-
-Explore the [context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
-and [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html)
-too. All three cards compare solo Astra and Astra supervising Terra or Sol, with
-every action, delivered file, and token counter. Supervised totals include both
-models; prefix-cache hits are shown separately within input tokens.
-
-**[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
-Same brief. Two playable games. Every recorded action and the delivered files.
+**Let Astra supervise.** Watch it direct a Terra or Sol worker on the
+[context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
+or [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html).
+Both models' work and tokens are included.
 
 <a id="start-with-what-you-already-have"></a>
 

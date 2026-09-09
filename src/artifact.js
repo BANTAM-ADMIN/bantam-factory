@@ -192,6 +192,7 @@ export function buildArtifact({
       ...(t.workspaceCoherence !== undefined
         ? { workspaceCoherence: serializableCopy(t.workspaceCoherence) }
         : {}),
+      ...(t.requiredReadHistory ? { requiredReadHistory: serializableCopy(t.requiredReadHistory) } : {}),
     })),
     rejectedOutputs: (result.rejectedOutputs ?? []).map((r) => ({
       turn: r.turn ?? null,

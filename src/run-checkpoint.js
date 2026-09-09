@@ -52,6 +52,12 @@ export class RunCheckpoint {
   /** Feed it the agent's `onEvent` stream. Only `action`/`observation` matter. */
   note(event) {
     if (!event) return;
+    if (event.type === 'required_read_history') {
+      const target = this._turns.find(turn => turn.i === event.turn);
+      if (target) target.requiredReadHistory = serializableCopy(event.history);
+      this._recordEvent(event);
+      return;
+    }
     if (event.type === "thinking") {
       this._pendingReasoning = event.text ?? null;
       return;

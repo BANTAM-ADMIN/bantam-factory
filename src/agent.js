@@ -170,6 +170,7 @@ import { degenerateRepairMessage, degenerateTail } from "./logic/degenerate-outp
 import { shellSyntaxHint } from "./logic/shell-syntax-guard.js";
 import { blastRadiusNote, dependentsOf } from "./logic/blast-radius.js";
 import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink } from "./thinking.js";
+import { RequiredReadHistory } from './required-read-history.js';
 import { requirementChecklistEnabled } from "./requirement-checklist.js";
 import { loadLibrary, retrieveSkills, formatSkills, distillSkill, saveSkill, promotePlanToSkill } from "./skills.js";
 import { makePlan, formatPlan, isStuck, rePlan } from "./plan.js";
@@ -1163,6 +1164,7 @@ async function runAgentCore({
         ...(t.repairHandoff ? { repairHandoff: structuredClone(t.repairHandoff) } : {}),
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
+        ...(t.requiredReadHistory ? { requiredReadHistory: structuredClone(t.requiredReadHistory) } : {}),
         ...(t.cliVerification ? { cliVerification: structuredClone(t.cliVerification) } : {}),
         ...(t.streamVerification ? { streamVerification: structuredClone(t.streamVerification) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
@@ -1695,6 +1697,9 @@ async function runAgentCore({
   const churnState = createChurnState();
   const readLedger = new ReadLedger();  // union of line ranges already read, per file
   const specProgressLedger = new ReadLedger(); // first delivery of requirements/current authored source, not reread credit
+  const requiredReadHistory = inspectionCheckpointAfter > 0
+    ? new RequiredReadHistory({ workspace, paths: suppliedSpecPaths, turns: resumeTurns }) : null;
+  let recordedRequiredReadHistory = '';
   const authoredReadPaths = new Set(turns.flatMap(turn => [
     ...(turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []),
     ...(turn.shellChangedPaths ?? []),
@@ -2053,6 +2058,15 @@ async function runAgentCore({
           onEvent({ type: "context_trim", historyCap, cause: "truncated", promptTokens: out.promptTokens ?? null });
           continue;
         }
+        if (out && !out.truncated && requiredReadHistory) {
+          requiredReadHistory.notePrompt(prompt);
+          const history = requiredReadHistory.snapshot(), encoded = JSON.stringify(history), latest = turns.at(-1);
+          if (latest && history.files.length && encoded !== recordedRequiredReadHistory) {
+            latest.requiredReadHistory = history;
+            recordedRequiredReadHistory = encoded;
+            onEvent({ type: 'required_read_history', turn: latest.i, history });
+          }
+        }
         return out;
       } catch (e) {
         lastCompleteError = e.message;
@@ -2102,6 +2116,7 @@ async function runAgentCore({
       pendingExternalChanges.add(changedPath);
       readLedger.invalidate(changedPath);
       specProgressLedger.invalidate(changedPath);
+      requiredReadHistory?.invalidate(changedPath);
       pagedReads.delete(changedPath);
       focusByPath.delete(changedPath);
       mutationFocusByPath.delete(changedPath);
@@ -2781,7 +2796,7 @@ async function runAgentCore({
         elapsedMs: Date.now() - runStartedAtMs,
       });
       const reanchorText = [budgetText, baseReanchor, documentDraftReanchor, postGreenReanchor, documentRevisionReanchor, editRecoveryReanchor, documentReviewReanchor, externalMutationReanchor, workingNoteReanchor, decHintText,
-        inspectionCheckpointTurn ? inspectionCheckpointText(inspectionCheckpointAfter) : '']
+        inspectionCheckpointTurn ? [inspectionCheckpointText(inspectionCheckpointAfter), requiredReadHistory?.render()].filter(Boolean).join('\n\n') : '']
         .filter(Boolean)
         .join("\n\n");
 
@@ -3978,6 +3993,7 @@ async function runAgentCore({
       verificationObservedPaths.add(rel);
       authoredReadPaths.add(rel);
       specProgressLedger.invalidate(rel);
+      requiredReadHistory?.invalidate(rel);
     }
     const pendingVerifier = pendingVerifierEntrypoint();
     if (directEditSucceeded && action.a === "write_batch") {

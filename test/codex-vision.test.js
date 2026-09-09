@@ -14,6 +14,7 @@ import {
 } from "../src/logic/codex-image.js";
 import {
   codexViewImageTool,
+  describeImageWithCodex,
   imagePixelFactsEnabled,
   inspectPng,
   viewImageTool,
@@ -66,6 +67,36 @@ test("Codex completion rejects unsupported visual input types", async (t) => {
     runtime.complete("unsafe", { inputItems: [{ type: "file", path: "/tmp/x" }] }),
     /unsupported Codex input item type/,
   );
+});
+
+test('isolated image tools do not inherit the coding session delta mode', async t => {
+  const old=process.env.BANTAM_CODEX_PROMPT_MODE;
+  process.env.BANTAM_CODEX_PROMPT_MODE='delta';
+  t.after(()=>{if(old===undefined)delete process.env.BANTAM_CODEX_PROMPT_MODE;else process.env.BANTAM_CODEX_PROMPT_MODE=old;});
+  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-isolated-vision-'));
+  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+  const image=path.join(workspace,'card.png');
+  fs.copyFileSync(path.resolve('creative-suite/assets/dispatch-card.png'),image);
+  const runtimes=[];
+  const runtimeFactory=options=>{
+    const runtime=new CodexAppServer({...options,command:process.execPath,commandArgs:[fixture],timeoutMs:2000,controlTimeoutMs:1000,idleTimeoutMs:1000});
+    runtimes.push(runtime);return runtime;
+  };
+  t.after(()=>runtimes.forEach(r=>r.close()));
+  const tool=codexViewImageTool(workspace,{model:'gpt-6-astra',effort:'medium',runtimeFactory});
+  assert.match(await tool.answer('view_image card.png | Count the diamonds.'),/saw high image/);
+  assert.equal(tool.lastOutcome.status,'pass');
+  assert.match(await describeImageWithCodex(image,'Describe this screenshot.',{workspace,model:'gpt-6-astra',effort:'medium',runtimeFactory}),/saw high image/);
+  assert.equal(runtimes.length,2);
+  assert.ok(runtimes.every(r=>r.threadMode==='ephemeral'&&r.promptMode==='full'));
+  let generationOptions=null;
+  const generation=codexImageTool(workspace,{env:{},runtimeFactory:options=>{
+    const runtime=new CodexAppServer(options);runtime.close();generationOptions=options;
+    return {async generateImage(){throw Error('generation fixture reached');},close(){}};
+  }});
+  assert.match(await generation.answer('generate_image test image'),/generation fixture reached/);
+  assert.equal(generationOptions.threadMode,'ephemeral');
+  assert.equal(generationOptions.promptMode,'full');
 });
 
 test("Codex view_image outcome retains causal usage and failure semantics", async (t) => {

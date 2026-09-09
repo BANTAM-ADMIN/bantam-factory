@@ -208,12 +208,14 @@ export async function describeImageWithCodex(absPath, prompt, {
   onEvent = () => {},
   onExternalUsage = () => {},
   purpose = "vision",
+  runtimeFactory = options => new CodexAppServer(options),
 } = {}) {
-  const runtime = new CodexAppServer({
+  const runtime = runtimeFactory({
     cwd: workspace,
     model,
     effort,
     threadMode: "ephemeral",
+    promptMode: "full",
   });
   const startedAt = Date.now();
   onEvent({ type: `codex_${purpose}_started`, path: absPath, model, effort });
@@ -357,6 +359,8 @@ export function codexViewImageTool(workspace, {
           model,
           effort,
           threadMode: "ephemeral",
+          // Independent image reviews have no retained coding prompt to extend.
+          promptMode: "full",
         });
         const startedAt = Date.now();
         onEvent({ type: "codex_vision_started", path: rel, model, effort });

@@ -195,6 +195,7 @@ async function generateOne({
     model,
     effort,
     threadMode: "ephemeral",
+    promptMode: "full",
     timeoutMs,
     idleTimeoutMs,
   });

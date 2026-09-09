@@ -567,9 +567,14 @@ async function runAgentCore({
   // the local model preserving broad intent while dropping clause-level
   // witnesses ("exactly one @", plain-object preconditions) when the sole task
   // copy is tens of thousands of characters behind the action boundary.
-  // Default-on; set BANTAM_GOAL_REANCHOR=0 for the historical control.
+  // Keep this local-model intervention off for Codex. In its append-only
+  // trajectory the changing wall-budget line defeats whole-guidance dedupe,
+  // appending another full assignment on every turn after turn three. The
+  // original assignment remains in the prompt head; post-green completion
+  // audits, requirement checklists and failure recovery remain active.
+  // BANTAM_GOAL_REANCHOR=1 explicitly restores the repeated full assignment.
   goalReanchor = process.env.BANTAM_GOAL_REANCHOR === undefined
-    ? true
+    ? !(model?.codex === true || model?.codexBacked === true)
     : envTruthy(process.env.BANTAM_GOAL_REANCHOR),
   goalReanchorAfter = positiveInt(process.env.BANTAM_GOAL_REANCHOR_AFTER, 3),
   // Content-identical edit actions return NO_CHANGE and do not reset

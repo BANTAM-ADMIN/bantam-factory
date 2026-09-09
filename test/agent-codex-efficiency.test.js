@@ -5,6 +5,45 @@ import os from 'node:os';
 import path from 'node:path';
 import {runAgent} from '../src/agent.js';
 import {composeRulesBlock, promptVersion} from '../src/prompt-rules.js';
+import {COMPLETION_AUDIT_MARKER} from '../src/completion-audit.js';
+
+test('Codex retains the assignment and completion audit without appending full-task reminders', async t => {
+  const prior = process.env.BANTAM_GOAL_REANCHOR;
+  t.after(() => {
+    if (prior === undefined) delete process.env.BANTAM_GOAL_REANCHOR;
+    else process.env.BANTAM_GOAL_REANCHOR = prior;
+  });
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-goal-context-'));
+  t.after(() => fs.rmSync(workspace, {recursive: true, force: true}));
+  const task = 'Explain these three modules and their interactions. Preserve every named constraint.';
+  const resumeTurns = ['a.js', 'b.js', 'c.js'].map((p, i) => {
+    fs.writeFileSync(path.join(workspace, p), `export const value = ${i};\n`);
+    return {action: {a: 'read_file', p}, observation: `${p}: export const value = ${i};\n`
+      + (i === 2 ? COMPLETION_AUDIT_MARKER : '')};
+  });
+  for (const promptTrajectory of ['rebuild', 'extension']) {
+    for (const [provider, setting, repeated] of [
+      ['codex', undefined, false], ['codexBacked', undefined, false],
+      ['local', undefined, true], ['codex', '1', true], ['local', '0', false],
+    ]) {
+      if (setting === undefined) delete process.env.BANTAM_GOAL_REANCHOR;
+      else process.env.BANTAM_GOAL_REANCHOR = setting;
+      let seen = false;
+      const result = await runAgent({workspace, task, promptTrajectory, resumeTurns: structuredClone(resumeTurns),
+        maxTurns: 10, interactive: true, grounding: false,
+        model: {[provider]: true, assistantPrefill: '', async complete(prompt) {
+          seen = true;
+          assert.ok(prompt.includes(`Task: ${task}`), 'the original assignment is always resident');
+          assert.equal(prompt.includes('Reminder — your objective'), repeated, provider + '/' + promptTrajectory);
+          assert.ok(prompt.includes('compare every explicit requirement in the original assignment'), 'the completion audit still reaches the worker');
+          return {content: JSON.stringify({a: 'done', summary: 'The three modules independently export numeric constants.'}), tokens: 1};
+        }},
+      });
+      assert.equal(seen, true);
+      assert.equal(result.reachedDone, true);
+    }
+  }
+});
 
 test('Codex defaults deliver the qualified compact prompt, file discovery and batch actions with explicit rollback', async t => {
   const keys = ['BANTAM_COMPACT_RULES', 'BANTAM_WORKSPACE_TREE', 'BANTAM_WRITE_BATCH', 'BANTAM_FIXTURE_DEFAULT_HINTS'];

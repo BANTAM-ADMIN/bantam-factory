@@ -355,7 +355,7 @@ const COMPACT_TEXT = {
   "prefer-replace": "Use replace for targeted edits; whole-file writes are for new files or intentional rewrites.",
   "open-files-live": "<open_files> contains current numbered source; use its bytes and line numbers for edits.",
   "verify-habit": "After changing code, run the checks that prove it works and inspect their results.",
-  "behavior-is-more-than-stdout": "For CLI behavior, assert exit code, stdout and stderr on normal, missing and invalid arguments. Expected failures belong in assertions whose own exit status reports success.",
+  "behavior-is-more-than-stdout": "For CLI behavior, assert exit code, stdout and stderr on normal, missing and invalid arguments. Use child-process assertions, not shell-escaped expected JSON or echoed exit codes. Expected failures belong in assertions whose own exit status reports success.",
   "answer-vs-build": 'For questions or reviews, investigate only enough to answer, then "respond".',
   "build-means-code": "Build requests require working deliverables. Start after focused inspection and complete the requested work. Deliver a coherent small task in one implementation; divide large tasks into runnable slices. Ask only when a material decision blocks progress.",
   "done-verified": '"done" requires passing checks after the latest edit. Repair failures before finishing.',

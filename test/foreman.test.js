@@ -58,6 +58,16 @@ test('green verification retains the actual test coverage instead of only a pass
   assert.equal(summary[0].result.verification.stdoutTail, stdout);
   assert.equal(summary[0].result.verification.stdoutTruncated, false);
 });
+test('settled receipts replace stale live output while running failures remain available', () => {
+  const progress = {evidence:{observation:{text:'Shell exit 1\nold failure'},verification:{text:'old log'}}};
+  const rows = [{id:'live',status:'running',progress}, {id:'settled',status:'passed',progress,
+    result:{pass:true,verification:{pass:true,stdout:'ok 1 - actual boundary behavior',stderr:''}}}];
+  const summary = summarizeJobs({snapshot:()=>structuredClone(rows)});
+  assert.deepEqual(summary[0].progress, progress);
+  assert.equal(summary[1].progress, null);
+  assert.match(summary[1].result.verification.stdoutTail, /actual boundary behavior/);
+  assert.deepEqual(rows[1].progress, progress, 'full evidence is retained in the journal');
+});
 test('a worker milestone does not inherit other jobs output obligations, while retaining the full project brief as context', () => {
   const original = 'Create arcade.html with an interactive game. Write release-notes.md for the complete product.';
   const j = {...job('core'),task:'Write engine.js and test/engine.test.js with deterministic assertions.'};
@@ -135,7 +145,9 @@ test('final check failure is fed back, repair is verified before accepted comple
   assert.equal(result.pass, true); assert.equal(queueRuns, 2); assert.equal(checks, 2);
 });
 test('missing and failed model receipts remain unknown and stop cloud admission', async () => {
-  for (const complete of [async () => ({ content: '{}' }), async () => { throw Error('upstream disconnected'); }]) {
+  for (const complete of [async () => ({ content: '{}' }),
+    async () => ({ content:'{}',rawUsage:usage,usage:{complete:false},codexUsageEvidence:{gaps:['missing response receipt']} }),
+    async () => { throw Error('upstream disconnected'); }]) {
     let n = 0; const result = await driveForeman({ task: 'x', initial: {}, model: { complete: () => { n++; return complete(); } }, execute: () => {}, verify: () => {}, inspect: () => {} });
     assert.equal(result.pass, false); assert.equal(n, 1); assert.equal(result.calls.length, 1); assert.equal(foremanUsage(result).total.inputTokens, null);
   }
@@ -184,6 +196,7 @@ test('Terra and Sol jobs execute the BANTAM loop with scoped context, steering a
     assert.equal(command.args[1], 'run');
     assert.ok(command.args.includes('--codex'));
     assert.equal(command.args[command.args.indexOf('--model')+1], `gpt-5.6-${worker}`);
+    assert.equal(command.args[command.args.indexOf('--codex-effort')+1], 'medium');
     assert.equal(command.args[command.args.indexOf('--verify')+1], 'npm test');
     assert.equal(command.args[command.args.indexOf('--supervisor-control')+1], dir);
     assert.equal(command.args[command.args.indexOf('--supporting-context-file')+1], path.join(dir,'supporting-context.txt'));
@@ -251,7 +264,7 @@ test('routine action traffic is coalesced while a new failure wakes the supervis
       evidence:{action:{turn:waits+1},observation:{turn:waits,text:waits===failureAt?'Shell exit 1\nAssertionError: wrong fixture':'Shell exit 0\nchecks passed'}}}}],
       wait:async()=>{waits++;time+=5000;}};
     await waitForForemanUpdate(queue,null,{now:()=>time});
-    assert.equal(waits,failureAt ?? 6);
+    assert.equal(waits,failureAt ?? 24);
   }
 });
 

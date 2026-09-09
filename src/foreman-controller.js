@@ -9,7 +9,7 @@ Every job needs its task, context (relevant contracts/files/edge cases, not unsu
 Snapshots do NOT update underneath running workers. If another worker fixes a broken test or contract needed by an in-flight job, inspect its live progress. Cancel stale work and submit a fresh job after the prerequisite integrates. Cancellation retains evidence and occupies the slot until cleanup finishes; it cannot merge cancelled work. Use job-focused verification for independently developed components, and the operator's full suite for final integration. Do not require a worker to satisfy a known broken test owned by another in-flight job. Live output is unverified evidence, not a completion receipt.
 Treat context and process as your FIRST diagnostic hypothesis, not an infallible explanation. When a worker fails, inspect its actual request/response and test evidence before guessing why. Identify missing contracts, misleading working notes, stale snapshots, inadequate probes or ambiguous acceptance criteria. Give the worker the missing evidence and a bounded repair, rather than repeatedly spending frontier tokens doing all its work yourself.
 You can commission factory machinery as jobs: task-local fixtures, deterministic checks, reusable helpers, station contracts and poka-yoke that make mistakes harder to repeat. A proposed jig must reproduce the defect and reject a known wrong result without weakening the original acceptance criteria; check a correct case too. Prefer a reusable improvement when it pays back its construction/review cost. Do not overbuild machinery for a job that is already clear. Record proposed shared-factory improvements in the candidate as proposals with evidence, not as automatic changes to the running BANTAM harness. Never change the benchmark grader, hide a failed attempt, or promote a shared station based solely on the same case that inspired it. Shared-factory promotion requires a separate versioned validation run.
-Actions: enqueue (jobs array, up to 8), list (target relative directory), read (target relative file), evidence (target job ID), check (text shell command in read-only/no-network candidate), steer (target running BANTAM job ID, text specific evidence and correction for its next turn), cancel (target queued or running job ID), wait (wait for changed worker evidence or completion), finish (text final explanation). Use empty jobs/target/text where unused. Steer a worker promptly when its observations show a bad fixture, repeated probing or untested claims; it retains its files and context. Steering is queued, not proof of delivery or correctness; inspect subsequent worker evidence. Do not repeatedly poll when there is no useful work: wait. Read/check see a stable integrated candidate, never a worker's half-written files. Finish is accepted only with no outstanding work, at least one verified job and the operator's final check passing. Never treat your final message as a completion receipt.`;
+Actions: enqueue (jobs array, up to 8), list (target relative directory), read (target relative file), evidence (target job ID), check (text shell command in read-only/no-network candidate), steer (target running BANTAM job ID, text specific evidence and correction for its next turn), cancel (target queued or running job ID), wait (wait for worker review or completion), finish (text final explanation). Use empty jobs/target/text where unused. Steer a worker promptly when its observations show a bad fixture, repeated probing or untested claims; it retains its files and context. Steering is queued, not proof of delivery or correctness; inspect subsequent worker evidence. Do not repeatedly poll when there is no useful work: wait. Failures and settled jobs wake you immediately; routine progress is reviewed at most every two minutes. Read/check see a stable integrated candidate, never a worker's half-written files. Review the delivered changes and retained behavior assertions against the original task. Use additional checks for a specific coverage gap; do not repeat an identical successful check on unchanged bytes. Finish itself runs the operator's final check on the integrated candidate and returns failures for repair. It is accepted only with no outstanding work, at least one verified job and that final check passing. Never treat your final message as a completion receipt.`;
 
 const strings = { type: 'array', items: { type: 'string' } };
 export const FOREMAN_SCHEMA = {
@@ -24,7 +24,9 @@ export const FOREMAN_SCHEMA = {
 };
 export function summarizeJobs(queue) {
   return queue.snapshot().map(j => ({ id: j.id, worker: j.worker, status: j.status,
-    progress: j.progress ?? null, cancelRequested: j.cancelRequested ?? false,
+    // Settled receipts replace live, unverified output. Replaying both included
+    // the same test log twice and kept stale half-written observations current.
+    progress: j.status === 'running' ? j.progress ?? null : null, cancelRequested: j.cancelRequested ?? false,
     dependsOn: j.dependsOn, resumeFrom: j.resumeFrom ?? '', queuedAt: j.queuedAt, startedAt: j.startedAt ?? null,
     wallMs: j.wallMs ?? null, result: j.result ? {
       recoveryAvailable: ['failed','cancelled'].includes(j.status) && Boolean(j.finishedAt && j.result.recoverySnapshot),
@@ -50,7 +52,7 @@ function failureEvidence(rows) {
       verification:verificationFailed ? evidence.verification : null}] : [];
   }));
 }
-export async function waitForForemanUpdate(queue, signal, {reviewIntervalMs = 30000, now = Date.now} = {}) {
+export async function waitForForemanUpdate(queue, signal, {reviewIntervalMs = 120000, now = Date.now} = {}) {
   const rows = queue.snapshot(), before = JSON.stringify(rows), settled = settledState(rows), failures = failureEvidence(rows), started = now();
   do {
     const remaining = reviewIntervalMs - (now() - started);
@@ -90,10 +92,11 @@ export async function driveForeman({ task, initial, model, execute, inspect, ver
       try { response = await model.complete(prompt, { signal, outputSchema: FOREMAN_SCHEMA, baseInstructions: FOREMAN_INSTRUCTIONS }); }
       catch (error) { const failed = { turn, startedAt: start, wallMs: Date.now() - start, usage: null, error: String(error.message ?? error) }; calls.push(failed); emit('supervisor.response', failed); throw error; }
       const raw = response.rawUsage;
-      const measured = raw && ['inputTokens','outputTokens','cachedInputTokens'].every(k => Number.isSafeInteger(raw[k]) && raw[k] >= 0) && raw.cachedInputTokens <= raw.inputTokens;
+      const measured = response.usage?.complete !== false && raw && ['inputTokens','outputTokens','cachedInputTokens'].every(k => Number.isSafeInteger(raw[k]) && raw[k] >= 0) && raw.cachedInputTokens <= raw.inputTokens;
       const usage = measured ? { inputTokens: raw.inputTokens, outputTokens: raw.outputTokens,
         cacheHitTokens: raw.cachedInputTokens, freshInputTokens: raw.inputTokens - raw.cachedInputTokens } : null;
-      const call = { turn, startedAt: start, wallMs: Date.now() - start, content: response.content, usage, rawUsage: raw ?? null, codexThread: response.codexThread ?? null };
+      const call = { turn, startedAt: start, wallMs: Date.now() - start, content: response.content, usage, rawUsage: raw ?? null, codexThread: response.codexThread ?? null,
+        codexUsageEvidence: response.codexUsageEvidence ?? null, codexPromptDelivery: response.codexPromptDelivery ?? null };
       calls.push(call); emit('supervisor.response', call);
       // Missing receipts are not zero spend. Preserve the failed trajectory and
       // stop further cloud admission rather than claiming a budget was honored.

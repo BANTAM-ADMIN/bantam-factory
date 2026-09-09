@@ -169,7 +169,9 @@ export function foremanWorkerCommand({task, job, workspace, dir, endpoint, model
   command.exe = process.execPath;
   if (!local) {
     command.args[command.args.indexOf('--model') + 1] = MODELS[job.worker];
-    command.args[command.args.indexOf('--codex-effort') + 1] = job.worker === 'sol' ? 'high' : 'medium';
+    // Match the direct factory worker. Supervision should not silently raise
+    // Sol's reasoning effort on top of Astra's planning and review.
+    command.args[command.args.indexOf('--codex-effort') + 1] = 'medium';
   }
   command.args.push('--supporting-context-file', path.join(dir, 'supporting-context.txt'), '--supervisor-control', dir);
   command.args[command.args.indexOf('--verify') + 1] = job.verify;
@@ -198,7 +200,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   fs.mkdirSync(plan.output, { recursive: true, mode: 0o700 });
   const journal = new LaneJournal({ root: plan.output, laneId: 'foreman' });
   const emit = (type, payload) => { journal.append(type, payload); if (['job.started','job.finished'].includes(type)) log(`${type}: ${payload.id} ${payload.status ?? ''}`); };
-  write(path.join(plan.output, 'plan.json'), { ...plan, startedAt, modelIdentity, supervisor: 'gpt-6-astra', supervisorEffort: 'medium', workerSlots: { local: plan.localEnabled === false ? 0 : 1, codex: plan.codexWorkers.length ? 1 : 0 } });
+  write(path.join(plan.output, 'plan.json'), { ...plan, startedAt, modelIdentity, supervisor: 'gpt-6-astra', supervisorEffort: 'medium', codexWorkerEffort: 'medium', workerSlots: { local: plan.localEnabled === false ? 0 : 1, codex: plan.codexWorkers.length ? 1 : 0 } });
   const store = new WorkspaceStore(path.join(plan.output, 'store'));
   const baseline = store.capture(plan.workspace, { excludePaths: [plan.output], message: 'foreman original source' });
   const candidate = path.join(plan.output, 'candidate'); store.materialize(baseline.commit, candidate);

@@ -1,0 +1,78 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 53333,
+      "sha256": "edec253d91641efcd799aac635c5f03df86ab42587d680f232732753f7125edf",
+      "arm": "bantam-codex-astra",
+      "wallMs": 99732,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "One batch. One receipt. A working planner.",
+        "paragraphs": [
+          {
+            "text": "Astra read the starter and proposed the implementation and regression tests together in one batch. After reviewing the rewrite, it sent a 92-character confirmation receipt. The factory applied the exact proposed files atomically, without making Astra generate them again.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra ran the test suite and delivered the planner in five actions. The unchanged program passed all five acceptance groups and all three additional graph and scale checks.",
+            "actions": [
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 52073,
+      "sha256": "4b81f1f5ea5fb150617d40a51b1f48e9600d8e9f5552f58ee994177f604fccae",
+      "arm": "codex-astra",
+      "wallMs": 103449,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the starter, then wrote the implementation and regression tests and ran them in one shell call. Its final Git inspection found that the starter was not a Git checkout. It completed in 103.4 seconds.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "The unchanged program passed all five acceptance groups and all three additional graph and scale checks. Open Files to inspect the implementation, or Tests for the exact results.",
+            "actions": []
+          }
+        ]
+      }
+    }
+  ]
+}

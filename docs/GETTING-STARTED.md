@@ -36,8 +36,7 @@ checks. No local model or GPU is needed. Ask for the work in plain language.
 
 [See Astra's fight cards](https://bantam-admin.github.io/bantam-factory/fights.html#codex)
 to compare the delivered work, time, input, output, and prefix-cache tokens
-against native Codex. Cached tokens are part of input, not an extra charge
-on top of it.
+against native Codex. Prefix-cache tokens are included in input.
 
 ## Give it a job
 

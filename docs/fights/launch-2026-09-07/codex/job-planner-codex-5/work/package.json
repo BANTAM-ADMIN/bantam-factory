@@ -1,0 +1,79 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 56033,
+      "sha256": "0cf992951455119473e8b611f7a0948d8117eb246ab771525d5ef5e7c31292ab",
+      "arm": "codex-astra",
+      "wallMs": 159919,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Native Astra recovered from an unavailable Python command and a patch that tried to delete and add the same path. It generated the implementation again through the shell, added tests, and completed in 159.9 seconds.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          },
+          {
+            "text": "The unchanged program passed all five acceptance groups and all three additional graph and scale checks. Open Files to inspect the implementation, or Tests for the exact results.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 55690,
+      "sha256": "f611601bc119187562f5845b127184c7fca4bd58c1ad44c051f0dec62ecfa097",
+      "arm": "bantam-codex-astra",
+      "wallMs": 108955,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Read together. Review once. Keep the exact edit.",
+        "paragraphs": [
+          {
+            "text": "Astra read the source, configuration and tests together. The factory retained the proposed rewrite, and Astra accepted it with a 92-character confirmation receipt.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra then revised its CLI entry-point check with a two-edit patch, added behavioral and CLI tests, ran them, and delivered the result. The unchanged program passed all five acceptance groups and all three additional graph and scale checks.",
+            "actions": [
+              "action-4",
+              "action-5",
+              "action-6",
+              "action-7"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

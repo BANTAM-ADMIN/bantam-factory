@@ -42,15 +42,15 @@ Astra inside BANTAM FACTORY vs. Astra in native Codex:
 | --- | --- | --- | --- | --- |
 | **Context packer** | **46%** | **18%** | **18%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
 | **Snapshot checker** | **35%** | **14%** | **12%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html#card=snapshot-drift&view=results&layout=compare&left=bantam-codex-astra&right=codex-astra) |
-| **Job planner** | **49%** | **42%** | **36%** | [Round 3 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-3/share/index.html) · [Round 4 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-4/share/index.html) |
+| **Job planner** | **44%** | **25%** | **21%** | [Round 5 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-5/share/index.html) · [Round 6 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-6/share/index.html) |
 
 Same task, starting files, and medium reasoning effort within each comparison.
 Every run passed all five independent acceptance groups. Context packer and
 job planner combine two paired repeats; snapshot checker is one pair.
 Open a replay for every action, delivered file, check, and token counter.
-Prefix-cache tokens are included in input. Job planner reused **94,976**
+Prefix-cache tokens are included in input. Job planner reused **73,472**
 prefix-cache tokens across the two factory runs; uncached input was
-**26,498 vs. 22,982** in native Codex.
+**22,760 vs. 25,860** in native Codex—**12% less uncached input**.
 
 <details>
 <summary>Sol and Terra work here, too.</summary>

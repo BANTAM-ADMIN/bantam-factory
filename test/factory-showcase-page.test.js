@@ -126,16 +126,17 @@ test('the Astra hero combines both scheduled pairs, including a slower factory r
   const row=(arm,n)=>({arm,model:'GPT-6 Astra · CLI',passed:true,accountingComplete:true,
     groupsPassed:5,groupsTotal:5,wallMs:n*1000,tokens:{inputTokens:n*2000,outputTokens:n*100,cacheHitTokens:n*1500}});
   const cards=[
-    {id:'job-planner-codex-3',recorded:true,rows:[row('bantam-codex-astra',2),row('codex-astra',1)]},
-    {id:'job-planner-codex-4',recorded:true,rows:[row('bantam-codex-astra',1),row('codex-astra',5)]},
+    {id:'job-planner-codex-5',recorded:true,rows:[row('bantam-codex-astra',2),row('codex-astra',1)]},
+    {id:'job-planner-codex-6',recorded:true,rows:[row('bantam-codex-astra',1),row('codex-astra',5)]},
   ];
   const html=renderCodexHighlight({codex:{cards}});
   assert.equal((html.match(/50<span>%/g)||[]).length,3);
   assert.match(html,/4,500 prefix-cache tokens reused/);
   assert.match(html,/Factory 1,500 · CLI 3,000/);
+  assert.match(html,/50% less uncached input/);
   assert.match(html,/two paired runs/);
-  assert.match(html,/job-planner-codex-3\/share\/index.html/);
-  assert.match(html,/job-planner-codex-4\/share\/index.html/);
+  assert.match(html,/job-planner-codex-5\/share\/index.html/);
+  assert.match(html,/job-planner-codex-6\/share\/index.html/);
   for(const mutate of [c=>c.pop(),c=>c[0].recorded=false,c=>c[0].rows[0].passed=false,
     c=>c[1].rows[1].accountingComplete=false,c=>c[0].rows.push({...c[0].rows[0]})]){
     const altered=structuredClone(cards);mutate(altered);

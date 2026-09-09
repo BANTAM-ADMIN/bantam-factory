@@ -312,3 +312,26 @@ test('settled workers wake immediately even inside the routine review interval',
   const queue={pending:true,snapshot:()=>[{id:'work',status:waits?'passed':'running'}],wait:async()=>{waits++;queue.pending=false;}};
   await waitForForemanUpdate(queue,null,{now:()=>0});assert.equal(waits,1);
 });
+
+test('green scope accounting stays in routine review; real scope refusals wake immediately', async () => {
+  const advisories = [
+    'Shell exit 0\nall 18 tests passed\n[scope] That was a different test command from the one your 2/2 baseline came from, so its numbers are not comparable.',
+    'Shell exit 0\n[scope] The exact baseline verifier `npm test` ran as a standalone segment inside this compound check.',
+    'wrote 100 bytes\n[scope] Verification invalidated: workspace generation 1 -> 2; changed source.js',
+  ];
+  const refusals = [
+    '[scope] test/public.test.js is immutable. The edit was NOT applied.',
+    '[scope] Requested cleanup was not executed. Keep this verification witness.',
+    '[scope] Diagnostic command was not executed. It recursively starts itself.',
+    '[scope] This shell action changed immutable task evidence: public.test.js.',
+    'Shell exit 1\n[scope] That was a different test command from the one your baseline came from.',
+  ];
+  for (const [text, immediate] of [...advisories.map(text=>[text,false]),...refusals.map(text=>[text,true])]) {
+    let waits=0, time=0;
+    const queue={pending:true,snapshot:()=>[{id:'work',status:'running',progress:{at:time,
+      evidence:{observation:{turn:waits,text:waits?text:'Shell exit 0\nold check passed'}}}}],
+      wait:async()=>{waits++;time+=5000;}};
+    await waitForForemanUpdate(queue,null,{now:()=>time});
+    assert.equal(waits,immediate?1:24,text);
+  }
+});

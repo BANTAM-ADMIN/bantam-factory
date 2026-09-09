@@ -45,7 +45,13 @@ function failureEvidence(rows) {
   return JSON.stringify(rows.flatMap(job => {
     const evidence = job.progress?.evidence;
     const observation = evidence?.observation;
-    const failed = /(?:^|\n)(?:Shell exit (?!0(?:\n|$))|\[[^\]\n]*(?:fail|error|scope|blocked)[^\]\n]*\])/i.test(observation?.text ?? '');
+    // Scope also labels successful verifier accounting and routine edit
+    // invalidation. Those advisories used to wake Astra just to say "wait"
+    // after a green test. Keep actual refusals and failures immediate.
+    const failed = String(observation?.text ?? '').split('\n').some(line => {
+      if (/^\[scope\] (?:That was a different test command|The exact baseline verifier|Verification invalidated: workspace generation)/.test(line)) return false;
+      return /^(?:Shell exit (?!0(?:\s|$))|\[[^\]\n]*(?:fail|error|scope|blocked)[^\]\n]*\])/i.test(line);
+    });
     let verificationFailed = false;
     try { const v=JSON.parse(evidence?.verification?.text); verificationFailed = v.status === 'fail' || v.status === 'error'; } catch {}
     return failed || verificationFailed ? [{id:job.id, observation:failed ? observation : null,

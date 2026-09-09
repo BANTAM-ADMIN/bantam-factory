@@ -48,6 +48,10 @@ const EMBEDDED_CONFIG = {
 const TEXT_WORKER_CONFIG = {
   'skills.include_instructions': false, 'skills.bundled.enabled': false,
   include_permissions_instructions: false,
+  // Native collaboration modes and apps do not control this text worker.
+  // Identical first worker/supervisor requests each dropped 253 input tokens
+  // with these unused instruction blocks absent (ABBA Astra calibration).
+  include_collaboration_mode_instructions: false, include_apps_instructions: false,
 };
 const BASE_INSTRUCTIONS = [
   "You are the model runtime embedded inside the BANTAM agent harness.",

@@ -151,9 +151,13 @@ test("embedded text workers omit native tool menus while image workers retain ge
   assert.equal(starts[0].config['skills.include_instructions'], false);
   assert.equal(starts[0].config['skills.bundled.enabled'], false);
   assert.equal(starts[0].config.include_permissions_instructions, false);
+  assert.equal(starts[0].config.include_collaboration_mode_instructions, false);
+  assert.equal(starts[0].config.include_apps_instructions, false);
   assert.equal(starts[1].config['features.image_generation'], true);
   assert.equal(Object.hasOwn(starts[1].config, 'skills.include_instructions'), false);
   assert.equal(Object.hasOwn(starts[1].config, 'include_permissions_instructions'), false);
+  assert.equal(Object.hasOwn(starts[1].config, 'include_collaboration_mode_instructions'), false);
+  assert.equal(Object.hasOwn(starts[1].config, 'include_apps_instructions'), false);
 });
 
 test('caller native image workers retain guidance and explicit context configuration wins', async t => {
@@ -164,11 +168,13 @@ test('caller native image workers retain guidance and explicit context configura
   await codex.complete('native image caller');
   assert.equal(Object.hasOwn(starts[0].config, 'skills.bundled.enabled'), false);
   codex.threadConfig = {'skills.include_instructions': true, 'skills.bundled.enabled': true,
-    include_permissions_instructions: true};
+    include_permissions_instructions: true, include_collaboration_mode_instructions: true, include_apps_instructions: true};
   await codex.complete('explicit native guidance');
   assert.equal(starts[1].config['skills.include_instructions'], true);
   assert.equal(starts[1].config['skills.bundled.enabled'], true);
   assert.equal(starts[1].config.include_permissions_instructions, true);
+  assert.equal(starts[1].config.include_collaboration_mode_instructions, true);
+  assert.equal(starts[1].config.include_apps_instructions, true);
 });
 
 test("run-scoped Codex mode reuses one thread only inside an explicit run", async (t) => {

@@ -25,3 +25,15 @@ test("atomic patch supports a bounded broad-module change set", () => {
 
   assert.equal(edits.maxItems, 16);
 });
+
+test("Codex auto mode exposes guarded batching while preserving explicit settings and local routing", () => {
+  const task = 'Extend the existing manifest API and add a CLI.';
+  assert.deepEqual(decidePatchAction(task, 'auto', { codex: true }), {
+    mode: 'auto', enabled: true, reason: 'auto-codex-edit-batching',
+  });
+  assert.equal(decidePatchAction(task, 'auto').enabled, false);
+  for (const setting of [false, 'off', '0']) {
+    assert.equal(decidePatchAction(task, setting, { codex: true }).enabled, false);
+  }
+  assert.equal(decidePatchAction(task, true, { codex: true }).reason, 'forced-on');
+});

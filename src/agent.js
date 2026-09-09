@@ -774,7 +774,10 @@ async function runAgentCore({
   const workspaceSourceFiles = workspace ? sourceFileCount(workspace) : 0;
   // Feature-integration patch exposure only on real codebases (>30 source
   // files), so fixture-measured auto-policy behavior is unchanged.
-  const patchActionPolicy = decidePatchAction(task, patchAction, { largeRepo: workspaceSourceFiles > 30 });
+  const patchActionPolicy = decidePatchAction(task, patchAction, {
+    largeRepo: workspaceSourceFiles > 30,
+    codex: model?.codex === true || model?.codexBacked === true,
+  });
   const fileOperationPolicy = decideFileOperations(task, fileOperations);
   const stateAuditPolicy = decideStateAudit(task, stateAudit);
   const planAuditPolicy = decidePlanAudit(task, planAudit);

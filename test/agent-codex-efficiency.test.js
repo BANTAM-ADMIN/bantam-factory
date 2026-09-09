@@ -85,3 +85,35 @@ test('Codex defaults deliver the qualified compact prompt, file discovery and ba
     assert.equal(result.promptVersion, promptVersion(process.env, {compact: enabled}));
   }
 });
+
+test('Codex exposes atomic patches before failures without bypassing caller exclusions or file guards', async t => {
+  for (const [provider, patchAction, excluded, protectedFile, enabled] of [
+    ['codex', 'auto', false, false, true], ['codexBacked', 'auto', false, false, true],
+    ['local', 'auto', false, false, false], ['codex', false, false, false, false],
+    ['codex', 'auto', true, false, false], ['codex', 'auto', false, true, true],
+  ]) {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-codex-patch-'));
+    t.after(() => fs.rmSync(workspace, {recursive: true, force: true}));
+    const source = 'export const count = 1;\n';
+    for (const name of ['left.js', 'right.js']) fs.writeFileSync(path.join(workspace, name), source);
+    let calls = 0;
+    await runAgent({workspace, task: 'Set the two counts to 2.', maxTurns: 2,
+      patchAction, excludeActions: excluded ? ['patch'] : [], interactive: true, grounding: false,
+      editGuard: protectedFile ? p => p === 'right.js' ? 'Protected by the operator.' : null : null,
+      model: {[provider]: true, assistantPrefill: '', async complete(prompt) {
+        if (++calls === 1) {
+          assert.equal(/^- \{"a":"patch",/m.test(prompt), enabled, provider + '/' + patchAction);
+          return {content: JSON.stringify({a: 'inspect', ops: ['left.js','right.js'].map(p => ({a:'read_file',p}))}), tokens: 1};
+        }
+        const action = provider === 'local' ? {a:'done',summary:'No batch edit available.'}
+          : {a:'patch', edits:['left.js','right.js'].map(p => ({p,old:'count = 1',new:'count = 2'}))};
+        return {content: JSON.stringify(action), tokens: 1};
+      }},
+    });
+    for (const name of ['left.js', 'right.js']) {
+      assert.equal(fs.readFileSync(path.join(workspace, name), 'utf8'),
+        enabled && !protectedFile ? source.replace('= 1', '= 2') : source,
+        `${provider}/${patchAction}/${excluded}/${protectedFile}: the whole transaction respects current action policy and every file guard`);
+    }
+  }
+});

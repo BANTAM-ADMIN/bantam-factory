@@ -10,10 +10,16 @@ const OFF_VALUES = new Set(["", "0", "false", "no", "off"]);
  */
 import { decideSeamSteer } from "./seam-steer.js";
 
-export function decidePatchAction(task, setting = false, { largeRepo = false } = {}) {
+export function decidePatchAction(task, setting = false, { largeRepo = false, codex = false } = {}) {
   const mode = normalizePatchActionMode(setting);
   if (mode === "on") return decision(mode, true, "forced-on");
   if (mode === "off") return decision(mode, false, "configured-off");
+
+  // The local-model routing below deliberately limits batching. Codex can
+  // select a bounded edit set without that task-shape heuristic. Hiding patch
+  // made the snapshot extension spend five requests on separate replacements;
+  // every member of a patch still passes the ordinary edit and scope gates.
+  if (codex) return decision(mode, true, "auto-codex-edit-batching");
 
   const text = String(task ?? "").replace(/\s+/g, " ").trim();
   if (isMechanicalConsistencyTask(text)) {

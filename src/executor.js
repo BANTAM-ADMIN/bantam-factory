@@ -91,6 +91,7 @@ export class Executor {
     // progress, grounding, and verification provenance, so truthfulness is the
     // default; callers may still disable it explicitly for controlled replay.
     this.noopEditGuard = opts.noopEditGuard ?? true;
+    this.fixtureDefaultHints = opts.fixtureDefaultHints ?? envEnabled(process.env.BANTAM_FIXTURE_DEFAULT_HINTS);
     this.shellSandbox = opts.shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker";
     // Docker is offline by default. Operators may explicitly opt into bridge networking for a
     // trusted workspace/model so project-local package managers can populate node_modules/.venv
@@ -411,7 +412,7 @@ export class Executor {
     // self-hosting runs spent 65 of 100 actions on reads). Big chunks in one
     // turn beat many small turns; history is char-budgeted anyway.
     const rendered = `${p} (${lines.length} lines, showing ${startLine}-${endIdx}):\n${numbered}${more}`;
-    const fixtureHint = process.env.BANTAM_FIXTURE_DEFAULT_HINTS === '1' && rendered.length < READ_OBS_MAX - 1000
+    const fixtureHint = this.fixtureDefaultHints && rendered.length < READ_OBS_MAX - 1000
       ? fixtureDefaultHints({ path:p, source:text, startLine, endLine:endIdx }) : '';
     return clipText(rendered + (fixtureHint ? `\n\n${fixtureHint}` : ''), READ_OBS_MAX);
   }

@@ -644,6 +644,8 @@ async function runAgentCore({
     ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WORKSPACE_TREE),
   writeBatch = process.env.BANTAM_WRITE_BATCH === undefined
     ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WRITE_BATCH),
+  fixtureDefaultHints = process.env.BANTAM_FIXTURE_DEFAULT_HINTS === undefined
+    ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_FIXTURE_DEFAULT_HINTS),
   // Candidate fixture experiments remain opt-in until downstream qualification.
   probeEnabled = envTruthy(process.env.BANTAM_PROBE),
   // Direct delete/move actions only for tasks that explicitly name those file
@@ -849,6 +851,7 @@ async function runAgentCore({
       ...instructionGuards.protectedExistingTests])];
   }
   const exec = new Executor(workspace, {
+    fixtureDefaultHints,
     probeEnabled,
     noopEditGuard,
     shellSandbox,

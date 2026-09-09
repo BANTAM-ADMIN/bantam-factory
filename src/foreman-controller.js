@@ -36,18 +36,41 @@ export function summarizeJobs(queue) {
       usage: j.result.usage ? Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens','freshInputTokens'].map(k => [k,j.result.usage[k] ?? null])) : null,
     } : null }));
 }
-export async function waitForForemanUpdate(queue, signal) {
-  const before = JSON.stringify(queue.snapshot());
+function settledState(rows) {
+  return JSON.stringify(rows.map(({progress, ...job}) => job));
+}
+function failureEvidence(rows) {
+  return JSON.stringify(rows.flatMap(job => {
+    const evidence = job.progress?.evidence;
+    const observation = evidence?.observation;
+    const failed = /(?:^|\n)(?:Shell exit (?!0(?:\n|$))|\[[^\]\n]*(?:fail|error|scope|blocked)[^\]\n]*\])/i.test(observation?.text ?? '');
+    let verificationFailed = false;
+    try { const v=JSON.parse(evidence?.verification?.text); verificationFailed = v.status === 'fail' || v.status === 'error'; } catch {}
+    return failed || verificationFailed ? [{id:job.id, observation:failed ? observation : null,
+      verification:verificationFailed ? evidence.verification : null}] : [];
+  }));
+}
+export async function waitForForemanUpdate(queue, signal, {reviewIntervalMs = 30000, now = Date.now} = {}) {
+  const rows = queue.snapshot(), before = JSON.stringify(rows), settled = settledState(rows), failures = failureEvidence(rows), started = now();
   do {
-    await queue.wait();
+    const remaining = reviewIntervalMs - (now() - started);
+    await queue.wait(remaining > 0 ? remaining : 30000);
     if (signal?.aborted) throw Error('foreman deadline or cancellation');
-  } while (queue.pending && JSON.stringify(queue.snapshot()) === before);
+    const current = queue.snapshot(), nextFailures = failureEvidence(current);
+    // Every action start used to wake Astra, including reads and green checks.
+    // Keep recording everything; ask the supervisor to review routine progress
+    // at most once per interval. New failures and settled jobs wake immediately.
+    if (settledState(current) !== settled || (nextFailures !== '[]' && nextFailures !== failures)) return;
+    if (JSON.stringify(current) !== before && now() - started >= reviewIntervalMs) return;
+  } while (queue.pending);
 }
 
 export async function driveForeman({ task, initial, model, execute, inspect, verify, emit = () => {},
   signal, validateJobs = async () => {}, steer = null, codexWorkers = [], localEnabled = true, maxJobs = 12, maxDecisions = 40, maxSupervisorTokens = 150000 }) {
   const queue = new ForemanQueue({ execute, emit, signal, codexWorkers, localEnabled, maxJobs });
-  let prompt = `${FOREMAN_INSTRUCTIONS}\n\nOPERATOR TASK:\n${task}\n\nCONFIGURATION AND INITIAL MATERIAL:\n${JSON.stringify(initial)}\nEnabled workers: ${[...queue.workers].join(', ')}\nJob limit: ${maxJobs}; supervisor decision limit: ${maxDecisions}.\n`;
+  // The transport binds FOREMAN_INSTRUCTIONS as the thread's base instructions.
+  // Sending the same policy in user context doubles its cost on every request.
+  let prompt = `OPERATOR TASK:\n${task}\n\nCONFIGURATION AND INITIAL MATERIAL:\n${JSON.stringify(initial)}\nEnabled workers: ${[...queue.workers].join(', ')}\nJob limit: ${maxJobs}; supervisor decision limit: ${maxDecisions}.\n`;
   const calls = [], priorQueue = new Map(), started = Date.now(); let final = null, error = null, consumed = 0;
   try {
     for (let turn = 1; turn <= maxDecisions; turn++) {

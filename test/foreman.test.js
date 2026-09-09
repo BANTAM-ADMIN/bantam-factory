@@ -243,3 +243,20 @@ test('idle wait wakeups do not spend another supervisor call until worker state 
   const ac=new AbortController();
   await assert.rejects(waitForForemanUpdate({pending:true,snapshot:()=>[],wait:async()=>ac.abort()},ac.signal),/cancellation/);
 });
+
+test('routine action traffic is coalesced while a new failure wakes the supervisor immediately', async () => {
+  for (const failureAt of [null, 2]) {
+    let waits=0, time=0;
+    const queue={pending:true, snapshot:()=>[{id:'work',status:'running',progress:{at:time,
+      evidence:{action:{turn:waits+1},observation:{turn:waits,text:waits===failureAt?'Shell exit 1\nAssertionError: wrong fixture':'Shell exit 0\nchecks passed'}}}}],
+      wait:async()=>{waits++;time+=5000;}};
+    await waitForForemanUpdate(queue,null,{now:()=>time});
+    assert.equal(waits,failureAt ?? 6);
+  }
+});
+
+test('settled workers wake immediately even inside the routine review interval', async () => {
+  let waits=0;
+  const queue={pending:true,snapshot:()=>[{id:'work',status:waits?'passed':'running'}],wait:async()=>{waits++;queue.pending=false;}};
+  await waitForForemanUpdate(queue,null,{now:()=>0});assert.equal(waits,1);
+});

@@ -164,7 +164,8 @@ export function foremanWorkerCommand({task, job, workspace, dir, endpoint, model
   const local = job.worker === 'local';
   if (!local && !Object.hasOwn(MODELS, job.worker)) throw Error('unknown worker model');
   const command = freshCommand({arm: local ? 'bantam-local-27b' : 'bantam-codex-astra',
-    task: foremanWorkerTask(task, job), workspace, dir, endpoint, model, contextTokens, timeoutMs});
+    task: foremanWorkerTask(task, job), workspace, dir, endpoint, model, contextTokens, timeoutMs,
+    verificationWorkspaceReadOnly: true});
   command.exe = process.execPath;
   if (!local) {
     command.args[command.args.indexOf('--model') + 1] = MODELS[job.worker];

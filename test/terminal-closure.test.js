@@ -59,6 +59,16 @@ test('default work-turn cap stays hard even when the last verification passes',a
   assert.equal(result.verification.status,'pass');assert.equal(result.metrics.terminalClosure.granted,false);
 });
 
+test('unlimited work still finishes through the real configured verifier and accepted DONE',async t=>{
+  const {result,prompts}=await run(fixture(t),[WRITE,VERIFY,DONE],{maxTurns:Infinity});
+  assert.equal(result.reachedDone,true,result.turns.at(-1).observation);
+  assert.equal(result.verification.status,'pass');
+  assert.equal(result.turns.at(-1).doneAccepted,true);
+  assert.equal(prompts.length,3);
+  assert.equal(result.metrics.landingVerifies,0);
+  assert.equal(result.metrics.terminalClosure.granted,false);
+});
+
 test('explicit closing allowance delivers one DONE-only opportunity and still records actual accepted DONE',async t=>{
   const {result,prompts,requests,events}=await run(fixture(t),[WRITE,VERIFY,DONE],{terminalClosureTurns:1});
   assert.equal(result.turns.length,3);assert.equal(prompts.length,3);

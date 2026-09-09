@@ -57,6 +57,12 @@ test('a reached deadline does not bypass any existing completion gate', () => {
   }
 });
 
+test('unlimited turns still respect an explicitly declared wall deadline and its verification gates', () => {
+  assert.equal(terminalClosureEligible({ ...base, workTurnLimit: Infinity }), false);
+  assert.equal(terminalClosureEligible({ ...base, workTurnLimit: Infinity, deadlineReached: true }), true);
+  assert.equal(terminalClosureEligible({ ...base, workTurnLimit: Infinity, deadlineReached: true, proof: null }), false);
+});
+
 test('both BANTAM lanes are told the wall budget the runner will enforce', async () => {
   const {freshCommand} = await import('../scripts/factory-fights.mjs');
   const base = {task: 'T', workspace: '/tmp/ws', dir: '/tmp/d', endpoint: 'http://127.0.0.1:9999', model: 'm'};

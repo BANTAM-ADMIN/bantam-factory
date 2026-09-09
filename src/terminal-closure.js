@@ -29,7 +29,8 @@ export function terminalClosureEligible({allowance, used, turnsUsed, workTurnLim
   proof, generation, configuredCommand, workspace, verificationWorkspaceReadOnly,
   pendingAudit, interrupted, controllerStopped, resultDone, callerExcludedActions = [], freshEvidence = false}) {
   const budgetExhausted = deadlineReached === true || turnsUsed === workTurnLimit;
-  if (allowance !== 1 || used || !budgetExhausted || !Number.isSafeInteger(workTurnLimit)
+  const validLimit = Number.isSafeInteger(workTurnLimit) || (workTurnLimit === Infinity && deadlineReached === true);
+  if (allowance !== 1 || used || !budgetExhausted || !validLimit
       || workTurnLimit < 1 || !action || ['done','respond'].includes(action.a)
       || interrupted || controllerStopped || resultDone || pendingAudit || !freshEvidence
       || callerExcludedActions.includes('done') || !configuredCommand) return false;
@@ -45,5 +46,6 @@ export function terminalClosureEligible({allowance, used, turnsUsed, workTurnLim
 }
 
 export function terminalClosureNote(workTurnLimit) {
-  return `[terminal-closure] The work budget has reached its ${workTurnLimit}-turn cap or wall-clock closing reserve. The controller grants ONE additional DONE-only action because current-generation verification is green and no audit checkpoint remains. Emit {"a":"done","summary":"..."} with the verified result and remaining limitations. No tools, reads, edits, cleanup or extra work are permitted. This is not automatic acceptance: every existing completion gate still applies.`;
+  const boundary = workTurnLimit === Infinity ? 'caller-declared wall-clock closing reserve' : `${workTurnLimit}-turn cap or wall-clock closing reserve`;
+  return `[terminal-closure] The work budget has reached its ${boundary}. The controller grants ONE additional DONE-only action because current-generation verification is green and no audit checkpoint remains. Emit {"a":"done","summary":"..."} with the verified result and remaining limitations. No tools, reads, edits, cleanup or extra work are permitted. This is not automatic acceptance: every existing completion gate still applies.`;
 }

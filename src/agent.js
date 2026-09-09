@@ -425,7 +425,7 @@ async function runAgentCore({
   inheritedInstructionScope = null,
   workspace,
   model = new ModelClient(),
-  maxTurns = 30,
+  maxTurns = 30, // Infinity explicitly selects a long-running task without a turn deadline.
   // Total wall budget the caller will actually enforce. Without it a run can be
   // killed mid-turn with verified-green work and never emit DONE. Declaring one
   // implies the single DONE-only closure turn, otherwise the grant that the
@@ -1332,6 +1332,8 @@ async function runAgentCore({
 
   const metrics = {
     turns: 0,
+    turnLimit: Number.isFinite(maxTurns) ? maxTurns : null,
+    unlimitedTurns: maxTurns === Infinity,
     terminalClosure: { workTurnLimit: maxTurns, allowance: terminalClosureTurns,
       granted: false, used: false, grantedTurn: null, usedTurn: null, generation: null },
     contextUpdatesIncluded: 0,
@@ -5304,13 +5306,13 @@ async function runAgentCore({
     // budget line says the edge exists, this says where the run stands against
     // it while there is still time to change course. Once, non-interactive,
     // and never on a turn that already carries the landing countdown.
-    if (!interactive && !result.done && !interrupted && !midpointNoticeGiven
+    if (Number.isFinite(maxTurns) && !interactive && !result.done && !interrupted && !midpointNoticeGiven
         && turns.length + 1 >= Math.ceil(maxTurns / 2) && turnsRemaining > Math.max(3, Math.round(maxTurns * 0.1))) {
       midpointNoticeGiven = true;
       result.observation = `${result.observation ?? ""}
 [budget] halfway: ${turns.length + 1} of ${maxTurns} turns used. If reconnaissance is still the bulk of what you have done, start converging on the deliverable now.`;
     }
-    const landingWindow = Math.max(3, Math.round(maxTurns * 0.1));
+    const landingWindow = Number.isFinite(maxTurns) ? Math.max(3, Math.round(maxTurns * 0.1)) : 0;
     let landingPassNote = null;
     // Interactive runs land too. The carve-off's TDD turn ran to its 60-turn
     // cap with no countdown (both notes were !interactive), wrapped up with a
@@ -5329,7 +5331,9 @@ async function runAgentCore({
         : `Land now: finish the smallest complete piece, then wrap up with what IS done and what remains, ending with "Next: <the one step you would take next>" — the user can accept it with a single Enter.`}`;
     }
     if (!interactive && !result.done && !interrupted && turnsRemaining >= 0 && (turnsRemaining <= landingWindow || wallDeadlineReached())) {
-      let landingNote = `\n[budget] ${turnsRemaining} turn${turnsRemaining === 1 ? "" : "s"} left after this one.`;
+      let landingNote = Number.isFinite(turnsRemaining)
+        ? `\n[budget] ${turnsRemaining} turn${turnsRemaining === 1 ? "" : "s"} left after this one.`
+        : '\n[budget] The caller-declared wall-clock closing reserve has been reached.';
       // Name the requirement still untouched, not just the countdown.
       const untouched = untouchedNamedPaths(taskNamedPaths, editedPathsThisRun);
       if (untouched.length && (!untouchedNoticeGiven || turnsRemaining === 0)) {

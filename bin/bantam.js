@@ -14,6 +14,7 @@ import readline from "node:readline";
 import { repoRootFromCli } from "../src/repo-root.js";
 import { isChangeShapedRequest, runAgent } from "../src/agent.js";
 import { runIsAttended } from "../src/attendance.js";
+import { parseRunTurnLimit } from "../src/run-turn-limit.js";
 import { openWorkerControl } from "../src/foreman-worker-control.js";
 import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
@@ -2007,14 +2008,12 @@ if (cmd === undefined || cmd === "chat") {
       model.completionIndex = Math.max(model.completionIndex, continuation.completionIndex);
     }
   }
-  const runMaxTurns = args["max-turns"]
-    ? Number(args["max-turns"])
-    : (Number(process.env.BANTAM_MAX_TURNS) || 200);
-  if (continuation && (!Number.isFinite(runMaxTurns) || runMaxTurns <= continuation.resumeTurns.length)) {
-    fail(
-      `--max-turns is the total trajectory length and must exceed the ${continuation.resumeTurns.length} restored turn(s)`,
-    );
-  }
+  let runMaxTurns;
+  try {
+    runMaxTurns = parseRunTurnLimit(args["max-turns"] ?? process.env.BANTAM_MAX_TURNS, {
+      restoredTurns: continuation?.resumeTurns.length ?? 0,
+    });
+  } catch (error) { fail(error.message); }
   const autonomous = Boolean(args.autonomous);
   // A run whose output is redirected has nobody to answer. `interactive` gates
   // the disguised-done guard (src/agent.js isDisguisedDone), which exists to
@@ -2168,6 +2167,8 @@ if (cmd === undefined || cmd === "chat") {
           laneId: args.lane ?? null,
           task: args.task,
           workspace,   // so `bantam run --resume-run <path>` works from any cwd
+          turnLimit: Number.isFinite(runMaxTurns) ? runMaxTurns : null,
+          unlimitedTurns: runMaxTurns === Infinity,
           ...(continuation ? { continuation: continuation.provenance } : {}),
         },
         initialEvidence: laneBridge?.resumeEvidence ?? continuation?.initialEvidence ?? null,
@@ -6066,6 +6067,7 @@ bantam chat                       same as above (explicit)
 ./bin/run-dev.sh self-improve --plan
                                   inspect candidates; no model or controller/source writes
 bantam run --task "..." [--workspace . | --lane ID [--state-home DIR]] [--max-turns 30] [--verify "npm test"] [--verify-workspace-read-only] [--autonomous] [--ground] [--tui] [--plan] [--skills] [--save-run[=path]]
+           --max-turns unlimited removes the turn deadline; --save-run preserves resumable checkpoints. Ctrl-C stops the run.
            [--resume-run artifact.json [--through-turn N]] [--review-file evidence.txt] [--factory [--factory-home DIR]]
 bantam exec [options] "<task text>"   one-shot: run a task, verify, exit (headless, no TUI)
 bantam factory list|show|audit|report ...

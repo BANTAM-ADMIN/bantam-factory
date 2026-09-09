@@ -59,7 +59,9 @@ export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedSh
   // unbounded and then gets a countdown.
   const budgetLine = Number.isInteger(maxTurns) && maxTurns > 0
     ? ` You have ${maxTurns} turns for this task; plan to finish comfortably inside them — finishing early is fine, running out is a failure.`
-    : "";
+    : maxTurns === Infinity
+      ? ' This task has no turn deadline. Work through verifiable milestones and maintain a concise progress record of completed work, evidence, remaining requirements, and the next step. Revisit that record as the project grows. Do not reduce the requested scope to fit an imagined turn budget; finish only when the requested work is complete and verified. Checkpointing preserves unfinished work for continuation.'
+      : "";
   const effortLine = REASONING_EFFORT_TEXT[String(reasoningEffort ?? "").toLowerCase()];
   const effortBlock = effortLine ? `${effortLine}\n\n` : "";
   return `${effortBlock}You are Bantam, a coding agent that works by emitting exactly ONE action at a time as a single JSON object. You never write prose outside an action.

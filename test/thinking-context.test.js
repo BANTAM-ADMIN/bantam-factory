@@ -33,3 +33,14 @@ test("post-inspection synthesis is a task-agnostic auto-think boundary", () => {
     lean: true,
   }), false);
 });
+
+test('runtime review and progress corrections trigger reconsideration on the auto rail', () => {
+  for (const observation of [
+    '[trusted-review-evidence]\nThe saved working note was clipped. Continue from the current files.',
+    '[progress-awareness]\nRepeated reconnaissance has not advanced the deliverable.',
+  ]) {
+    assert.equal(shouldThink('auto', { turnIndex: 512, lastObservation: observation, lean: true }), true);
+    assert.equal(shouldThink('off', { turnIndex: 512, lastObservation: observation }), false);
+  }
+  assert.equal(shouldThink('auto', { turnIndex: 512, lastObservation: 'Progress report: files listed.', lean: true }), false);
+});

@@ -1689,7 +1689,11 @@ async function runAgentCore({
   // writing dbg1/dbg2/... one per turn instead of scripting the loop (script-churn.js).
   const churnState = createChurnState();
   const readLedger = new ReadLedger();  // union of line ranges already read, per file
-  const specProgressLedger = new ReadLedger(); // first delivery of task-named requirements, not reread credit
+  const specProgressLedger = new ReadLedger(); // first delivery of requirements/current authored source, not reread credit
+  const authoredReadPaths = new Set(turns.flatMap(turn => [
+    ...(turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []),
+    ...(turn.shellChangedPaths ?? []),
+  ]).map(normalizeWorkspaceRel));
   const recordReadDelivery = (turn, observation, panelText) => {
     // Only the newest turn can add coverage: older snapshots may predate an
     // edit. This callback receives the scrubbed, clipped model-facing body,
@@ -2092,6 +2096,7 @@ async function runAgentCore({
     for (const changedPath of changed) {
       pendingExternalChanges.add(changedPath);
       readLedger.invalidate(changedPath);
+      specProgressLedger.invalidate(changedPath);
       pagedReads.delete(changedPath);
       focusByPath.delete(changedPath);
       mutationFocusByPath.delete(changedPath);
@@ -3954,7 +3959,12 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
-    for (const p of [...directEditPaths, ...shellChangedPaths]) verificationObservedPaths.add(normalizeWorkspaceRel(p));
+    for (const p of [...directEditPaths, ...shellChangedPaths]) {
+      const rel = normalizeWorkspaceRel(p);
+      verificationObservedPaths.add(rel);
+      authoredReadPaths.add(rel);
+      specProgressLedger.invalidate(rel);
+    }
     const pendingVerifier = pendingVerifierEntrypoint();
     if (directEditSucceeded && action.a === "write_batch") {
       onEvent({ type: "write_batch_committed", files: directEditPaths });
@@ -6513,21 +6523,21 @@ async function runAgentCore({
     }
     if (!progress.progress && readExecuted && !gateRejection && !duplicate
         && (action.a === 'read_file' || action.a === 'inspect')) {
-      // A large supplied specification can require more windows than the
-      // no-progress threshold. Price the same bounded read view the prompt
+      // A large supplied specification or the worker's own module can require
+      // more windows than the no-progress threshold. Price the bounded view the prompt
       // receives, so omitted tails cannot earn credit. Each range earns it
       // once; revisiting the same document does not disable the loop guard.
       const view = clipKeepingControllerAnnotation(result.observation, preserveSlimmedControlAnnotations,
         Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)), clipReadObservation);
       for (const op of action.a === 'inspect' ? action.ops : [action]) {
         const specPath = normalizeWorkspaceRel(op.p);
-        if (!suppliedSpecPaths.has(specPath)) continue;
+        if (!suppliedSpecPaths.has(specPath) && !authoredReadPaths.has(specPath)) continue;
         const range = deliveredReadRange(op, view);
         if (!range || specProgressLedger.covers(specPath, range.start, range.end)) continue;
         specProgressLedger.note(specPath, range.start, range.end, range.total);
         progress.progress = true;
-        progress.reason = 'spec_read';
-        onEvent({ type: 'spec_read_progress', path: specPath, ...range });
+        progress.reason = suppliedSpecPaths.has(specPath) ? 'spec_read' : 'source_read';
+        onEvent({ type: `${progress.reason}_progress`, path: specPath, ...range });
       }
     }
     // Bound the progress credit a query can earn. Crediting every routed query removes anti-spiral
@@ -6542,7 +6552,7 @@ async function runAgentCore({
         metrics.queryBudgetBlocks = (metrics.queryBudgetBlocks ?? 0) + 1;
         onEvent({ type: "query_budget_spent", query: action.q, tool: queryToolUsed });
       }
-    } else if (progress.progress && progress.reason !== 'spec_read') {
+    } else if (progress.progress && !['spec_read', 'source_read'].includes(progress.reason)) {
       queryBudget.noteDeliverableProgress();
     }
     // Keep duplicate memory tied to observable filesystem state, not abstract progress. A passing

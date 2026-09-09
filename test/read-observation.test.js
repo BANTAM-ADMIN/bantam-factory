@@ -140,3 +140,63 @@ test('repeated clipped requirements do not earn credit for their undelivered tai
   assert.ok(events.some(e=>e.type==='progress_nudge'));
   assert.ok(events.find(e=>e.type==='spec_read_progress').end<300);
 });
+
+for (const via of ['read_file', 'inspect']) test(`fresh ${via} windows of resumed worker source remain inspectable`, async t => {
+  const { dir } = fixture(t), events = [], controller = new AbortController();
+  const source = Array.from({ length: 200 }, (_, i) => `// Contract ${i}: ${'implementation detail '.repeat(12)}`).join('\n');
+  fs.writeFileSync(path.join(dir, 'app.js'), source);
+  let calls = 0;
+  await runAgent({ workspace: dir, task: 'Finish the application.', maxTurns: 100, interactive: false,
+    grounding: false, openFilesView: false, useGrammar: false, shellSandbox: 'host', progressNudgeAfter: 3,
+    promptTrajectory: 'extension', signal: controller.signal,
+    resumeTurns: [{ action: { a: 'write_file', p: 'app.js', content: source }, editApplied: true, observation: 'wrote app.js' }],
+    model: { assistantPrefill: '', async complete() {
+      const read = { a: 'read_file', p: 'app.js', start: 1 + calls++ * 12, limit: 12 };
+      return { content: JSON.stringify(via === 'inspect' ? { a: 'inspect', ops: [read] } : read), tokens: 1, stoppedEos: true, timings: {} };
+    } }, onEvent: e => {
+      events.push(e);
+      if (events.filter(e => e.type === 'source_read_progress').length === 12) controller.abort();
+    },
+  });
+  assert.equal(events.filter(e => e.type === 'source_read_progress').length, 12);
+  assert.ok(events.every(e => !['progress_nudge', 'progress_gate'].includes(e.type)));
+});
+
+test('a rejected edit does not turn arbitrary reconnaissance into authored-source progress', async t => {
+  const { dir } = fixture(t), events = [], controller = new AbortController();
+  fs.copyFileSync(path.join(dir, 'DESIGN.md'), path.join(dir, 'unrelated.txt'));
+  let calls = 0;
+  await runAgent({ workspace: dir, task: 'Finish the application.', maxTurns: 100, interactive: false,
+    grounding: false, openFilesView: false, useGrammar: false, shellSandbox: 'host', progressNudgeAfter: 3,
+    signal: controller.signal,
+    resumeTurns: [{ action: { a: 'write_file', p: 'unrelated.txt', content: 'rejected' }, editApplied: false, observation: 'edit rejected' }],
+    model: { assistantPrefill: '', async complete() {
+      return { content: JSON.stringify({ a: 'read_file', p: 'unrelated.txt', start: 1 + calls++ * 12, limit: 12 }), tokens: 1, stoppedEos: true, timings: {} };
+    } }, onEvent: e => { events.push(e); if (e.type === 'progress_nudge') controller.abort(); },
+  });
+  assert.ok(events.some(e => e.type === 'progress_nudge'));
+  assert.ok(events.every(e => e.type !== 'source_read_progress'));
+});
+
+test('owned source rereads earn fresh credit only after the bytes change', async t => {
+  const { dir } = fixture(t), events = [], controller = new AbortController();
+  const actions = [
+    { a: 'write_file', p: 'app.js', content: 'export const value = 1;\n' },
+    { a: 'read_file', p: 'app.js', start: 1, limit: 100 },
+    { a: 'read_file', p: 'app.js', start: 1, limit: 200 },
+    { a: 'replace', p: 'app.js', old: 'value = 1', new: 'value = 2' },
+    { a: 'read_file', p: 'app.js', start: 1, limit: 100 },
+  ];
+  await runAgent({ workspace: dir, task: 'Build the application.', maxTurns: 100, interactive: false,
+    grounding: false, openFilesView: false, useGrammar: false, shellSandbox: 'host', signal: controller.signal,
+    model: { assistantPrefill: '', async complete() {
+      return { content: JSON.stringify(actions.shift()), tokens: 1, stoppedEos: true, timings: {} };
+    } }, onEvent: e => {
+      events.push(e);
+      if (events.filter(e => e.type === 'source_read_progress').length === 2) controller.abort();
+    },
+  });
+  assert.equal(actions.length, 0, 'the unchanged reread did not earn credit');
+  assert.equal(events.filter(e => e.type === 'source_read_progress').length, 2);
+  assert.match(fs.readFileSync(path.join(dir, 'app.js'), 'utf8'), /value = 2/);
+});

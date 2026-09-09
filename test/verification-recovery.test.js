@@ -430,6 +430,10 @@ test("long-task extension delivers the dynamic edit schema through coactive reco
     { a: "shell", c: PHASE_VERIFY },
     { a: "replace", p: "target.js", old: 'module.exports = "absent";', new: PHASE_IMPLEMENTATION },
     { a: "read_file", p: "target.js" },
+    // The fresh current-source read earns progress. Repeated failing checks
+    // then establish the stalled recovery phase this fixture exercises.
+    { a: "shell", c: "node verify.mjs" },
+    { a: "shell", c: "node verify.mjs" },
     { a: "shell", c: "node verify.mjs" },
     { a: "edit_lines", p: "target.js", start: 1, end: 1, new: PHASE_IMPLEMENTATION.trimEnd() },
     { a: "shell", c: PHASE_VERIFY },
@@ -443,7 +447,7 @@ test("long-task extension delivers the dynamic edit schema through coactive reco
   });
   assert.equal(result.turns[3].editApplied, false);
   assert.ok(events.some(event => event.type === "verification_recovery_mask"));
-  const call = calls[6];
+  const call = calls[8];
   assert.match(call.prompt, /\[verification recovery\]/);
   assert.match(call.options.grammar, /edit_lines/);
   assert.match(call.options.grammar, /shell/);
@@ -451,13 +455,13 @@ test("long-task extension delivers the dynamic edit schema through coactive reco
   assert.doesNotMatch(call.options.grammar, /\\"replace\\"/);
   const expected = actionPromptMenuLine("edit_lines", { features: [LINE_EDIT_FEATURE] });
   assert.ok(call.prompt.includes(expected), "the newly enabled verb's complete canonical schema must actually reach the worker");
-  const update = result.turns[5].contextUpdates.find(entry => entry.kind === "action-contract");
-  assert.equal(update.turn, 6);
+  const update = result.turns[7].contextUpdates.find(entry => entry.kind === "action-contract");
+  assert.equal(update.turn, 8);
   assert.ok(call.prompt.includes(contextUpdatePromptText(update)));
   assert.match(contextUpdatePromptText(update), /read_file is unavailable/);
   assert.ok(result.metrics.contextUpdatePromptReceipts.some(receipt => receipt.id === update.id && receipt.status === "included"));
-  assert.equal(result.turns[6].editApplied, true);
-  assert.equal(result.turns[7].verificationEvidence.status, "pass");
+  assert.equal(result.turns[8].editApplied, true);
+  assert.equal(result.turns[9].verificationEvidence.status, "pass");
   assert.equal(result.done, true);
   assert.equal(result.turns.at(-1).doneAccepted, true);
   assert.deepEqual(fs.readFileSync(path.join(workspace, "test/public.test.js")), publicBytes);

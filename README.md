@@ -68,13 +68,20 @@ action and the files they delivered.
 - **Put your hardware to work.** Run a local model, or bring your Codex account.
 
 Already use Codex? Connect your signed-in CLI during setup and put its model
-inside the factory. On Context Packet, **the same Terra finished 2.3× faster with
-73% fewer input tokens**: 52.8s / 50,313 tokens in BANTAM FACTORY versus
-123.4s / 188,100 in native Codex. Both passed all five checks.
-**[Replay the same-model Codex fight →](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra)**
+inside the factory. Same models, same Context Packet work order:
+
+| Model | BANTAM FACTORY vs. native Codex | Watch |
+| --- | --- | --- |
+| **Terra** | **2.3× faster · 73% fewer input tokens** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra) |
+| **Sol** | **1.8× faster · 44% fewer input tokens** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html) |
+| **Astra** | **28% fewer input tokens · similar elapsed time** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-2/share/index.html) |
+
+Every run above passed all five independent check groups. Astra and Sol figures
+combine two paired repeats; Terra is one pair. Cards show wall clock, input,
+output and prefix-cache tokens, plus the complete work.
 
 **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
-Same brief. Two complete games. Every recorded action and the delivered files.
+Same brief. Two playable games. Every recorded action and the delivered files.
 
 <a id="start-with-what-you-already-have"></a>
 

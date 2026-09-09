@@ -1,0 +1,309 @@
+{
+  "schema": "bantam.factory-showcase.v1",
+  "mode": "public",
+  "generatedAt": "2026-09-09T03:22:44.649Z",
+  "privacy": {
+    "redacted": true,
+    "rawEvidenceIncluded": false,
+    "policy": "Explicit numeric/public-task allowlist; private logs, paths, source, prompts, group names and configuration omitted."
+  },
+  "series": [
+    {
+      "id": "series-1",
+      "title": "Factory system comparison",
+      "kind": "comparison",
+      "complete": true,
+      "startedAt": "2026-09-09T03:10:09.387Z",
+      "finishedAt": "2026-09-09T03:21:46.283Z",
+      "counts": {
+        "observed": 4,
+        "planned": 4,
+        "accepted": 4,
+        "completed": 4,
+        "pass": 4,
+        "groupsMeasured": 4,
+        "groupsPassed": 20,
+        "groupsTotal": 20
+      },
+      "cards": [
+        {
+          "id": "s1-context-packet-r1",
+          "card": "context-packet",
+          "title": "Context packet",
+          "kind": "BUILD",
+          "number": "01",
+          "description": "Fit complete, attributable context sections into a strict UTF-8 byte budget.",
+          "repeat": 1,
+          "rows": [
+            {
+              "id": "s1-context-packet-r1-lane1",
+              "arm": "codex-sol",
+              "label": "Codex · Sol",
+              "model": "GPT-5.6 Sol · native CLI",
+              "family": "astra",
+              "bantam": false,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 225343,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 129475,
+                  "outputTokens": 6314,
+                  "cacheHitTokens": 114048,
+                  "freshInputTokens": 15427
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 129475,
+                  "outputTokens": 6314,
+                  "cacheHitTokens": 114048,
+                  "freshInputTokens": 15427
+                },
+                "server": null,
+                "complete": true,
+                "requests": 8,
+                "measuredRequests": 8,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 8,
+                    "totalRequests": 8,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 8,
+                    "totalRequests": 8,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 8,
+                    "totalRequests": 8,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 8,
+                    "totalRequests": 8,
+                    "complete": null,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [
+                {
+                  "t": 9857,
+                  "inputTokens": 12644,
+                  "outputTokens": 153,
+                  "cacheHitTokens": 8704,
+                  "freshInputTokens": 3940,
+                  "partial": false
+                },
+                {
+                  "t": 15890,
+                  "inputTokens": 25531,
+                  "outputTokens": 289,
+                  "cacheHitTokens": 21120,
+                  "freshInputTokens": 4411,
+                  "partial": false
+                },
+                {
+                  "t": 74903,
+                  "inputTokens": 39013,
+                  "outputTokens": 2085,
+                  "cacheHitTokens": 33792,
+                  "freshInputTokens": 5221,
+                  "partial": false
+                },
+                {
+                  "t": 118697,
+                  "inputTokens": 54386,
+                  "outputTokens": 3362,
+                  "cacheHitTokens": 47104,
+                  "freshInputTokens": 7282,
+                  "partial": false
+                },
+                {
+                  "t": 134105,
+                  "inputTokens": 71060,
+                  "outputTokens": 3775,
+                  "cacheHitTokens": 62336,
+                  "freshInputTokens": 8724,
+                  "partial": false
+                },
+                {
+                  "t": 164255,
+                  "inputTokens": 88406,
+                  "outputTokens": 4657,
+                  "cacheHitTokens": 78848,
+                  "freshInputTokens": 9558,
+                  "partial": false
+                },
+                {
+                  "t": 199405,
+                  "inputTokens": 106658,
+                  "outputTokens": 5669,
+                  "cacheHitTokens": 96000,
+                  "freshInputTokens": 10658,
+                  "partial": false
+                },
+                {
+                  "t": 224002,
+                  "inputTokens": 129475,
+                  "outputTokens": 6314,
+                  "cacheHitTokens": 114048,
+                  "freshInputTokens": 15427,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 59,
+              "untimedEvents": 0,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            },
+            {
+              "id": "s1-context-packet-r1-lane2",
+              "arm": "bantam-codex-sol",
+              "label": "BANTAM · Sol",
+              "model": "GPT-5.6 Sol · wrapped CLI",
+              "family": "astra",
+              "bantam": true,
+              "recorded": true,
+              "outcome": "PASS",
+              "accepted": true,
+              "completed": true,
+              "wallMs": 138812,
+              "groupsPassed": 5,
+              "groupsTotal": 5,
+              "publicExit": 0,
+              "hiddenExit": 0,
+              "protectedChanges": 0,
+              "accounting": {
+                "full": {
+                  "inputTokens": 86321,
+                  "outputTokens": 3678,
+                  "cacheHitTokens": 52224,
+                  "freshInputTokens": 34097
+                },
+                "subset": null,
+                "native": {
+                  "inputTokens": 86321,
+                  "outputTokens": 3678,
+                  "cacheHitTokens": 52224,
+                  "freshInputTokens": 34097
+                },
+                "server": null,
+                "complete": true,
+                "requests": 6,
+                "measuredRequests": 6,
+                "serverIdleBefore": null,
+                "serverIdleAfter": null,
+                "coverage": {
+                  "inputTokens": {
+                    "measuredRequests": 6,
+                    "totalRequests": 6,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "outputTokens": {
+                    "measuredRequests": 6,
+                    "totalRequests": 6,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "cacheHitTokens": {
+                    "measuredRequests": 6,
+                    "totalRequests": 6,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  },
+                  "freshInputTokens": {
+                    "measuredRequests": 6,
+                    "totalRequests": 6,
+                    "complete": true,
+                    "missingRequestIndices": []
+                  }
+                },
+                "gaps": []
+              },
+              "tokenUpdates": [
+                {
+                  "t": 8343,
+                  "inputTokens": 10547,
+                  "outputTokens": 87,
+                  "cacheHitTokens": 0,
+                  "freshInputTokens": 10547,
+                  "partial": false
+                },
+                {
+                  "t": 60443,
+                  "inputTokens": 22768,
+                  "outputTokens": 1658,
+                  "cacheHitTokens": 10368,
+                  "freshInputTokens": 12400,
+                  "partial": false
+                },
+                {
+                  "t": 62635,
+                  "inputTokens": 36759,
+                  "outputTokens": 1682,
+                  "cacheHitTokens": 22400,
+                  "freshInputTokens": 14359,
+                  "partial": false
+                },
+                {
+                  "t": 91823,
+                  "inputTokens": 51216,
+                  "outputTokens": 2519,
+                  "cacheHitTokens": 36224,
+                  "freshInputTokens": 14992,
+                  "partial": false
+                },
+                {
+                  "t": 119957,
+                  "inputTokens": 67405,
+                  "outputTokens": 3286,
+                  "cacheHitTokens": 36224,
+                  "freshInputTokens": 31181,
+                  "partial": false
+                },
+                {
+                  "t": 137037,
+                  "inputTokens": 86321,
+                  "outputTokens": 3678,
+                  "cacheHitTokens": 52224,
+                  "freshInputTokens": 34097,
+                  "partial": false
+                }
+              ],
+              "events": [],
+              "timedEvents": 36,
+              "untimedEvents": 6,
+              "stopReasons": [],
+              "files": [],
+              "inventory": [],
+              "warnings": [],
+              "artifactCount": 0,
+              "artifactBytes": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

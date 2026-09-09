@@ -2069,6 +2069,76 @@
             "accountingComplete": true
           }
         ]
+      },
+      {
+        "title": "Sol · efficiency round 1",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.",
+        "id": "context-packet-sol-1",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "23a86959494476923d3833efada3492adebf5c7666b0ad6ab3206d660fcb3ce2",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Sol",
+            "model": "GPT-5.6 Sol · native CLI",
+            "arm": "codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 225343,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "BANTAM · Sol",
+            "model": "GPT-5.6 Sol · wrapped CLI",
+            "arm": "bantam-codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 138812,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
+      },
+      {
+        "title": "Sol · efficiency round 2",
+        "kind": "BUILD",
+        "number": "01",
+        "description": "The same context-packet work order, in native Codex and BANTAM FACTORY. A fresh paired run after the context improvements.",
+        "id": "context-packet-sol-2",
+        "workOrder": "context-packet",
+        "recorded": true,
+        "sourceSha256": "a98ef40b80c3c629a985c121d028cbb47ff5e99219a8dc020d3dd8573898d1c5",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Sol",
+            "model": "GPT-5.6 Sol · wrapped CLI",
+            "arm": "bantam-codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 106838,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          },
+          {
+            "label": "Codex · Sol",
+            "model": "GPT-5.6 Sol · native CLI",
+            "arm": "codex-sol",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 219696,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true
+          }
+        ]
       }
     ]
   }

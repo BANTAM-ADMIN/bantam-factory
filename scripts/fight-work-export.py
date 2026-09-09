@@ -193,6 +193,20 @@ class Extractor:
                     state='timed-out', source='factory-model-transport')
         for turn in run.get('turns', []):
             action = turn.get('parsedAction') or {}
+            submitted = action or turn.get('rawOutput')
+            confirmation = turn.get('editConfirmation')
+            if confirmation is not None:
+                if (not isinstance(confirmation, dict) or set(confirmation) != {'a', 'id'}
+                    or confirmation.get('a') != 'confirm_edit'
+                    or not isinstance(confirmation.get('id'), str)
+                    or not re.fullmatch(r'[a-f0-9]{64}', confirmation['id'])
+                    or action.get('a') not in ['write_file', 'write_batch']
+                    or unpack(turn.get('rawOutput')) != confirmation):
+                    raise ValueError('Unbound edit confirmation in recorded turn')
+                # The full proposal is in its earlier action. Replaying the
+                # resolved write here would falsely show the model resending
+                # all those bytes instead of submitting its compact receipt.
+                submitted = confirmation
             index = turn.get('modelCallIndex')
             call = calls[index] if isinstance(index, int) and 0 <= index < len(calls) else {}
             observation = turn.get('rawObservation') or turn.get('observation')
@@ -202,7 +216,7 @@ class Extractor:
                 observation = re.split(r'\n\[(?:guidance|working-checkpoint|contract-state-audit|completion-audit|completion-checklist)(?:\]|[ ;])', observation, maxsplit=1)[0].rstrip()
             shell = turn.get('shellExecution') or {}
             workflow = turn.get('verificationWorkflow') or {}
-            item = self.action(action.get('a', 'unparsed-action'), action or turn.get('rawOutput'), observation,
+            item = self.action('confirm_edit' if confirmation else action.get('a', 'unparsed-action'), submitted, observation,
                 at=call.get('completedAt'), exit_code=shell.get('exitCode'),
                 state='blocked' if turn.get('protocolViolation') or shell.get('blocked') else 'recorded',
                 source='factory-turn', turn=turn.get('i'))

@@ -68,6 +68,34 @@ function existingTestPaths(workspace) {
   return [...found].sort();
 }
 
+// Capture once at the operator's project boundary. A later worker must not
+// promote tests produced by earlier workers into the supplied-test baseline.
+// This object travels through the private controller mailbox, never model text.
+export function captureInstructionScope(workspace, instruction) {
+  const existingTests = existingTestPaths(workspace);
+  return validateInstructionScope({ schema: 1, instruction,
+    frozenTests: { schema: 1, instructionSha256: instructionHash(instruction), existingTests,
+      hashes: immutableViolations.snapshot(workspace,
+        { mode: "forbid", forbidden: [], existingTests }).hashes } });
+}
+
+export function validateInstructionScope(scope) {
+  if (!plainRecord(scope) || scope.schema !== 1 || typeof scope.instruction !== "string"
+      || scope.instruction.length > 100000) throw Error("invalid inherited instruction scope");
+  const restored = restoreFrozenTests(scope.frozenTests, scope.instruction);
+  if (!restored) throw Error("inherited instruction scope does not match its operator brief");
+  return { schema: 1, instruction: scope.instruction,
+    frozenTests: { schema: 1, instructionSha256: instructionHash(scope.instruction), ...restored } };
+}
+
+function scopeCheckpoint(scope, instruction, workspace) {
+  const exceptions = new Set((extractImmutable(instruction).existingTestExceptions ?? []).map(name =>
+    path.relative(path.resolve(workspace), path.resolve(workspace, name)).split(path.sep).join("/")));
+  const existingTests = scope.frozenTests.existingTests.filter(rel => !exceptions.has(rel));
+  return { schema: 1, instructionSha256: instructionHash(instruction), existingTests,
+    hashes: Object.fromEntries(existingTests.map(rel => [rel, scope.frozenTests.hashes[rel]])) };
+}
+
 export function instructionPathPolicy(workspace, invariants) {
   const root = fs.realpathSync(path.resolve(workspace));
   const normalize = (name) => {
@@ -115,7 +143,18 @@ export function instructionPathPolicy(workspace, invariants) {
 }
 
 export function composeInstructionGuards({ workspace, instruction, editGuard = null, shellScopeGuard = null,
-  frozenTests = null } = {}) {
+  frozenTests = null, inheritedScope = null } = {}) {
+  if (inheritedScope !== null) {
+    const scope = validateInstructionScope(inheritedScope);
+    // The milestone may add constraints, but cannot remove the operator's.
+    const operator = composeInstructionGuards({ workspace, instruction: scope.instruction,
+      editGuard, shellScopeGuard, frozenTests: scopeCheckpoint(scope, scope.instruction, workspace) });
+    const worker = composeInstructionGuards({ workspace, instruction,
+      editGuard: operator.editGuard, shellScopeGuard: operator.shellScopeGuard,
+      frozenTests: frozenTests ?? scopeCheckpoint(scope, instruction, workspace) });
+    return { ...worker, inheritedScope: scope,
+      protectedExistingTests: [...new Set([...operator.protectedExistingTests, ...worker.protectedExistingTests])] };
+  }
   let invariants = extractImmutable(instruction);
   if (invariants.mode === "none") return { invariants, editGuard, shellScopeGuard, protectedExistingTests: [] };
   let frozenTestCheckpoint = null;

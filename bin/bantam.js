@@ -2176,7 +2176,7 @@ if (cmd === undefined || cmd === "chat") {
   const detachModelCheckpoint = attachModelRequestCheckpoint(model, checkpoint);
   let checkpointDisarmed = false;
   const baseOnEvent = tui ? (e) => tui.handleEvent(e) : (autonomous ? liveLogger : makeInteractiveLogger());
-  const workerControl = args['supervisor-control'] === undefined ? null : openWorkerControl(args['supervisor-control'], workspace);
+  const workerControl = args['supervisor-control'] === undefined ? null : openWorkerControl(args['supervisor-control'], workspace, args.task);
   const captureEvent = (checkpoint || factoryTelemetry || workerControl)
     ? (event) => {
         checkpoint?.note(event);
@@ -2216,6 +2216,7 @@ if (cmd === undefined || cmd === "chat") {
       supportingContext: typeof args["supporting-context-file"] === "string"
         ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
       drainInjections: workerControl ? () => workerControl.drain() : null,
+      inheritedInstructionScope: workerControl?.instructionScope ?? null,
       workspace,
       shellNetwork: args["dangerously-allow-net"] ? true : undefined,
       model,

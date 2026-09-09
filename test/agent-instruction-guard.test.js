@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { runAgent } from "../src/agent.js";
 import { verificationVerdict } from "../src/done-guard.js";
+import { captureInstructionScope } from "../src/instruction-guard.js";
 
 function fixture(t) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-agent-instruction-"));
@@ -24,6 +25,33 @@ const options = {
   task: "Implement deliverable.txt. Do not modify keep.txt.",
   interactive: true, useGrammar: false, grounding: false, completionAudit: false, stateAudit: "off", shellSandbox: "host",
 };
+
+test('successor agent repairs an earlier generated test while retaining operator guards and resume provenance', async t => {
+  const workspace = fixture(t);
+  fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'test/base.test.js'), '// supplied assertions\n');
+  const inheritedInstructionScope = captureInstructionScope(workspace,
+    'Extend the checker. Do not change existing public tests or keep.txt.');
+  fs.writeFileSync(path.join(workspace, 'test/generated.test.js'), '// fixture from previous worker\n');
+  const task = 'Repair generated fixtures. Do not change existing public tests.';
+  const result = await runAgent({...options, task, workspace, inheritedInstructionScope,
+    autoVerifyBlindEdits: 0, autoVerifyStaleTurns: 0, autoVerifyProbes: 0, maxTurns: 3,
+    model: scripted([
+      {a: 'replace', p: 'test/generated.test.js', old: '// fixture from previous worker', new: '// deterministic fixture'},
+      {a: 'write_file', p: 'test/base.test.js', content: '// weakened assertions'},
+      {a: 'write_file', p: 'keep.txt', content: 'forbidden'},
+    ])});
+  assert.equal(result.turns[0].editApplied, true);
+  assert.equal(fs.readFileSync(path.join(workspace, 'test/generated.test.js'), 'utf8'), '// deterministic fixture\n');
+  assert.equal(fs.readFileSync(path.join(workspace, 'test/base.test.js'), 'utf8'), '// supplied assertions\n');
+  assert.equal(fs.readFileSync(path.join(workspace, 'keep.txt'), 'utf8'), 'original');
+  assert.deepEqual(result.turns[0].contextBasis.inheritedInstructionScope, inheritedInstructionScope);
+  const resumed = await runAgent({...options, task, workspace, resumeTurns: result.turns, maxTurns: 4,
+    autoVerifyBlindEdits: 0, autoVerifyStaleTurns: 0, autoVerifyProbes: 0,
+    model: scripted([{a: 'write_file', p: 'keep.txt', content: 'forbidden on resume'}])});
+  assert.equal(fs.readFileSync(path.join(workspace, 'keep.txt'), 'utf8'), 'original');
+  assert.ok(resumed.metrics.immutableEditRejections > 0);
+});
 
 test("ordinary interactive agent enforces named prohibition before repeated direct edits", async (t) => {
   const workspace = fixture(t);

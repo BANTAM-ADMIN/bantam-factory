@@ -2,7 +2,9 @@
 // enter the existing between-turn injection path; no process or model restart.
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {writeJsonAtomic} from './atomic-file.js';
+import {validateInstructionScope} from './instruction-guard.js';
 
 const MAX_BYTES = 256 * 1024;
 function directory(dir, workspace) {
@@ -11,11 +13,11 @@ function directory(dir, workspace) {
   if (real !== path.resolve(dir) || !fs.statSync(real).isDirectory() || real === ws || real.startsWith(ws + path.sep)) throw Error('supervisor control must be outside the worker workspace, without symlinks');
   return real;
 }
-function read(file) {
+function read(file, maxBytes = MAX_BYTES) {
   const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
   try {
     const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.size > MAX_BYTES) throw Error('invalid supervisor control file');
+    if (!stat.isFile() || stat.size > maxBytes) throw Error('invalid supervisor control file');
     return JSON.parse(fs.readFileSync(fd, 'utf8'));
   } finally { fs.closeSync(fd); }
 }
@@ -24,8 +26,16 @@ function messages(file) {
   if (!Array.isArray(rows) || rows.length > 32 || rows.some((m, i) => m?.sequence !== i + 1 || typeof m.text !== 'string' || !m.text.trim() || m.text.length > 8000)) throw Error('invalid supervisor messages');
   return rows;
 }
-export function createWorkerControl(dir, workspace) {
+const taskHash = task => createHash('sha256').update(task).digest('hex');
+const MAX_SCOPE_BYTES = 8 * 1024 * 1024;
+export function createWorkerControl(dir, workspace, {instructionScope = null, task = null} = {}) {
   const root = directory(dir, workspace);
+  if (instructionScope !== null) {
+    if (typeof task !== 'string') throw Error('worker instruction scope requires its assigned task');
+    const data = JSON.stringify({taskSha256: taskHash(task), scope: validateInstructionScope(instructionScope)});
+    if (Buffer.byteLength(data) > MAX_SCOPE_BYTES) throw Error('worker instruction scope exceeds its size bound');
+    fs.writeFileSync(path.join(root, 'instruction-scope.json'), data, {flag: 'wx', mode: 0o600});
+  }
   for (const [name, value] of [['steering.json', []], ['feedback.json', {revision: 0}]]) {
     fs.writeFileSync(path.join(root, name), JSON.stringify(value), {flag: 'wx', mode: 0o600});
   }
@@ -50,13 +60,21 @@ export function workerObservation(text) {
   value = value.split('\n[guidance]')[0];
   return {text: value.length <= 6000 ? value : value.slice(0, 4500) + '\n[excerpt; full observation in run evidence]\n' + value.slice(-1500), truncated: value.length > 6000};
 }
-export function openWorkerControl(dir, workspace) {
+export function openWorkerControl(dir, workspace, task = null) {
   const root = directory(dir, workspace), inbox = path.join(root, 'steering.json'), feedbackFile = path.join(root, 'feedback.json');
   messages(inbox); read(feedbackFile);
+  let instructionScope = null;
+  const scopeFile = path.join(root, 'instruction-scope.json');
+  try {
+    const receipt = read(scopeFile, MAX_SCOPE_BYTES);
+    if (typeof task !== 'string' || receipt?.taskSha256 !== taskHash(task)) throw Error('worker instruction scope task mismatch');
+    instructionScope = validateInstructionScope(receipt.scope);
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
   let consumed = 0, revision = 0, turn = 0;
   const feedback = {revision, steeringRead: 0, action: null, observation: null};
   const save = () => {feedback.revision = ++revision; writeJsonAtomic(feedbackFile, feedback);};
   return {
+    instructionScope,
     drain() {
       const all = messages(inbox);
       if (all.length < consumed) throw Error('supervisor mailbox was truncated');

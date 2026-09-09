@@ -16,6 +16,7 @@ import { settleServerCounters } from '../scripts/fight-usage.mjs';
 import { cornerUsage } from './fight.js';
 import { normalizeCardEndpoint } from './factory-cards-command.js';
 import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from './foreman-worker-control.js';
+import { captureInstructionScope } from './instruction-guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODELS = { astra: 'gpt-6-astra', sol: 'gpt-5.6-sol', terra: 'gpt-5.6-terra' };
@@ -212,6 +213,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
   const store = new WorkspaceStore(path.join(plan.output, 'store'));
   const baseline = store.capture(plan.workspace, { excludePaths: [plan.output], message: 'foreman original source' });
   const candidate = path.join(plan.output, 'candidate'); store.materialize(baseline.commit, candidate);
+  const instructionScope = captureInstructionScope(candidate, plan.task);
   const controlRoom = path.join(plan.output, 'control-room'), supervisorCids = path.join(plan.output, 'supervisor-containers');
   fs.mkdirSync(controlRoom); fs.mkdirSync(supervisorCids);
   const supervisor = new CodexAppServer({ command: path.join(ROOT, 'scripts/astra-container-cli.mjs'), cwd: controlRoom,
@@ -229,7 +231,7 @@ export async function runForeman(plan, { log = () => {} } = {}) {
     const task = foremanWorkerTask(plan.task, job, dependencies);
     fs.writeFileSync(path.join(dir, 'task.md'), task, { mode: 0o600 });
     const cids = path.join(dir, 'containers'), sessions = path.join(dir, 'sessions'); fs.mkdirSync(cids, { mode: 0o700 }); fs.mkdirSync(sessions, { mode: 0o700 });
-    createWorkerControl(dir, ws);
+    createWorkerControl(dir, ws, {instructionScope, task: foremanWorkerTask(plan.task, job)});
     let recorder = null, result, usage = null, settlement = null, lastProgress = 0, lastFeedback = '';
     try {
       let command;

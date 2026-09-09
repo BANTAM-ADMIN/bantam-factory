@@ -415,6 +415,7 @@ function extraModelStationsEnabled(model) {
 async function runAgentCore({
   task,
   supportingContext = "",
+  inheritedInstructionScope = null,
   workspace,
   model = new ModelClient(),
   maxTurns = 30,
@@ -855,6 +856,7 @@ async function runAgentCore({
   const instructionGuards = composeInstructionGuards({
     workspace, instruction: task, editGuard, shellScopeGuard,
     frozenTests: savedContextBasis?.frozenTests ?? null,
+    inheritedScope: inheritedInstructionScope ?? savedContextBasis?.inheritedInstructionScope ?? null,
   });
   ({ editGuard, shellScopeGuard } = instructionGuards);
   // Only exact invocation-frozen files, never the whole test directory: new
@@ -898,6 +900,7 @@ async function runAgentCore({
     : uneditedTaskSpecDocuments(task, [], exec).slice(0, 4)
       .map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.text.length > 12000 }));
   const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments,
+    ...(instructionGuards.inheritedScope ? { inheritedInstructionScope: instructionGuards.inheritedScope } : {}),
     ...(instructionGuards.frozenTestCheckpoint ? { frozenTests: instructionGuards.frozenTestCheckpoint } : {}) };
   let contextBasisRecorded = Boolean(savedContextBasis)
     && (!instructionGuards.frozenTestCheckpoint || savedContextBasis.frozenTests?.instructionSha256 === instructionGuards.frozenTestCheckpoint.instructionSha256);

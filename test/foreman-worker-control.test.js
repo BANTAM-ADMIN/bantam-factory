@@ -5,11 +5,33 @@ import os from 'node:os';
 import path from 'node:path';
 import {createWorkerControl, openWorkerControl, queueWorkerSteering, readWorkerFeedback, workerObservation} from '../src/foreman-worker-control.js';
 import {frameInjection} from '../src/logic/attendant.js';
+import {captureInstructionScope, composeInstructionGuards} from '../src/instruction-guard.js';
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'foreman-control-')), ws = path.join(root, 'ws');
   fs.mkdirSync(ws); t.after(() => fs.rmSync(root, {recursive:true, force:true}));
   createWorkerControl(root, ws); return {root, ws};
 }
+
+test('original test provenance crosses the private mailbox, bound to the assigned task', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'foreman-scope-')), ws = path.join(root, 'ws');
+  fs.mkdirSync(ws); fs.mkdirSync(path.join(ws, 'test'));
+  t.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(ws, 'test/base.test.js'), 'supplied');
+  const instructionScope = captureInstructionScope(ws, 'Do not change existing public tests.');
+  fs.writeFileSync(path.join(ws, 'test/generated.test.js'), 'first worker output');
+  const task = 'Repair the generated fixture. Do not change existing public tests.';
+  createWorkerControl(root, ws, {instructionScope, task});
+  const control = openWorkerControl(root, ws, task);
+  const guards = composeInstructionGuards({workspace: ws, instruction: task, inheritedScope: control.instructionScope});
+  assert.equal(guards.editGuard('test/generated.test.js'), null);
+  assert.equal(guards.editGuard('test/base.test.js'), 'instruction-forbidden');
+  assert.equal(fs.statSync(path.join(root, 'instruction-scope.json')).mode & 0o777, 0o600);
+  assert.throws(() => openWorkerControl(root, ws, 'Another task'), /task mismatch/);
+  fs.unlinkSync(path.join(root, 'instruction-scope.json'));
+  fs.writeFileSync(path.join(ws, 'forged.json'), '{}');
+  fs.symlinkSync(path.join(ws, 'forged.json'), path.join(root, 'instruction-scope.json'));
+  assert.throws(() => openWorkerControl(root, ws, task));
+});
 test('live corrections retain order and are consumed once without changing worker files', t => {
   const {root,ws} = fixture(t), worker = openWorkerControl(root, ws);
   fs.writeFileSync(path.join(ws, 'work.js'), 'current work');

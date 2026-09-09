@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { composeInstructionGuards } from "../src/instruction-guard.js";
+import { composeInstructionGuards, captureInstructionScope } from "../src/instruction-guard.js";
 import { createShellScopeGuard, immutableEditReason } from "../src/scope-guard.js";
 import { evaluateDoneGates } from "../src/done-gates.js";
 import { extractImmutable, immutableViolations } from "../src/logic/self-check.js";
@@ -16,6 +16,57 @@ function fixture(t) {
   fs.writeFileSync(path.join(root, "source.txt"), "old source");
   return root;
 }
+
+test("successor workers keep the operator's original test boundary and independent prohibitions", t => {
+  const workspace = fixture(t);
+  fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'test/supplied.test.js'), 'supplied assertions');
+  fs.symlinkSync('test/supplied.test.js', path.join(workspace, 'alias.js'));
+  const scope = captureInstructionScope(workspace,
+    'Extend the checker. Do not modify keep.txt or existing public tests.');
+  fs.writeFileSync(path.join(workspace, 'test/generated.test.js'), 'generated fixture');
+  const guards = composeInstructionGuards({workspace,
+    instruction: 'Correct generated fixtures. Do not modify existing public tests.', inheritedScope: scope});
+  assert.equal(guards.editGuard('test/generated.test.js'), null);
+  for (const file of ['test/supplied.test.js', 'alias.js', 'keep.txt']) {
+    assert.equal(guards.editGuard(file), 'instruction-forbidden');
+  }
+  assert.ok(!guards.protectedExistingTests.includes('test/generated.test.js'));
+  assert.ok(guards.protectedExistingTests.includes('test/supplied.test.js'));
+  const before = guards.shellScopeGuard.capture();
+  fs.writeFileSync(path.join(workspace, 'test/supplied.test.js'), 'weakened supplied assertions');
+  fs.writeFileSync(path.join(workspace, 'test/generated.test.js'), 'repaired generated fixture');
+  fs.writeFileSync(path.join(workspace, 'keep.txt'), 'forbidden change');
+  const rollback = guards.shellScopeGuard.rollback(before);
+  assert.equal(rollback.clean, true);
+  assert.equal(fs.readFileSync(path.join(workspace, 'test/supplied.test.js'), 'utf8'), 'supplied assertions');
+  assert.equal(fs.readFileSync(path.join(workspace, 'keep.txt'), 'utf8'), 'original');
+  assert.equal(fs.readFileSync(path.join(workspace, 'test/generated.test.js'), 'utf8'), 'repaired generated fixture');
+  const explicit = composeInstructionGuards({workspace, inheritedScope: scope,
+    instruction: 'Do not modify test/generated.test.js. Do not modify existing public tests.'});
+  assert.equal(explicit.editGuard('test/generated.test.js'), 'instruction-forbidden');
+  const omit = composeInstructionGuards({workspace, inheritedScope: scope, instruction: 'Repair the fixture.'});
+  assert.equal(omit.editGuard('test/supplied.test.js'), 'instruction-forbidden');
+  assert.equal(omit.editGuard('keep.txt'), 'instruction-forbidden');
+});
+
+test("worker class exceptions cannot weaken original prohibitions; inherited scopes are validated", t => {
+  const workspace = fixture(t);
+  fs.mkdirSync(path.join(workspace, 'test'));
+  fs.writeFileSync(path.join(workspace, 'test/base.test.js'), 'original');
+  const scope = captureInstructionScope(workspace, 'Do not change existing tests.');
+  const inherited = composeInstructionGuards({workspace, inheritedScope: scope,
+    instruction: 'Do not change existing tests except test/base.test.js.'});
+  assert.equal(inherited.editGuard('test/base.test.js'), 'instruction-forbidden');
+  const permitted = captureInstructionScope(workspace, 'Do not change existing tests except test/base.test.js.');
+  assert.equal(composeInstructionGuards({workspace, inheritedScope: permitted,
+    instruction: 'Repair the fixture.'}).editGuard('test/base.test.js'), null);
+  for (const invalid of [ {...scope, instruction: 'Different brief'},
+    {...scope, frozenTests: {...scope.frozenTests, hashes: {}}},
+    {...scope, frozenTests: {...scope.frozenTests, existingTests: ['../escape']}} ]) {
+    assert.throws(() => composeInstructionGuards({workspace, instruction: 'Repair.', inheritedScope: invalid}), /scope|checkpoint/);
+  }
+});
 
 test("explicit prohibition blocks direct writes forever and composes supplied policy", (t) => {
   const workspace = fixture(t);

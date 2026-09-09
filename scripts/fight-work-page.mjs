@@ -22,9 +22,14 @@ export function fightWorkBrowser(replayEvents) {
   const seconds = value => typeof value === 'number' ? (value/1000).toFixed(1) + 's' : 'Sequence only';
   const code = value => `<pre tabindex="0"><code>${E(printed(value) ?? 'No result was recorded.')}</code></pre>`;
   const names = {'factory-verification':'Factory · run project tests', 'factory-cli-check':'Factory · check the command-line contract',
-    'supervisor-review':'Supervisor · review an edge case', inspect:'Inspect the workspace', done:'Deliver the work'};
+    'supervisor-review':'Supervisor · review an edge case',
+    'supervisor-dispatch':'Astra · assign work and await evidence', 'supervisor-enqueue':'Astra · assign work',
+    'supervisor-wait':'Astra · wait for worker evidence', 'supervisor-check':'Astra · review the candidate',
+    'supervisor-read':'Astra · read the delivered source', 'supervisor-evidence':'Astra · inspect worker evidence',
+    'supervisor-steer':'Astra · correct the worker', 'supervisor-finish':'Astra · accept the complete job',
+    'integrate-worker':'Factory · integrate verified work', 'settle-worker':'Factory · record worker outcome', inspect:'Inspect the workspace', done:'Deliver the work'};
   function actionTitle(action) {
-    const r = action.request;
+    const r = action.source.startsWith('factory-worker-') ? action.request?.action : action.request;
     if (names[action.name]) return names[action.name];
     if (typeof r === 'object' && r) {
       const file = r.p ?? r.path ?? r.filePath ?? r.file_path;

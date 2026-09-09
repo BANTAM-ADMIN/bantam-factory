@@ -49,6 +49,17 @@ test('untimed or out-of-clock records stay in the final log without manufactured
   assert.equal(events.find(e=>e.kind==='delivery').title,'LAST RECORDED MESSAGE');
   assert.match(events.find(e=>e.kind==='finish').body,/Project accepted: no\nClean completion: no/);
 });
+test('supervised replay bounds worker results by that worker job, never concurrent supervisor traffic',()=>{
+  const events=workReplayEvents(work({actions:[
+    action({source:'factory-worker-terra',turn:0,request:{job:'build',action:{a:'shell'}},endedMs:null}),
+    action({id:'action-2',source:'factory-supervisor',atMs:200,endedMs:250}),
+    action({id:'action-3',source:'factory-worker-terra',turn:1,request:{job:'another',action:{}},atMs:300,endedMs:null}),
+    action({id:'action-4',source:'factory-worker-terra',turn:1,request:{job:'build',action:{}},atMs:700,endedMs:null}),
+  ]}));
+  const response=events.find(e=>e.id==='action-1-response');
+  assert.equal(response.atMs,700);assert.equal(response.precision,'by');
+  assert.equal(events.find(e=>e.id==='action-2-response').atMs,250);
+});
 
 test('the published intro uses an accepted same-model pair and the public gallery omits archived Claude references',()=>{
   const gallery=buildFightGallery(new URL('../docs/fights/launch-2026-09-07',import.meta.url).pathname);

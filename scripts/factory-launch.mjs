@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {publicShowcaseData} from './factory-showcase.mjs';
 import {PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 import {publicFollowups} from './fight-followups.mjs';
+import {SUPERVISED_SYSTEMS} from './fight-supervision.mjs';
 
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -15,6 +16,7 @@ const CARD_IDS = ['receipt-reducer', 'snapshot-drift', 'job-planner'];
 const COUNTERS = ['inputTokens', 'outputTokens', 'cacheHitTokens', 'freshInputTokens'];
 const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 const PUBLIC_MODELS = {
+  ...Object.fromEntries(Object.entries(SUPERVISED_SYSTEMS).map(([arm, identity]) => [arm, identity[2]])),
   'bantam-local-27b': 'Qwen 27B · same local weights',
   'deepseek-local-27b': 'Qwen 27B · same local weights',
   opencode: 'Qwen 27B · same local weights',

@@ -11,6 +11,7 @@ import {deriveSavedWireUsage} from './fight-usage-report.mjs';
 import {derivePerformance,publicPerformance,performanceView,validateHardware} from './fight-performance.mjs';
 import {followupFields} from './fight-followups.mjs';
 import {factoryKit, PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
+import {SUPERVISED_SYSTEMS, publicSupervisorRoles} from './fight-supervision.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SHA=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -22,6 +23,7 @@ const J=v=>JSON.stringify(v).replace(/[<>&\u2028\u2029]/g,c=>`\\u${c.charCodeAt(
 const readJSON=f=>JSON.parse(fs.readFileSync(f,'utf8'));
 const CARDS=PUBLIC_FACTORY_CARDS;
 const SYSTEMS={
+  ...SUPERVISED_SYSTEMS,
   'bantam-local-27b':['BANTAM · 27B','local','Qwen 27B · same local weights'],
   'deepseek-local-27b':['DeepSeek Harness','local','Qwen 27B · same local weights'],
   opencode:['OpenCode','local','Qwen 27B · same local weights'],
@@ -103,7 +105,7 @@ export function sameModelObservation(rows){
   if(b?.outcome!=='PASS'||d?.outcome!=='PASS'||!(b.wallMs>0)||!Number.isFinite(b.wallMs)||!Number.isFinite(d.wallMs)||d.wallMs<=b.wallMs)return null;
   return {ratio:d.wallMs/b.wallMs,savedWallMs:d.wallMs-b.wallMs};
 }
-function publicAccounting(a={}){
+function publicAccounting(a={}, arm){
   const count=v=>Number.isSafeInteger(v)&&v>=0?v:null;
   const indices=v=>Array.isArray(v)?v.filter(x=>count(x)!==null):[];
   return {full:metrics(a.full),subset:a.subset?metrics(a.subset):null,native:a.native?metrics(a.native):null,
@@ -111,6 +113,7 @@ function publicAccounting(a={}){
     serverIdleBefore:BOOL(a.serverIdleBefore),serverIdleAfter:BOOL(a.serverIdleAfter),
     coverage:Object.fromEntries(FIELDS.map(f=>{const c=a.coverage?.[f];return [f,{measuredRequests:count(c?.measuredRequests),
       totalRequests:count(c?.totalRequests),complete:BOOL(c?.complete),missingRequestIndices:indices(c?.missingRequestIndices)}];})),
+    ...publicSupervisorRoles(arm, a),
     gaps:(Array.isArray(a.gaps)?a.gaps:[]).map(g=>({index:count(g.index),missingFields:(Array.isArray(g.missingFields)?g.missingFields:[]).filter(f=>FIELDS.includes(f)),
       finished:BOOL(g.finished),responseBytes:count(g.responseBytes)}))};
 }
@@ -139,7 +142,7 @@ export function publicShowcaseData(privateData){
           recorded:r.recorded===true,outcome:OUTCOMES.has(r.outcome)?r.outcome:'NOT RECORDED',
           accepted:BOOL(r.accepted),completed:BOOL(r.completed),wallMs:N(r.wallMs),groupsPassed:N(r.groupsPassed),groupsTotal:N(r.groupsTotal),
           publicExit:N(r.publicExit),hiddenExit:N(r.hiddenExit),protectedChanges:N(r.protectedChanges),
-          accounting:publicAccounting(r.accounting),...performanceFields({...r,...publicIdentity(r)}),tokenUpdates:numericUpdates(r.tokenUpdates),events:[],timedEvents:N(r.timedEvents),untimedEvents:N(r.untimedEvents),
+          accounting:publicAccounting(r.accounting,r.arm),...performanceFields({...r,...publicIdentity(r)}),tokenUpdates:numericUpdates(r.tokenUpdates),events:[],timedEvents:N(r.timedEvents),untimedEvents:N(r.untimedEvents),
           stopReasons:[],files:[],inventory:[],warnings:[],artifactCount:0,artifactBytes:0}))};})}))};
 }
 

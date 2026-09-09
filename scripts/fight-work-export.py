@@ -88,6 +88,7 @@ def category(name, request):
 class Extractor:
     def __init__(self, directory, result, manifest, manifest_bytes, repo):
         self.directory = directory
+        self.workspace = directory / 'ws'
         self.result = result
         self.manifest = manifest
         self.repo = repo
@@ -428,7 +429,7 @@ class Extractor:
             row = {'path': name, 'state': 'deleted' if name not in final else 'added' if name not in starter else 'unchanged' if final[name] == starter[name] else 'changed',
                 'beforeSha256': starter.get(name), 'afterSha256': final.get(name), 'before': None, 'after': None}
             if name in final:
-                data = read(self.directory / 'ws' / name, 1024 * 1024)
+                data = read(self.workspace / name, 1024 * 1024)
                 if digest(data) != final[name]:
                     raise ValueError('Final file seal mismatch: ' + name)
                 row['after'] = self.clean(data.decode('utf8'))
@@ -446,7 +447,9 @@ class Extractor:
 
     def export(self):
         arm = self.result['arm']
-        if arm in ['bantam-local-27b', 'bantam-codex-astra', 'bantam-codex-sol', 'bantam-codex-terra']:
+        if arm in ['bantam-astra-terra', 'bantam-astra-sol']:
+            source = self.foreman()
+        elif arm in ['bantam-local-27b', 'bantam-codex-astra', 'bantam-codex-sol', 'bantam-codex-terra']:
             source = self.bantam()
         elif arm == 'hermes':
             source = self.hermes()

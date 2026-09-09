@@ -8,7 +8,10 @@ export function workReplayEvents(work) {
     ?Object.entries(value).map(([key,value])=>key+': '+(typeof value==='string'&&value.includes('\n')?'\n':'')+(text(value)??'null')).join('\n')
     :text(value)??'No output was recorded.';
   const add=(id,atMs,kind,title,body,precision='exact')=>events.push({id,atMs,kind,title,body,precision,order:events.length});
-  const byNextTurn=action=>work.actions.find(next=>next.source==='factory-turn'&&Number.isInteger(next.turn)
+  const byNextTurn=action=>work.actions.find(next=>
+    (action.source.startsWith('factory-worker-')
+      ? next.source===action.source&&next.request?.job===action.request?.job
+      : next.source==='factory-turn')&&Number.isInteger(next.turn)
     &&Number.isInteger(action.turn)&&next.turn>action.turn&&timed(next.atMs))?.atMs;
   add('work-order',0,'request','WORK ORDER',work.task);
   for(const [i,station] of (work.stations??[]).entries()){

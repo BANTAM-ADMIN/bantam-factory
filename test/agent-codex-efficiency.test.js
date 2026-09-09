@@ -31,8 +31,8 @@ test('Codex defaults deliver the qualified compact prompt, file discovery and ba
         assert.ok(prompt.includes(composeRulesBlock(process.env, {compact: enabled})), provider);
         if(calls===1)assert.equal(prompt.includes('test/public.test.js'), enabled, provider);
         if(calls===1)assert.doesNotMatch(prompt, /SOURCE_BODY_MUST_NOT_BE_PRELOADED/);
-        else assert.equal(prompt.includes('Passing undefined or omitting that argument uses the default'), enabled);
-        assert.equal(options.jsonSchema.properties.a.enum.includes('write_batch'), enabled, provider);
+        else assert.equal(prompt.includes('Passing undefined or omitting that argument uses the default'), enabled, 'fixture hint delivery');
+        if(calls===1)assert.equal(options.jsonSchema.properties.a.enum.includes('write_batch'), enabled, provider);
         return {content: JSON.stringify(calls===1?{a:'read_file',p:'test/public.test.js'}:{a: 'done', summary: 'Hello.'}), tokens: 1};
       }},
     });

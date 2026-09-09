@@ -24,6 +24,7 @@ import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
 import { Executor, runShellProcess, withNodeTestTimeout, START_WINDOW } from "./executor.js";
 import { isGeneratedPath, isTestPath, snapshotTree } from "./scope-guard.js";
+import { verificationOutputDirectories, isDeclaredVerificationOutput } from "./verification-outputs.js";
 import { isTestCommand, isDeliverableRun, isInlineEvalProbe } from "./logic/deliverable-signals.js";
 import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer, unicodeUnitGauge, shipTheGeneratorSteer, enumerateContractNote } from "./logic/probe-discipline.js";
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
@@ -493,6 +494,7 @@ async function runAgentCore({
   dockerImage = undefined,
   readOnlyWorkspacePaths = null,
   verificationWorkspaceReadOnly = envTruthy(process.env.BANTAM_VERIFY_WORKSPACE_READ_ONLY),
+  verificationOutputDirs = process.env.BANTAM_VERIFY_OUTPUT_DIRS ?? '',
   shellEnvOverrides = null,
   // Subprocess dependency injection for embedders/tests. The same runner sees
   // implementation shells and harness-owned verifiers, while their mount
@@ -852,6 +854,7 @@ async function runAgentCore({
   // the shell will actually have (per-action docker container vs host shell).
   const sandboxedShell = (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker";
   if (typeof verificationWorkspaceReadOnly !== "boolean") throw new TypeError("verificationWorkspaceReadOnly must be a boolean");
+  const declaredVerificationOutputs = verificationOutputDirectories(verificationOutputDirs);
   if (verificationWorkspaceReadOnly && !sandboxedShell) {
     throw new Error("read-only configured verification requires the Docker shell sandbox; host mode cannot enforce it");
   }
@@ -908,9 +911,11 @@ async function runAgentCore({
     : uneditedTaskSpecDocuments(task, [], exec).slice(0, 4)
       .map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.text.length > 12000 }));
   const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments,
+    verificationOutputDirs: declaredVerificationOutputs,
     ...(instructionGuards.inheritedScope ? { inheritedInstructionScope: instructionGuards.inheritedScope } : {}),
     ...(instructionGuards.frozenTestCheckpoint ? { frozenTests: instructionGuards.frozenTestCheckpoint } : {}) };
   let contextBasisRecorded = Boolean(savedContextBasis)
+    && sameStrings(savedContextBasis.verificationOutputDirs ?? [], declaredVerificationOutputs)
     && (!instructionGuards.frozenTestCheckpoint || savedContextBasis.frozenTests?.instructionSha256 === instructionGuards.frozenTestCheckpoint.instructionSha256);
   const contractAuditEnabled = !interactive && !advisoryMode
     && contractStateAuditEnabled(contractStateAudit, task, suppliedTaskDocuments);
@@ -1134,6 +1139,7 @@ async function runAgentCore({
         ...(t.controllerStop ? { controllerStop: structuredClone(t.controllerStop) } : {}),
         ...(t.sourceEditedByShell === true ? { sourceEditedByShell: true } : {}),
         ...(Array.isArray(t.shellChangedPaths) ? { shellChangedPaths: t.shellChangedPaths.slice() } : {}),
+        ...(Array.isArray(t.shellOutputPaths) ? { shellOutputPaths: t.shellOutputPaths.slice() } : {}),
         ...(t.shellScopeRollback ? { shellScopeRollback: structuredClone(t.shellScopeRollback) } : {}),
         ...(t.scopedVerify ? { scopedVerify: t.scopedVerify } : {}),
         ...(Object.hasOwn(t, "verificationEvidence") ? { verificationEvidence: t.verificationEvidence } : {}),
@@ -3851,14 +3857,30 @@ async function runAgentCore({
     const afterShellFiles = !gateRejection && !interactiveStop && action.a === "shell"
       ? snapshotWorkspaceFiles(workspace)
       : null;
-    const shellChangedPaths = afterShellFiles
+    const allShellChangedPaths = afterShellFiles
       ? workspaceFileChanges(beforeShellFiles, afterShellFiles)
         // Restoring byte-identical protected evidence updates filesystem mtimes.
         // Those paths were rolled back, not changed by the surviving shell
         // transaction, so keep them out of mutation provenance.
         .filter((rel) => !result.shellScopeRollback?.restored?.includes(rel))
       : [];
+    // A real test execution may emit declared reports/screenshots. Keep those
+    // writes in the film without treating them as edits to what was tested.
+    // No declaration, non-test shell, uncertain execution, source/config edit,
+    // or scope rollback can acquire this exemption.
+    const outputExecution = declaredVerificationOutputs.length ? verificationEvidence({
+      execution: result.shellExecution, configuredCommand: verificationScript,
+      generation: workspaceEditGeneration,
+    }) : null;
+    const shellOutputPaths = ['pass', 'fail'].includes(outputExecution?.status)
+      && !result.shellScopeRollback?.violations?.length
+      ? allShellChangedPaths.filter(p => isDeclaredVerificationOutput(p, declaredVerificationOutputs)) : [];
+    const shellChangedPaths = allShellChangedPaths.filter(p => !shellOutputPaths.includes(p));
     const shellChangedWorkspace = shellChangedPaths.length > 0;
+    if (shellOutputPaths.length) {
+      result.observation += `\n[verification-outputs] Recorded ${shellOutputPaths.length} file(s) in operator-declared test output directories: ${shellOutputPaths.slice(0, 8).join(', ')}${shellOutputPaths.length > 8 ? ' …' : ''}. These outputs do not change the verified source generation.`;
+      metrics.verificationOutputFiles = (metrics.verificationOutputFiles ?? 0) + shellOutputPaths.length;
+    }
     // A shell command that rewrites SOURCE (sed -i, >>, tee, git apply, a codegen script) is a real
     // edit the completion gates must see — otherwise a model can regress just-verified code via shell
     // and `done` over it, since the edit-action gates only key on write_file/replace/patch/etc. Filter
@@ -6619,6 +6641,7 @@ async function runAgentCore({
       environmentVerification: result.environmentVerification,
       sourceEditedByShell: result.sourceEditedByShell,  // shell command that rewrote source (undefined if not)
       ...(shellChangedPaths.length ? { shellChangedPaths } : {}),
+      ...(shellOutputPaths.length ? { shellOutputPaths } : {}),
       ...(result.shellScopeRollback ? { shellScopeRollback: result.shellScopeRollback } : {}),
       ...(stateAuditIssued ? { stateAudit: stateAuditSnapshot() } : {}),
       workspaceCoherence: {
@@ -6718,7 +6741,7 @@ async function runAgentCore({
       ...Object.fromEntries([
         "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop", "promptPrelude", "promptAttempts",
-        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
+        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths", "shellOutputPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ].filter((key) => Object.hasOwn(lastTurn, key) && lastTurn[key] !== undefined)
         .map((key) => [key, lastTurn[key]])),

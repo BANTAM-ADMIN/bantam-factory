@@ -185,6 +185,7 @@ export function buildArtifact({
         ? { sourceEditedByShell: t.sourceEditedByShell }
         : {}),
       ...(Array.isArray(t.shellChangedPaths) ? { shellChangedPaths: [...t.shellChangedPaths] } : {}),
+      ...(Array.isArray(t.shellOutputPaths) ? { shellOutputPaths: [...t.shellOutputPaths] } : {}),
       ...(t.shellScopeRollback !== undefined ? { shellScopeRollback: serializableCopy(t.shellScopeRollback) } : {}),
       ...(t.stateAudit !== undefined ? { stateAudit: serializableCopy(t.stateAudit) } : {}),
       ...(t.workspaceCoherence !== undefined

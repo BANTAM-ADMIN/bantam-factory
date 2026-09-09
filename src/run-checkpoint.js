@@ -134,7 +134,7 @@ export class RunCheckpoint {
       for (const key of [
         "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop",
-        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths",
+        "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths", "shellOutputPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
       ]) {
         if (Object.hasOwn(event, key)) this._pending[key] = serializableCopy(event[key]);

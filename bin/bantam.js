@@ -260,6 +260,7 @@ Options:
   --workspace <dir>   workspace directory (default: current directory)
   --verify "<cmd>"    verification command to run after the task completes
   --verify-workspace-read-only  run configured verification with source read-only (Docker; /tmp writable)
+  --verify-output-dirs <dirs>   comma-separated report/screenshot output directories (never inputs)
   --dangerously-allow-net   grant shell NETWORK access for the whole run without asking
                       (default: network is OFF; interactive sessions ask per request)
   --max-turns <n>     maximum agent turns (default: 30)
@@ -2224,6 +2225,7 @@ if (cmd === undefined || cmd === "chat") {
       ...(args["write-batch"] === true ? { writeBatch: true } : {}),
       verificationScript: args.verify || null,
       verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
+      verificationOutputDirs: args["verify-output-dirs"],
       // --no-edit: answer questions about a codebase without touching it. The
       // model's own prompt already says a QUESTION deserves an ANSWER rather
       // than a file change, and asked politely it still edited — on the joblog
@@ -5294,6 +5296,7 @@ async function repl() {
           maxTurns: args["max-turns"] ? Number(args["max-turns"]) : (Number(process.env.BANTAM_MAX_TURNS) || 60),
           verificationScript,
           verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
+          verificationOutputDirs: args["verify-output-dirs"],
           verificationPolicy: "after_edit",
           thinkMode, skills: skillsCfg, planMode,
           postVerifyIntegrity: skillSnapshot ? () => checkWorkspace(skillSnapshot, workspace, {}) : null,

@@ -1,0 +1,79 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 56012,
+      "sha256": "8a94b4149a9f52f1c261952ed932f9d646f65a0e45f3ef76666bde984e53a4fa",
+      "arm": "codex-astra",
+      "wallMs": 157908,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "A completed repair, with a repeated implementation.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the starter and attempted a patch that deleted and added the same path. The patch tool rejected it, so Astra generated the implementation again through the shell. It then added regression tests and ran the suite.",
+            "actions": [
+              "action-2",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          },
+          {
+            "text": "The delivered program passed all five acceptance groups and all three additional graph and scale checks. The full record includes its tool failures, recovery, tests and finished source.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 51708,
+      "sha256": "4b3a9c8aad794baa9b9f0bcf440cba226b23e2bf6265f17ecd013e427d5fe460",
+      "arm": "bantam-codex-astra",
+      "wallMs": 95409,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Read together. Review once. Keep the exact edit.",
+        "paragraphs": [
+          {
+            "text": "Astra read the implementation, configuration and tests together. The factory flagged a large rewrite for review; Astra approved a 92-character receipt and the factory applied the original proposed bytes. It did not generate the program a second time.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra added behavioral and CLI tests, ran them, and finished. The delivered program passed all five acceptance groups and all three additional graph and scale checks.",
+            "actions": [
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

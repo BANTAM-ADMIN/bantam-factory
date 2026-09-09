@@ -1,0 +1,361 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "job-planner",
+  "arm": "bantam-codex-astra",
+  "wallMs": 110286,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-09T12:42:18.001Z",
+  "task": "# Job planner: repair deterministic dependency planning\n\nThe supplied `job-plan.js` has a simple but flawed implementation. Repair it\nand complete its CLI using only Node.js builtins. Export synchronous\n`planJobs(spec)`, where `spec` is an array of job objects, each with:\n\n- `id`: nonempty string; preserve whitespace and Unicode exactly.\n- `deps`: array of unique nonempty string IDs. Every referenced ID must exist.\n- `state`: exactly `pending`, `succeeded`, or `failed`.\n\nDuplicate IDs, missing references, duplicate dependencies, malformed required\nfields, and any directed dependency cycle throw an Error. A self-dependency is\na cycle. Check cycles over the entire graph, including completed/failed jobs.\nUnknown object fields are ignored. Do not coerce values or mutate the input.\nEmpty input is valid. `__proto__` and `constructor` are ordinary IDs.\n\nReturn exactly `{order: [ID], ready: [ID], blocked: [{id, causes: [ID]}]}`.\n\nFirst compute a deterministic topological ordering of the ENTIRE graph using\nKahn's algorithm: repeatedly remove the JavaScript `<`/`>` lexically smallest\ncurrently zero-indegree ID, updating its children before choosing again. This\nis code-unit string ordering, not locale collation, input order, depth-first\npostorder, or sorting whole waves of nodes. `order` is that full ordering\nfiltered to pending jobs that are not blocked. Do not simply topologically sort\nthe induced pending-only graph.\n\nA pending job is `blocked` if it has any failed job as a direct or transitive\ndependency. Each blocked entry's `causes` lists ALL such failed ancestor IDs,\nuniquely sorted using the same string order. Traverse dependency paths even\nthrough succeeded or failed intermediate jobs: an intermediate state does not\nerase ancestry. `blocked` itself is sorted by id. Failed and succeeded jobs\nnever appear in `order` or `blocked`.\n\n`ready` contains exactly the unblocked pending jobs whose direct dependencies\nare all currently `succeeded`, sorted by id. It describes the input states,\nnot a simulated future after executing `order`. Jobs with no dependencies are\nready. No job is executed or state mutated by this tool.\n\nCLI: `node job-plan.js SPECFILE` reads UTF-8 JSON and prints only the plan as\nJSON followed by newline on stdout, with exit 0 and no stderr. It takes exactly\none file argument. Invalid arguments, unreadable input, invalid JSON, or invalid\ngraphs produce nonempty stderr, no stdout, and exit 2. Importing the module\nmust not run the CLI. Do not add third-party dependencies or modify\n`package.json` or existing public tests. You may add tests. Run `npm test` before\nfinishing. Every arm receives this same fixed starter and complete contract.\n",
+  "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+  "source": "factory-turns-and-verification",
+  "actions": [
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "read_file",
+            "p": "job-plan.js"
+          },
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "read_file",
+            "p": "test/job-plan.test.js"
+          }
+        ]
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"job-plan.js\"}\njob-plan.js (19 lines, showing 1-19):\n1\t// Known-flawed starter, identical for every contender. Repair using task.md.\n2\texport function planJobs(spec) {\n3\t  const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n4\t  const order = [], visited = new Set();\n5\t  function visit(id) {\n6\t    if (visited.has(id)) return;\n7\t    visited.add(id);\n8\t    for (const dep of jobs[id].deps) visit(dep);\n9\t    if (jobs[id].state === 'pending') order.push(id);\n10\t  }\n11\t  for (const job of spec) visit(job.id);\n12\t  return {\n13\t    order,\n14\t    ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n15\t    blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n16\t      .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n17\t  };\n18\t}\n19\t\n\u2014 end of file (19 lines); nothing beyond line 19, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n\u2014 end of file (2 lines); nothing beyond line 2, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"test/job-plan.test.js\"}\ntest/job-plan.test.js (21 lines, showing 1-21):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport { planJobs } from '../job-plan.js';\n4\tconst job = (id,deps=[],state='pending') => ({id,deps,state});\n5\ttest('empty and a basic chain', () => {\n6\t  assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n7\t  assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n8\t});\n9\ttest('the smallest newly available job precedes other queued jobs', () => {\n10\t  assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n11\t});\n12\ttest('failure is transitive and successful dependencies permit readiness', () => {\n13\t  assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n14\t    order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n15\t  });\n16\t});\n17\ttest('cycles and unknown dependencies are errors', () => {\n18\t  assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n19\t  assert.throws(() => planJobs([job('a',['absent'])]));\n20\t});\n21\t\n\u2014 end of file (21 lines); nothing beyond line 21, do not re-read this range.\n\n[fixture-defaults] Visible object builders have default parameters: job (line 4): deps=[], state='pending'. Passing undefined or omitting that argument uses the default. To test an invalid or missing object field, construct the object explicitly, overwrite the field after calling the helper, or delete the field. This describes the fixture, not the API's behavior.",
+      "atMs": 8822,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 0,
+      "id": "action-1"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "job-plan.js",
+        "content": "import { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nconst compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;\nconst validId = value => typeof value === 'string' && value.length > 0;\n\nexport function planJobs(spec) {\n  if (!Array.isArray(spec)) throw new Error('Expected an array of jobs');\n  const jobs = new Map();\n  for (const job of spec) {\n    if (job === null || typeof job !== 'object' || Array.isArray(job) ||\n        !validId(job.id) || !Array.isArray(job.deps) ||\n        !['pending', 'succeeded', 'failed'].includes(job.state)) {\n      throw new Error('Malformed job');\n    }\n    if (jobs.has(job.id)) throw new Error('Duplicate job ID');\n    const deps = new Set();\n    for (const dep of job.deps) {\n      if (!validId(dep) || deps.has(dep)) throw new Error('Invalid or duplicate dependency');\n      deps.add(dep);\n    }\n    jobs.set(job.id, { id: job.id, deps, state: job.state, children: [], remaining: deps.size, causes: new Set() });\n  }\n  for (const job of jobs.values()) {\n    for (const dep of job.deps) {\n      if (!jobs.has(dep)) throw new Error('Unknown dependency');\n      jobs.get(dep).children.push(job.id);\n    }\n  }\n\n  // Keep the frontier sorted, inserting newly available jobs before choosing again.\n  const frontier = [...jobs.values()].filter(job => job.remaining === 0)\n    .map(job => job.id).sort(compare);\n  const fullOrder = [];\n  while (frontier.length) {\n    const id = frontier.shift();\n    const job = jobs.get(id);\n    fullOrder.push(id);\n    for (const childId of job.children) {\n      const child = jobs.get(childId);\n      // Propagate ancestry regardless of either endpoint's state.\n      for (const cause of job.causes) child.causes.add(cause);\n      if (job.state === 'failed') child.causes.add(id);\n      if (--child.remaining === 0) {\n        let low = 0, high = frontier.length;\n        while (low < high) {\n          const mid = (low + high) >>> 1;\n          if (compare(frontier[mid], childId) < 0) low = mid + 1;\n          else high = mid;\n        }\n        frontier.splice(low, 0, childId);\n      }\n    }\n  }\n  if (fullOrder.length !== jobs.size) throw new Error('Dependency cycle');\n\n  const order = [], ready = [], blocked = [];\n  for (const id of fullOrder) {\n    const job = jobs.get(id);\n    if (job.state !== 'pending') continue;\n    if (job.causes.size) {\n      blocked.push({ id, causes: [...job.causes].sort(compare) });\n    } else {\n      order.push(id);\n      if ([...job.deps].every(dep => jobs.get(dep).state === 'succeeded')) ready.push(id);\n    }\n  }\n  ready.sort(compare);\n  blocked.sort((a, b) => compare(a.id, b.id));\n  return { order, ready, blocked };\n}\n\nif (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {\n  try {\n    if (process.argv.length !== 3) throw new Error('Usage: node job-plan.js SPECFILE');\n    const plan = planJobs(JSON.parse(readFileSync(process.argv[2], 'utf8')));\n    process.stdout.write(JSON.stringify(plan) + '\\n');\n  } catch (error) {\n    process.stderr.write(`job-plan: ${error.message}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+      },
+      "output": "[edit-preservation] Staged bytes remove 7 executable statement(s) by AST comparison; 2 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: compare (AFTER L5), validId (AFTER L6).\n- BEFORE job-plan.js:3 in planJobs: \"const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\"\n  STAGED AFTER job-plan.js:19 (next-retained-statement): \"const dep\".\n- BEFORE job-plan.js:4 in planJobs: \"const order = [], visited = new Set();\"\n  STAGED AFTER job-plan.js:19 (next-retained-statement): \"const dep\".\n- BEFORE job-plan.js:6 in planJobs: \"return;\"\n  STAGED AFTER job-plan.js:19 (next-retained-statement): \"const dep\".\n- BEFORE job-plan.js:7 in planJobs: \"visited.add(id);\"\n  STAGED AFTER job-plan.js:19 (next-retained-statement): \"const dep\".\n- BEFORE job-plan.js:8 in planJobs: \"visit(dep);\"\n  STAGED AFTER job-plan.js:65 (next-retained-statement): \"order.push(id);\".\n- BEFORE job-plan.js:11 in planJobs: \"visit(job.id);\"\n  STAGED AFTER job-plan.js:11 (previous-retained-statement): \"const job\".\n1 more removed statements omitted from this bounded display.\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:85a74c585722099d12ac87832051c67d838164d63b6f144ca2e4323f68f43a6d.\n[edit-confirmation] To accept this reviewed write, use {\"a\":\"confirm_edit\",\"id\":\"6e3aca2e04c1d821cf7e1040752bbfd54aa041d46b3892df0a898b1a26dd7a0f\"}. The factory retains the exact proposed bytes; do not regenerate them. A changed target invalidates this receipt.",
+      "atMs": 43762,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 1,
+      "id": "action-2"
+    },
+    {
+      "name": "confirm_edit",
+      "category": "edit",
+      "request": {
+        "a": "confirm_edit",
+        "id": "6e3aca2e04c1d821cf7e1040752bbfd54aa041d46b3892df0a898b1a26dd7a0f"
+      },
+      "output": "wrote 3122 bytes to job-plan.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `planJobs` is also referenced in: test/job-plan.test.js\n  `order` is also referenced in: test/job-plan.test.js",
+      "atMs": 49868,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 2,
+      "id": "action-3"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "a": "write_file",
+        "p": "test/job-plan-extra.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { spawnSync } from 'node:child_process';\nimport { planJobs } from '../job-plan.js';\n\nconst job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n\ntest('validates required fields and every graph component', () => {\n  const invalid = [null, {}, 'jobs', [null], [[]], [{}],\n    [{ id: '', deps: [], state: 'pending' }],\n    [{ id: 1, deps: [], state: 'pending' }],\n    [{ id: 'x', state: 'pending' }],\n    [{ id: 'x', deps: 'y', state: 'pending' }],\n    [{ id: 'x', deps: [] }],\n    [{ id: 'x', deps: [], state: 'Pending' }],\n    [job('x', [''])], [job('x', [1])], [job('x', ['y'])],\n    [job('x'), job('x')], [job('x', ['y', 'y']), job('y')],\n    [job('x', ['x'], 'succeeded')],\n    [job('p'), job('x', ['y'], 'failed'), job('y', ['x'], 'succeeded')]];\n  for (const spec of invalid) assert.throws(() => planJobs(spec), Error);\n});\n\ntest('uses full-graph Kahn ordering, not pending-only ordering', () => {\n  const spec = [job('a', ['z']), job('b'), job('z', [], 'succeeded')];\n  assert.deepEqual(planJobs(spec), { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] });\n  assert.deepEqual(planJobs([...spec].reverse()), planJobs(spec));\n  assert.deepEqual(planJobs([job('a'), job('b', ['a'])]), {\n    order: ['a', 'b'], ready: ['a'], blocked: [],\n  });\n});\n\ntest('collects all failed ancestors through completed intermediates', () => {\n  const spec = [job('z', [], 'failed'), job('a', ['z'], 'failed'),\n    job('s', ['a'], 'succeeded'), job('p', ['s', 'z']), job('q', ['p']),\n    job('r', ['s']), job('ok', [], 'succeeded'), job('next', ['ok'])];\n  assert.deepEqual(planJobs(spec), {\n    order: ['next'], ready: ['next'], blocked: [\n      { id: 'p', causes: ['a', 'z'] }, { id: 'q', causes: ['a', 'z'] },\n      { id: 'r', causes: ['a', 'z'] },\n    ],\n  });\n});\n\ntest('preserves exact IDs, ignores extras, and does not mutate frozen inputs', () => {\n  const ids = ['\u00e9', 'Z', 'a', '\ud83d\ude00', '\\uE000', '__proto__', 'constructor', ' ', ' a '];\n  const sorted = [...ids].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n  const spec = Object.freeze(ids.map(id => Object.freeze({\n    id, deps: Object.freeze([]), state: 'pending', extra: { ignored: true },\n  })));\n  assert.deepEqual(planJobs(spec), { order: sorted, ready: sorted, blocked: [] });\n  assert.deepEqual(planJobs([job('__proto__', [], 'failed'), job('constructor', ['__proto__'])]), {\n    order: [], ready: [], blocked: [{ id: 'constructor', causes: ['__proto__'] }],\n  });\n});\n\ntest('CLI success, failures and inert module import', () => {\n  const cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const run = args => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n  const fails = args => {\n    const result = run(args);\n    assert.ifError(result.error);\n    assert.equal(result.status, 2);\n    assert.equal(result.stdout, '');\n    assert.ok(result.stderr.trim());\n  };\n  try {\n    const good = join(dir, 'valid unicode \u00e9.json');\n    writeFileSync(good, JSON.stringify([job('\u00e9')]));\n    const result = run([good]);\n    assert.ifError(result.error);\n    assert.equal(result.status, 0);\n    assert.equal(result.stdout, JSON.stringify({ order: ['\u00e9'], ready: ['\u00e9'], blocked: [] }) + '\\n');\n    assert.equal(result.stderr, '');\n    fails([]);\n    fails([good, good]);\n    fails([join(dir, 'absent.json')]);\n    const bad = join(dir, 'bad.json');\n    for (const content of ['{', '{}', JSON.stringify([job('x', ['x'])]), JSON.stringify([job('x', ['absent'])])]) {\n      writeFileSync(bad, content);\n      fails([bad]);\n    }\n    const imported = spawnSync(process.execPath,\n      ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../job-plan.js', import.meta.url).href)})`],\n      { encoding: 'utf8' });\n    assert.ifError(imported.error);\n    assert.equal(imported.status, 0);\n    assert.equal(imported.stdout, '');\n    assert.equal(imported.stderr, '');\n  } finally {\n    rmSync(dir, { recursive: true, force: true });\n  }\n});\n"
+      },
+      "output": "wrote 4242 bytes to test/job-plan-extra.test.js\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 96052,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 3,
+      "id": "action-4"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "output": "VERDICT: all 9 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: validates required fields and every graph component\nok 1 - validates required fields and every graph component\n  ---\n  duration_ms: 1.323479\n  ...\n# Subtest: uses full-graph Kahn ordering, not pending-only ordering\nok 2 - uses full-graph Kahn ordering, not pending-only ordering\n  ---\n  duration_ms: 0.559644\n  ...\n# Subtest: collects all failed ancestors through completed intermediates\nok 3 - collects all failed ancestors through completed intermediates\n  ---\n  duration_ms: 0.311982\n  ...\n# Subtest: preserves exact IDs, ignores extras, and does not mutate frozen inputs\nok 4 - preserves exact IDs, ignores extras, and does not mutate frozen inputs\n  ---\n  duration_ms: 0.280892\n  ...\n# Subtest: CLI success, failures and inert module import\nok 5 - CLI success, failures and inert module import\n  ---\n  duration_ms: 191.887174\n  ...\n# Subtest: empty and a basic chain\nok 6 - empty and a basic chain\n  ---\n  duration_ms: 1.322659\n  ...\n# Subtest: the smallest newly available job precedes other queued jobs\nok 7 - the smallest newly available job precedes other queued jobs\n  ---\n  duration_ms: 0.161132\n  ...\n# Subtest: failure is transitive and successful dependencies permit readiness\nok 8 - failure is transitive and successful dependencies permit readiness\n  ---\n  duration_ms: 0.233801\n  ...\n# Subtest: cycles and unknown dependencies are errors\nok 9 - cycles and unknown dependencies are errors\n  ---\n  duration_ms: 0.232421\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 237.599468",
+      "atMs": 101476,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 4,
+      "id": "action-5"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "a": "done",
+        "summary": "Repaired validation, deterministic full-graph Kahn ordering, failed-ancestor propagation, and readiness. Completed the import-safe CLI with required output and exit behavior. Added regression tests using temporary-directory fixtures; npm test passed all 9 tests. No dependencies, package.json, or existing tests changed."
+      },
+      "output": "",
+      "atMs": 108994,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-turn",
+      "turn": 5,
+      "id": "action-6"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 253,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 260,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 267,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 274,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 286,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 109906,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 109913,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 109920,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 109928,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 109935,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 109942,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 109949,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 109956,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Repaired validation, deterministic full-graph Kahn ordering, failed-ancestor propagation, and readiness. Completed the import-safe CLI with required output and exit behavior. Added regression tests using temporary-directory fixtures; npm test passed all 9 tests. No dependencies, package.json, or existing tests changed.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "job-plan.js",
+      "state": "changed",
+      "beforeSha256": "ed381e455c483d87557ddf9c10e7d90ffe6a3389a10bcb747eb7c829acec00bb",
+      "afterSha256": "05f4f0d2cf7e3497c41aab4496f5b342ed5350351c63b8816832cfdc7cb8b229",
+      "before": "// Known-flawed starter, identical for every contender. Repair using task.md.\nexport function planJobs(spec) {\n  const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n  const order = [], visited = new Set();\n  function visit(id) {\n    if (visited.has(id)) return;\n    visited.add(id);\n    for (const dep of jobs[id].deps) visit(dep);\n    if (jobs[id].state === 'pending') order.push(id);\n  }\n  for (const job of spec) visit(job.id);\n  return {\n    order,\n    ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n    blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n      .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n  };\n}\n",
+      "after": "import { readFileSync } from 'node:fs';\nimport { resolve } from 'node:path';\nimport { pathToFileURL } from 'node:url';\n\nconst compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;\nconst validId = value => typeof value === 'string' && value.length > 0;\n\nexport function planJobs(spec) {\n  if (!Array.isArray(spec)) throw new Error('Expected an array of jobs');\n  const jobs = new Map();\n  for (const job of spec) {\n    if (job === null || typeof job !== 'object' || Array.isArray(job) ||\n        !validId(job.id) || !Array.isArray(job.deps) ||\n        !['pending', 'succeeded', 'failed'].includes(job.state)) {\n      throw new Error('Malformed job');\n    }\n    if (jobs.has(job.id)) throw new Error('Duplicate job ID');\n    const deps = new Set();\n    for (const dep of job.deps) {\n      if (!validId(dep) || deps.has(dep)) throw new Error('Invalid or duplicate dependency');\n      deps.add(dep);\n    }\n    jobs.set(job.id, { id: job.id, deps, state: job.state, children: [], remaining: deps.size, causes: new Set() });\n  }\n  for (const job of jobs.values()) {\n    for (const dep of job.deps) {\n      if (!jobs.has(dep)) throw new Error('Unknown dependency');\n      jobs.get(dep).children.push(job.id);\n    }\n  }\n\n  // Keep the frontier sorted, inserting newly available jobs before choosing again.\n  const frontier = [...jobs.values()].filter(job => job.remaining === 0)\n    .map(job => job.id).sort(compare);\n  const fullOrder = [];\n  while (frontier.length) {\n    const id = frontier.shift();\n    const job = jobs.get(id);\n    fullOrder.push(id);\n    for (const childId of job.children) {\n      const child = jobs.get(childId);\n      // Propagate ancestry regardless of either endpoint's state.\n      for (const cause of job.causes) child.causes.add(cause);\n      if (job.state === 'failed') child.causes.add(id);\n      if (--child.remaining === 0) {\n        let low = 0, high = frontier.length;\n        while (low < high) {\n          const mid = (low + high) >>> 1;\n          if (compare(frontier[mid], childId) < 0) low = mid + 1;\n          else high = mid;\n        }\n        frontier.splice(low, 0, childId);\n      }\n    }\n  }\n  if (fullOrder.length !== jobs.size) throw new Error('Dependency cycle');\n\n  const order = [], ready = [], blocked = [];\n  for (const id of fullOrder) {\n    const job = jobs.get(id);\n    if (job.state !== 'pending') continue;\n    if (job.causes.size) {\n      blocked.push({ id, causes: [...job.causes].sort(compare) });\n    } else {\n      order.push(id);\n      if ([...job.deps].every(dep => jobs.get(dep).state === 'succeeded')) ready.push(id);\n    }\n  }\n  ready.sort(compare);\n  blocked.sort((a, b) => compare(a.id, b.id));\n  return { order, ready, blocked };\n}\n\nif (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {\n  try {\n    if (process.argv.length !== 3) throw new Error('Usage: node job-plan.js SPECFILE');\n    const plan = planJobs(JSON.parse(readFileSync(process.argv[2], 'utf8')));\n    process.stdout.write(JSON.stringify(plan) + '\\n');\n  } catch (error) {\n    process.stderr.write(`job-plan: ${error.message}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "05f4f0d2cf7e3497c41aab4496f5b342ed5350351c63b8816832cfdc7cb8b229",
+      "diff": "--- starter/job-plan.js\n+++ delivered/job-plan.js\n@@ -1,18 +1,83 @@\n-// Known-flawed starter, identical for every contender. Repair using task.md.\n+import { readFileSync } from 'node:fs';\n+import { resolve } from 'node:path';\n+import { pathToFileURL } from 'node:url';\n+\n+const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;\n+const validId = value => typeof value === 'string' && value.length > 0;\n+\n export function planJobs(spec) {\n-  const jobs = Object.fromEntries(spec.map(job => [job.id,job]));\n-  const order = [], visited = new Set();\n-  function visit(id) {\n-    if (visited.has(id)) return;\n-    visited.add(id);\n-    for (const dep of jobs[id].deps) visit(dep);\n-    if (jobs[id].state === 'pending') order.push(id);\n+  if (!Array.isArray(spec)) throw new Error('Expected an array of jobs');\n+  const jobs = new Map();\n+  for (const job of spec) {\n+    if (job === null || typeof job !== 'object' || Array.isArray(job) ||\n+        !validId(job.id) || !Array.isArray(job.deps) ||\n+        !['pending', 'succeeded', 'failed'].includes(job.state)) {\n+      throw new Error('Malformed job');\n+    }\n+    if (jobs.has(job.id)) throw new Error('Duplicate job ID');\n+    const deps = new Set();\n+    for (const dep of job.deps) {\n+      if (!validId(dep) || deps.has(dep)) throw new Error('Invalid or duplicate dependency');\n+      deps.add(dep);\n+    }\n+    jobs.set(job.id, { id: job.id, deps, state: job.state, children: [], remaining: deps.size, causes: new Set() });\n   }\n-  for (const job of spec) visit(job.id);\n-  return {\n-    order,\n-    ready:spec.filter(job => job.state === 'pending' && job.deps.length === 0).map(job => job.id),\n-    blocked:spec.filter(job => job.state === 'pending' && job.deps.some(dep => jobs[dep].state === 'failed'))\n-      .map(job => ({id:job.id,causes:job.deps.filter(dep => jobs[dep].state === 'failed')})),\n-  };\n+  for (const job of jobs.values()) {\n+    for (const dep of job.deps) {\n+      if (!jobs.has(dep)) throw new Error('Unknown dependency');\n+      jobs.get(dep).children.push(job.id);\n+    }\n+  }\n+\n+  // Keep the frontier sorted, inserting newly available jobs before choosing again.\n+  const frontier = [...jobs.values()].filter(job => job.remaining === 0)\n+    .map(job => job.id).sort(compare);\n+  const fullOrder = [];\n+  while (frontier.length) {\n+    const id = frontier.shift();\n+    const job = jobs.get(id);\n+    fullOrder.push(id);\n+    for (const childId of job.children) {\n+      const child = jobs.get(childId);\n+      // Propagate ancestry regardless of either endpoint's state.\n+      for (const cause of job.causes) child.causes.add(cause);\n+      if (job.state === 'failed') child.causes.add(id);\n+      if (--child.remaining === 0) {\n+        let low = 0, high = frontier.length;\n+        while (low < high) {\n+          const mid = (low + high) >>> 1;\n+          if (compare(frontier[mid], childId) < 0) low = mid + 1;\n+          else high = mid;\n+        }\n+        frontier.splice(low, 0, childId);\n+      }\n+    }\n+  }\n+  if (fullOrder.length !== jobs.size) throw new Error('Dependency cycle');\n+\n+  const order = [], ready = [], blocked = [];\n+  for (const id of fullOrder) {\n+    const job = jobs.get(id);\n+    if (job.state !== 'pending') continue;\n+    if (job.causes.size) {\n+      blocked.push({ id, causes: [...job.causes].sort(compare) });\n+    } else {\n+      order.push(id);\n+      if ([...job.deps].every(dep => jobs.get(dep).state === 'succeeded')) ready.push(id);\n+    }\n+  }\n+  ready.sort(compare);\n+  blocked.sort((a, b) => compare(a.id, b.id));\n+  return { order, ready, blocked };\n }\n+\n+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {\n+  try {\n+    if (process.argv.length !== 3) throw new Error('Usage: node job-plan.js SPECFILE');\n+    const plan = planJobs(JSON.parse(readFileSync(process.argv[2], 'utf8')));\n+    process.stdout.write(JSON.stringify(plan) + '\\n');\n+  } catch (error) {\n+    process.stderr.write(`job-plan: ${error.message}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "afterSha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "before": "{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-job-planner\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "817f7a7b32589357663ea5e9f6dc32e97257b750944f81eec82ab7242ced01a8",
+      "diff": ""
+    },
+    {
+      "path": "test/job-plan-extra.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "f67fdd1c4be45ac4bd16593d0564ed6258e8655b561731efa899c5325d13f764",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\nimport { tmpdir } from 'node:os';\nimport { join } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { spawnSync } from 'node:child_process';\nimport { planJobs } from '../job-plan.js';\n\nconst job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n\ntest('validates required fields and every graph component', () => {\n  const invalid = [null, {}, 'jobs', [null], [[]], [{}],\n    [{ id: '', deps: [], state: 'pending' }],\n    [{ id: 1, deps: [], state: 'pending' }],\n    [{ id: 'x', state: 'pending' }],\n    [{ id: 'x', deps: 'y', state: 'pending' }],\n    [{ id: 'x', deps: [] }],\n    [{ id: 'x', deps: [], state: 'Pending' }],\n    [job('x', [''])], [job('x', [1])], [job('x', ['y'])],\n    [job('x'), job('x')], [job('x', ['y', 'y']), job('y')],\n    [job('x', ['x'], 'succeeded')],\n    [job('p'), job('x', ['y'], 'failed'), job('y', ['x'], 'succeeded')]];\n  for (const spec of invalid) assert.throws(() => planJobs(spec), Error);\n});\n\ntest('uses full-graph Kahn ordering, not pending-only ordering', () => {\n  const spec = [job('a', ['z']), job('b'), job('z', [], 'succeeded')];\n  assert.deepEqual(planJobs(spec), { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] });\n  assert.deepEqual(planJobs([...spec].reverse()), planJobs(spec));\n  assert.deepEqual(planJobs([job('a'), job('b', ['a'])]), {\n    order: ['a', 'b'], ready: ['a'], blocked: [],\n  });\n});\n\ntest('collects all failed ancestors through completed intermediates', () => {\n  const spec = [job('z', [], 'failed'), job('a', ['z'], 'failed'),\n    job('s', ['a'], 'succeeded'), job('p', ['s', 'z']), job('q', ['p']),\n    job('r', ['s']), job('ok', [], 'succeeded'), job('next', ['ok'])];\n  assert.deepEqual(planJobs(spec), {\n    order: ['next'], ready: ['next'], blocked: [\n      { id: 'p', causes: ['a', 'z'] }, { id: 'q', causes: ['a', 'z'] },\n      { id: 'r', causes: ['a', 'z'] },\n    ],\n  });\n});\n\ntest('preserves exact IDs, ignores extras, and does not mutate frozen inputs', () => {\n  const ids = ['\u00e9', 'Z', 'a', '\ud83d\ude00', '\\uE000', '__proto__', 'constructor', ' ', ' a '];\n  const sorted = [...ids].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n  const spec = Object.freeze(ids.map(id => Object.freeze({\n    id, deps: Object.freeze([]), state: 'pending', extra: { ignored: true },\n  })));\n  assert.deepEqual(planJobs(spec), { order: sorted, ready: sorted, blocked: [] });\n  assert.deepEqual(planJobs([job('__proto__', [], 'failed'), job('constructor', ['__proto__'])]), {\n    order: [], ready: [], blocked: [{ id: 'constructor', causes: ['__proto__'] }],\n  });\n});\n\ntest('CLI success, failures and inert module import', () => {\n  const cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n  const run = args => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n  const fails = args => {\n    const result = run(args);\n    assert.ifError(result.error);\n    assert.equal(result.status, 2);\n    assert.equal(result.stdout, '');\n    assert.ok(result.stderr.trim());\n  };\n  try {\n    const good = join(dir, 'valid unicode \u00e9.json');\n    writeFileSync(good, JSON.stringify([job('\u00e9')]));\n    const result = run([good]);\n    assert.ifError(result.error);\n    assert.equal(result.status, 0);\n    assert.equal(result.stdout, JSON.stringify({ order: ['\u00e9'], ready: ['\u00e9'], blocked: [] }) + '\\n');\n    assert.equal(result.stderr, '');\n    fails([]);\n    fails([good, good]);\n    fails([join(dir, 'absent.json')]);\n    const bad = join(dir, 'bad.json');\n    for (const content of ['{', '{}', JSON.stringify([job('x', ['x'])]), JSON.stringify([job('x', ['absent'])])]) {\n      writeFileSync(bad, content);\n      fails([bad]);\n    }\n    const imported = spawnSync(process.execPath,\n      ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../job-plan.js', import.meta.url).href)})`],\n      { encoding: 'utf8' });\n    assert.ifError(imported.error);\n    assert.equal(imported.status, 0);\n    assert.equal(imported.stdout, '');\n    assert.equal(imported.stderr, '');\n  } finally {\n    rmSync(dir, { recursive: true, force: true });\n  }\n});\n",
+      "displaySha256": "f67fdd1c4be45ac4bd16593d0564ed6258e8655b561731efa899c5325d13f764",
+      "diff": "--- starter/test/job-plan-extra.test.js\n+++ delivered/test/job-plan-extra.test.js\n@@ -0,0 +1,97 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';\n+import { tmpdir } from 'node:os';\n+import { join } from 'node:path';\n+import { fileURLToPath } from 'node:url';\n+import { spawnSync } from 'node:child_process';\n+import { planJobs } from '../job-plan.js';\n+\n+const job = (id, deps = [], state = 'pending') => ({ id, deps, state });\n+\n+test('validates required fields and every graph component', () => {\n+  const invalid = [null, {}, 'jobs', [null], [[]], [{}],\n+    [{ id: '', deps: [], state: 'pending' }],\n+    [{ id: 1, deps: [], state: 'pending' }],\n+    [{ id: 'x', state: 'pending' }],\n+    [{ id: 'x', deps: 'y', state: 'pending' }],\n+    [{ id: 'x', deps: [] }],\n+    [{ id: 'x', deps: [], state: 'Pending' }],\n+    [job('x', [''])], [job('x', [1])], [job('x', ['y'])],\n+    [job('x'), job('x')], [job('x', ['y', 'y']), job('y')],\n+    [job('x', ['x'], 'succeeded')],\n+    [job('p'), job('x', ['y'], 'failed'), job('y', ['x'], 'succeeded')]];\n+  for (const spec of invalid) assert.throws(() => planJobs(spec), Error);\n+});\n+\n+test('uses full-graph Kahn ordering, not pending-only ordering', () => {\n+  const spec = [job('a', ['z']), job('b'), job('z', [], 'succeeded')];\n+  assert.deepEqual(planJobs(spec), { order: ['b', 'a'], ready: ['a', 'b'], blocked: [] });\n+  assert.deepEqual(planJobs([...spec].reverse()), planJobs(spec));\n+  assert.deepEqual(planJobs([job('a'), job('b', ['a'])]), {\n+    order: ['a', 'b'], ready: ['a'], blocked: [],\n+  });\n+});\n+\n+test('collects all failed ancestors through completed intermediates', () => {\n+  const spec = [job('z', [], 'failed'), job('a', ['z'], 'failed'),\n+    job('s', ['a'], 'succeeded'), job('p', ['s', 'z']), job('q', ['p']),\n+    job('r', ['s']), job('ok', [], 'succeeded'), job('next', ['ok'])];\n+  assert.deepEqual(planJobs(spec), {\n+    order: ['next'], ready: ['next'], blocked: [\n+      { id: 'p', causes: ['a', 'z'] }, { id: 'q', causes: ['a', 'z'] },\n+      { id: 'r', causes: ['a', 'z'] },\n+    ],\n+  });\n+});\n+\n+test('preserves exact IDs, ignores extras, and does not mutate frozen inputs', () => {\n+  const ids = ['\u00e9', 'Z', 'a', '\ud83d\ude00', '\\uE000', '__proto__', 'constructor', ' ', ' a '];\n+  const sorted = [...ids].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n+  const spec = Object.freeze(ids.map(id => Object.freeze({\n+    id, deps: Object.freeze([]), state: 'pending', extra: { ignored: true },\n+  })));\n+  assert.deepEqual(planJobs(spec), { order: sorted, ready: sorted, blocked: [] });\n+  assert.deepEqual(planJobs([job('__proto__', [], 'failed'), job('constructor', ['__proto__'])]), {\n+    order: [], ready: [], blocked: [{ id: 'constructor', causes: ['__proto__'] }],\n+  });\n+});\n+\n+test('CLI success, failures and inert module import', () => {\n+  const cli = fileURLToPath(new URL('../job-plan.js', import.meta.url));\n+  const dir = mkdtempSync(join(tmpdir(), 'job-plan-'));\n+  const run = args => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });\n+  const fails = args => {\n+    const result = run(args);\n+    assert.ifError(result.error);\n+    assert.equal(result.status, 2);\n+    assert.equal(result.stdout, '');\n+    assert.ok(result.stderr.trim());\n+  };\n+  try {\n+    const good = join(dir, 'valid unicode \u00e9.json');\n+    writeFileSync(good, JSON.stringify([job('\u00e9')]));\n+    const result = run([good]);\n+    assert.ifError(result.error);\n+    assert.equal(result.status, 0);\n+    assert.equal(result.stdout, JSON.stringify({ order: ['\u00e9'], ready: ['\u00e9'], blocked: [] }) + '\\n');\n+    assert.equal(result.stderr, '');\n+    fails([]);\n+    fails([good, good]);\n+    fails([join(dir, 'absent.json')]);\n+    const bad = join(dir, 'bad.json');\n+    for (const content of ['{', '{}', JSON.stringify([job('x', ['x'])]), JSON.stringify([job('x', ['absent'])])]) {\n+      writeFileSync(bad, content);\n+      fails([bad]);\n+    }\n+    const imported = spawnSync(process.execPath,\n+      ['--input-type=module', '-e', `await import(${JSON.stringify(new URL('../job-plan.js', import.meta.url).href)})`],\n+      { encoding: 'utf8' });\n+    assert.ifError(imported.error);\n+    assert.equal(imported.status, 0);\n+    assert.equal(imported.stdout, '');\n+    assert.equal(imported.stderr, '');\n+  } finally {\n+    rmSync(dir, { recursive: true, force: true });\n+  }\n+});\n"
+    },
+    {
+      "path": "test/job-plan.test.js",
+      "state": "unchanged",
+      "beforeSha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "afterSha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\nconst job = (id,deps=[],state='pending') => ({id,deps,state});\ntest('empty and a basic chain', () => {\n  assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n  assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n});\ntest('the smallest newly available job precedes other queued jobs', () => {\n  assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n});\ntest('failure is transitive and successful dependencies permit readiness', () => {\n  assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n    order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n  });\n});\ntest('cycles and unknown dependencies are errors', () => {\n  assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n  assert.throws(() => planJobs([job('a',['absent'])]));\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { planJobs } from '../job-plan.js';\nconst job = (id,deps=[],state='pending') => ({id,deps,state});\ntest('empty and a basic chain', () => {\n  assert.deepEqual(planJobs([]),{order:[],ready:[],blocked:[]});\n  assert.deepEqual(planJobs([job('build',['fetch']),job('fetch')]),{order:['fetch','build'],ready:['fetch'],blocked:[]});\n});\ntest('the smallest newly available job precedes other queued jobs', () => {\n  assert.deepEqual(planJobs([job('z'),job('b'),job('a',['b'])]),{order:['b','a','z'],ready:['b','z'],blocked:[]});\n});\ntest('failure is transitive and successful dependencies permit readiness', () => {\n  assert.deepEqual(planJobs([job('bad',[],'failed'),job('mid',['bad']),job('end',['mid']),job('ok',[],'succeeded'),job('next',['ok'])]),{\n    order:['next'],ready:['next'],blocked:[{id:'end',causes:['bad']},{id:'mid',causes:['bad']}],\n  });\n});\ntest('cycles and unknown dependencies are errors', () => {\n  assert.throws(() => planJobs([job('a',['b']),job('b',['a'])]));\n  assert.throws(() => planJobs([job('a',['absent'])]));\n});\n",
+      "displaySha256": "3bc8f3a488fe47052fcf470a2256759c4a154d5ab9259280c4679afe8502ec47",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: validates required fields and every graph component\nok 1 - validates required fields and every graph component\n  ---\n  duration_ms: 1.342279\n  ...\n# Subtest: uses full-graph Kahn ordering, not pending-only ordering\nok 2 - uses full-graph Kahn ordering, not pending-only ordering\n  ---\n  duration_ms: 0.551124\n  ...\n# Subtest: collects all failed ancestors through completed intermediates\nok 3 - collects all failed ancestors through completed intermediates\n  ---\n  duration_ms: 0.333782\n  ...\n# Subtest: preserves exact IDs, ignores extras, and does not mutate frozen inputs\nok 4 - preserves exact IDs, ignores extras, and does not mutate frozen inputs\n  ---\n  duration_ms: 0.277332\n  ...\n# Subtest: CLI success, failures and inert module import\nok 5 - CLI success, failures and inert module import\n  ---\n  duration_ms: 195.044856\n  ...\n# Subtest: empty and a basic chain\nok 6 - empty and a basic chain\n  ---\n  duration_ms: 1.335619\n  ...\n# Subtest: the smallest newly available job precedes other queued jobs\nok 7 - the smallest newly available job precedes other queued jobs\n  ---\n  duration_ms: 0.159991\n  ...\n# Subtest: failure is transitive and successful dependencies permit readiness\nok 8 - failure is transitive and successful dependencies permit readiness\n  ---\n  duration_ms: 0.235852\n  ...\n# Subtest: cycles and unknown dependencies are errors\nok 9 - cycles and unknown dependencies are errors\n  ---\n  duration_ms: 0.234032\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 240.343948\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"job-planner\",\"pass\":true,\"groups\":[{\"name\":\"lexical-kahn-not-dfs-or-waves\",\"pass\":true},{\"name\":\"all-failed-ancestors-across-completed-nodes\",\"pass\":true},{\"name\":\"ready-is-current-not-simulated-and-identities-are-opaque\",\"pass\":true},{\"name\":\"all-graph-cycles-and-invalid-input\",\"pass\":true},{\"name\":\"cli-plan-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    },
+    {
+      "title": "Post-run review \u00b7 graph correctness and scale",
+      "description": "Three additional checks against the unchanged delivered program: 5,184 small-graph/state combinations, a 5,000-job chain, and a 2,000-job ready frontier. Run after the recorded attempt in a read-only, offline sandbox.",
+      "exitCode": 0,
+      "stdout": "TAP version 13\n# Subtest: 5,184 dependency graphs and state assignments agree with an independent exhaustive-order oracle\nok 1 - 5,184 dependency graphs and state assignments agree with an independent exhaustive-order oracle\n  ---\n  duration_ms: 50.800015\n  ...\n# Subtest: a 5,000-job dependency chain completes without recursive-stack failure\nok 2 - a 5,000-job dependency chain completes without recursive-stack failure\n  ---\n  duration_ms: 8.921572\n  ...\n# Subtest: a broad 2,000-job ready frontier preserves code-unit ordering\nok 3 - a broad 2,000-job ready frontier preserves code-unit ordering\n  ---\n  duration_ms: 3.851627\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 79.636216\n",
+      "stderr": "",
+      "sourceReview": {
+        "schema": "bantam.delivered-source-review.v1",
+        "sourcePath": "job-plan.js",
+        "sourceSha256": "05f4f0d2cf7e3497c41aab4496f5b342ed5350351c63b8816832cfdc7cb8b229",
+        "probeSha256": "66ab96cc75e1b146c033365aa7f43c689ece4283777506834de6dae8aeaf19c9",
+        "probeSource": "import assert from 'node:assert/strict';\nimport test from 'node:test';\nimport {pathToFileURL} from 'node:url';\nimport path from 'node:path';\nconst {planJobs}=await import(pathToFileURL(path.resolve(process.env.CANDIDATE_ROOT,'job-plan.js')));\nconst compare=(a,b)=>a<b?-1:a>b?1:0;\nfunction permutations(a){return a.length ? a.flatMap((v,i)=>permutations(a.filter((_,j)=>j!==i)).map(t=>[v,...t])) : [[]];}\nconst ids=['\ud83d\udc13','constructor','__proto__',' '];\nconst orders=permutations([...ids].sort(compare));\nfunction reference(spec){\n const jobs=new Map(spec.map(j=>[j.id,j]));\n // Enumerate complete orders independently of the candidate's Kahn traversal.\n const order=orders.find(p=>spec.every(j=>j.deps.every(d=>p.indexOf(d)<p.indexOf(j.id))));\n const blocked=spec.filter(j=>j.state==='pending').map(j=>{\n  const reached=new Set(),todo=[...j.deps];\n  for(let i=0;i<todo.length;i++)if(!reached.has(todo[i])){\n   reached.add(todo[i]);todo.push(...jobs.get(todo[i]).deps);\n  }\n  return {id:j.id,causes:[...reached].filter(id=>jobs.get(id).state==='failed').sort(compare)};\n }).filter(j=>j.causes.length).sort((a,b)=>compare(a.id,b.id));\n const blockedIds=new Set(blocked.map(j=>j.id));\n return {order:order.filter(id=>jobs.get(id).state==='pending'&&!blockedIds.has(id)),\n  ready:spec.filter(j=>j.state==='pending'&&!blockedIds.has(j.id)&&j.deps.every(d=>jobs.get(d).state==='succeeded')).map(j=>j.id).sort(compare),blocked};\n}\ntest('5,184 dependency graphs and state assignments agree with an independent exhaustive-order oracle',()=>{\n const edges=ids.flatMap((_,i)=>ids.flatMap((_,j)=>i<j?[[i,j]]:[]));\n let cases=0;\n for(let mask=0;mask<64;mask++)for(let states=0;states<81;states++){\n  let n=states;\n  const spec=ids.map(id=>{const state=['pending','succeeded','failed'][n%3];n=Math.floor(n/3);return {id,state,deps:[],future:{ignored:true}};});\n  edges.forEach(([dep,child],bit)=>{if(mask&(1<<bit))spec[child].deps.push(ids[dep]);});\n  spec.reverse();const expected=reference(spec);\n  for(const job of spec){Object.freeze(job.future);Object.freeze(job.deps);Object.freeze(job);}Object.freeze(spec);\n  assert.deepEqual(planJobs(spec),expected,`edge mask ${mask}, states ${states}`);cases++;\n }\n assert.equal(cases,5184);\n});\ntest('a 5,000-job dependency chain completes without recursive-stack failure',()=>{\n const ids=Array.from({length:5000},(_,i)=>String(i).padStart(5,'0'));\n const spec=ids.map((id,i)=>({id,state:'pending',deps:i?[ids[i-1]]:[]})).reverse();\n assert.deepEqual(planJobs(spec),{order:ids,ready:[ids[0]],blocked:[]});\n});\ntest('a broad 2,000-job ready frontier preserves code-unit ordering',()=>{\n const ids=Array.from({length:2000},(_,i)=>`job-${i}`),expected=[...ids].sort(compare);\n const spec=ids.map(id=>({id,state:'pending',deps:[]})).reverse();\n assert.deepEqual(planJobs(spec),{order:expected,ready:expected,blocked:[]});\n});\n"
+      }
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "ae0ab753591e908e41141d76ab6f53ffacbf04d5a30f1e7bc96604e1570643da"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "7e022aef6b23742225f5fea1085e980564c0ec934f3b072e99b83fc808838e82"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "d46c4e04a7d5797c90680df8453c98e97cf4b4329550efb1e7e0442dc49881a1"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "302003618bba364f4486eb51864bbef62edd5362b956db6386771fe9845e8ba4"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "0c0a4345ecfa1fb8ee7066b93e551ca8c47dc3d322e5718064416ec0bdd4cb73"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 6,
+    "withResults": 6,
+    "normalizedPathOccurrences": 1,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Read together. Review once. Keep the exact edit.",
+    "paragraphs": [
+      {
+        "text": "Astra read the implementation, configuration and tests together. The factory flagged a large rewrite for review; Astra approved a 92-character receipt and the factory applied the original proposed bytes. It did not generate the program a second time.",
+        "actions": [
+          "action-1",
+          "action-2",
+          "action-3"
+        ]
+      },
+      {
+        "text": "Astra added behavioral and CLI tests, ran them, and finished. The delivered program passed all five acceptance groups and all three additional graph and scale checks.",
+        "actions": [
+          "action-4",
+          "action-5",
+          "action-6"
+        ]
+      }
+    ]
+  }
+}

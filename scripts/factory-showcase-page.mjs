@@ -115,20 +115,29 @@ function renderTokenSavings(factory,peer){
 }
 
 export function renderCodexHighlight(data){
-  const card=data.codex?.cards?.find(c=>c.id==='snapshot-drift-qualified-4'&&c.recorded);
-  const factory=card?.rows.find(r=>r.arm==='bantam-codex-astra'),native=card?.rows.find(r=>r.arm==='codex-astra');
-  if(!factory||!native||[factory,native].some(r=>!r.passed||!r.accountingComplete
+  const cards=data.codex?.cards??[],pairIds=['job-planner-codex-3','job-planner-codex-4'];
+  const paired=cards.some(c=>pairIds.includes(c.id));
+  const selected=(paired?pairIds:['snapshot-drift-qualified-4']).map(id=>cards.find(c=>c.id===id));
+  if(selected.some(c=>!c?.recorded))return '';
+  const sides=['bantam-codex-astra','codex-astra'].map(arm=>selected.map(c=>{
+    const rows=c.rows.filter(r=>r.arm===arm);return rows.length===1?rows[0]:null;
+  }));
+  if(sides.flat().some(r=>!r||!r.passed||!r.accountingComplete
     ||!r.model?.startsWith('GPT-6 Astra · ')||!Number.isFinite(r.wallMs)||r.wallMs<=0
     ||!['inputTokens','outputTokens','cacheHitTokens'].every(k=>Number.isSafeInteger(r.tokens?.[k])&&r.tokens[k]>=0)
     ||r.tokens.cacheHitTokens>r.tokens.inputTokens||r.groupsTotal!==5||r.groupsPassed!==5))return '';
+  const [factory,native]=sides.map(rows=>rows.reduce((sum,r)=>({arm:r.arm,wallMs:sum.wallMs+r.wallMs,
+    tokens:Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens'].map(k=>[k,sum.tokens[k]+r.tokens[k]]))}),
+    {wallMs:0,tokens:{inputTokens:0,outputTokens:0,cacheHitTokens:0}}));
+  const card=selected[0],workOrder=paired?'job-planner':'snapshot-drift';
   const measures=[['inputTokens','less input'],['outputTokens','less output'],['wallMs','less time']].map(([key,label])=>{
     const a=key==='wallMs'?factory.wallMs:factory.tokens[key],b=key==='wallMs'?native.wallMs:native.tokens[key];
     return {value:b>0?Math.round((1-a/b)*100):0,label};
   });
   if(measures.some(m=>m.value<=0))return '';
-  const hash=new URLSearchParams({card:'snapshot-drift',view:'results',layout:'compare',left:factory.arm,right:native.arm});
+  const hash=new URLSearchParams({card:workOrder,view:'results',layout:'compare',left:factory.arm,right:native.arm});
   const fresh=r=>(r.tokens.inputTokens-r.tokens.cacheHitTokens).toLocaleString('en-US');
-  return `<section class="hero-codex" aria-labelledby="hero-codex-heading"><div class="hero-codex-copy"><p class="hero-codex-label">YOUR CODEX ACCOUNT. A BETTER FACTORY.</p><h2 id="hero-codex-heading">More from Astra.</h2><p>Put Codex inside BANTAM FACTORY. In this recorded fight, the same Astra finished sooner with fewer tokens. Both delivered tools passed all five acceptance checks.</p><a href="codex/${E(card.id)}/share/index.html#${E(hash)}">See Astra’s work <span aria-hidden="true">↗</span></a><a href="fights.html#codex">More Astra fights ↗</a></div><div class="hero-codex-proof"><div class="hero-codex-metrics">${measures.map(m=>`<div><strong>${m.value}<span>%</span></strong><span>${m.label}</span></div>`).join('')}</div><p class="hero-codex-cache"><b>${factory.tokens.cacheHitTokens.toLocaleString('en-US')} prefix-cache tokens reused.</b><br>Uncached input: Factory ${fresh(factory)} · CLI ${fresh(native)}</p><p class="hero-codex-condition">Snapshot checker · Astra, medium effort · one recorded pair.<br>Prefix-cache tokens are included in input.</p></div></section>`;
+  return `<section class="hero-codex" aria-labelledby="hero-codex-heading"><div class="hero-codex-copy"><p class="hero-codex-label">YOUR CODEX ACCOUNT. A BETTER FACTORY.</p><h2 id="hero-codex-heading">More from Astra.</h2><p>Put Codex inside BANTAM FACTORY. Across ${paired?'two paired runs':'this recorded fight'}, the same Astra finished sooner with fewer tokens. Every delivered tool passed all five acceptance checks.</p><a href="codex/${E(card.id)}/share/index.html#${E(hash)}">See Astra’s work <span aria-hidden="true">↗</span></a>${paired?`<a href="codex/${E(selected[1].id)}/share/index.html#${E(hash)}">Second paired run ↗</a>`:''}<a href="fights.html#codex">More Astra fights ↗</a></div><div class="hero-codex-proof"><div class="hero-codex-metrics">${measures.map(m=>`<div><strong>${m.value}<span>%</span></strong><span>${m.label}</span></div>`).join('')}</div><p class="hero-codex-cache"><b>${factory.tokens.cacheHitTokens.toLocaleString('en-US')} prefix-cache tokens reused.</b><br>Uncached input: Factory ${fresh(factory)} · CLI ${fresh(native)}</p><p class="hero-codex-condition">${paired?'Job planner · Astra, medium effort · two paired runs.':'Snapshot checker · Astra, medium effort · one recorded pair.'}<br>Prefix-cache tokens are included in input.</p></div></section>`;
 }
 export function showcaseRows(data){
   return data.cards.filter(c=>c.recorded).map(card=>{

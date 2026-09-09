@@ -122,6 +122,27 @@ test('Codex hero uses its reviewed pair and only claims measured improvements wi
   }
 });
 
+test('the Astra hero combines both scheduled pairs, including a slower factory round',()=>{
+  const row=(arm,n)=>({arm,model:'GPT-6 Astra · CLI',passed:true,accountingComplete:true,
+    groupsPassed:5,groupsTotal:5,wallMs:n*1000,tokens:{inputTokens:n*2000,outputTokens:n*100,cacheHitTokens:n*1500}});
+  const cards=[
+    {id:'job-planner-codex-3',recorded:true,rows:[row('bantam-codex-astra',2),row('codex-astra',1)]},
+    {id:'job-planner-codex-4',recorded:true,rows:[row('bantam-codex-astra',1),row('codex-astra',5)]},
+  ];
+  const html=renderCodexHighlight({codex:{cards}});
+  assert.equal((html.match(/50<span>%/g)||[]).length,3);
+  assert.match(html,/4,500 prefix-cache tokens reused/);
+  assert.match(html,/Factory 1,500 · CLI 3,000/);
+  assert.match(html,/two paired runs/);
+  assert.match(html,/job-planner-codex-3\/share\/index.html/);
+  assert.match(html,/job-planner-codex-4\/share\/index.html/);
+  for(const mutate of [c=>c.pop(),c=>c[0].recorded=false,c=>c[0].rows[0].passed=false,
+    c=>c[1].rows[1].accountingComplete=false,c=>c[0].rows.push({...c[0].rows[0]})]){
+    const altered=structuredClone(cards);mutate(altered);
+    assert.equal(renderCodexHighlight({codex:{cards:altered}}),'','never select only the winning repeat');
+  }
+});
+
 test('the scrolling race shares the table records and never includes private fields or archived references',()=>{
   const data=gallery();data.cards[0].rows[0].privatePrompt='PRIVATE_DO_NOT_PUBLISH';
   const html=renderFactoryShowcase(data),json=html.match(/<script id="fight-preview" type="application\/json">(.*?)<\/script>/s)[1];

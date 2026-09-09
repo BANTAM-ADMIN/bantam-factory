@@ -2334,6 +2334,96 @@
   "codex": {
     "cards": [
       {
+        "title": "Astra · job planner · round 3",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "The same Astra repairs a dependency planner in native Codex and BANTAM FACTORY. Both paired repeats are published, with every action, delivered file, token counter and independent check.",
+        "id": "job-planner-codex-3",
+        "workOrder": "job-planner",
+        "recorded": true,
+        "sourceSha256": "194f8587c2cb02227d389b3c74fa6cdcb6b1dc34fed4801e05a70a4e6799f881",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 157908,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 109826,
+              "outputTokens": 4443,
+              "cacheHitTokens": 98816
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 95409,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 60309,
+              "outputTokens": 2421,
+              "cacheHitTokens": 47232
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · job planner · round 4",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "The same Astra repairs a dependency planner in native Codex and BANTAM FACTORY. Both paired repeats are published, with every action, delivered file, token counter and independent check.",
+        "id": "job-planner-codex-4",
+        "workOrder": "job-planner",
+        "recorded": true,
+        "sourceSha256": "a8c4d9f09414b890ecbfb6f3b2a7dcf9162a387b7f4b6ade1966a6205e545386",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 110286,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 61165,
+              "outputTokens": 2662,
+              "cacheHitTokens": 47744
+            }
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 163127,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 129604,
+              "outputTokens": 4284,
+              "cacheHitTokens": 117632
+            }
+          }
+        ]
+      },
+      {
         "title": "Astra · job planner · round 1",
         "kind": "REPAIR",
         "number": "03",

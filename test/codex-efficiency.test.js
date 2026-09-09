@@ -127,4 +127,37 @@ describe("summarising a recorded Codex run", () => {
     assert.equal(r.phases.unknown.calls, 2);
     assert.equal(r.phases.unknown.tokens.input, 2000);
   });
+
+  it('reports the recorded Tetris partial cache drops even though both reused some cache', () => {
+    const rows = [[3, 12539, 11776], [4, 14677, 4480], [5, 15570, 14464],
+      [7, 16848, 16000], [8, 17298, 12416], [9, 18143, 17152]];
+    const modelCalls = rows.map(([i, input, hit]) => {
+      const call = measuredCall(i, true, input, hit);
+      call.response.normalized.codexThread.threadId = 'tetris';
+      return call;
+    });
+    const report = codexEfficiency({ modelCalls });
+    assert.deepEqual(report.cacheRegressions.map(r => [r.callIndex, r.cachedTokenDrop]), [[4, 7296], [8, 3584]]);
+    assert.deepEqual(report.uncachedContinuations, []);
+    assert.match(formatCodexEfficiency(report), /11776 → 4480 cached tokens/);
+    assert.match(formatCodexEfficiency(report), /does not establish the cause/);
+  });
+
+  it('compares only usable consecutive receipts from the same thread with growing input', () => {
+    const call = (i, id, input, hit, extra = {}, reused = true) => {
+      const c = measuredCall(i, reused, input, hit, extra);
+      c.response.normalized.codexThread.threadId = id;
+      return c;
+    };
+    const a = call(0, 'a', 2000, 1500);
+    for (const next of [call(1, 'b', 2100, 500), call(1, 'a', 1000, 500),
+      call(1, 'a', 2100, 500, {complete:false}), call(1, 'a', 2100, 500, {}, false),
+      call(1, undefined, 2100, 500), call(1, 'a', 3000, 1500)]) {
+      assert.deepEqual(codexEfficiency({ modelCalls: [a, next] }).cacheRegressions, []);
+    }
+    const missing = call(1, 'a', 2100, null), after = call(2, 'a', 2200, 500);
+    assert.deepEqual(codexEfficiency({ modelCalls: [a, missing, after] }).cacheRegressions, []);
+    const interleaved = codexEfficiency({ modelCalls: [a, call(1, 'b', 1000, 0), after] });
+    assert.equal(interleaved.cacheRegressions[0].previousCallIndex, 0);
+  });
 });

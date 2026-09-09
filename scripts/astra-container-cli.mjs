@@ -48,7 +48,7 @@ function absolute(value, label) {
   return path.resolve(value);
 }
 
-export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds = 480, probe = false, sessionDirectory = null }) {
+export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds = 480, probe = false, sessionDirectory = null, traceDirectory = null }) {
   const {uid,gid}=nonRootIdentity(runtime.identity);
   const root = absolute(workspace, "workspace");
   if (["/", os.homedir(), REPO].includes(root)) throw new Error("use a disposable project workspace, not a home or harness root");
@@ -69,6 +69,17 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
       throw new Error("session directory must be separate from the candidate workspace");
     }
   }
+  // Opt-in local provider-request evidence survives even an ephemeral Codex
+  // thread. Keep it outside the candidate and mount only the trace directory,
+  // never the whole Codex home (which also contains credentials).
+  if (traceDirectory) {
+    traceDirectory = absolute(traceDirectory, "trace directory");
+    if (["/", os.homedir(), REPO, root].includes(traceDirectory)
+      || path.resolve(runtime.auth).startsWith(traceDirectory + path.sep)
+      || traceDirectory.startsWith(root + path.sep) || root.startsWith(traceDirectory + path.sep)) {
+      throw new Error("trace directory must be separate from the candidate workspace");
+    }
+  }
   const containerArgs = [
     "run", "--rm", "--pull", "never", "--init", "--interactive",
     "--name", name, "--cidfile", absolute(cidfile, "cidfile"),
@@ -83,6 +94,7 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
     ...(runtime.vendor?mount(runtime.vendor,'/opt/codex'):mount(runtime.binary,'/opt/codex/bin/codex')),
     ...mount(runtime.auth, "/home/ubuntu/.codex/auth.json"),
     ...(sessionDirectory ? mount(sessionDirectory, "/home/ubuntu/.codex/sessions", false) : []),
+    ...(traceDirectory ? mount(traceDirectory, "/home/ubuntu/codex-traces", false) : []),
     ...mount(runtime.certificates, "/etc/ssl/certs/ca-certificates.crt"),
     ...(runtime.toolMounts??runtime.tools.map(tool=>({source:tool,target:tool}))).flatMap(tool=>mount(tool.source,tool.target)),
     ...runtime.libraries.flatMap((library) => mount(fs.realpathSync(library), library)),
@@ -91,6 +103,7 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
     ...mount(runtime.npm, "/opt/npm"),
     "--env", "PATH=/tmp/astra-tools:/opt/codex/codex-path:/opt/codex/bin:/usr/bin:/bin",
     "--env", "LANG=C.UTF-8", "--env", "NO_COLOR=1",
+    ...(traceDirectory ? ["--env", "CODEX_ROLLOUT_TRACE_ROOT=/home/ubuntu/codex-traces"] : []),
     '--env','GIT_EXEC_PATH=/opt/git-core',
     "--workdir", root,
     ...(probe ? ["--network", "none"] : []),
@@ -146,7 +159,14 @@ export async function main(args = process.argv.slice(2)) {
       throw new Error("session directory must be an existing non-symlink directory");
     }
   }
-  const dockerArgs = buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds, probe, sessionDirectory });
+  const traceDirectory = process.env.ASTRA_CONTAINER_TRACE_DIR || null;
+  if (traceDirectory) {
+    const stat = fs.lstatSync(absolute(traceDirectory, "trace directory"));
+    if (!stat.isDirectory() || stat.isSymbolicLink() || fs.realpathSync(traceDirectory) !== path.resolve(traceDirectory)) {
+      throw new Error("trace directory must be an existing non-symlink directory");
+    }
+  }
+  const dockerArgs = buildDockerArgs({ args, workspace, runtime, cidfile, name, timeoutSeconds, probe, sessionDirectory, traceDirectory });
   const child = spawn("docker", dockerArgs, { stdio: "inherit" });
   const cleanup = () => {
     try { execFileSync("docker", ["rm", "-f", name], { stdio: "ignore", timeout: 10000 }); } catch { /* --rm may have finished */ }

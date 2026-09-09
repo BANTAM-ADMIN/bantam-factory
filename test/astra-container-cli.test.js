@@ -92,6 +92,19 @@ test('non-default non-root identity and discovered tools are mounted without hos
  assert.throws(()=>buildDockerArgs({...base,runtime:{...base.runtime,identity:{uid:0,gid:0}}}),/non-root/);
 });
 
+test('opt-in provider traces survive ephemeral threads without mounting credentials writable', () => {
+  const traceDirectory = '/tmp/astra-test/private-traces';
+  const args = buildDockerArgs({ ...base, args: ['app-server', '--listen', 'stdio://'], traceDirectory });
+  assert.deepEqual(values(args, '--mount').filter(m => !m.endsWith(',readonly')), [
+    'type=bind,src=/tmp/astra-test/private-traces,dst=/home/ubuntu/codex-traces',
+  ]);
+  assert.ok(values(args, '--env').includes('CODEX_ROLLOUT_TRACE_ROOT=/home/ubuntu/codex-traces'));
+  assert.ok(!values(buildDockerArgs(base), '--env').some(v => v.startsWith('CODEX_ROLLOUT_TRACE_ROOT=')));
+  for (const invalid of ['/', os.homedir(), '/home/operator/.codex', base.workspace, base.workspace + '/traces', '/tmp/astra-test', '/tmp/traces,readonly']) {
+    assert.throws(() => buildDockerArgs({ ...base, traceDirectory: invalid }));
+  }
+});
+
 test('installed binary discovery accepts standalone ELF or resolves npm native bundle, without running it',t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-codex-layout-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));

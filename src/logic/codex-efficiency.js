@@ -42,11 +42,28 @@ export function codexEfficiency(artifact) {
 
   const tokens = tokenTotals(calls), { input, cacheHit: hit, cacheMiss: miss } = tokens;
   const phases = { initial: [], continuation: [], unknown: [] }, uncachedContinuations = [];
+  const previousByThread = new Map(), cacheRegressions = [];
   for (const [index, call] of calls.entries()) {
     const reused = call?.response?.normalized?.codexThread?.threadReused;
     const phase = reused === false ? 'initial' : reused === true ? 'continuation' : 'unknown';
     phases[phase].push(call);
     const measured = callTokens(call);
+    const threadId = call?.response?.normalized?.codexThread?.threadId;
+    const previous = threadId ? previousByThread.get(threadId) : null;
+    const complete = call?.response?.normalized?.usage?.complete !== false;
+    // A partial cache miss can be much larger than a cold startup. Compare
+    // adjacent receipts within each thread, not just zero-cache calls or hit
+    // percentages (which also fall when useful new context is appended).
+    if (phase === 'continuation' && complete && previous?.complete
+        && measured.input !== null && previous.input !== null
+        && measured.input >= previous.input && measured.cacheHit !== null
+        && previous.cacheHit !== null && measured.cacheHit < previous.cacheHit) {
+      cacheRegressions.push({ callIndex: call.index ?? index, previousCallIndex: previous.callIndex,
+        inputTokens: measured.input, previousCachedTokens: previous.cacheHit,
+        cachedTokens: measured.cacheHit, cachedTokenDrop: previous.cacheHit - measured.cacheHit,
+        deliveryMode: call?.response?.normalized?.codexPromptDelivery?.mode ?? null });
+    }
+    if (threadId) previousByThread.set(threadId, { ...measured, complete, callIndex: call.index ?? index });
     if (phase === 'continuation' && measured.input > 0 && measured.cacheHit === 0
         && call?.response?.normalized?.usage?.complete !== false) {
       uncachedContinuations.push({ callIndex: call.index ?? index, inputTokens: measured.input,
@@ -74,6 +91,7 @@ export function codexEfficiency(artifact) {
     perTurn: turns ? { cacheMiss: miss === null ? null : miss / turns, replacedChars: replaced / turns } : null,
     phases: Object.fromEntries(Object.entries(phases).map(([phase, calls]) => [phase, { calls: calls.length, tokens: tokenTotals(calls) }])),
     uncachedContinuations,
+    cacheRegressions,
     delivery: {
       calls: Number(delivery.calls) || 0,
       deltaCalls: Number(delivery.deltaCalls) || 0,
@@ -117,6 +135,12 @@ export function formatCodexEfficiency(report, label = "") {
   if (r.uncachedContinuations?.length) {
     lines.push(`  zero-cache continuations at model call(s): ${r.uncachedContinuations.map(c => c.callIndex).join(', ')}.`);
     lines.push('  These are reported cache misses on reused threads; inspect delivery evidence before assigning a cause.');
+  }
+  for (const drop of r.cacheRegressions ?? []) {
+    lines.push(`  cache drop at model call ${drop.callIndex}: ${drop.previousCachedTokens} → ${drop.cachedTokens} cached tokens, input ${drop.inputTokens} (${drop.deliveryMode ?? 'unknown'} delivery).`);
+  }
+  if (r.cacheRegressions?.length) {
+    lines.push('  Partial cache misses require provider-request evidence; an intact BANTAM prompt alone does not establish the cause.');
   }
   lines.push(`  delivery   ${r.delivery.deltaCalls}/${r.delivery.calls} delta, `
     + `${r.delivery.fallbackCalls} fallback, saved ${pct(r.delivery.savedRatio)}`);

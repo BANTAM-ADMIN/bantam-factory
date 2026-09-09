@@ -10,6 +10,7 @@ import {
   PATCH_ACTION_FEATURE,
   PROBE_ACTION_FEATURE,
   WRITE_BATCH_FEATURE,
+  EDIT_CONFIRMATION_FEATURE,
   READ_ONLY_ACTION_VERBS,
   actionDefinition,
   actionDefinitionsInGroup,
@@ -40,6 +41,7 @@ const ALL_VERBS = [
   "edit_lines",
   "patch",
   "write_file",
+  "confirm_edit",
   "write_batch",
   "delete_file",
   "move_file",
@@ -85,7 +87,7 @@ test("feature gates enable only the requested actions in canonical order", () =>
   );
   assert.deepEqual(
     enabledActionDefinitions({
-      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE, PROBE_ACTION_FEATURE],
+      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE, PROBE_ACTION_FEATURE, EDIT_CONFIRMATION_FEATURE],
     }).map(({ verb }) => verb),
     ALL_VERBS,
   );

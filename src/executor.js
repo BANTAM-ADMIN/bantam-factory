@@ -120,6 +120,9 @@ export class Executor {
     this.processRunner = opts.processRunner;
     this.probeEnabled = opts.probeEnabled ?? envEnabled(process.env.BANTAM_PROBE);
     this.renameFile = opts.renameFile ?? fs.renameSync;
+    this.editConfirmations = opts.editConfirmations === true;
+    this._reviewedWrites = new Map();
+    this._confirmedWrites = new WeakMap();
   }
 
   // Named-symbol deletion may be intentional, so preserve the existing
@@ -295,7 +298,21 @@ export class Executor {
       ...(pending.preservationReviews.length ? { preservationReviews: pending.preservationReviews } : {}),
     });
     try {
-      const observation = operation();
+      let observation = operation();
+      if (this.editConfirmations && action.a === "write_file"
+          && pending.outcome?.reason === "confirmation_required") {
+        const encoded = JSON.stringify(action);
+        // Keep only bounded, in-memory proposals. The ordinary identical-edit
+        // route remains available for larger writes and other edit verbs.
+        if (Buffer.byteLength(encoded) <= 256 * 1024) {
+          const full = this.resolveExisting(action.p);
+          const beforeSha256 = crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
+          const id = crypto.createHash("sha256").update(JSON.stringify([full, beforeSha256, encoded])).digest("hex");
+          if (this._reviewedWrites.size >= 8) this._reviewedWrites.delete(this._reviewedWrites.keys().next().value);
+          this._reviewedWrites.set(id, { full, beforeSha256, action: JSON.parse(encoded) });
+          observation += `\n[edit-confirmation] To accept this reviewed replacement, use ${JSON.stringify({a:"confirm_edit",id})}. The factory retains the exact proposed bytes; do not regenerate the file. A changed target invalidates this receipt.`;
+        }
+      }
       return { observation, editOutcome: outcome() };
     } catch (error) {
       return {
@@ -309,6 +326,31 @@ export class Executor {
         for (const review of pending.preservationReviews) this._preservationConfirm?.delete(review.witness.id);
       }
       this._activeEditResult = previous;
+    }
+  }
+
+  resolveEditConfirmation(action) {
+    if (!this.editConfirmations) throw new Error("Edit confirmation receipts are disabled");
+    const pending = this._reviewedWrites.get(action.id);
+    if (!pending) throw new Error("Unknown or consumed edit confirmation receipt; submit a fresh edit");
+    this._reviewedWrites.delete(action.id);
+    const resolved = structuredClone(pending.action);
+    this._confirmedWrites.set(resolved, pending);
+    this.assertConfirmedWrite(resolved);
+    return resolved;
+  }
+
+  assertConfirmedWrite(action) {
+    const pending = this._confirmedWrites.get(action);
+    if (!pending) return;
+    if (JSON.stringify(action) !== JSON.stringify(pending.action)) {
+      throw new Error("Edit confirmation no longer matches the exact reviewed action");
+    }
+    const full = this.resolveExisting(action.p);
+    this.assertWritablePolicy(full, action.p);
+    const hash = crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
+    if (full !== pending.full || hash !== pending.beforeSha256) {
+      throw new Error("Stale edit confirmation: the target changed; read current source and submit a fresh edit");
     }
   }
 
@@ -337,6 +379,10 @@ export class Executor {
       return { observation: "[interrupted] The user stopped this action before it started.", interrupted: true };
     }
     try {
+      if (action.a === "confirm_edit") action = this.resolveEditConfirmation(action);
+      // Recheck at mutation time, after the agent's ordinary policy/authority
+      // guards. Resolving a receipt never writes or bypasses those guards.
+      this.assertConfirmedWrite(action);
       switch (action.a) {
         case "read_file": return { observation: this.readFile(action) };
         case "list_dir": return { observation: this.listDir(action) };

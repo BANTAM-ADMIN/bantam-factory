@@ -22,6 +22,7 @@ test("estimateCost covers every protocol action family with finite non-negative 
     ["edit_lines", { latency: 3, io: 2, cpu: 1 }],
     ["patch", { latency: 5, io: 2, cpu: 1.5 }],
     ["write_file", { latency: 4, io: 2, cpu: 1 }],
+    ["confirm_edit", { latency: 8, io: 4, cpu: 2 }],
     ["write_batch", { latency: 6, io: 4, cpu: 2 }],
     ["delete_file", { latency: 3, io: 2, cpu: 1 }],
     ["move_file", { latency: 3, io: 2, cpu: 1 }],

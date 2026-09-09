@@ -145,6 +145,7 @@ export function buildArtifact({
       reasoning: t.reasoning ?? null,
       rawOutput: t.rawOutput ?? null,
       parsedAction: serializableCopy(t.parsedAction ?? t.action ?? null),
+      ...(t.editConfirmation ? { editConfirmation: serializableCopy(t.editConfirmation) } : {}),
       protocolViolation: Boolean(t.protocolViolation),
       observation: t.observation ?? null,
       rawObservation: t.rawObservation ?? null,

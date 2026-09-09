@@ -703,11 +703,11 @@ export function buildPrompt({
       // (which is why immutableHistory skips it), while eliding at write time
       // costs nothing, because the bytes were never in the prefix to remove.
       // Unconditional also means no churn when the panel window slides.
-      const replayedAction = extensionWorkingSet
+      const replayedAction = turn.editConfirmation ?? (extensionWorkingSet
         ? alwaysElideEditBody(shellReplay.action)
         : (immutableHistory || turnIndex === latestFailedEditProposal
           ? shellReplay.action
-          : slimReplayedAction(shellReplay.action, stickyLivePaths, unslimPaths));
+          : slimReplayedAction(shellReplay.action, stickyLivePaths, unslimPaths)));
       p += `${historyPrefill}${scrub(JSON.stringify(replayedAction))}${template.close}`;
     }
     const staleReadPaths = new Set(

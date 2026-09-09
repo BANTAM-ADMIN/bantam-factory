@@ -152,6 +152,7 @@ import {
   WRITE_BATCH_FEATURE,
   LINE_EDIT_FEATURE,
   PROBE_ACTION_FEATURE,
+  EDIT_CONFIRMATION_FEATURE,
 } from "./action-protocol.js";
 import { decidePatchAction } from "./patch-policy.js";
 import { decideFileOperations } from "./file-op-policy.js";
@@ -821,7 +822,10 @@ async function runAgentCore({
   // replayed byte-for-byte; the rebuild panel re-renders history anyway.
   const bareHistory = extensionTrajectory && Boolean(extensionBareHistory);
   const lineEditEnabled = /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_LINE_EDIT ?? ""));
+  const editConfirmations = (model?.codex === true || model?.codexBacked === true)
+    && process.env.BANTAM_EDIT_CONFIRMATION !== "0";
   const baseActionFeatures = [
+    ...(editConfirmations ? [EDIT_CONFIRMATION_FEATURE] : []),
     ...(lineEditEnabled ? [LINE_EDIT_FEATURE] : []),
     ...(patchActionPolicy.enabled ? [PATCH_ACTION_FEATURE] : []),
     ...(writeBatch ? [WRITE_BATCH_FEATURE] : []),
@@ -869,6 +873,7 @@ async function runAgentCore({
       ...instructionGuards.protectedExistingTests])];
   }
   const exec = new Executor(workspace, {
+    editConfirmations,
     fixtureDefaultHints,
     inspectMaxChars: readObservationMaxChars,
     probeEnabled,
@@ -1114,6 +1119,7 @@ async function runAgentCore({
     ? resumeTurns.map((t, i) => ({
         i: Number.isInteger(t.i) ? t.i : i,
         action: t.action ?? t.parsedAction ?? null,
+        ...(t.editConfirmation ? { editConfirmation: structuredClone(t.editConfirmation) } : {}),
         observation: t.observation ?? "",
         ...(typeof t.promptPrelude === "string" ? { promptPrelude: t.promptPrelude } : {}),
         ...(Array.isArray(t.promptAttempts) ? { promptAttempts: structuredClone(t.promptAttempts) } : {}),
@@ -2347,6 +2353,7 @@ async function runAgentCore({
     const turnStart = nowMs();
     // Pull one valid action, allowing a few repair attempts.
     let action = null;
+    let editConfirmation = null;
     let rawOutput = null;      // accepted raw model output, preserved for the artifact
     let protocolViolation = false;
     let reasoning = null;      // reasoning that produced the accepted action, if any
@@ -3045,9 +3052,26 @@ async function runAgentCore({
       const parsed = parseAction(out.content);
       if (parsed.ok) {
         degeneratePenalty = 0;
-        const normalizedAction = normalizeWorkspaceAction(parsed.action);
+        let normalizedAction = normalizeWorkspaceAction(parsed.action);
+        if (normalizedAction.a === "confirm_edit") {
+          try {
+            if (!editConfirmations || callerExcludedActions.includes("confirm_edit")) {
+              throw new Error('Action "confirm_edit" is disabled by the caller policy.');
+            }
+            normalizedAction = exec.resolveEditConfirmation(normalizedAction);
+          } catch (error) {
+            metrics.invalid++;
+            repairObs = String(error.message);
+            rejectedOutputs.push({turn:turns.length,attempt,rawOutput:out.content,error:repairObs,
+              reasoning:turnReasoning,kind:"edit_confirmation",tokens:out.tokens,stoppedLimit:Boolean(out.stoppedLimit)});
+            onEvent({type:"invalid_action",error:repairObs,raw:out.content});
+            recordRejectedPrompt(out);
+            continue;
+          }
+        }
         const policyActions = normalizedAction.a === "inspect"
-          ? [normalizedAction, ...(normalizedAction.ops ?? [])] : [normalizedAction];
+          ? [normalizedAction, ...(normalizedAction.ops ?? [])]
+          : parsed.action.a === "confirm_edit" ? [parsed.action, normalizedAction] : [normalizedAction];
         const maskedAction = codexStableSchema && useGrammar
           ? policyActions.find(entry => !legalTurnVerbs.includes(entry.a)) : null;
         if (maskedAction) {
@@ -3084,7 +3108,8 @@ async function runAgentCore({
           continue;
         }
         action = normalizedAction;
-        if (action !== parsed.action) {
+        editConfirmation = parsed.action.a === "confirm_edit" ? parsed.action : null;
+        if (action !== parsed.action && !editConfirmation) {
           metrics.workspaceAliasNormalizations++;
           onEvent({ type: "workspace_alias_normalized", original: parsed.action, action });
         }
@@ -3187,6 +3212,7 @@ async function runAgentCore({
     const actionEvent = {
       type: "action",
       action,
+      ...(editConfirmation ? { editConfirmation } : {}),
       rawOutput,
       reasoning,
       protocolViolation,
@@ -6544,6 +6570,7 @@ async function runAgentCore({
     // replay/debugging/training. `action`+`observation` are kept for prompt reuse.
     turns.push({
       i: turns.length,
+      ...(editConfirmation ? { editConfirmation } : {}),
       ...(promptPrelude ? { promptPrelude } : {}),
       ...(promptAttempts.length ? { promptAttempts: structuredClone(promptAttempts) } : {}),
       rawOutput,

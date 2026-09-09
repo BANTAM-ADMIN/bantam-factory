@@ -62,6 +62,7 @@ export const WRITE_BATCH_FEATURE = "write_batch";
 export const LINE_EDIT_FEATURE = "line_edit";
 export const FILE_OPS_FEATURE = "file_ops";
 export const PROBE_ACTION_FEATURE = "probe";
+export const EDIT_CONFIRMATION_FEATURE = "confirm_edit";
 
 // How many read-only ops one `inspect` may batch.
 //
@@ -206,6 +207,10 @@ export const ACTION_DEFINITIONS = deepFreeze([
     example: { a: "write_file", p: "path", content: "..." },
     help: "   create/overwrite a file",
   }),
+  define("confirm_edit", [string("id")], {
+    example: { a: "confirm_edit", id: "receipt from edit review" },
+    help: " apply an exact reviewed write_file without regenerating it",
+  }, { feature: EDIT_CONFIRMATION_FEATURE }),
   define("write_batch", [
     recordArray("files", {
       fields: [

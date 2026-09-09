@@ -85,6 +85,7 @@ export class RunCheckpoint {
       this._pending = {
         i: this._turns.length,
         parsedAction: event.action ?? null,
+        ...(event.editConfirmation ? { editConfirmation: serializableCopy(event.editConfirmation) } : {}),
         rawOutput: event.rawOutput ?? this._pendingProtocol?.rawOutput ?? null,
         reasoning: event.reasoning ?? this._pendingReasoning,
         protocolViolation: Boolean(event.protocolViolation ?? this._pendingProtocol),

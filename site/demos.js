@@ -18,7 +18,7 @@
   window.DEMOS = {
 
     // ---------------------------------------------------------------- Recorded Tetris build, 148.2 s
-    job: {
+    localGame: {
       title: 'bantam · build me a game',
       caption: 'One request. A playable game. <a href="assets/showcase/examples/tetris/index.html">Play what it built ↗</a>',
       end: 'pass',
@@ -311,10 +311,81 @@
       ],
     },
   };
+  window.DEMOS.job = {
+  "title": "Astra · BANTAM FACTORY · build me a game",
+  "caption": "Latest factory Astra build · 6m 21s · 14 passing tests. <a href=\"assets/showcase/examples/arcade/index.html?build=astra-factory-refresh\">Play the delivered game ↗</a>",
+  "end": "pass",
+  "steps": [
+    {
+      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
+      "wait": 500
+    },
+    {
+      "working": "building",
+      "ms": 2000
+    },
+    {
+      "out": [
+        "  [g]write arcade.html[/]",
+        "  [d]hold · ghost landing · combos · levels · keyboard and touch[/]"
+      ],
+      "every": 180,
+      "wait": 600
+    },
+    {
+      "working": "previewing on a phone",
+      "ms": 1000
+    },
+    {
+      "out": [
+        "  [g]preview the game at 390 × 844[/]",
+        "  [g]write gameplay and input tests[/]"
+      ],
+      "every": 180,
+      "wait": 600
+    },
+    {
+      "out": [
+        "  [ok]13 tests passed[/]"
+      ],
+      "wait": 600
+    },
+    {
+      "working": "refining the layout",
+      "ms": 1200
+    },
+    {
+      "out": [
+        "  [d]fit the board to the screen height[/]",
+        "  [g]add a touch-control regression test[/]",
+        "  [ok]14 tests passed[/]"
+      ],
+      "every": 180,
+      "wait": 500
+    },
+    {
+      "working": "checking desktop and phone",
+      "ms": 1000
+    },
+    {
+      "out": [
+        "  [ok]Desktop and 320 px phone previews passed[/]",
+        "",
+        "  [g]Astra in BANTAM FACTORY · 15 actions · 6m 21s[/]",
+        "  [d]232,784 input · 10,124 output · 194,304 prefix-cache tokens[/]"
+      ],
+      "every": 150,
+      "wait": 400
+    },
+    {
+      "idle": true
+    }
+  ]
+};
   window.JOB_DEMOS = [
-    {label:'Build a game',demo:window.DEMOS.job,summary:'A falling-block game. One HTML file. Twelve recorded actions and 2 minutes 28 seconds from request to delivery.',link:'assets/showcase/examples/tetris/index.html',action:'Play what it built ↗'},
+    {label:'Build a game',demo:window.DEMOS.job,summary:'Astra inside BANTAM FACTORY. A complete offline arcade in 6m 21s, with 14 passing tests and desktop/phone previews.',link:'assets/showcase/examples/arcade/index.html?build=astra-factory-refresh',action:'Play the latest Astra build ↗'},
     {label:'Make a tool',summary:'Project notes that fit an AI’s context budget. Keep complete sections, preserve required evidence, and see exactly what was included. Built and checked in 58.1 seconds.',link:'context-packet/share/index.html#try-it',action:'Try the tool it built ↗',demo:{
-      title:'bantam · make a useful little tool',caption:'Context packet · 58.1 seconds. <a href="context-packet/share/index.html#try-it">Try the recorded tool ↗</a>',end:'pass',steps:[
+      title:'Local 27B · BANTAM FACTORY · make a tool',caption:'Context packet · 58.1 seconds. <a href="context-packet/share/index.html#try-it">Try the recorded tool ↗</a>',end:'pass',steps:[
         {prompt:'Build a tool that fits my project notes into an AI context budget without cutting sections in half.',wait:400},
         {working:'building',ms:1500},
         {out:['  [g]build context-packet.js[/]','  [d]keep required notes · rank optional sections · count UTF-8 bytes[/]'],every:160,wait:500},
@@ -326,7 +397,7 @@
         {idle:true},
       ]}},
     {label:'Fix a bug',summary:'Retries should respect the clock. Repair backoff, honor the server’s retry delay, and stop when the job’s time budget is spent. Finished in 141.7 seconds.',link:'retry-budget/share/index.html',action:'See the repair and its checks ↗',demo:{
-      title:'bantam · fix the retry logic',caption:'Retry budget · 141.7 seconds. <a href="retry-budget/share/index.html">Open the recorded repair ↗</a>',end:'pass',steps:[
+      title:'Local 27B · BANTAM FACTORY · fix a bug',caption:'Retry budget · 141.7 seconds. <a href="retry-budget/share/index.html">Open the recorded repair ↗</a>',end:'pass',steps:[
         {prompt:'Fix the retry controller so backoff and server retry hints stay within the job’s remaining time budget.',wait:400},
         {working:'inspecting',ms:1100},
         {out:['  [d]read the controller and its tests[/]','  [g]repair retry-budget.js and its command-line interface[/]'],every:200,wait:500},

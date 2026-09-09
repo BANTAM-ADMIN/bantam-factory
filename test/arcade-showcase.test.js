@@ -26,7 +26,8 @@ test('playable comparison files match recorded deliveries, prompts and measured 
       assert.match(row.result,/timed out|incomplete/i);
     }
     assert.equal(record.usage.outputTokens,row.usage.outputTokens);
-    assert.ok(record.usage.maxRequestInputTokens>0&&record.usage.maxRequestInputTokens<=272000);
+    const maxInput=record.usage.maxRequestInputTokens??Math.max(...record.usage.calls.map(c=>c.usage.inputTokens));
+    assert.ok(maxInput>0&&maxInput<=272000);
     assert.equal(record.usage.calls.reduce((sum,c)=>sum+c.usage.outputTokens,0),record.usage.outputTokens);
     assert.equal(record.usage.inputTokens-record.usage.cacheHitTokens,row.usage.freshInputTokens);
     assert.equal(record.usage.cacheHitTokens,row.usage.cacheHitTokens);
@@ -41,8 +42,8 @@ test('playable comparison files match recorded deliveries, prompts and measured 
   assert.doesNotMatch(read('index.html').toString()+read('builds.json').toString(), /API equivalent|apiEquivalent|token-price estimate|actualCostUsd/);
 });
 
-test('the two Astra games independently passed desktop and phone playtests',()=>{
-  for(const file of ['astra-cli.json','astra-factory.json']){
+test('the saved native Astra baseline passed desktop and phone playtests',()=>{
+  for(const file of ['astra-cli.json']){
     const record=json(file);assert.equal(record.processCompleted,true);
     assert.deepEqual(record.playtest.errors,[]);
     for(const check of ['gravity_visible','move_visible','hold_visible','hard_drop_scores','pause_freezes_board','resume_gravity','restart_resets_score','game_over_visible'])assert.equal(record.playtest.checks[check],true,file+': '+check);
@@ -51,7 +52,7 @@ test('the two Astra games independently passed desktop and phone playtests',()=>
 });
 
 test('the current factory build and prefix-cache reuse match the retained records',()=>{
-  const current=json(data.versions.at(-1).record),previous=json('astra-factory.json');
+  const current=json(data.versions.at(-1).record),previous=json('astra-cli.json');
   assert.equal(current.playtest.pass,true);assert.deepEqual(current.playtest.errors,[]);
   assert.deepEqual(current.playtest.externalRequests,[]);
   assert.ok(Object.values(current.playtest.checks).every(v=>v===true));
@@ -63,4 +64,26 @@ test('the current factory build and prefix-cache reuse match the retained record
   assert.equal(current.prompt,previous.prompt);
   assert.equal(data.contextReuse.percentCached,
     Math.round(100*current.usage.cacheHitTokens/current.usage.inputTokens));
+});
+
+test('each featured model opens its own recorded artifact and the latest factory build is the default',()=>{
+  assert.deepEqual(data.featured.map(r=>r.id),['astra-factory-refresh','astra-cli','local-27b']);
+  assert.equal(data.defaultBuild,data.versions.at(-1).id);
+  for(const row of data.featured){
+    const record=json(row.record),artifact=record.artifact??record.file;
+    assert.equal(sha(read(row.file)),artifact.sha256);
+    assert.equal(row.wallMs,record.wallMs??record.durationMs);
+    assert.equal(row.actionCount,record.actions.length);
+    assert.equal(row.prompt,(record.prompt??record.request).split('\n\n')[0]);
+    assert.equal(row.recordedAt,record.startedAt);
+  }
+  assert.equal(data.baseline.reused,true);
+  assert.equal(sha(read(data.baseline.record)),data.baseline.recordSha256);
+  const context={window:{},document:{getElementById:()=>null}};
+  vm.runInNewContext(fs.readFileSync(new URL('../site/demos.js',import.meta.url),'utf8'),context);
+  const current=json(data.versions.at(-1).record),job=context.window.JOB_DEMOS[0];
+  assert.equal(job.demo.steps[0].prompt,current.prompt.split('\n\n')[0]);
+  assert.match(job.demo.title,/Astra · BANTAM FACTORY/);
+  assert.ok(job.link.endsWith('arcade/index.html?build='+data.defaultBuild));
+  assert.match(fs.readFileSync(new URL('../site/index.html',import.meta.url),'utf8'),/id="job-open" href="assets\/showcase\/examples\/arcade\/index.html\?build=astra-factory-refresh"/);
 });

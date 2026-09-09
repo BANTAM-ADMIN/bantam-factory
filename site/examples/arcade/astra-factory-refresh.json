@@ -1,0 +1,437 @@
+{
+  "schema": "bantam.showcase-build.v2",
+  "arm": "bantam-codex-astra-refresh",
+  "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
+  "startedAt": "2026-09-09T13:20:47.888Z",
+  "wallMs": 380513,
+  "processCompleted": true,
+  "operatorStopped": false,
+  "projectChecksPassed": true,
+  "recordingWindowMs": 1800000,
+  "artifact": {
+    "file": "astra-factory-refresh.html",
+    "bytes": 20542,
+    "sha256": "967119337892728d74208511cb24f31ccafe2c2aaeed8b95e6406f7c50b20d82"
+  },
+  "actions": [
+    {
+      "title": "inspect",
+      "action": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "read_file",
+            "p": "test/delivery.test.js"
+          }
+        ]
+      },
+      "observation": "# 1 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (10 lines, showing 1-10):\n1\t{\n2\t  \"name\": \"creative-arcade\",\n3\t  \"version\": \"1.0.0\",\n4\t  \"private\": true,\n5\t  \"type\": \"module\",\n6\t  \"scripts\": {\n7\t    \"test\": \"node --test\"\n8\t  }\n9\t}\n10\t\n\u2014 end of file (10 lines); nothing beyond line 10, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/delivery.test.js\"}\ntest/delivery.test.js (14 lines, showing 1-14):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport vm from 'node:vm';\n5\tconst file=new URL('../arcade.html',import.meta.url);\n6\ttest('deliver one regular, bounded HTML file',()=>{\n7\t const s=fs.lstatSync(file);assert.ok(s.isFile()&&!s.isSymbolicLink());assert.ok(s.size>0&&s.size<=1024*1024);\n8\t const text=fs.readFileSync(file,'utf8');assert.match(text,/<!doctype html>/i);assert.match(text,/<html\\b/i);assert.match(text,/<title>[^<]+<\\/title>/i);assert.match(text,/name=[\"']viewport[\"']/i);\n9\t});\n10\ttest('include classic JavaScript that parses',()=>{\n11\t const text=fs.readFileSync(file,'utf8');const blocks=[...text.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)];\n12\t assert.ok(blocks.length>0);for(const [,attrs,code] of blocks){assert.doesNotMatch(attrs,/\\bsrc\\s*=/i);assert.doesNotMatch(attrs,/type\\s*=\\s*[\"']module[\"']/i);new vm.Script(code);}\n13\t});\n14\t\n\u2014 end of file (14 lines); nothing beyond line 14, do not re-read this range.",
+      "atMs": 7357.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "write file",
+      "action": {
+        "a": "write_file",
+        "p": "arcade.html",
+        "content": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<meta name=\"theme-color\" content=\"#101c2b\">\n<title>AFTERGLOW \u2014 a pocket block arcade</title>\n<style>\n:root{color-scheme:dark;--bg:#101c2b;--panel:#172638;--ink:#ecf4f3;--muted:#9aafbe;--mint:#aff6c8;--line:#304354}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 20% 0%,#29463f66,transparent 55%),radial-gradient(ellipse at 100% 90%,#5a3d5f44,transparent 60%),var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;min-height:100svh}button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);border-radius:10px;background:#223346;padding:10px 14px;touch-action:manipulation;transition:background .15s,transform .15s}button:hover{background:#344b5d}button:active{transform:translateY(2px)}button:focus-visible{outline:3px solid var(--mint);outline-offset:3px}button:disabled{opacity:.4;cursor:default}.page{max-width:980px;margin:auto;padding:32px 24px 22px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:26px}.brand{font-size:31px;font-weight:900;letter-spacing:.15em;margin:0;line-height:1}.brand span{color:var(--mint)}.eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--mint);font-weight:750}.brand-note{font-size:12px;color:var(--muted);margin:10px 0 0}.live{font-size:11px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--line);border-radius:25px;padding:10px 14px;color:var(--muted)}.live:before{content:\"\";display:inline-block;width:6px;height:6px;margin-right:8px;background:var(--mint);border-radius:50%;box-shadow:0 0 12px #aff6c877}.arcade{display:grid;grid-template-columns:180px minmax(240px,320px) 180px;justify-content:center;gap:24px}.column{display:flex;flex-direction:column;gap:16px}.card{background:linear-gradient(140deg,#203346bb,#172638bb);border:1px solid var(--line);border-radius:16px;padding:19px}.label{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}.score{font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.04em}.best{font-size:12px;margin-top:14px;color:var(--muted)}.best b{color:var(--ink);font-weight:500}.pair{display:flex;justify-content:space-between;gap:12px;margin-top:20px}.pair .number{font-size:23px;font-variant-numeric:tabular-nums}.pair .label{margin-bottom:5px}.progress{height:4px;border-radius:4px;background:#0d1927;margin:16px 0 8px;overflow:hidden}.progress i{display:block;width:0;height:100%;background:var(--mint);transition:width .2s}.small{font-size:11px;color:var(--muted);line-height:1.6}.preview{width:100%;height:70px;display:block}.hold-card{position:relative}.key-tag{float:right;border:1px solid #526271;border-radius:4px;padding:1px 5px;font-size:10px;color:var(--muted)}.board-shell{position:relative;padding:9px;background:#253a47;border:1px solid #536963;border-radius:17px;box-shadow:0 18px 80px #0005,0 0 50px #aff6c808}.board-shell:before{content:\"\";position:absolute;top:-1px;left:25%;right:25%;height:2px;background:var(--mint);box-shadow:0 0 18px var(--mint)}#board{width:100%;aspect-ratio:1/2;display:block;background:#0b1522;border-radius:8px}.overlay{position:absolute;inset:9px;border-radius:8px;background:#0b1522db;backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:2}.overlay[hidden]{display:none}.overlay h2{font-size:34px;letter-spacing:-.04em;line-height:1.05;margin:16px 0}.overlay p{font-size:13px;color:#bdcdd6;line-height:1.7}.primary{background:var(--mint);color:#142c25;border-color:var(--mint);font-weight:800;padding:13px 22px;box-shadow:0 4px 24px #aff6c815}.primary:hover{background:#d0ffdf}.emblem{font-size:48px;line-height:1;color:var(--mint);text-shadow:0 0 30px #aff6c844}.status{min-height:32px;text-align:center;padding:10px 0 0;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mint)}.queue canvas{height:63px}.queue canvas+canvas{border-top:1px solid #30435480}.controls{display:grid;gap:8px}.controls button{text-align:left;font-size:12px;display:flex;justify-content:space-between;align-items:center}.how{margin-top:auto}.how p{display:flex;justify-content:space-between;margin:9px 0;font-size:11px;color:var(--muted)}kbd{font:inherit;color:#d8e5e8}.touch{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:12px auto 0;max-width:440px}.touch button{padding:12px 2px;min-height:48px;font-size:18px;user-select:none;-webkit-user-select:none;touch-action:none}.touch small{display:block;font-size:8px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;color:var(--muted)}.touch .drop{background:#375649;color:var(--mint)}footer{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);margin-top:24px;padding-top:16px;font-size:10px;letter-spacing:.05em;color:var(--muted)}.mobile-hold{display:none}.help-footer{font-size:11px;text-align:center;color:var(--muted);margin:12px 0 0}@media(max-width:720px){.page{max-width:510px;padding:18px 14px}.top{margin-bottom:18px}.brand{font-size:25px}.live{padding:8px;font-size:9px}.brand-note{font-size:10px}.arcade{grid-template-columns:minmax(0,1fr) 116px;gap:12px}.board-column{grid-column:1;grid-row:1 / span 2}.left{grid-column:2;grid-row:1;gap:10px}.right{grid-column:2;grid-row:2;gap:10px;margin-top:-2px}.card{padding:12px;border-radius:12px}.score{font-size:25px}.pair{gap:6px;margin-top:14px}.pair .number{font-size:19px}.label{font-size:9px;letter-spacing:.12em;margin-bottom:8px}.best{font-size:10px;margin-top:10px}.small{font-size:9px}.preview{height:48px}.queue canvas{height:39px}.controls{gap:6px}.controls button{padding:9px 8px;font-size:11px}.controls .key-tag{display:none}.how{display:none}.board-shell{padding:6px;border-radius:12px}.overlay{inset:6px;padding:12px}.overlay h2{font-size:27px}.overlay p{font-size:11px}.overlay .primary{padding:12px 14px;font-size:12px}.emblem{font-size:36px}.eyebrow{font-size:8px}.status{font-size:9px}.touch{margin-top:9px;max-width:none}.touch button{min-height:50px}footer{margin-top:18px;font-size:9px}.progress{margin-top:12px}.queue .label{margin-bottom:3px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}\n</style>\n</head>\n<body>\n<main class=\"page\">\n<header class=\"top\"><div><h1 class=\"brand\">AFTER<span>GLOW</span></h1><p class=\"brand-note\">A little order in a world of falling things.</p></div><div class=\"live\">Pocket arcade \u00b7 01</div></header>\n<section class=\"arcade\" aria-label=\"Falling block arcade\">\n<aside class=\"column left\">\n<div class=\"card\"><h2 class=\"label\">Your score</h2><div class=\"score\" id=\"score\">0</div><div class=\"best\">PERSONAL BEST <b id=\"best\">0</b></div><div class=\"pair\"><div><div class=\"label\">Level</div><div class=\"number\" id=\"level\">01</div></div><div><div class=\"label\">Lines</div><div class=\"number\" id=\"lines\">0</div></div></div><div class=\"progress\"><i id=\"progress\"></i></div><div class=\"small\" id=\"goal\">10 lines to next level</div></div>\n<div class=\"card hold-card\"><span class=\"key-tag\">C</span><h2 class=\"label\">Hold</h2><canvas class=\"preview\" id=\"hold\" width=\"160\" height=\"80\" aria-label=\"Held piece\"></canvas><div class=\"small\" id=\"hold-note\">Save one for later.</div></div>\n<div class=\"card how\"><h2 class=\"label\">Find your flow</h2><div class=\"small\">Fill a row. Make it vanish.<br>Keep a little space to breathe.</div></div>\n</aside>\n<div class=\"board-column\"><div class=\"board-shell\"><canvas id=\"board\" width=\"300\" height=\"600\" aria-label=\"Game board: 10 columns by 20 rows. Use the controls below.\" role=\"img\"></canvas><div class=\"overlay\" id=\"overlay\"><div><div class=\"emblem\" aria-hidden=\"true\">\u2726</div><div class=\"eyebrow\" id=\"overlay-kicker\">Take a deep breath</div><h2 id=\"overlay-title\">Drop into<br>the glow.</h2><p id=\"overlay-copy\">Stack colors. Clear your mind.<br>How long can you keep the light alive?</p><button class=\"primary\" id=\"play\">Let's play</button><p id=\"overlay-tip\">\u2190 \u2192 move \u00b7 \u2191 rotate \u00b7 Space drop</p></div></div></div><div class=\"status\" id=\"status\" role=\"status\" aria-live=\"polite\">Your next small obsession.</div></div>\n<aside class=\"column right\"><div class=\"card queue\"><h2 class=\"label\">Coming up</h2><canvas class=\"preview\" id=\"next0\" width=\"160\" height=\"80\" aria-label=\"Next piece\"></canvas><canvas class=\"preview\" id=\"next1\" width=\"160\" height=\"80\" aria-label=\"Second upcoming piece\"></canvas><canvas class=\"preview\" id=\"next2\" width=\"160\" height=\"80\" aria-label=\"Third upcoming piece\"></canvas></div><div class=\"controls\"><button id=\"pause\" disabled>Pause <span class=\"key-tag\">P</span></button><button id=\"restart\">Restart <span class=\"key-tag\">R</span></button></div><div class=\"card how\"><h2 class=\"label\">The controls</h2><p><span>Move</span><kbd>\u2190 \u2192</kbd></p><p><span>Rotate</span><kbd>\u2191 / X</kbd></p><p><span>Reverse rotate</span><kbd>Z</kbd></p><p><span>Soft drop</span><kbd>\u2193</kbd></p><p><span>Hard drop</span><kbd>Space</kbd></p><p><span>Hold</span><kbd>C / Shift</kbd></p><p><span>Pause</span><kbd>P / Esc</kbd></p></div></aside>\n</section>\n<nav class=\"touch\" aria-label=\"Touch game controls\"><button data-action=\"left\" aria-label=\"Move left\">\u2190<small>Left</small></button><button data-action=\"rotate\" aria-label=\"Rotate clockwise\">\u21bb<small>Rotate</small></button><button data-action=\"right\" aria-label=\"Move right\">\u2192<small>Right</small></button><button data-action=\"down\" aria-label=\"Soft drop\">\u2193<small>Down</small></button><button data-action=\"drop\" class=\"drop\" aria-label=\"Hard drop\">\u21d3<small>Drop</small></button></nav>\n<div class=\"help-footer\"><button id=\"touch-hold\" style=\"font-size:11px;padding:7px 16px\">\u21c4 Hold piece</button> <span>Ghost outline shows your landing.</span></div>\n<footer><span>BUILT FOR THE IN-BETWEEN MOMENTS</span><span>Offline. Unhurried. Yours.</span></footer>\n</main>\n<script>\n'use strict';\nconst SHAPES={I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1],[0,0,0]],S:[[0,1,1],[1,1,0],[0,0,0]],Z:[[1,1,0],[0,1,1],[0,0,0]],J:[[1,0,0],[1,1,1],[0,0,0]],L:[[0,0,1],[1,1,1],[0,0,0]]};\nconst COLORS={I:'#8adbe5',O:'#f0d78b',T:'#c6a3e8',S:'#aff6c8',Z:'#ed9aab',J:'#8aaef0',L:'#efb07e'};\nconst NAMES={I:'cyan line',O:'gold square',T:'lavender T',S:'mint S',Z:'rose Z',J:'blue J',L:'peach L'};\nclass Game {\n constructor(random=Math.random){this.random=random;this.reset();}\n reset(){this.board=Array.from({length:20},()=>Array(10).fill(null));this.queue=[];this.bag=[];this.score=0;this.lines=0;this.level=1;this.held=null;this.holdUsed=false;this.over=false;this.combo=-1;this.lastClear=0;this.spawn();}\n take(){if(!this.bag.length){this.bag=Object.keys(SHAPES);for(let i=6;i>0;i--){const j=Math.floor(this.random()*(i+1));[this.bag[i],this.bag[j]]=[this.bag[j],this.bag[i]];}}return this.bag.pop();}\n spawn(type){while(this.queue.length<4)this.queue.push(this.take());type=type||this.queue.shift();this.active={type,m:SHAPES[type].map(r=>r.slice()),x:type==='O'?4:3,y:0};if(!this.valid(this.active.m,this.active.x,this.active.y))this.over=true;}\n valid(m,x,y){return m.every((row,dy)=>row.every((v,dx)=>!v||(x+dx>=0&&x+dx<10&&y+dy<20&&(y+dy<0||!this.board[y+dy][x+dx]))));}\n move(dx,dy){if(this.over)return false;const p=this.active;if(!this.valid(p.m,p.x+dx,p.y+dy))return false;p.x+=dx;p.y+=dy;return true;}\n rotate(dir=1){if(this.over)return false;const p=this.active,n=p.m.length;const m=Array.from({length:n},(_,y)=>Array.from({length:n},(_,x)=>dir===1?p.m[n-1-x][y]:p.m[x][n-1-y]));for(const [dx,dy] of [[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[-1,-1],[1,-1],[0,-2]]){if(this.valid(m,p.x+dx,p.y+dy)){p.m=m;p.x+=dx;p.y+=dy;return true;}}return false;}\n ghostY(){let y=this.active.y;while(this.valid(this.active.m,this.active.x,y+1))y++;return y;}\n hold(){if(this.over||this.holdUsed)return false;const type=this.active.type;this.spawn(this.held);this.held=type;this.holdUsed=true;return true;}\n lock(){if(this.over)return 0;const p=this.active;let above=false;p.m.forEach((row,y)=>row.forEach((v,x)=>{if(v){if(p.y+y<0)above=true;else this.board[p.y+y][p.x+x]=p.type;}}));if(above){this.over=true;return 0;}const remaining=this.board.filter(r=>r.some(v=>!v));const count=20-remaining.length;while(remaining.length<20)remaining.unshift(Array(10).fill(null));this.board=remaining;this.combo=count?this.combo+1:-1;this.score+=([0,100,300,500,800][count]+(count?Math.max(0,this.combo)*50:0))*this.level;this.lines+=count;this.level=1+Math.floor(this.lines/10);this.lastClear=count;this.holdUsed=false;this.spawn();return count;}\n hardDrop(){if(this.over)return 0;const y=this.ghostY();this.score+=(y-this.active.y)*2;this.active.y=y;return this.lock();}\n}\nconst $=id=>document.getElementById(id);\nconst game=new Game();let mode='ready',best=0,gravity=0,lockTime=0,lockResets=0,last=0,flash=0;\ntry{best=Math.max(0,Number(localStorage.getItem('afterglow-best'))||0);}catch(e){}\nconst ctx=$('board').getContext('2d');\nfunction tile(c,x,y,size,type,ghost=false){const color=COLORS[type];if(ghost){c.strokeStyle=color;c.globalAlpha=.5;c.lineWidth=1.5;c.strokeRect(x+3,y+3,size-6,size-6);c.globalAlpha=1;return;}c.fillStyle=color;c.fillRect(x+1.5,y+1.5,size-3,size-3);c.fillStyle='#ffffff40';c.fillRect(x+3,y+3,size-6,3);c.fillStyle='#00000016';c.fillRect(x+3,y+size-6,size-6,3);c.fillStyle='#ffffff12';c.fillRect(x+6,y+7,size-12,size-14);}\nfunction preview(id,type){const canvas=$(id),c=canvas.getContext('2d');c.clearRect(0,0,160,80);canvas.setAttribute('aria-label',type?NAMES[type]:'Empty hold');if(!type){c.strokeStyle='#526271';c.setLineDash([3,5]);c.strokeRect(63,23,34,34);c.setLineDash([]);return;}const m=SHAPES[type],cells=[];m.forEach((r,y)=>r.forEach((v,x)=>{if(v)cells.push([x,y]);}));const minX=Math.min(...cells.map(v=>v[0])),minY=Math.min(...cells.map(v=>v[1])),w=Math.max(...cells.map(v=>v[0]))-minX+1,h=Math.max(...cells.map(v=>v[1]))-minY+1;cells.forEach(([x,y])=>tile(c,(160-w*23)/2+(x-minX)*23,(80-h*23)/2+(y-minY)*23,23,type));}\nfunction render(){ctx.clearRect(0,0,300,600);ctx.fillStyle='#0b1522';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#1c2d3c';ctx.lineWidth=.5;for(let x=0;x<=10;x++){ctx.beginPath();ctx.moveTo(x*30,0);ctx.lineTo(x*30,600);ctx.stroke();}for(let y=0;y<=20;y++){ctx.beginPath();ctx.moveTo(0,y*30);ctx.lineTo(300,y*30);ctx.stroke();}game.board.forEach((row,y)=>row.forEach((v,x)=>{if(v)tile(ctx,x*30,y*30,30,v);}));if(!game.over){const p=game.active,gy=game.ghostY();p.m.forEach((row,y)=>row.forEach((v,x)=>{if(v){tile(ctx,(p.x+x)*30,(gy+y)*30,30,p.type,true);tile(ctx,(p.x+x)*30,(p.y+y)*30,30,p.type);}}));}if(flash>0){ctx.fillStyle=`rgba(175,246,200,${flash/1000})`;ctx.fillRect(0,0,300,600);}}\nfunction update(){ $('score').textContent=game.score.toLocaleString();$('best').textContent=best.toLocaleString();$('level').textContent=String(game.level).padStart(2,'0');$('lines').textContent=game.lines;$('goal').textContent=(10-game.lines%10)+' lines to next level';$('progress').style.width=(game.lines%10*10)+'%';preview('hold',game.held);for(let i=0;i<3;i++)preview('next'+i,game.queue[i]);$('hold-note').textContent=game.holdUsed?'Ready after next lock.':'Save one for later.';$('touch-hold').disabled=mode!=='playing'||game.holdUsed;$('pause').disabled=mode==='ready'||mode==='over';$('pause').firstChild.textContent=mode==='paused'?'Resume ':'Pause ';render();}\nfunction showOverlay(kicker,title,copy,button){$('overlay').hidden=false;$('overlay-kicker').textContent=kicker;$('overlay-title').textContent=title;$('overlay-copy').textContent=copy;$('play').textContent=button;}\nfunction start(){clearInputs();game.reset();mode='playing';gravity=lockTime=lockResets=flash=0;$('overlay').hidden=true;$('status').textContent='Make room for something good.';update();}\nfunction pause(){if(mode==='playing'){mode='paused';clearInputs();showOverlay('No rush','A quiet moment.','Your stack is safe. Come back when you\u2019re ready.','Keep glowing');}else if(mode==='paused'){mode='playing';$('overlay').hidden=true;}update();}\nfunction finish(count){gravity=lockTime=lockResets=0;if(count){flash=160;$('status').textContent=(['','A little breathing room.','Double. Nicely done.','Triple. Beautifully arranged.','AFTERGLOW! Four lines.'][count])+(game.combo>0?' \u00d7'+(game.combo+1)+' combo':'');}if(game.over){mode='over';clearInputs();const record=game.score>best;if(record){best=game.score;try{localStorage.setItem('afterglow-best',String(best));}catch(e){}}showOverlay(record?'A new personal best':'Every ending is a beginning','One more glow?',game.score.toLocaleString()+' points \u00b7 '+game.lines+' lines cleared.','Play again');$('status').textContent=record?'Your brightest run yet.':'Good things are worth another try.';}}\nfunction act(action){if(mode!=='playing')return;let moved=false;const grounded=!game.valid(game.active.m,game.active.x,game.active.y+1);if(action==='left')moved=game.move(-1,0);if(action==='right')moved=game.move(1,0);if(action==='rotate')moved=game.rotate(1);if(action==='reverse')moved=game.rotate(-1);if(action==='down'&&game.move(0,1)){game.score++;gravity=0;}if(action==='drop')finish(game.hardDrop());if(action==='hold'&&game.hold()){gravity=lockTime=lockResets=0;if(game.over)finish(0);}if(moved&&grounded&&lockResets<15){lockTime=0;lockResets++;}update();}\nconst pressed=new Map();\nfunction clearInputs(){pressed.clear();}\nfunction press(key,action){if(pressed.has(key))return;act(action);if(mode==='playing'&&['left','right','down'].includes(action))pressed.set(key,{action,time:0,next:action==='down'?50:160});}\nconst keys={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',x:'rotate',z:'reverse',' ':'drop',c:'hold',Shift:'hold'};\ndocument.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const key=e.key.length===1?e.key.toLowerCase():e.key;if(keys[key]){if(e.target.tagName==='BUTTON'&&key===' ')return;e.preventDefault();if(!e.repeat)press(key,keys[key]);}else if(['p','Escape','r','Enter'].includes(key)){if(key==='Enter'&&e.target.tagName==='BUTTON')return;e.preventDefault();if(e.repeat)return;if(key==='p'||key==='Escape')pause();if(key==='r')requestRestart();if(key==='Enter'&&mode!=='playing'){if(mode==='paused')pause();else start();}}});\ndocument.addEventListener('keyup',e=>pressed.delete(e.key.length===1?e.key.toLowerCase():e.key));\nfor(const button of document.querySelectorAll('[data-action]')){button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);press('pointer'+e.pointerId,button.dataset.action);});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,e=>pressed.delete('pointer'+e.pointerId));button.addEventListener('click',e=>{if(e.detail===0)act(button.dataset.action);});}\nfunction requestRestart(){if(mode==='ready'||mode==='over'){start();return;}if(mode==='playing')pause();if(window.confirm('Start a fresh run? Your current stack will be cleared.'))start();}\n$('play').addEventListener('click',()=>{if(mode==='paused')pause();else start();$('play').blur();});$('pause').addEventListener('click',pause);$('restart').addEventListener('click',requestRestart);$('touch-hold').addEventListener('click',()=>act('hold'));\nwindow.addEventListener('blur',()=>{clearInputs();if(mode==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing')pause();});\nfunction frame(now){const dt=Math.min(50,now-last||0);last=now;if(mode==='playing'){for(const input of pressed.values()){input.time+=dt;if(input.time>=input.next){act(input.action);input.next+=input.action==='down'?40:60;}}gravity+=dt;const interval=Math.max(75,850*Math.pow(.8,game.level-1));if(gravity>=interval){game.move(0,1);gravity=0;}if(!game.valid(game.active.m,game.active.x,game.active.y+1)){lockTime+=dt;if(lockTime>=450)finish(game.lock());}else lockTime=0;flash=Math.max(0,flash-dt);update();}requestAnimationFrame(frame);}\nupdate();requestAnimationFrame(frame);\n</script>\n</body>\n</html>\n"
+      },
+      "observation": "wrote 20086 bytes to arcade.html",
+      "atMs": 203526.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html --interact --width=390 --height=844"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (52.5 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play\"\n  focus after primary: body \"AFTERGLOW A little order in a world of falling things. POCKE\"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"33\"; div#level.number \"01\"; div#lines.number \"0\"; div#status.status \"MAKE ROOM FOR SOMETHING GOOD.\"\n  overlays after first P: div#overlay.overlay \"\u2726 NO RUSH A quiet moment. Your stack is safe. Come back when\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"AFTERGLOW A little order in a world of falling things. POCKET ARCADE \u00b7 01 YOUR SCORE 33 PERSONAL BEST 0 LEVEL 01 LINES 0 10 lines to next level C HOLD Save one \"\nMEASURED LAYOUT (px, viewport 390x844, page 390x844, body bg rgb(16, 28, 43), text rgb(236, 244, 243)):\n  main.page @ x=0 y=0 w=390 h=840 \"AFTERGLOW\"\n  header.top @ x=14 y=18 w=362 h=49 \"AFTERGLOW\"\n  section.arcade @ x=14 y=85 w=362 h=569 \"YOUR SCORE\"\n  nav.touch @ x=14 y=663 w=362 h=66 \"\u2190\"\n  div.help-footer @ x=14 y=741 w=362 h=33 \"\u21c4 Hold piece Ghost outline shows you\"\n  footer @ x=14 y=792 w=362 h=30 \"BUILT FOR THE IN-BETWEEN MOMENTS\"",
+      "atMs": 207195.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "write file",
+      "action": {
+        "a": "write_file",
+        "p": "test/game.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nconst source=html.match(/<script>([\\s\\S]*?)<\\/script>/)[1];\nfunction engine(){const context=vm.createContext({});vm.runInContext(source.split('const $=')[0]+'\\nglobalThis.Game=Game;',context);return new context.Game(()=>0.42);}\nconst cells=g=>g.board.flat().filter(Boolean).length;\ntest('seven-bag provides every piece once and three previews remain available',()=>{const g=engine();const types=[];for(let i=0;i<14;i++){types.push(g.active.type);assert.ok(g.queue.length>=3);g.spawn();}assert.equal(new Set(types.slice(0,7)).size,7);assert.equal(new Set(types.slice(7)).size,7);});\ntest('movement rejects walls, floor and occupied cells',()=>{const g=engine();g.spawn('O');while(g.move(-1,0)){}assert.equal(g.active.x,0);assert.equal(g.move(-1,0),false);while(g.move(1,0)){}assert.equal(g.active.x,8);g.board[3][8]='I';assert.equal(g.move(0,1),true);assert.equal(g.move(0,1),false);g.board[3][8]=null;while(g.move(0,1)){}assert.equal(g.active.y,18);assert.equal(g.move(0,1),false);});\ntest('rotations round trip, kick off walls, and reject a blocked rotation',()=>{const g=engine();g.spawn('T');const original=JSON.stringify(g.active.m);for(let i=0;i<4;i++)assert.equal(g.rotate(),true);assert.equal(JSON.stringify(g.active.m),original);g.rotate(1);g.rotate(-1);assert.equal(JSON.stringify(g.active.m),original);g.spawn('I');g.rotate();while(g.move(-1,0)){}assert.equal(g.rotate(),true);assert.ok(g.valid(g.active.m,g.active.x,g.active.y));g.board=Array.from({length:20},()=>Array(10).fill('Z'));assert.equal(g.rotate(),false);});\ntest('ghost and hard drop agree, award distance points and lock exactly four cells',()=>{const g=engine();g.spawn('O');const y=g.ghostY();assert.equal(y,18);assert.equal(g.active.y,0);g.hardDrop();assert.equal(cells(g),4);assert.equal(g.score,36);assert.equal(g.board[19][4],'O');assert.equal(g.board[19][5],'O');});\ntest('hold is limited to once per lock and resets swapped orientation',()=>{const g=engine();g.spawn('T');g.rotate();const next=g.queue[0];assert.equal(g.hold(),true);assert.equal(g.held,'T');assert.equal(g.active.type,next);assert.equal(g.hold(),false);g.hardDrop();assert.equal(g.holdUsed,false);assert.equal(g.hold(),true);assert.equal(g.active.type,'T');assert.equal(JSON.stringify(g.active.m),JSON.stringify([[0,1,0],[1,1,1],[0,0,0]]));assert.equal(g.active.y,0);});\ntest('four lines clear simultaneously with scoring, combos and level progression',()=>{const g=engine();function well(){g.board=Array.from({length:20},(_,y)=>Array.from({length:10},(_,x)=>y>=16&&x!==5?'J':null));g.spawn('I');g.rotate();}well();g.lines=8;g.active.y=g.ghostY();assert.equal(g.lock(),4);assert.equal(g.lines,12);assert.equal(g.level,2);assert.equal(g.score,800);assert.equal(cells(g),0);well();g.active.y=g.ghostY();g.lock();assert.equal(g.score,2500);assert.equal(g.combo,1);g.hardDrop();assert.equal(g.combo,-1);});\ntest('clearing one row shifts cells above it down',()=>{const g=engine();g.board[19]=Array(10).fill('J');g.board[19][4]=g.board[19][5]=null;g.board[17][0]='T';g.spawn('O');g.active.y=g.ghostY();assert.equal(g.lock(),1);assert.equal(g.score,100);assert.equal(g.board[18][0],'T');assert.equal(g.board[19][4],'O');assert.equal(g.board[0].every(v=>v===null),true);});\ntest('blocked spawn and hold end the game; reset restores a clean run',()=>{const g=engine();g.board[0].fill('Z');g.spawn('O');assert.equal(g.over,true);assert.equal(g.move(1,0),false);assert.equal(g.rotate(),false);assert.equal(g.hold(),false);g.reset();assert.equal(g.over,false);assert.equal(g.score,0);assert.equal(g.lines,0);assert.equal(cells(g),0);assert.equal(g.held,null);g.held='O';g.board[0].fill('Z');g.hold();assert.equal(g.over,true);});\nfunction ui(){const elements=new Map(),events={};const noop=()=>{};const context2d=new Proxy({}, {get:(o,k)=>o[k]||noop,set:(o,k,v)=>(o[k]=v,true)});function element(id){if(!elements.has(id))elements.set(id,{id,textContent:'',hidden:false,disabled:false,style:{},firstChild:{textContent:''},events:{},setAttribute:noop,getContext:()=>context2d,addEventListener(name,fn){this.events[name]=fn;},blur:noop});return elements.get(id);}const sandbox={document:{getElementById:element,querySelectorAll:()=>[],addEventListener:(k,f)=>events[k]=f,hidden:false},window:{addEventListener:noop,confirm:()=>true},localStorage:{getItem:()=>{throw Error('blocked');},setItem:()=>{throw Error('blocked');}},requestAnimationFrame:noop};vm.createContext(sandbox);vm.runInContext(source,sandbox);return {run:s=>vm.runInContext(s,sandbox),element,events};}\ntest('UI starts, moves, pauses simulation, resumes, holds and restarts without storage',()=>{const u=ui();assert.equal(u.run('mode'),'ready');u.element('play').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.element('overlay').hidden,true);u.run(\"act('left')\");assert.equal(u.run('game.active.x'),2);u.run(\"act('hold')\");assert.equal(u.element('touch-hold').disabled,true);u.element('pause').events.click();assert.equal(u.run('mode'),'paused');const x=u.run('game.active.x');u.run(\"act('right');frame(10000)\");assert.equal(u.run('game.active.x'),x);u.element('play').events.click();assert.equal(u.run('mode'),'playing');u.run(\"act('drop')\");assert.ok(u.run('game.score')>0);u.element('restart').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.run('game.score'),0);});\ntest('gravity locks a grounded piece, game over displays score and restart recovers',()=>{const u=ui();u.run(\"start();game.spawn('O');game.active.y=18\");for(let t=50;t<=550;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.run(\"game.score=321;game.board[0].fill('Z');game.spawn('O');finish(0);update()\");assert.equal(u.run('mode'),'over');assert.match(u.element('overlay-copy').textContent,/321 points/);assert.equal(u.element('overlay').hidden,false);assert.equal(u.run('best'),321);u.element('play').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.run('game.over'),false);});\ntest('keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss',()=>{const u=ui();u.run('start()');let prevented=false;u.events.keydown({key:' ',target:{tagName:'BODY'},preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.events.keydown({key:' ',repeat:true,target:{tagName:'BODY'},preventDefault(){}});assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.run('document.hidden=true');u.events.visibilitychange();assert.equal(u.run('mode'),'paused');});\n"
+      },
+      "observation": "wrote 6739 bytes to test/game.test.js",
+      "atMs": 274780.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "shell",
+      "action": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "observation": "VERDICT: all 13 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.369399\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 0.810045\n  ...\n# Subtest: seven-bag provides every piece once and three previews remain available\nok 3 - seven-bag provides every piece once and three previews remain available\n  ---\n  duration_ms: 2.398705\n  ...\n# Subtest: movement rejects walls, floor and occupied cells\nok 4 - movement rejects walls, floor and occupied cells\n  ---\n  duration_ms: 0.637393\n  ...\n# Subtest: rotations round trip, kick off walls, and reject a blocked rotation\nok 5 - rotations round trip, kick off walls, and reject a blocked rotation\n  ---\n  duration_ms: 0.828705\n  ...\n# Subtest: ghost and hard drop agree, award distance points and lock exactly four cells\nok 6 - ghost and hard drop agree, award distance points and lock exactly four cells\n  ---\n  duration_ms: 0.754314\n  ...\n# Subtest: hold is limited to once per lock and resets swapped orientation\nok 7 - hold is limited to once per lock and resets swapped orientation\n  ---\n  duration_ms: 0.939595\n  ...\n# Subtest: four lines clear simultaneously with scoring, combos and level progression\nok 8 - four lines clear simultaneously with scoring, combos and level progression\n  ---\n  duration_ms: 1.417549\n  ...\n# Subtest: clearing one row shifts cells above it down\nok 9 - clearing one row shifts cells above it down\n  ---\n  duration_ms: 0.596134\n  ...\n# Subtest: blocked spawn and hold end the game; reset restores a clean run\nok 10 - blocked spawn and hold end the game; reset restores a clean run\n  ---\n  duration_ms: 0.589924\n  ...\n# Subtest: UI starts, moves, pauses simulation, resumes, holds and restarts without storage\nok 11 - UI starts, moves, pauses simulation, resumes, holds and restarts without storage\n  ---\n  duration_ms: 12.387054\n  ...\n# Subtest: gravity locks a grounded piece, game over displays score and restart recovers\nok 12 - gravity locks a grounded piece, game over displays score and restart recovers\n  ---\n  duration_ms: 2.145142\n  ...\n# Subtest: keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\nok 13 - keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\n  ---\n  duration_ms: 1.214167\n  ...\n1..13\n# tests 13\n# suites 0\n# pass 13\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 69.135711",
+      "atMs": 279566.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": 0
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html --interact --width=1280 --height=900"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (52.5 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play\"\n  focus after primary: body \"AFTERGLOW A little order in a world of falling things. POCKE\"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"31\"; div#level.number \"01\"; div#lines.number \"0\"; div#status.status \"MAKE ROOM FOR SOMETHING GOOD.\"\n  overlays after first P: div#overlay.overlay \"\u2726 NO RUSH A quiet moment. Your stack is safe. Come back when\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"AFTERGLOW A little order in a world of falling things. POCKET ARCADE \u00b7 01 YOUR SCORE 31 PERSONAL BEST 0 LEVEL 01 LINES 0 10 lines to next level C HOLD Save one \"\nMEASURED LAYOUT (px, viewport 1280x900, page 1280x968, body bg rgb(16, 28, 43), text rgb(236, 244, 243)):\n  main.page @ x=150 y=0 w=980 h=968 \"AFTERGLOW\"\n  header.top @ x=174 y=32 w=932 h=58 \"AFTERGLOW\"\n  section.arcade @ x=174 y=116 w=932 h=652 \"YOUR SCORE\"\n  nav.touch @ x=420 y=780 w=440 h=66 \"\u2190\"\n  div.help-footer @ x=174 y=858 w=932 h=33 \"\u21c4 Hold piece Ghost outline shows you\"\n  footer @ x=174 y=915 w=932 h=31 \"BUILT FOR THE IN-BETWEEN MOMENTS\"",
+      "atMs": 289757.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "patch",
+      "action": {
+        "a": "patch",
+        "edits": [
+          {
+            "p": "arcade.html",
+            "old": "grid-template-columns:180px minmax(240px,320px) 180px",
+            "new": "grid-template-columns:180px clamp(215px,calc((100svh - 330px)/2),320px) 180px"
+          },
+          {
+            "p": "test/game.test.js",
+            "old": "const sandbox={document:{getElementById:element,querySelectorAll:()=>[],",
+            "new": "const touch=['left','right','rotate','down','drop'].map(action=>{const button=element('touch-'+action);button.dataset={action};button.setPointerCapture=noop;return button;});const sandbox={document:{getElementById:element,querySelectorAll:()=>touch,"
+          }
+        ]
+      },
+      "observation": "patched 2 edits across 2 files: arcade.html, test/game.test.js\n[regression-guard] Test inputs changed (test/game.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.",
+      "atMs": 311549.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "patch",
+      "action": {
+        "a": "patch",
+        "edits": [
+          {
+            "p": "test/game.test.js",
+            "old": "assert.equal(u.run('mode'),'paused');});\n",
+            "new": "assert.equal(u.run('mode'),'paused');});\ntest('touch press repeats movement, cancellation stops it, and rotate/drop/hold work',()=>{const u=ui();u.run('start();game.spawn(\"T\")');const event={pointerId:7,preventDefault(){}};u.element('touch-left').events.pointerdown(event);assert.equal(u.run('game.active.x'),2);for(let t=50;t<=200;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.active.x'),1);u.element('touch-left').events.pointercancel(event);for(let t=250;t<=450;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.active.x'),1);assert.equal(u.run('pressed.size'),0);const shape=u.run('JSON.stringify(game.active.m)');u.element('touch-rotate').events.pointerdown(event);assert.notEqual(u.run('JSON.stringify(game.active.m)'),shape);u.element('touch-drop').events.pointerdown(event);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.element('touch-hold').events.click();assert.equal(u.run('game.holdUsed'),true);});\n"
+          }
+        ]
+      },
+      "observation": "patched 1 edit across 1 file: test/game.test.js",
+      "atMs": 322978.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "shell",
+      "action": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "observation": "VERDICT: all 14 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.335818\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 0.776454\n  ...\n# Subtest: seven-bag provides every piece once and three previews remain available\nok 3 - seven-bag provides every piece once and three previews remain available\n  ---\n  duration_ms: 2.541445\n  ...\n# Subtest: movement rejects walls, floor and occupied cells\nok 4 - movement rejects walls, floor and occupied cells\n  ---\n  duration_ms: 0.621954\n  ...\n# Subtest: rotations round trip, kick off walls, and reject a blocked rotation\nok 5 - rotations round trip, kick off walls, and reject a blocked rotation\n  ---\n  duration_ms: 0.810845\n  ...\n# Subtest: ghost and hard drop agree, award distance points and lock exactly four cells\nok 6 - ghost and hard drop agree, award distance points and lock exactly four cells\n  ---\n  duration_ms: 0.771775\n  ...\n# Subtest: hold is limited to once per lock and resets swapped orientation\nok 7 - hold is limited to once per lock and resets swapped orientation\n  ---\n  duration_ms: 1.311878\n  ...\n# Subtest: four lines clear simultaneously with scoring, combos and level progression\nok 8 - four lines clear simultaneously with scoring, combos and level progression\n  ---\n  duration_ms: 0.773575\n  ...\n# Subtest: clearing one row shifts cells above it down\nok 9 - clearing one row shifts cells above it down\n  ---\n  duration_ms: 0.589533\n  ...\n# Subtest: blocked spawn and hold end the game; reset restores a clean run\nok 10 - blocked spawn and hold end the game; reset restores a clean run\n  ---\n  duration_ms: 0.529473\n  ...\n# Subtest: UI starts, moves, pauses simulation, resumes, holds and restarts without storage\nok 11 - UI starts, moves, pauses simulation, resumes, holds and restarts without storage\n  ---\n  duration_ms: 12.157863\n  ...\n# Subtest: gravity locks a grounded piece, game over displays score and restart recovers\nok 12 - gravity locks a grounded piece, game over displays score and restart recovers\n  ---\n  duration_ms: 2.134423\n  ...\n# Subtest: keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\nok 13 - keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\n  ---\n  duration_ms: 1.246648\n  ...\n# Subtest: touch press repeats movement, cancellation stops it, and rotate/drop/hold work\nok 14 - touch press repeats movement, cancellation stops it, and rotate/drop/hold work\n  ---\n  duration_ms: 1.796981\n  ...\n1..14\n# tests 14\n# suites 0\n# pass 14\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 73.35484",
+      "atMs": 325462.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": 0
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html --interact --width=1280 --height=900"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (53.3 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play\"\n  focus after primary: body \"AFTERGLOW A little order in a world of falling things. POCKE\"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"33\"; div#level.number \"01\"; div#lines.number \"0\"; div#status.status \"MAKE ROOM FOR SOMETHING GOOD.\"\n  overlays after first P: div#overlay.overlay \"\u2726 NO RUSH A quiet moment. Your stack is safe. Come back when\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"AFTERGLOW A little order in a world of falling things. POCKET ARCADE \u00b7 01 YOUR SCORE 33 PERSONAL BEST 0 LEVEL 01 LINES 0 10 lines to next level C HOLD Save one \"\nMEASURED LAYOUT (px, viewport 1280x900, page 1280x925, body bg rgb(16, 28, 43), text rgb(236, 244, 243)):\n  main.page @ x=150 y=0 w=980 h=925 \"AFTERGLOW\"\n  header.top @ x=174 y=32 w=932 h=58 \"AFTERGLOW\"\n  section.arcade @ x=174 y=116 w=932 h=609 \"YOUR SCORE\"\n  nav.touch @ x=420 y=737 w=440 h=66 \"\u2190\"\n  div.help-footer @ x=174 y=815 w=932 h=33 \"\u21c4 Hold piece Ghost outline shows you\"\n  footer @ x=174 y=872 w=932 h=31 \"BUILT FOR THE IN-BETWEEN MOMENTS\"",
+      "atMs": 329234.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html --interact --width=320 --height=740"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (54.2 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play\"\n  focus after primary: body \"AFTERGLOW A little order in a world of falling things. POCKE\"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"33\"; div#level.number \"01\"; div#lines.number \"0\"; div#status.status \"MAKE ROOM FOR SOMETHING GOOD.\"\n  overlays after first P: div#overlay.overlay \"\u2726 NO RUSH A quiet moment. Your stack is safe. Come back when\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"AFTERGLOW A little order in a world of falling things. POCKET ARCADE \u00b7 01 YOUR SCORE 33 PERSONAL BEST 0 LEVEL 01 LINES 0 10 lines to next level C HOLD Save one \"\nMEASURED LAYOUT (px, viewport 320x740, page 320x867, body bg rgb(16, 28, 43), text rgb(236, 244, 243)):\n  main.page @ x=0 y=0 w=320 h=867 \"AFTERGLOW\"\n  header.top @ x=14 y=18 w=292 h=63 \"AFTERGLOW\"\n  section.arcade @ x=14 y=99 w=292 h=569 \"YOUR SCORE\"\n  nav.touch @ x=14 y=677 w=292 h=66 \"\u2190\"\n  div.help-footer @ x=14 y=755 w=292 h=33 \"\u21c4 Hold piece Ghost outline shows you\"\n  footer @ x=14 y=806 w=292 h=43 \"BUILT FOR THE IN-BETWEEN MOMENTS\"",
+      "atMs": 338797.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "patch",
+      "action": {
+        "a": "patch",
+        "edits": [
+          {
+            "p": "arcade.html",
+            "old": "@media(prefers-reduced-motion:reduce){*{transition:none!important}}",
+            "new": "@media(max-width:720px){.left,.right{gap:8px}.card{padding:10px}.pair{margin-top:10px}.best{margin-top:8px}.progress{margin:9px 0 5px}.hold-card .small{display:none}.hold-card .preview{height:40px}.queue canvas{height:32px}.controls button{padding:8px}.right{margin-top:0}}@media(max-width:380px){.live{display:none}.brand-note{white-space:nowrap}.help-footer>span{display:block;margin-top:6px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}"
+          }
+        ]
+      },
+      "observation": "patched 1 edit across 1 file: arcade.html",
+      "atMs": 359111.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html --interact --width=320 --height=740"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (56.7 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play\"\n  focus after primary: body \"AFTERGLOW A little order in a world of falling things. YOUR \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"35\"; div#level.number \"01\"; div#lines.number \"0\"; div#status.status \"MAKE ROOM FOR SOMETHING GOOD.\"\n  overlays after first P: div#overlay.overlay \"\u2726 NO RUSH A quiet moment. Your stack is safe. Come back when\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"AFTERGLOW A little order in a world of falling things. YOUR SCORE 35 PERSONAL BEST 0 LEVEL 01 LINES 0 10 lines to next level C HOLD MAKE ROOM FOR SOMETHING GOOD\"\nMEASURED LAYOUT (px, viewport 320x740, page 320x801, body bg rgb(16, 28, 43), text rgb(236, 244, 243)):\n  main.page @ x=0 y=0 w=320 h=801 \"AFTERGLOW\"\n  header.top @ x=14 y=18 w=292 h=49 \"AFTERGLOW\"\n  section.arcade @ x=14 y=85 w=292 h=496 \"YOUR SCORE\"\n  nav.touch @ x=14 y=590 w=292 h=66 \"\u2190\"\n  div.help-footer @ x=14 y=668 w=292 h=54 \"\u21c4 Hold piece\"\n  footer @ x=14 y=740 w=292 h=43 \"BUILT FOR THE IN-BETWEEN MOMENTS\"",
+      "atMs": 363291.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "shell",
+      "action": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "observation": "VERDICT: all 14 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.321768\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 0.776555\n  ...\n# Subtest: seven-bag provides every piece once and three previews remain available\nok 3 - seven-bag provides every piece once and three previews remain available\n  ---\n  duration_ms: 2.315484\n  ...\n# Subtest: movement rejects walls, floor and occupied cells\nok 4 - movement rejects walls, floor and occupied cells\n  ---\n  duration_ms: 0.653384\n  ...\n# Subtest: rotations round trip, kick off walls, and reject a blocked rotation\nok 5 - rotations round trip, kick off walls, and reject a blocked rotation\n  ---\n  duration_ms: 0.851175\n  ...\n# Subtest: ghost and hard drop agree, award distance points and lock exactly four cells\nok 6 - ghost and hard drop agree, award distance points and lock exactly four cells\n  ---\n  duration_ms: 0.772885\n  ...\n# Subtest: hold is limited to once per lock and resets swapped orientation\nok 7 - hold is limited to once per lock and resets swapped orientation\n  ---\n  duration_ms: 0.641944\n  ...\n# Subtest: four lines clear simultaneously with scoring, combos and level progression\nok 8 - four lines clear simultaneously with scoring, combos and level progression\n  ---\n  duration_ms: 0.819305\n  ...\n# Subtest: clearing one row shifts cells above it down\nok 9 - clearing one row shifts cells above it down\n  ---\n  duration_ms: 0.567113\n  ...\n# Subtest: blocked spawn and hold end the game; reset restores a clean run\nok 10 - blocked spawn and hold end the game; reset restores a clean run\n  ---\n  duration_ms: 0.536583\n  ...\n# Subtest: UI starts, moves, pauses simulation, resumes, holds and restarts without storage\nok 11 - UI starts, moves, pauses simulation, resumes, holds and restarts without storage\n  ---\n  duration_ms: 12.395855\n  ...\n# Subtest: gravity locks a grounded piece, game over displays score and restart recovers\nok 12 - gravity locks a grounded piece, game over displays score and restart recovers\n  ---\n  duration_ms: 2.070263\n  ...\n# Subtest: keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\nok 13 - keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\n  ---\n  duration_ms: 1.217127\n  ...\n# Subtest: touch press repeats movement, cancellation stops it, and rotate/drop/hold work\nok 14 - touch press repeats movement, cancellation stops it, and rotate/drop/hold work\n  ---\n  duration_ms: 1.689121\n  ...\n1..14\n# tests 14\n# suites 0\n# pass 14\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 72.828109",
+      "atMs": 371576.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": 0
+    },
+    {
+      "title": "done",
+      "action": {
+        "a": "done",
+        "summary": "Created arcade.html: AFTERGLOW, a self-contained offline arcade with pastel blocks, keyboard/touch controls, hold, three-piece preview, ghost landing, combos, levels, personal best, pause/resume, restart and game over. Starter files unchanged. Added gameplay and input checks; all 14 tests pass with npm test. Desktop and phone browser previews passed without runtime errors or failed loads. Open arcade.html to play."
+      },
+      "observation": "",
+      "atMs": 379010.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    }
+  ],
+  "finalResponse": "Created arcade.html: AFTERGLOW, a self-contained offline arcade with pastel blocks, keyboard/touch controls, hold, three-piece preview, ghost landing, combos, levels, personal best, pause/resume, restart and game over. Starter files unchanged. Added gameplay and input checks; all 14 tests pass with npm test. Desktop and phone browser previews passed without runtime errors or failed loads. Open arcade.html to play.",
+  "verification": "Recorded project check: 14/14 tests passed. Two supplied tests check packaging; the other tests were written by the agent.",
+  "verificationOutput": "\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.369408\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 0.793715\n  ...\n# Subtest: seven-bag provides every piece once and three previews remain available\nok 3 - seven-bag provides every piece once and three previews remain available\n  ---\n  duration_ms: 2.432055\n  ...\n# Subtest: movement rejects walls, floor and occupied cells\nok 4 - movement rejects walls, floor and occupied cells\n  ---\n  duration_ms: 0.612924\n  ...\n# Subtest: rotations round trip, kick off walls, and reject a blocked rotation\nok 5 - rotations round trip, kick off walls, and reject a blocked rotation\n  ---\n  duration_ms: 0.815365\n  ...\n# Subtest: ghost and hard drop agree, award distance points and lock exactly four cells\nok 6 - ghost and hard drop agree, award distance points and lock exactly four cells\n  ---\n  duration_ms: 0.776285\n  ...\n# Subtest: hold is limited to once per lock and resets swapped orientation\nok 7 - hold is limited to once per lock and resets swapped orientation\n  ---\n  duration_ms: 0.630134\n  ...\n# Subtest: four lines clear simultaneously with scoring, combos and level progression\nok 8 - four lines clear simultaneously with scoring, combos and level progression\n  ---\n  duration_ms: 1.132997\n  ...\n# Subtest: clearing one row shifts cells above it down\nok 9 - clearing one row shifts cells above it down\n  ---\n  duration_ms: 0.647344\n  ...\n# Subtest: blocked spawn and hold end the game; reset restores a clean run\nok 10 - blocked spawn and hold end the game; reset restores a clean run\n  ---\n  duration_ms: 0.563714\n  ...\n# Subtest: UI starts, moves, pauses simulation, resumes, holds and restarts without storage\nok 11 - UI starts, moves, pauses simulation, resumes, holds and restarts without storage\n  ---\n  duration_ms: 12.463105\n  ...\n# Subtest: gravity locks a grounded piece, game over displays score and restart recovers\nok 12 - gravity locks a grounded piece, game over displays score and restart recovers\n  ---\n  duration_ms: 2.006362\n  ...\n# Subtest: keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\nok 13 - keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss\n  ---\n  duration_ms: 1.208917\n  ...\n# Subtest: touch press repeats movement, cancellation stops it, and rotate/drop/hold work\nok 14 - touch press repeats movement, cancellation stops it, and rotate/drop/hold work\n  ---\n  duration_ms: 1.65057\n  ...\n1..14\n# tests 14\n# suites 0\n# pass 14\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 72.479357\n\n",
+  "sourceCommit": "a2a88a0",
+  "source": "factory-turns-and-verification",
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "4432f63e56f0fac96be23f8a3354ebf4c3a4b39a1977c945339b2fa9446dded6"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "05a009bdcc3b83403726a5dd5cd922a18ecc523826250d879eda95a41b5f5fa1"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "1392b003d6f53704183cd720e9d260c9252b293d6dc6f4ac6e6a3a5ba58b9cce"
+    }
+  ],
+  "usage": {
+    "source": "run.json",
+    "complete": true,
+    "requests": 15,
+    "inputTokens": 232784,
+    "outputTokens": 10124,
+    "cacheHitTokens": 194304,
+    "reasoningTokens": 733,
+    "prefixReuse": 0.83,
+    "freshInputTokens": 38480,
+    "calls": [
+      {
+        "usage": {
+          "inputTokens": 4683,
+          "outputTokens": 36,
+          "cacheHitTokens": 0,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 5292,
+          "outputTokens": 6466,
+          "cacheHitTokens": 1920,
+          "reasoningTokens": 22
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 11893,
+          "outputTokens": 52,
+          "cacheHitTokens": 5120,
+          "reasoningTokens": 24
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 12539,
+          "outputTokens": 2001,
+          "cacheHitTokens": 11776,
+          "reasoningTokens": 24
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 14677,
+          "outputTokens": 14,
+          "cacheHitTokens": 4480,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 15570,
+          "outputTokens": 172,
+          "cacheHitTokens": 14464,
+          "reasoningTokens": 143
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 16236,
+          "outputTokens": 429,
+          "cacheHitTokens": 15360,
+          "reasoningTokens": 262
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 16848,
+          "outputTokens": 311,
+          "cacheHitTokens": 16000,
+          "reasoningTokens": 12
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 17298,
+          "outputTokens": 14,
+          "cacheHitTokens": 12416,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 18143,
+          "outputTokens": 27,
+          "cacheHitTokens": 17152,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 18766,
+          "outputTokens": 62,
+          "cacheHitTokens": 17920,
+          "reasoningTokens": 34
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 19320,
+          "outputTokens": 389,
+          "cacheHitTokens": 18560,
+          "reasoningTokens": 200
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 19846,
+          "outputTokens": 26,
+          "cacheHitTokens": 19200,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 20356,
+          "outputTokens": 28,
+          "cacheHitTokens": 19712,
+          "reasoningTokens": 12
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 21317,
+          "outputTokens": 97,
+          "cacheHitTokens": 20224,
+          "reasoningTokens": 0
+        }
+      }
+    ],
+    "maxRequestInputTokens": 21317
+  },
+  "playtest": {
+    "arm": "bantam-codex-astra-refresh",
+    "method": "Untouched delivered HTML in Chromium. Real keyboard and touch events; deterministic line-clear fixture in browser memory only. No product edits. ",
+    "checks": {
+      "gravity": true,
+      "left": true,
+      "right": true,
+      "rotation": true,
+      "hard_drop_and_next": true,
+      "hold": true,
+      "pause": true,
+      "resume": true,
+      "restart": true,
+      "line_clear": true,
+      "game_over": true,
+      "restart_after_game_over": true
+    },
+    "viewports": [
+      {
+        "width": 390,
+        "horizontalOverflow": false,
+        "touchMovesPiece": true,
+        "touchControlsWithinWidth": true,
+        "controlsBottom": 655.890625,
+        "screenHeight": 844
+      },
+      {
+        "width": 320,
+        "horizontalOverflow": false,
+        "touchMovesPiece": true,
+        "touchControlsWithinWidth": true,
+        "controlsBottom": 655.890625,
+        "screenHeight": 844
+      }
+    ],
+    "errors": [],
+    "externalRequests": [],
+    "pass": true,
+    "artifactSha256": "967119337892728d74208511cb24f31ccafe2c2aaeed8b95e6406f7c50b20d82"
+  },
+  "files": [
+    {
+      "path": "test/delivery.test.js",
+      "sha256": "756944dc3596dc7ace4a2069253751e2e1344d9cfbfcd6d97fe9057a09672ae1",
+      "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst file=new URL('../arcade.html',import.meta.url);\ntest('deliver one regular, bounded HTML file',()=>{\n const s=fs.lstatSync(file);assert.ok(s.isFile()&&!s.isSymbolicLink());assert.ok(s.size>0&&s.size<=1024*1024);\n const text=fs.readFileSync(file,'utf8');assert.match(text,/<!doctype html>/i);assert.match(text,/<html\\b/i);assert.match(text,/<title>[^<]+<\\/title>/i);assert.match(text,/name=[\"']viewport[\"']/i);\n});\ntest('include classic JavaScript that parses',()=>{\n const text=fs.readFileSync(file,'utf8');const blocks=[...text.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)];\n assert.ok(blocks.length>0);for(const [,attrs,code] of blocks){assert.doesNotMatch(attrs,/\\bsrc\\s*=/i);assert.doesNotMatch(attrs,/type\\s*=\\s*[\"']module[\"']/i);new vm.Script(code);}\n});\n"
+    },
+    {
+      "path": "test/game.test.js",
+      "sha256": "65e766ba50b21f9fc0d8878acb5331405dd039a3cb99b024d130d93402a25048",
+      "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nconst source=html.match(/<script>([\\s\\S]*?)<\\/script>/)[1];\nfunction engine(){const context=vm.createContext({});vm.runInContext(source.split('const $=')[0]+'\\nglobalThis.Game=Game;',context);return new context.Game(()=>0.42);}\nconst cells=g=>g.board.flat().filter(Boolean).length;\ntest('seven-bag provides every piece once and three previews remain available',()=>{const g=engine();const types=[];for(let i=0;i<14;i++){types.push(g.active.type);assert.ok(g.queue.length>=3);g.spawn();}assert.equal(new Set(types.slice(0,7)).size,7);assert.equal(new Set(types.slice(7)).size,7);});\ntest('movement rejects walls, floor and occupied cells',()=>{const g=engine();g.spawn('O');while(g.move(-1,0)){}assert.equal(g.active.x,0);assert.equal(g.move(-1,0),false);while(g.move(1,0)){}assert.equal(g.active.x,8);g.board[3][8]='I';assert.equal(g.move(0,1),true);assert.equal(g.move(0,1),false);g.board[3][8]=null;while(g.move(0,1)){}assert.equal(g.active.y,18);assert.equal(g.move(0,1),false);});\ntest('rotations round trip, kick off walls, and reject a blocked rotation',()=>{const g=engine();g.spawn('T');const original=JSON.stringify(g.active.m);for(let i=0;i<4;i++)assert.equal(g.rotate(),true);assert.equal(JSON.stringify(g.active.m),original);g.rotate(1);g.rotate(-1);assert.equal(JSON.stringify(g.active.m),original);g.spawn('I');g.rotate();while(g.move(-1,0)){}assert.equal(g.rotate(),true);assert.ok(g.valid(g.active.m,g.active.x,g.active.y));g.board=Array.from({length:20},()=>Array(10).fill('Z'));assert.equal(g.rotate(),false);});\ntest('ghost and hard drop agree, award distance points and lock exactly four cells',()=>{const g=engine();g.spawn('O');const y=g.ghostY();assert.equal(y,18);assert.equal(g.active.y,0);g.hardDrop();assert.equal(cells(g),4);assert.equal(g.score,36);assert.equal(g.board[19][4],'O');assert.equal(g.board[19][5],'O');});\ntest('hold is limited to once per lock and resets swapped orientation',()=>{const g=engine();g.spawn('T');g.rotate();const next=g.queue[0];assert.equal(g.hold(),true);assert.equal(g.held,'T');assert.equal(g.active.type,next);assert.equal(g.hold(),false);g.hardDrop();assert.equal(g.holdUsed,false);assert.equal(g.hold(),true);assert.equal(g.active.type,'T');assert.equal(JSON.stringify(g.active.m),JSON.stringify([[0,1,0],[1,1,1],[0,0,0]]));assert.equal(g.active.y,0);});\ntest('four lines clear simultaneously with scoring, combos and level progression',()=>{const g=engine();function well(){g.board=Array.from({length:20},(_,y)=>Array.from({length:10},(_,x)=>y>=16&&x!==5?'J':null));g.spawn('I');g.rotate();}well();g.lines=8;g.active.y=g.ghostY();assert.equal(g.lock(),4);assert.equal(g.lines,12);assert.equal(g.level,2);assert.equal(g.score,800);assert.equal(cells(g),0);well();g.active.y=g.ghostY();g.lock();assert.equal(g.score,2500);assert.equal(g.combo,1);g.hardDrop();assert.equal(g.combo,-1);});\ntest('clearing one row shifts cells above it down',()=>{const g=engine();g.board[19]=Array(10).fill('J');g.board[19][4]=g.board[19][5]=null;g.board[17][0]='T';g.spawn('O');g.active.y=g.ghostY();assert.equal(g.lock(),1);assert.equal(g.score,100);assert.equal(g.board[18][0],'T');assert.equal(g.board[19][4],'O');assert.equal(g.board[0].every(v=>v===null),true);});\ntest('blocked spawn and hold end the game; reset restores a clean run',()=>{const g=engine();g.board[0].fill('Z');g.spawn('O');assert.equal(g.over,true);assert.equal(g.move(1,0),false);assert.equal(g.rotate(),false);assert.equal(g.hold(),false);g.reset();assert.equal(g.over,false);assert.equal(g.score,0);assert.equal(g.lines,0);assert.equal(cells(g),0);assert.equal(g.held,null);g.held='O';g.board[0].fill('Z');g.hold();assert.equal(g.over,true);});\nfunction ui(){const elements=new Map(),events={};const noop=()=>{};const context2d=new Proxy({}, {get:(o,k)=>o[k]||noop,set:(o,k,v)=>(o[k]=v,true)});function element(id){if(!elements.has(id))elements.set(id,{id,textContent:'',hidden:false,disabled:false,style:{},firstChild:{textContent:''},events:{},setAttribute:noop,getContext:()=>context2d,addEventListener(name,fn){this.events[name]=fn;},blur:noop});return elements.get(id);}const touch=['left','right','rotate','down','drop'].map(action=>{const button=element('touch-'+action);button.dataset={action};button.setPointerCapture=noop;return button;});const sandbox={document:{getElementById:element,querySelectorAll:()=>touch,addEventListener:(k,f)=>events[k]=f,hidden:false},window:{addEventListener:noop,confirm:()=>true},localStorage:{getItem:()=>{throw Error('blocked');},setItem:()=>{throw Error('blocked');}},requestAnimationFrame:noop};vm.createContext(sandbox);vm.runInContext(source,sandbox);return {run:s=>vm.runInContext(s,sandbox),element,events};}\ntest('UI starts, moves, pauses simulation, resumes, holds and restarts without storage',()=>{const u=ui();assert.equal(u.run('mode'),'ready');u.element('play').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.element('overlay').hidden,true);u.run(\"act('left')\");assert.equal(u.run('game.active.x'),2);u.run(\"act('hold')\");assert.equal(u.element('touch-hold').disabled,true);u.element('pause').events.click();assert.equal(u.run('mode'),'paused');const x=u.run('game.active.x');u.run(\"act('right');frame(10000)\");assert.equal(u.run('game.active.x'),x);u.element('play').events.click();assert.equal(u.run('mode'),'playing');u.run(\"act('drop')\");assert.ok(u.run('game.score')>0);u.element('restart').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.run('game.score'),0);});\ntest('gravity locks a grounded piece, game over displays score and restart recovers',()=>{const u=ui();u.run(\"start();game.spawn('O');game.active.y=18\");for(let t=50;t<=550;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.run(\"game.score=321;game.board[0].fill('Z');game.spawn('O');finish(0);update()\");assert.equal(u.run('mode'),'over');assert.match(u.element('overlay-copy').textContent,/321 points/);assert.equal(u.element('overlay').hidden,false);assert.equal(u.run('best'),321);u.element('play').events.click();assert.equal(u.run('mode'),'playing');assert.equal(u.run('game.over'),false);});\ntest('keyboard prevents scrolling, suppresses repeated hard drops, and pauses on visibility loss',()=>{const u=ui();u.run('start()');let prevented=false;u.events.keydown({key:' ',target:{tagName:'BODY'},preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.events.keydown({key:' ',repeat:true,target:{tagName:'BODY'},preventDefault(){}});assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.run('document.hidden=true');u.events.visibilitychange();assert.equal(u.run('mode'),'paused');});\ntest('touch press repeats movement, cancellation stops it, and rotate/drop/hold work',()=>{const u=ui();u.run('start();game.spawn(\"T\")');const event={pointerId:7,preventDefault(){}};u.element('touch-left').events.pointerdown(event);assert.equal(u.run('game.active.x'),2);for(let t=50;t<=200;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.active.x'),1);u.element('touch-left').events.pointercancel(event);for(let t=250;t<=450;t+=50)u.run(`frame(${t})`);assert.equal(u.run('game.active.x'),1);assert.equal(u.run('pressed.size'),0);const shape=u.run('JSON.stringify(game.active.m)');u.element('touch-rotate').events.pointerdown(event);assert.notEqual(u.run('JSON.stringify(game.active.m)'),shape);u.element('touch-drop').events.pointerdown(event);assert.equal(u.run('game.board.flat().filter(Boolean).length'),4);u.element('touch-hold').events.click();assert.equal(u.run('game.holdUsed'),true);});\n"
+    }
+  ]
+}

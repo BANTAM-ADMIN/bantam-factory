@@ -170,7 +170,7 @@ test('the product page stages a finite local asset set without its template or p
   assert.throws(()=>renderShowcaseResults({cards:[{id:'../private',recorded:true,rows:[]}]}),/Unrecognized/);
 });
 
-test('the playable game matches the recorded edits and the opening tour uses its real request',()=>{
+test('the earlier local game matches its recorded edits and retains its real request',()=>{
   const source=fs.readFileSync(new URL('../site/examples/tetris/BANTAMTETRIS.html',import.meta.url));
   const build=JSON.parse(fs.readFileSync(new URL('../site/examples/tetris/build.json',import.meta.url)));
   const hash=crypto.createHash('sha256').update(source).digest('hex');
@@ -182,6 +182,6 @@ test('the playable game matches the recorded edits and the opening tour uses its
   assert.ok(build.actions.every(row=>!Object.hasOwn(row,'reasoning')));
   const context={window:{},document:{getElementById:()=>null}};
   vm.runInNewContext(fs.readFileSync(new URL('../site/demos.js',import.meta.url),'utf8'),context);
-  assert.equal(context.window.DEMOS.job.steps[0].prompt,build.request);
-  assert.doesNotMatch(JSON.stringify(context.window.DEMOS.job.steps),/npm test|context-packet|all checks passed/i);
+  assert.equal(context.window.DEMOS.localGame.steps[0].prompt,build.request);
+  assert.doesNotMatch(JSON.stringify(context.window.DEMOS.localGame.steps),/npm test|context-packet|all checks passed/i);
 });

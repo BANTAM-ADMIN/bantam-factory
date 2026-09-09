@@ -1,121 +1,95 @@
 <p align="center">
   <a href="https://bantam-admin.github.io/bantam-factory/">
-    <img src="docs/brand/bantam-banner.svg" alt="BANTAM FACTORY — Small model. Heavy hitter. Your model. Your hardware. A better coding factory." width="100%">
+    <img src="docs/brand/bantam-factory-stations.png" alt="BANTAM FACTORY — turn one chicken's impossible job into a factory of small, repeatable steps." width="100%">
   </a>
 </p>
 
 <p align="center">
-  <strong>Your model is the worker. Give it a factory.</strong><br>
-  An open source coding factory that can improve its own machinery.
+  <strong>Get more from Codex. Give your model a factory.</strong><br>
+  Same Astra. Less waste. Finished work you can inspect.
 </p>
 
 <p align="center">
-  <a href="#quick-start"><strong>Get started</strong></a> ·
+  <a href="#get-started"><strong>Get started</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/fights.html"><strong>Watch the fights</strong></a> ·
-  <a href="https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html">Play what it built</a> ·
-  <a href="docs/README.md">Docs</a> ·
-  <a href="CONTRIBUTING.md">Contribute</a>
+  <a href="https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html"><strong>Play the builds</strong></a> ·
+  <a href="docs/README.md">Docs</a>
 </p>
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-f2b544?style=flat-square&labelColor=19251f" alt="License: Apache 2.0"></a>
-  <a href="docs/GETTING-STARTED.md"><img src="https://img.shields.io/badge/status-public_beta-f2b544?style=flat-square&labelColor=19251f" alt="Public beta"></a>
-</p>
+BANTAM FACTORY is an open source coding factory. Put **Codex Astra** inside it,
+or run a **local 27B on your own GPU**. Give it a job in plain language:
+build an app, fix a bug, automate the boring part.
 
-Give BANTAM FACTORY a job: build an app, fix a stubborn bug, automate the boring part.
-It brings your model the tools, context, and checks to get the work done.
-Run a local 27B, or put **Codex Astra, Sol, or Terra** inside the factory.
+A harness for Codex. A factory for your local model. A fight card that lets
+you see the difference.
 
-The factory formula: **turn big jobs into chicken problems**. Put the model at
-one station at a time—as worker, reviewer, or test builder. The factory runs
-the checks, feeds back the result, and directs the next repair or delivery.
+## Your Codex account. More work from your tokens.
 
-## Get more from Codex.
+The same Astra completed these jobs with fewer tokens and less time inside
+BANTAM FACTORY than in native Codex:
 
-**Your Codex account. Same Astra. More work from your tokens.**
-Connect your signed-in Codex CLI during setup. The factory gives Astra focused
-context, reusable tools, and checks that guide the next step.
-
-Astra inside BANTAM FACTORY vs. Astra in native Codex:
-
-| Job | Less input | Less output | Less time | See the work |
+| Job | Less input | Less output | Less time | Inspect the work |
 | --- | --- | --- | --- | --- |
-| **Context packer** | **46%** | **18%** | **18%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
-| **Snapshot checker** | **35%** | **14%** | **12%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html#card=snapshot-drift&view=results&layout=compare&left=bantam-codex-astra&right=codex-astra) |
-| **Job planner** | **44%** | **25%** | **21%** | [Round 5 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-5/share/index.html) · [Round 6 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-6/share/index.html) |
+| **Plan dependent jobs** | **44%** | **25%** | **21%** | [Two recorded pairs ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-5/share/index.html) · [second pair](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-6/share/index.html) |
+| **Pack project context** | **46%** | **18%** | **18%** | [Two recorded pairs ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [second pair](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
+| **Check changed files** | **35%** | **14%** | **12%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html) |
 
 Same task, starting files, and medium reasoning effort within each comparison.
-Every run passed all five independent acceptance groups. Context packer and
-job planner combine two paired repeats; snapshot checker is one pair.
-Open a replay for every action, delivered file, check, and token counter.
-Prefix-cache tokens are included in input. Job planner reused **73,472**
-prefix-cache tokens across the two factory runs; uncached input was
-**22,760 vs. 25,860** in native Codex—**12% less uncached input**.
+All passed five independent acceptance groups. The paired results combine both
+repeats. Job planner also used **12% less uncached input**. Prefix-cache tokens
+are included in input; each card shows the complete counters and conditions.
 
-<details>
-<summary>Sol and Terra work here, too.</summary>
+**Less context to carry. More room for the work.** Open a fight to follow every
+action, read the tests, and inspect what each harness delivered.
 
-On the Context Packet task, factory Sol finished **1.8× faster with 44% less
-input** across two pairs ([round 1](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html),
-[round 2](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html)).
-Factory Terra finished **2.3× faster with 73% less input** in
-[one recorded pair](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra).
-All passed the same five acceptance groups at medium effort.
+## Don't just watch. Play it.
 
-</details>
+> Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file.
 
-**[Play what Astra built →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
-Same brief. Two playable games. Compare the factory and native CLI builds.
+Factory Astra built **Afterglow in 6m 21s**: hold, ghost landing, combos,
+levels, saved best score, and keyboard and touch controls. It previewed the
+interface, improved the layout, and left **14 passing tests**.
 
-<p align="center">
-  <img src="docs/brand/chicken-problems.png" alt="A chicken struggles with a square peg, then builds a factory that sorts the pieces and sends the right one to the job." width="100%">
-</p>
+Against the saved native Astra baseline: **49% less input, 7% less output,
+and 6% less time**. Both delivered playable games. The native build retained
+10 passing tests; the page includes both recordings and browser playtests.
 
-## Same model. Bigger punch.
+**[Play factory Astra · native Astra · local 27B →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 
-Same task. Same local Qwen 27B. Both systems passed in each comparison below.
+Three clearly labelled builds. Each has its own prompt, clock, actions, and
+original downloadable file. The local game came from a shorter prompt.
 
-The local rig: **one RTX 4090 · 24 GB**. BANTAM FACTORY's recorded generation speed
-across the published cards: **82.6–105.2 tokens/second**.
+## The factory formula: chicken problems.
 
-| BANTAM FACTORY vs. | Faster completion | Fewer input tokens | Watch the fight |
+Big jobs become small jobs the model can finish and check. Stations give it
+the right context and tools, run the checks, and feed back the next repair.
+The model can work, review, and build tests. Reusable tools become the factory's
+jigs; guards catch recurring mistakes before they spread.
+
+- **Build it. Check it. Improve it.** Actual test results guide the next step.
+- **Keep the work contained.** Project file boundaries and Docker shell isolation; shell networking is off by default.
+- **Improve the machinery.** The experimental [self-improvement loop](docs/SELF-IMPROVEMENT.md) studies recorded friction, builds changes, and tests them before eligible promotion. You choose when to run it.
+
+[See the factory at work →](https://bantam-admin.github.io/bantam-factory/)
+
+## Small model. Heavy hitter.
+
+Local Qwen 27B on **one RTX 4090 · 24 GB VRAM**.
+Recorded generation speeds: **82.6–105.2 tokens/second**.
+
+| Same model inside… | Factory finished | Fewer input tokens | Fight |
 | --- | --- | --- | --- |
-| **Pi** | **6.0×** | **74%** | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
-| **Hermes** | **8.8×** | **≥69%** | [Context Packet ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
-| **DeepSeek Harness** | **3.9×** | **47%** | [Receipt Reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
-| **OpenCode** | **6.8×** | **73%** | [Patch Transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
+| **Pi** | **6.0× faster** | **74%** | [Context packer ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
+| **Hermes** | **8.8× faster** | **≥69%** | [Context packer ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
+| **OpenCode** | **6.8× faster** | **73%** | [Patch transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
+| **DeepSeek Harness** | **3.9× faster** | **47%** | [Receipt reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
 
-These are highlights from recorded development tasks. Open a card for every
-contender, the checks, and the run conditions.
-Hermes' token saving is a lower bound: 18 of its 19 requests have token counters.
+Selected recorded fights; both contenders passed each job. Hermes' saving is
+at least 69% because one of its 19 requests lacks token counters.
 
-The little model can trade punches with frontier agents, too:
-[Context Packet](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html)
-took **58.1s locally vs. 110.6s in native Codex/Astra**, both 5/5.
+## Get started
 
-**[Enter the fight gallery →](https://bantam-admin.github.io/bantam-factory/fights.html)**
-Pick a task. Put agents side by side. Read how it went. Inspect every recorded
-action and the files they delivered.
-
-**[Try a tool the factory built in 58 seconds →](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#try-it)**
-
-## What can it do?
-
-- **Build what you need.** Features, tools, scripts, fixes, and tests.
-- **Check and repair.** Use real test results to guide the next attempt.
-- **Make the next job easier.** Build reusable tools for the work you keep doing.
-- **Put your hardware to work.** Run a local model, or bring your Codex account.
-
-**Let Astra supervise.** Watch it direct a Terra or Sol worker on the
-[context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
-or [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html).
-Both models' work and tokens are included.
-
-<a id="start-with-what-you-already-have"></a>
-
-## Quick start
-
-<a id="platforms"></a>
+<a id="quick-start"></a><a id="platforms"></a><a id="start-with-what-you-already-have"></a>
 
 **Linux / WSL2 · Node.js 20+ · Git · Docker**
 
@@ -128,40 +102,23 @@ npm link
 bantamfactory setup
 ```
 
-Setup connects your model server or installed Codex CLI. Need a local model?
-It also offers a guided download for supported NVIDIA GPUs.
-
-Then open your project:
+Setup connects your signed-in Codex CLI or local model. To use Astra, open a project:
 
 ```bash
 cd /path/to/your/project
-bantamfactory --verify "npm test"
+bantamfactory --codex --model gpt-6-astra
 ```
 
-Tell it what you want:
+Then ask for the work. Your existing Codex account works here; no local GPU is
+needed for Astra. Sol and Terra are supported too.
 
-> Add dark mode. Remember my choice. Make sure the tests pass.
+[Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md)
 
-Use your project's test command in place of `npm test`.
-[Installation help](docs/GETTING-STARTED.md) · [Models & hardware](docs/FIRST-RUN-SETUP.md)
+## Bring your harness. Put it in the ring.
 
-## Use the factory to improve the factory.
+Same task. Same starting files. Side-by-side work, checks, tokens, and clocks.
+Register Codex, Hermes, OpenCode, Pi, or DeepSeek Harness and run your own fights.
 
-BANTAM FACTORY records recurring friction. Its experimental self-improvement workflow
-can study those signals, build a change to BANTAM FACTORY, and test its own work before
-adopting an eligible improvement. You choose when to run that cycle.
+**[Run your own cage match →](docs/BRING-YOUR-OWN-COMPARISONS.md)**
 
-**Better tools. Fewer repeated mistakes. A better-equipped factory.**
-[Try self-improvement →](docs/SELF-IMPROVEMENT.md)
-
-## Put it in the ring.
-
-Give it a task worth solving. Watch the work. Bring competitors to the same
-task and see what the harness changes.
-
-[Run your own cards →](docs/BRING-YOUR-OWN-COMPARISONS.md)
-
-Bring a task, a bug, or a better idea for the factory.
-**[Contributions welcome →](CONTRIBUTING.md)**
-
-[How the factory works](docs/FACTORY-MODEL.md) · [All docs](docs/README.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE)
+[Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)

@@ -11,11 +11,9 @@ export const SHOWCASE_STATIC_FILES=Object.freeze([
   'fonts/source-code-pro-400.woff2','fonts/source-code-pro-600.woff2',
   'fonts/barlow-OFL.txt','fonts/manrope-OFL.txt','fonts/source-code-pro-OFL.txt',
   'examples/tetris/index.html','examples/tetris/BANTAMTETRIS.html','examples/tetris/build.json',
-  'examples/arcade/index.html','examples/arcade/arcade.css','examples/arcade/arcade.js','examples/arcade/builds.json','examples/arcade/attempts.json',
-  'examples/arcade/astra-cli.html','examples/arcade/astra-cli.json','examples/arcade/astra-factory.html','examples/arcade/astra-factory.json',
-  'examples/arcade/astra-factory-context.html','examples/arcade/astra-factory-context.json',
-  'examples/arcade/astra-cli-efficient.html','examples/arcade/astra-cli-efficient.json',
-  'examples/arcade/astra-factory-efficient.html','examples/arcade/astra-factory-efficient.json',
+  'examples/arcade/index.html','examples/arcade/arcade.css','examples/arcade/arcade.js','examples/arcade/builds.json',
+  'examples/arcade/astra-cli.html','examples/arcade/astra-cli.json',
+  'examples/arcade/astra-factory-refresh.html','examples/arcade/astra-factory-refresh.json',
 ]);
 const ARMS=Object.freeze([
   ['bantam-local-27b','BANTAM FACTORY','Qwen 27B, local'],

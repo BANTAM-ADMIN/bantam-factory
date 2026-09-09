@@ -2,98 +2,129 @@
   "schema": "bantam.arcade-showcase.v1",
   "versions": [
     {
-      "id": "astra-factory",
-      "label": "Earlier factory build",
-      "title": "Moonstack",
-      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
-      "file": "astra-factory.html",
-      "record": "astra-factory.json",
-      "wallMs": 420169,
-      "actionCount": 14,
-      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
-      "features": "A complete offline game: hold, a ghost piece, a three-piece queue, combos, touch controls and a personal best. The factory inspected phone and desktop previews before accepting the build."
-    },
-    {
-      "id": "astra-factory-context",
-      "label": "Previous factory build",
+      "id": "astra-factory-refresh",
+      "label": "Latest · 6m 21s",
+      "selectionLabel": "Astra · BANTAM FACTORY",
       "title": "Afterglow",
-      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
-      "file": "astra-factory-context.html",
-      "record": "astra-factory-context.json",
-      "wallMs": 485277,
-      "actionCount": 16,
-      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
-      "features": "An offline pocket arcade with a ghost piece, hold, a three-piece queue, combos, a personal best and touch controls. All 17 retained tests pass. The board and controls fit on 390 px and 320 px phones."
-    },
-    {
-      "id": "astra-factory-efficient",
-      "label": "Current factory build",
-      "title": "Afterglow",
-      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
-      "file": "astra-factory-efficient.html",
-      "record": "astra-factory-efficient.json",
-      "wallMs": 471678,
+      "model": "GPT-6 Astra · inside BANTAM FACTORY",
+      "file": "astra-factory-refresh.html",
+      "record": "astra-factory-refresh.json",
+      "wallMs": 380513,
       "actionCount": 15,
       "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
-      "features": "A midnight arcade with hold, a ghost landing guide, three-piece preview, combos, levels, saved best score and touch controls. Twenty retained tests pass. The factory previewed desktop and phone layouts, fixed interaction details, and finished the job."
+      "features": "The latest factory build. A midnight arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra refined the desktop and phone layouts after browser previews and retained 14 passing tests.",
+      "recordedAt": "2026-09-09T13:20:47.888Z"
     }
   ],
   "comparisons": [
     {
-      "id": "astra-factory-efficient",
-      "label": "Astra \u00b7 BANTAM FACTORY",
+      "id": "astra-factory-refresh",
+      "label": "Astra · BANTAM FACTORY",
       "title": "Afterglow",
-      "model": "GPT-6 Astra \u00b7 medium",
-      "file": "astra-factory-efficient.html",
-      "record": "astra-factory-efficient.json",
-      "wallMs": 471678,
-      "result": "Complete \u00b7 20 tests \u00b7 browser playtested",
+      "model": "GPT-6 Astra · medium",
+      "file": "astra-factory-refresh.html",
+      "record": "astra-factory-refresh.json",
+      "wallMs": 380513,
+      "result": "Complete · 14 tests · browser playtested",
       "processCompleted": true,
-      "review": "Mint and peach on a calm midnight background. Compact phone controls, restart confirmation and a clean three-piece queue. The factory used its built-in browser preview to check and refine the interface. All 20 retained tests and the independent desktop/phone playtest pass.",
+      "review": "Compact midnight panels with mint and peach accents. The board adapts to screen height, and touch controls fit on both phone widths. Astra used browser previews to refine the layout and added a touch-input regression test. Fourteen retained tests and our independent desktop/phone playtest pass.",
       "usage": {
-        "inputTokens": 359278,
-        "outputTokens": 13051,
-        "cacheHitTokens": 324736,
-        "freshInputTokens": 34542,
+        "inputTokens": 232784,
+        "outputTokens": 10124,
+        "cacheHitTokens": 194304,
+        "freshInputTokens": 38480,
         "complete": true,
         "astraCalls": 15
       }
     },
     {
-      "id": "astra-cli-efficient",
-      "label": "Astra \u00b7 Codex CLI",
-      "title": "Orbital",
-      "model": "GPT-6 Astra \u00b7 medium",
-      "file": "astra-cli-efficient.html",
-      "record": "astra-cli-efficient.json",
-      "wallMs": 600485,
-      "result": "Game playable \u00b7 run timed out",
-      "processCompleted": false,
-      "review": "A distinctive orbital theme with lilac, lime, soft blocks, a seven-bag queue, wall kicks and optional sound. The game passes our browser playtest. The run timed out while setting up a browser; its downloaded dependency tree broke npm test. Its 12 retained tests pass when run directly.",
+      "id": "astra-cli",
+      "label": "Astra · native Codex",
+      "title": "Afterglow",
+      "model": "GPT-6 Astra · medium",
+      "file": "astra-cli.html",
+      "record": "astra-cli.json",
+      "wallMs": 404937,
+      "result": "Complete · 10 tests · browser playtested",
+      "processCompleted": true,
+      "review": "The saved native baseline: cream, teal and lime with a spacious editorial layout, optional sound and a three-piece queue. Ten retained tests and the independent browser playtest pass. It uses more vertical space on phones; the touch controls sit further down the page.",
       "usage": {
-        "inputTokens": 1052390,
-        "outputTokens": 16945,
-        "cacheHitTokens": 1008896,
-        "freshInputTokens": 43494,
-        "complete": false,
-        "astraCalls": null
+        "inputTokens": 456384,
+        "outputTokens": 10848,
+        "cacheHitTokens": 430208,
+        "freshInputTokens": 26176,
+        "complete": true,
+        "astraCalls": 19
       }
     }
   ],
   "defaults": {
-    "left": "astra-factory-efficient",
-    "right": "astra-cli-efficient"
+    "left": "astra-factory-refresh",
+    "right": "astra-cli"
   },
   "comparisonNote": "One shared brief. Identical starting files. Astra at medium effort in both harnesses. These are the files each delivered.",
   "sharedBrief": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
-  "conditions": "Fresh attempts, native then factory, run serially. Identical brief and starting files; Astra at medium effort in both; ten-minute recording window. BANTAM finished in 471.7 seconds with 20 passing tests. Native Codex reached 600.5 seconds without a final completion; npm test failed on a downloaded browser dependency path. Both untouched HTML files passed our independent desktop and phone playtest. Earlier builds and measurements remain in the attempt index.",
-  "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. The \u2265 marker identifies the native run\u2019s recorded subset: its unfinished request may have additional unreported usage. Factory figures include all 15 measured requests and its recorded checks.",
+  "conditions": "Fresh BANTAM FACTORY build against the saved, completed native Astra baseline. Same creative brief and starting files; GPT-6 Astra at medium effort. The native baseline was recorded on September 8 in 404.9 seconds; this factory run on September 9 in 380.5 seconds. The runs used maximum windows of ten and thirty minutes respectively and both finished naturally. The earlier native run overlapped other local work. Fourteen factory tests and ten native tests pass; both unedited games pass independent browser playtests.",
+  "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. All requests in these two completed builds have usage receipts. The local 27B game uses a different, shorter brief and is shown separately.",
   "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
   "contextReuse": {
-    "percentCached": 90,
-    "inputTokens": 359278,
-    "cacheHitTokens": 324736,
-    "description": "324,736 of 359,278 input tokens came from prefix cache. The factory delivered a working game, 20 passing tests and desktop/phone browser checks in 7m 52s.",
-    "record": "astra-factory-efficient.json"
+    "percentCached": 83,
+    "inputTokens": 232784,
+    "cacheHitTokens": 194304,
+    "description": "194,304 of 232,784 factory input tokens came from prefix cache. The game finished in 6m 21s with 14 passing tests. Against the saved native baseline: 49% less input, 7% less output and 6% less time.",
+    "record": "astra-factory-refresh.json"
+  },
+  "featured": [
+    {
+      "id": "astra-factory-refresh",
+      "label": "Latest · 6m 21s",
+      "selectionLabel": "Astra · BANTAM FACTORY",
+      "title": "Afterglow",
+      "model": "GPT-6 Astra · inside BANTAM FACTORY",
+      "file": "astra-factory-refresh.html",
+      "record": "astra-factory-refresh.json",
+      "wallMs": 380513,
+      "actionCount": 15,
+      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
+      "features": "The latest factory build. A midnight arcade with pastel blocks, hold, ghost landing, a three-piece preview, combos, levels, saved best score and touch controls. Astra refined the desktop and phone layouts after browser previews and retained 14 passing tests.",
+      "recordedAt": "2026-09-09T13:20:47.888Z"
+    },
+    {
+      "id": "astra-cli",
+      "selectionLabel": "Astra · native Codex",
+      "title": "Afterglow",
+      "model": "GPT-6 Astra · native Codex CLI",
+      "file": "astra-cli.html",
+      "record": "astra-cli.json",
+      "wallMs": 404937,
+      "actionCount": 18,
+      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
+      "features": "The completed native Astra baseline, reused for factory development. A cream-and-teal arcade with sound, a personal best, hold, a ghost piece and touch controls. Ten retained tests pass. Same creative brief as the factory Astra build.",
+      "recordedAt": "2026-09-08T21:22:49.375Z"
+    },
+    {
+      "id": "local-27b",
+      "selectionLabel": "Local 27B · BANTAM FACTORY",
+      "title": "BANTAM Tetris",
+      "model": "Local 27B · inside BANTAM FACTORY",
+      "file": "../tetris/BANTAMTETRIS.html",
+      "record": "../tetris/build.json",
+      "wallMs": 148189,
+      "actionCount": 12,
+      "prompt": "Make Tetris in one Static html file called BANTAMTETRIS.html it must be fully self contained in one file.",
+      "features": "The earlier local 27B build, made from the short prompt shown here. A keyboard-controlled desktop game with all seven pieces, hold, a ghost piece, scoring and levels. Its brief differs from the two Astra builds.",
+      "recordedAt": "2026-09-04T23:24:46.065Z",
+      "fixedViewport": {
+        "width": 560,
+        "height": 860
+      }
+    }
+  ],
+  "defaultBuild": "astra-factory-refresh",
+  "baseline": {
+    "record": "astra-cli.json",
+    "recordSha256": "db4ea7afa08ceee469d7c478c97d4f8e015cd1f9445484464a8645a1b6eb1582",
+    "recordedAt": "2026-09-08T21:22:49.375Z",
+    "reused": true
   }
 }

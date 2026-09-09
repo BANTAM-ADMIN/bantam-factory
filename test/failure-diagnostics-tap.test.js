@@ -68,3 +68,45 @@ test('a real process failure after passing test labels remains visible',()=>{
   assert.ok(failureOutcomeFingerprint(green+tail));
  }
 });
+
+test('a verified pass ends an outcome episode and permits a later regression to earn its own hint',()=>{
+ const tracker=new OutcomeCycleTracker();
+ tracker.observe(shell,red,{turn:1});tracker.noteWorkspaceChanged();
+ const oldCycle=tracker.observe(shell,red,{turn:3});
+ assert.ok(tracker.hintFor(oldCycle));
+ tracker.noteWorkspaceChanged();
+ tracker.observe(shell,green,{turn:5,evidence:{command:'npm test',status:'pass'}});
+ tracker.noteWorkspaceChanged();
+ assert.equal(tracker.observe(shell,red,{turn:7}),null);
+ tracker.noteWorkspaceChanged();
+ const newCycle=tracker.observe(shell,red,{turn:9});
+ assert.equal(newCycle.priorTurn,7);
+ assert.equal(newCycle.occurrence,2);
+ assert.ok(tracker.hintFor(newCycle));
+});
+
+test('passing another command cannot clear a still-failing command',()=>{
+ const tracker=new OutcomeCycleTracker(),other={a:'shell',c:'node --test test/unit.test.js'};
+ tracker.observe(shell,red,{turn:1});tracker.noteWorkspaceChanged();
+ tracker.observe(other,green,{turn:3,evidence:{command:other.c,status:'pass'}});
+ assert.equal(tracker.observe(shell,red,{turn:4}).priorTurn,1);
+});
+
+test('unverified output, mismatched evidence and actual failures cannot reset an outcome episode',()=>{
+ for(const [observation,evidence] of [
+  [green,null],[green,{command:'npm test',status:'unverified'}],
+  [green,{command:'some other check',status:'pass'}],
+  [green+'Error: teardown failed',{command:'npm test',status:'pass'}],
+ ]){
+  const tracker=new OutcomeCycleTracker();tracker.observe(shell,red,{turn:1});
+  tracker.noteWorkspaceChanged();tracker.observe(shell,observation,{turn:3,evidence});
+  assert.equal(tracker.observe(shell,red,{turn:4}).priorTurn,1);
+ }
+});
+
+test('a late receipt from an earlier pass cannot erase a newer failure',()=>{
+ const tracker=new OutcomeCycleTracker();tracker.observe(shell,red,{turn:5});
+ tracker.observe(shell,green,{turn:3,evidence:{command:'npm test',status:'pass'}});
+ tracker.noteWorkspaceChanged();
+ assert.equal(tracker.observe(shell,red,{turn:7}).priorTurn,5);
+});

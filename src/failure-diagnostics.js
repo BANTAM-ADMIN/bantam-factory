@@ -93,11 +93,25 @@ export class OutcomeCycleTracker {
     this.editRevision++;
   }
 
-  observe(action, observation, { turn = 0 } = {}) {
+  observe(action, observation, { turn = 0, evidence = null } = {}) {
     if (action?.a !== "shell") return null;
     const fingerprint = failureOutcomeFingerprint(observation);
-    if (!fingerprint) return null;
     const command = normalizeCommand(action.c);
+    if (!fingerprint) {
+      // A real passing execution ends this command's failure episode. A later
+      // regression is new evidence, not proof that the successful fix did
+      // nothing. Printed green text or an unverified/refused run cannot reset
+      // the history; use the controller's execution-bound verification status.
+      if (evidence?.status === "pass" && normalizeCommand(evidence.command) === command) {
+        for (const [key, prior] of this._seen) {
+          if (key.startsWith(`${command}\u0000`) && prior.turn <= turn) {
+            this._seen.delete(key);
+            this._hinted.delete(key);
+          }
+        }
+      }
+      return null;
+    }
     const key = `${command}\u0000${fingerprint}`;
     const prior = this._seen.get(key);
     const withinEpisode = Boolean(prior) && turn >= prior.turn && turn - prior.turn <= this.maxTurnGap;

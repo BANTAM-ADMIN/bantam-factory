@@ -4609,7 +4609,9 @@ async function runAgentCore({
       metrics.testDigestHits++;
     }
     if (action.a === "shell") {
-      const cycle = outcomeCycles.observe(action, result.observation, { turn: metrics.turns + 1 });
+      const cycle = outcomeCycles.observe(action, result.observation, {
+        turn: metrics.turns + 1, evidence: result.verificationEvidence,
+      });
       if (cycle) {
         metrics.outcomeCycleEvents++;
         onEvent({ type: "outcome_cycle_event", ...cycle });

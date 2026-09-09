@@ -30,8 +30,9 @@ function fixture(t) {
 }
 
 async function run(workspace, actions, extra = {}) {
+  const {modelFlags = {}, ...settings} = extra;
   const auditPrompts = [], actionPrompts = [];
-  const model = { assistantPrefill: "", actTemperature: null,
+  const model = { ...modelFlags, assistantPrefill: "", actTemperature: null,
     async complete(prompt) {
       if (String(prompt).includes("You are a source-code state-machine auditor.")) {
         auditPrompts.push(String(prompt));
@@ -46,7 +47,7 @@ async function run(workspace, actions, extra = {}) {
     verificationScript: "npm test", shellProcessRunner: async () => ({ code: 0, stdout: GREEN, stderr: "" }),
     completionAudit: false, stateAudit: "off", contractStateAudit: "auto", diagnoseStuckTests: false,
     testFocus: false, regressionGuard: false, autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
-    ...extra,
+    ...settings,
   });
   return { result, auditPrompts, actionPrompts };
 }
@@ -78,6 +79,23 @@ test("first substantial edit audits once; a changed generation reaching green ge
   assert.match(auditPrompts[0], /CURRENT_SOURCE_VERSION_1/);
   assert.match(auditPrompts[1], /CURRENT_SOURCE_VERSION_2/);
   assert.doesNotMatch(auditPrompts[1], /CURRENT_SOURCE_VERSION_1/);
+});
+
+test('Codex keeps automatic model audits opt-in while preserving configured verification', async t => {
+  const keys = ['BANTAM_CONTRACT_STATE_AUDIT', 'BANTAM_STATE_AUDIT', 'BANTAM_CODEX_EXTRA_STATIONS'];
+  const prior = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  for (const key of keys) delete process.env[key];
+  t.after(() => {for (const key of keys) {if (prior[key] === undefined) delete process.env[key]; else process.env[key] = prior[key];}});
+  for (const flag of ['codex', 'codexBacked']) {
+    const {result, auditPrompts} = await run(fixture(t), [write(1), verify, done], {
+      modelFlags: {[flag]: true}, contractStateAudit: undefined, stateAudit: undefined,
+    });
+    assert.equal(auditPrompts.length, 0);
+    assert.equal(result.reachedDone, true);
+    assert.ok(result.turns.some(turn => turn.verificationEvidence?.status === 'pass'));
+  }
+  const enabled = await run(fixture(t), [write(1), verify, done], {modelFlags: {codex: true}, contractStateAudit: 'auto'});
+  assert.ok(enabled.auditPrompts.length > 0, 'an explicit audit remains available');
 });
 
 test("independent audits keep original supplied contract bytes after the primary edits the document", async (t) => {

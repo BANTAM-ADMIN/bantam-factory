@@ -406,6 +406,11 @@ export async function runAgent(options = {}) {
   }
 }
 
+function extraModelStationsEnabled(model) {
+  return !(model?.codex === true || model?.codexBacked === true)
+    || process.env.BANTAM_CODEX_EXTRA_STATIONS === "1";
+}
+
 async function runAgentCore({
   task,
   supportingContext = "",
@@ -613,10 +618,10 @@ async function runAgentCore({
   // Moon/Birds sections already present in saved view_image evidence.
   visualAltCoverage = visualAltCoverageEnabled(),
   // Specialize the post-green audit for high-confidence concurrent lifecycle
-  // tasks. Conservative auto-selection is the production default; explicit
-  // BANTAM_STATE_AUDIT=0/off remains the rollback.
-  stateAudit = process.env.BANTAM_STATE_AUDIT ?? "auto",
-  contractStateAudit = process.env.BANTAM_CONTRACT_STATE_AUDIT ?? "auto",
+  // tasks. Local workers auto-select; Codex opts into extra model audits.
+  // An explicit audit setting takes precedence over the provider default.
+  stateAudit = process.env.BANTAM_STATE_AUDIT ?? (extraModelStationsEnabled(model) ? "auto" : "off"),
+  contractStateAudit = process.env.BANTAM_CONTRACT_STATE_AUDIT ?? (extraModelStationsEnabled(model) ? "auto" : "off"),
   contractAssertionStation = process.env.BANTAM_CONTRACT_ASSERTION_STATION ?? "off",
   // Two bounded objections prevent an immediate second-done bypass while the
   // global turn budget remains a hard escape from a heuristic audit.
@@ -1002,8 +1007,7 @@ async function runAgentCore({
   // These additional model-designed cases are useful for local workers, but
   // duplicate Codex's own investigation by default. Explicit configured
   // verification and all ordinary completion gates still apply to Codex.
-  const extraModelStations = !(model?.codex === true || model?.codexBacked === true)
-    || process.env.BANTAM_CODEX_EXTRA_STATIONS === "1";
+  const extraModelStations = extraModelStationsEnabled(model);
   const cliContract = extraModelStations && !interactive && !advisoryMode && probeEnabled
     && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? "docker") === "docker"
     && !callerExcludedActions.includes("probe") && !callerExcludedActions.includes("shell")

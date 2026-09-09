@@ -2711,11 +2711,11 @@ async function auditCodexCommand() {
     console.log("usage: bantam audit-codex <run-artifact.json> [...] [--json] [--calls]");
     return artifactPaths.length ? 0 : 2;
   }
-  const { auditCodexArtifactFile } = await import("../src/codex-artifact-audit.js");
+  const { auditCodexArtifactFileAsync } = await import("../src/codex-artifact-audit.js");
   const reports = [];
   try {
     for (const artifactPath of artifactPaths) {
-      reports.push(auditCodexArtifactFile(artifactPath, { includeCalls: Boolean(args.calls) }));
+      reports.push(await auditCodexArtifactFileAsync(artifactPath, { includeCalls: Boolean(args.calls) }));
     }
   } catch (error) {
     console.error(`audit-codex: ${error.message}`);
@@ -2757,10 +2757,11 @@ async function auditRunCommand() {
     return artifactPaths.length ? 0 : 2;
   }
   const {
-    auditRunArtifactFile,
+    auditRunArtifactFileAsync,
     formatRunArtifactAudit,
   } = await import("../src/run-artifact-audit.js");
-  const reports = artifactPaths.map((artifactPath) => auditRunArtifactFile(artifactPath));
+  const reports = [];
+  for (const artifactPath of artifactPaths) reports.push(await auditRunArtifactFileAsync(artifactPath));
   if (args.json) {
     process.stdout.write(`${JSON.stringify(reports, null, 2)}\n`);
   } else {

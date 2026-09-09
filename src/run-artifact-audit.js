@@ -10,6 +10,7 @@ import path from "node:path";
 import { auditCodexPromptDelivery } from "./codex-artifact-audit.js";
 import { changedFilesFromDiff, hashText } from "./diff.js";
 import { fixtureEvaluatorRoot } from "./fixture-provenance.js";
+import { readJsonFile } from "./json-file.js";
 
 const TOOL_STATUSES = new Set(["pass", "partial", "failed", "blocked", "error"]);
 const USAGE_FIELDS = Object.freeze([
@@ -68,21 +69,35 @@ export function auditRunArtifactFile(filePath) {
   try {
     artifact = JSON.parse(fs.readFileSync(resolved, "utf8"));
   } catch (error) {
-    return {
-      schema: 1,
-      status: "fail",
-      artifactPath: resolved,
-      runId: null,
-      checks: {},
-      failures: [{
-        check: "artifact",
-        code: "unreadable",
-        message: String(error?.message ?? error).slice(0, 500),
-      }],
-      warnings: [],
-    };
+    return unreadableArtifact(resolved, error);
   }
   return auditRunArtifact(artifact, { artifactPath: resolved });
+}
+
+// The CLI can inspect long-running records larger than a single V8 string.
+// Keep the synchronous API for existing callers with ordinary-sized files.
+export async function auditRunArtifactFileAsync(filePath) {
+  const resolved = path.resolve(filePath);
+  let artifact;
+  try { artifact = await readJsonFile(resolved); }
+  catch (error) { return unreadableArtifact(resolved, error); }
+  return auditRunArtifact(artifact, { artifactPath: resolved });
+}
+
+function unreadableArtifact(resolved, error) {
+  return {
+    schema: 1,
+    status: "fail",
+    artifactPath: resolved,
+    runId: null,
+    checks: {},
+    failures: [{
+      check: "artifact",
+      code: "unreadable",
+      message: String(error?.message ?? error).slice(0, 500),
+    }],
+    warnings: [],
+  };
 }
 
 export function formatRunArtifactAudit(report) {

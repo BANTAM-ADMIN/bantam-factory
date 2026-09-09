@@ -10,6 +10,7 @@ import { buildArtifact, saveArtifact } from "../src/artifact.js";
 import {
   auditRunArtifact,
   auditRunArtifactFile,
+  auditRunArtifactFileAsync,
 } from "../src/run-artifact-audit.js";
 
 function proofRun(t) {
@@ -119,9 +120,10 @@ function proofRun(t) {
   return { root, artifact, artifactPath };
 }
 
-test("run artifact audit independently reconciles complete evidence", (t) => {
+test("run artifact audit independently reconciles complete evidence", async (t) => {
   const { artifactPath } = proofRun(t);
   const report = auditRunArtifactFile(artifactPath);
+  assert.deepEqual(await auditRunArtifactFileAsync(artifactPath), report);
   assert.equal(report.status, "pass");
   assert.deepEqual(
     Object.fromEntries(Object.entries(report.checks).map(([key, value]) => [key, value.status])),
@@ -136,6 +138,19 @@ test("run artifact audit independently reconciles complete evidence", (t) => {
   );
   assert.equal(report.checks.usage.sums.totalTokens, 37);
   assert.equal(report.checks.attachments.files, 1);
+});
+
+test('streamed artifact audits retain explicit unreadable-file failures', async t => {
+  const { artifactPath } = proofRun(t);
+  for (const text of ['{"schema":1,"turns":[{}', 'not JSON']) {
+    fs.writeFileSync(artifactPath,text);
+    const report=await auditRunArtifactFileAsync(artifactPath);
+    assert.equal(report.status,'fail');
+    assert.equal(report.failures[0].code,'unreadable');
+  }
+  const missing=await auditRunArtifactFileAsync(artifactPath+'.missing');
+  assert.equal(missing.status,'fail');
+  assert.equal(missing.failures[0].code,'unreadable');
 });
 
 test("run artifact audit detects tampered, missing, and symlinked attachment bytes", (t) => {

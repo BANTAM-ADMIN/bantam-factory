@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {types} from 'node:util';
-import {parseChunked} from '@discoveryjs/json-ext';
+import {parseChunked} from './vendor/json-parse-chunked.js';
 
 /** Parse and hash the same bytes, including when a record exceeds 512 MiB. */
 export async function readJsonFile(filePath, {withHash = false, highWaterMark = 1024 * 1024} = {}) {

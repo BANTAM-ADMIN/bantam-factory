@@ -7,6 +7,7 @@ import test from "node:test";
 
 import {
   auditCodexArtifactFile,
+  auditCodexArtifactFileAsync,
   auditCodexPromptDelivery,
 } from "../src/codex-artifact-audit.js";
 import { buildCodexPromptDelivery } from "../src/codex-transport.js";
@@ -129,15 +130,18 @@ test("Codex artifact audit fails closed on missing evidence and ignores local ar
   }).status, "not-applicable");
 });
 
-test("Codex artifact audit reads evidence from disk without model access", () => {
+test("Codex artifact audit reads evidence from disk without model access", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-codex-audit-"));
   try {
     const file = path.join(directory, "run.json");
     fs.writeFileSync(file, JSON.stringify(exactArtifact()));
     const report = auditCodexArtifactFile(file);
+    assert.deepEqual(await auditCodexArtifactFileAsync(file), report);
     assert.equal(report.file, file);
     assert.equal(report.status, "pass");
     assert.equal(report.exactCalls, 2);
+    fs.writeFileSync(file, '{"modelCalls":[{}');
+    await assert.rejects(auditCodexArtifactFileAsync(file), SyntaxError);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

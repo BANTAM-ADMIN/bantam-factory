@@ -44,3 +44,34 @@ test('atomic JSON reads split UTF-8 and escapes across chunks and hash the origi
   await assert.rejects(readJsonFile(file,{highWaterMark:3}),SyntaxError);
   assert.deepEqual(fs.readdirSync(dir),['run.json']);
 });
+
+test('chunk boundaries preserve every JSON property, including escaped and repeated prototype names', async t => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-json-properties-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const file=path.join(dir,'record.json');
+  const documents = [
+    '{"head":1,"__proto__":{"payload":"must survive"},"tail":[2,3]}',
+    '{"head":1,"__proto__":false,"tail":2}',
+    '{"head":1,"__proto__":null,"tail":2}',
+    '{"head":1,"__proto__":"text","tail":2}',
+    '{"head":1,"__proto__":[1,{"__proto__":[2,3]}],"tail":4}',
+    '{"head":1,"\\u005f_proto__":{"snow":"雪🐔"},"tail":2}',
+    '{"head":1,"constructor":{"prototype":{"payload":3}},"toString":"data","tail":2}',
+    '{"head":1,"__proto__":{"old":1},"__proto__":{"new":2},"tail":3}',
+    '[{"a":1,"__proto__":{"nested":{"__proto__":7}}},{"constructor":"value"}]',
+  ];
+  function ordinaryPrototypes(value) {
+    if (!value || typeof value !== 'object') return;
+    assert.equal(Object.getPrototypeOf(value),Array.isArray(value)?Array.prototype:Object.prototype);
+    for (const child of Object.values(value)) ordinaryPrototypes(child);
+  }
+  for (const document of documents) {
+    fs.writeFileSync(file,document);
+    for (const highWaterMark of [1,2,3,5,11,16,31,64,1024]) {
+      const actual=await readJsonFile(file,{highWaterMark});
+      assert.deepEqual(actual,JSON.parse(document),`chunk size ${highWaterMark}: ${document}`);
+      ordinaryPrototypes(actual);
+    }
+  }
+  assert.equal({}.payload,undefined);
+});

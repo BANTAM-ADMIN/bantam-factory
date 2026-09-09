@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { reconstructCodexPromptDelivery } from "./codex-transport.js";
 import { parseAction } from "./actions.js";
+import { readJsonFile } from "./json-file.js";
 
 const MAX_FAILURES = 32;
 
@@ -190,6 +191,12 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
 export function auditCodexArtifactFile(filePath, options) {
   const resolved = path.resolve(filePath);
   const artifact = JSON.parse(fs.readFileSync(resolved, "utf8"));
+  return { file: resolved, ...auditCodexPromptDelivery(artifact, options) };
+}
+
+export async function auditCodexArtifactFileAsync(filePath, options) {
+  const resolved = path.resolve(filePath);
+  const artifact = await readJsonFile(resolved);
   return { file: resolved, ...auditCodexPromptDelivery(artifact, options) };
 }
 

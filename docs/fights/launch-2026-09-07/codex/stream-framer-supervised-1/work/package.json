@@ -1,0 +1,156 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "stream-framer",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 66480,
+      "sha256": "d322bea732ac521437de123b1a0d8d4ca1d3d975cd4da0e4726a7924566d325d",
+      "arm": "bantam-codex-astra",
+      "wallMs": 141407,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Five factory actions. A repaired decoder.",
+        "paragraphs": [
+          {
+            "text": "Astra read the supplied project, repaired the decoder and CLI, added regression tests, ran npm test, and delivered. All five independent acceptance groups passed.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          },
+          {
+            "text": "This run used 57,574 input tokens against native Astra’s 78,311. Native finished sooner: 121.9 seconds against 141.4. The token table includes output and prefix-cache tokens for both.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 52761,
+      "sha256": "12d1951f15ae7364bf27f690d6866a7128cbfaa6b3db652693c75357d7e1443d",
+      "arm": "codex-astra",
+      "wallMs": 121947,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Native Astra repairs and tests the stream.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the workspace and supplied files, checked for repository instructions, then implemented and tested the repair. All five independent acceptance groups passed.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "Native finished this attempt in 121.9 seconds. Its 78,311 input tokens and 3,497 output tokens are recorded alongside the factory lanes.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 178997,
+      "sha256": "75385c5f5b3aebc7c4f89ca5ef40179480b313a9514425aed4cc8fe8edcc7846",
+      "arm": "bantam-astra-terra",
+      "wallMs": 375812,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 46,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Astra reviews. Terra closes the gaps.",
+        "paragraphs": [
+          {
+            "text": "Terra repaired framing and decoding. Astra’s review reproduced a large-chunk CLI crash and found malformed UTF-8 file bytes being accepted through replacement decoding.",
+            "actions": [
+              "action-2",
+              "action-26",
+              "action-27"
+            ]
+          },
+          {
+            "text": "Terra repaired both issues and retained regressions. Astra inspected the integrated changes and exercised additional protocol boundaries. All five acceptance groups passed; both models’ usage is counted.",
+            "actions": [
+              "action-28",
+              "action-44",
+              "action-45",
+              "action-46"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 178626,
+      "sha256": "63299e377c1ad639035708883d2c3b52ef22d021a936a30e80655cca810b5baf",
+      "arm": "bantam-astra-sol",
+      "wallMs": 504951,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 38,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Astra catches the high-volume crash.",
+        "paragraphs": [
+          {
+            "text": "Sol repaired the decoder and added tests. Astra’s review then sent 150,000 frames through the CLI in one chunk and reproduced an argument-limit crash.",
+            "actions": [
+              "action-3",
+              "action-21",
+              "action-24"
+            ]
+          },
+          {
+            "text": "Astra assigned a focused repair. Sol replaced argument spreading with iterative collection, retained a large-chunk regression, and strengthened the base64 tests. The integrated product passed all five acceptance groups. Totals include both models.",
+            "actions": [
+              "action-25",
+              "action-31",
+              "action-33",
+              "action-36",
+              "action-38"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

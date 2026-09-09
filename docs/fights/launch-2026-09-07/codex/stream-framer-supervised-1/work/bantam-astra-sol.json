@@ -1,0 +1,1298 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "stream-framer",
+  "arm": "bantam-astra-sol",
+  "wallMs": 504951,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-09T04:59:30.792Z",
+  "task": "# Stream framer: repair a transport-independent decoder\n\nRepair `stream-framer.js`, using Node.js builtins only. The starter mishandles\ntransport boundaries and completion. A model gateway must recover the same\nframes whether bytes arrive all at once or one at a time. This is the bounded\nprotocol below, not an implementation of the complete SSE/EventSource standard.\n\nExport `createDecoder()`. Each call returns an independent decoder with methods:\n\n```\npush(chunk: Uint8Array) -> [{event: STRING, data: STRING}]\nfinish() -> []\n```\n\nBuffers are accepted because they are Uint8Arrays. Strings and other types\nare rejected. Never mutate a supplied chunk. Decode strict UTF-8 across pushes;\ninvalid sequences throw an Error, including incomplete multibyte sequences\nat finish. One optional leading UTF-8 BOM is ignored. Subsequent BOM characters\nare ordinary data. Empty chunks are allowed before finish.\n\nLines end at LF or CRLF, even if CR and LF arrive in separate chunks. Strip\nthe one CR immediately preceding LF. Other CR characters remain data. A\nnonterminated final line is an error, not an implicit newline.\n\nFor each complete line:\n\n- A blank line dispatches the current frame only if it has at least one data\n  field. Join data-field values with exactly one LF between them. The event\n  name is the last event-field value in that frame, or `message` if none was\n  supplied or the last value was empty. Then reset all frame fields.\n- A line beginning with `:` is a comment and has no effect.\n- Otherwise split at the first `:`. With no colon the whole line is the field\n  name and the value is ''. Remove at most one leading ASCII space from a\n  field value. Field names are case-sensitive. Only `data` and `event` are\n  recognized; ignore other fields.\n- A data value of '' is still a data field and can dispatch an empty string.\n  Blank/comment/unknown-field-only frames emit nothing; an event name must\n  never leak from an earlier dispatched or empty frame into a later frame.\n\nWhen the joined data value of a dispatched frame is exactly `[DONE]`, mark\nthe stream terminated and emit no frame for it, regardless of event name.\nAfter that marker, only blank lines are allowed. A second marker, comments,\nunknown fields or any other nonblank line after termination throw an Error.\n\n`finish()` is required and may succeed once only. It succeeds only after a\ntermination marker, with no unterminated line and no pending data/event fields.\nIt returns an empty array; it does not auto-dispatch pending data. Repeated\nfinish or any push after successful finish throws an Error, even an empty push.\nAny rejected push/finish poisons that decoder: all subsequent push/finish calls\nthrow an Error. Failures in one decoder must not affect another.\n\n`push` returns only frames completed during that call. Empty strings and\nmultiline data are not parsed as JSON or trimmed. If a push fails, do not return\na partial array from that call. Earlier returned frames remain ordinary values.\n\nKeep and repair the CLI: `node stream-framer.js INPUT_JSON_FILE`. The UTF-8 JSON\ncontains `{chunks:[BASE64_STRING,...]}`; extra object fields are ignored. The\nouter input must be a non-null non-array object and chunks must be an array.\nEach string must be canonical standard padded base64 as produced by\n`Buffer.toString('base64')`; '' is valid. Reject whitespace, URL-safe alphabet,\nbad padding and noncanonical pad bits. Feed chunks in order and call finish.\nSuccess prints exactly `{frames:[ALL_EMITTED_FRAMES]}` as one JSON value plus\nnewline, exits 0 and has no stderr. Require exactly one file argument. Invalid\narguments/files/JSON/base64/protocol exit 2, with nonempty stderr and no stdout.\nImporting the module must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification runs in a read-only workspace: place fixtures in\n`os.tmpdir()` and clean them up. Run `npm test` before finishing. Hidden checks\nchange chunk sizes and input values, not this public contract.\n",
+  "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+  "source": "supervisor-actions-worker-turns-and-committed-integrations",
+  "actions": [
+    {
+      "name": "supervisor-read",
+      "category": "inspect",
+      "request": {
+        "action": "read",
+        "jobs": [],
+        "target": "stream-framer.js",
+        "text": ""
+      },
+      "output": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n// Deliberately flawed: transport chunks are not complete lines or frames.\nexport function createDecoder(){\n  let ended=false;\n  return {\n    push(chunk){\n      const frames=[];\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n        if(line.startsWith('data:')){\n          const data=line.slice(5).trim();\n          if(data==='[DONE]')ended=true;\n          else frames.push({event:'message',data});\n        }\n      }\n      return frames;\n    },\n    finish(){return [];},\n  };\n}\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n  try{\n    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    const decoder=createDecoder(),frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n}\n",
+      "atMs": 7466,
+      "endedMs": 7482,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-1"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat package.json && printf '\\n--- public tests ---\\n' && find test -type f -maxdepth 2 -print -exec cat {} \\;"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "0bb80893814cb3c09f8e8546b2164a7d749a0b45",
+        "stderr": "",
+        "stdout": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n--- public tests ---\ntest/public.test.js\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+        "timedOut": false
+      },
+      "atMs": 11035,
+      "endedMs": 11542,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-2"
+    },
+    {
+      "name": "supervisor-enqueue",
+      "category": "other",
+      "request": {
+        "action": "enqueue",
+        "jobs": [
+          {
+            "id": "repair-framer",
+            "worker": "sol",
+            "task": "Repair the complete bounded stream decoder and CLI in stream-framer.js per original brief. Add retained deterministic node:test coverage for transport splits, parsing, UTF-8 and lifecycle failures, isolation, and CLI validation. Do not edit package.json or existing public tests. Run npm test.",
+            "context": "Starter inspected: ESM package, npm test is node --test; only test/public.test.js with four basic decoder tests. Current decoder incorrectly splits individual chunks, trims data, dispatches immediately, and finish is no-op. CLI lacks input/base64 validation. This is a small coherent utility: own complete repair plus tests. Use Node builtins only. Ensure strict streaming UTF-8 incl one optional initial BOM only, LF/CRLF exact stripping, first-colon fields and one-space removal, blank-line reset even event-only frames, exact joined [DONE], post-marker only blank lines, finish requires marker and fully consumed line/no fields, all rejection poisons instance and no partial returns. Uint8Arrays including Buffer only, no mutation. CLI must validate outer object/chunks and canonical padded base64 (round-trip can reject pad bits), exactly one argument, atomic stdout on full success; invalid UTF-8 JSON files should be rejected rather than replaced. Preserve import guard. Deterministic tests should exercise all splits and bytewise input including BOM/multibyte, invalid UTF8 both during push and flush, rejected input poison and independent instances. CLI fixtures must be created under os.tmpdir and cleaned, so verification works read-only.",
+            "verify": "npm test",
+            "dependsOn": [],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "repair-framer"
+        ]
+      },
+      "atMs": 24142,
+      "endedMs": 24777,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-3"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 30521,
+      "endedMs": 150551,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-4"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "start": 1,
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "test/public.test.js",
+              "start": 1,
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "start": 1,
+              "limit": 120
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"start\":1,\"limit\":400}\nstream-framer.js (32 lines, showing 1-32):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport {fileURLToPath} from 'node:url';\n4\t\n5\t// Deliberately flawed: transport chunks are not complete lines or frames.\n6\texport function createDecoder(){\n7\t  let ended=false;\n8\t  return {\n9\t    push(chunk){\n10\t      const frames=[];\n11\t      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n12\t        if(line.startsWith('data:')){\n13\t          const data=line.slice(5).trim();\n14\t          if(data==='[DONE]')ended=true;\n15\t          else frames.push({event:'message',data});\n16\t        }\n17\t      }\n18\t      return frames;\n19\t    },\n20\t    finish(){return [];},\n21\t  };\n22\t}\n23\tif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n24\t  try{\n25\t    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n26\t    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n27\t    const decoder=createDecoder(),frames=[];\n28\t    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n29\t    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n30\t  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n31\t}\n32\t\n— end of file (32 lines); nothing beyond line 32, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/public.test.js\",\"start\":1,\"limit\":400}\ntest/public.test.js (26 lines, showing 1-26):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport {createDecoder} from '../stream-framer.js';\n4\ttest('dispatch only at a blank line, then require explicit termination',()=>{\n5\t  const d=createDecoder();\n6\t  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n7\t  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n8\t  assert.deepEqual(d.finish(),[]);\n9\t});\n10\ttest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n11\t  const d=createDecoder(),frames=[];\n12\t  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n13\t  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n14\t});\n15\ttest('event names, multiple data lines, and empty data',()=>{\n16\t  const d=createDecoder();\n17\t  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n18\t    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n19\t  assert.deepEqual(d.finish(),[]);\n20\t});\n21\ttest('missing termination and post-finish activity are errors',()=>{\n22\t  assert.throws(()=>createDecoder().finish(),Error);\n23\t  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n24\t  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n25\t});\n26\t\n— end of file (26 lines); nothing beyond line 26, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\",\"start\":1,\"limit\":120}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.",
+      "atMs": 33307,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 0,
+      "id": "action-5"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "stream-framer.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nexport function createDecoder() {\n  const utf8 = new TextDecoder('utf-8', {fatal: true});\n  let lineBuffer = '';\n  let dataValues = [];\n  let eventSeen = false;\n  let eventValue = '';\n  let terminated = false;\n  let finished = false;\n  let poisoned = false;\n\n  function reject(message, cause) {\n    poisoned = true;\n    throw new Error(message, cause === undefined ? undefined : {cause});\n  }\n\n  function ensureActive() {\n    if (poisoned) reject('decoder is poisoned');\n    if (finished) reject('decoder is already finished');\n  }\n\n  function resetFrame() {\n    dataValues = [];\n    eventSeen = false;\n    eventValue = '';\n  }\n\n  function consumeLine(line, frames) {\n    if (terminated) {\n      if (line !== '') throw new Error('nonblank line after termination');\n      return;\n    }\n\n    if (line === '') {\n      if (dataValues.length > 0) {\n        const data = dataValues.join('\\n');\n        if (data === '[DONE]') {\n          terminated = true;\n        } else {\n          frames.push({\n            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n            data,\n          });\n        }\n      }\n      resetFrame();\n      return;\n    }\n\n    if (line.startsWith(':')) return;\n    const colon = line.indexOf(':');\n    const field = colon === -1 ? line : line.slice(0, colon);\n    let value = colon === -1 ? '' : line.slice(colon + 1);\n    if (value.startsWith(' ')) value = value.slice(1);\n\n    if (field === 'data') {\n      dataValues.push(value);\n    } else if (field === 'event') {\n      eventSeen = true;\n      eventValue = value;\n    }\n  }\n\n  function consumeText(text, frames) {\n    lineBuffer += text;\n    let newline;\n    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n      let line = lineBuffer.slice(0, newline);\n      lineBuffer = lineBuffer.slice(newline + 1);\n      if (line.endsWith('\\r')) line = line.slice(0, -1);\n      consumeLine(line, frames);\n    }\n  }\n\n  return {\n    push(chunk) {\n      ensureActive();\n      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n      const frames = [];\n      try {\n        consumeText(utf8.decode(chunk, {stream: true}), frames);\n        return frames;\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n\n    finish() {\n      ensureActive();\n      try {\n        const frames = [];\n        consumeText(utf8.decode(), frames);\n        if (lineBuffer !== '') throw new Error('unterminated final line');\n        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n        if (!terminated) throw new Error('stream is not terminated');\n        if (frames.length > 0) throw new Error('frame completed during finish');\n        finished = true;\n        return [];\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n  };\n}\n\nfunction decodeCanonicalBase64(value) {\n  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n    throw new Error('invalid base64');\n  }\n  const bytes = Buffer.from(value, 'base64');\n  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n  return bytes;\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n  const fileBytes = fs.readFileSync(process.argv[2]);\n  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n  const input = JSON.parse(jsonText);\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    throw new Error('input must be an object');\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n  frames.push(...decoder.finish());\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+        }
+      },
+      "output": "[edit-preservation] Staged bytes remove 8 executable statement(s) by AST comparison; 2 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: decodeCanonicalBase64 (AFTER L111), runCli (AFTER L121).\n- BEFORE stream-framer.js:7 in createDecoder: \"let ended=false;\"\n  STAGED AFTER stream-framer.js:5 (retained function).\n- BEFORE stream-framer.js:8 in createDecoder: \"return {\\n    push(chunk){\\n      const frames=[];\\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\\\n')){\\n        if(line.start… [display clipped] [excerpt clipped]\n  STAGED AFTER stream-framer.js:5 (retained function).\n- BEFORE stream-framer.js:25 in <module>: \"throw Error('usage: stream-framer.js INPUT_JSON_FILE');\"\n  STAGED AFTER stream-framer.js:143 (next-retained-statement): \"process.exitCode = 2;\".\n- BEFORE stream-framer.js:26 in <module>: \"const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\"\n  STAGED AFTER stream-framer.js:143 (next-retained-statement): \"process.exitCode = 2;\".\n- BEFORE stream-framer.js:27 in <module>: \"const decoder=createDecoder(),frames=[];\"\n  STAGED AFTER stream-framer.js:143 (next-retained-statement): \"process.exitCode = 2;\".\n- BEFORE stream-framer.js:28 in <module>: \"frames.push(...decoder.push(Buffer.from(encoded,'base64')));\"\n  STAGED AFTER stream-framer.js:143 (next-retained-statement): \"process.exitCode = 2;\".\n2 more removed statements omitted from this bounded display.\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:b1d9a5e23d3e0b56a78c6232f0bf212809e0024c1c8e2a94b41aecbc0e64a0b1.",
+      "atMs": 122360,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 1,
+      "id": "action-6"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 154018,
+      "endedMs": 274071,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-7"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "stream-framer.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nexport function createDecoder() {\n  const utf8 = new TextDecoder('utf-8', {fatal: true});\n  let lineBuffer = '';\n  let dataValues = [];\n  let eventSeen = false;\n  let eventValue = '';\n  let terminated = false;\n  let finished = false;\n  let poisoned = false;\n\n  function reject(message, cause) {\n    poisoned = true;\n    throw new Error(message, cause === undefined ? undefined : {cause});\n  }\n\n  function ensureActive() {\n    if (poisoned) reject('decoder is poisoned');\n    if (finished) reject('decoder is already finished');\n  }\n\n  function resetFrame() {\n    dataValues = [];\n    eventSeen = false;\n    eventValue = '';\n  }\n\n  function consumeLine(line, frames) {\n    if (terminated) {\n      if (line !== '') throw new Error('nonblank line after termination');\n      return;\n    }\n\n    if (line === '') {\n      if (dataValues.length > 0) {\n        const data = dataValues.join('\\n');\n        if (data === '[DONE]') {\n          terminated = true;\n        } else {\n          frames.push({\n            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n            data,\n          });\n        }\n      }\n      resetFrame();\n      return;\n    }\n\n    if (line.startsWith(':')) return;\n    const colon = line.indexOf(':');\n    const field = colon === -1 ? line : line.slice(0, colon);\n    let value = colon === -1 ? '' : line.slice(colon + 1);\n    if (value.startsWith(' ')) value = value.slice(1);\n\n    if (field === 'data') {\n      dataValues.push(value);\n    } else if (field === 'event') {\n      eventSeen = true;\n      eventValue = value;\n    }\n  }\n\n  function consumeText(text, frames) {\n    lineBuffer += text;\n    let newline;\n    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n      let line = lineBuffer.slice(0, newline);\n      lineBuffer = lineBuffer.slice(newline + 1);\n      if (line.endsWith('\\r')) line = line.slice(0, -1);\n      consumeLine(line, frames);\n    }\n  }\n\n  return {\n    push(chunk) {\n      ensureActive();\n      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n      const frames = [];\n      try {\n        consumeText(utf8.decode(chunk, {stream: true}), frames);\n        return frames;\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n\n    finish() {\n      ensureActive();\n      try {\n        const frames = [];\n        consumeText(utf8.decode(), frames);\n        if (lineBuffer !== '') throw new Error('unterminated final line');\n        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n        if (!terminated) throw new Error('stream is not terminated');\n        if (frames.length > 0) throw new Error('frame completed during finish');\n        finished = true;\n        return [];\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n  };\n}\n\nfunction decodeCanonicalBase64(value) {\n  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n    throw new Error('invalid base64');\n  }\n  const bytes = Buffer.from(value, 'base64');\n  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n  return bytes;\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n  const fileBytes = fs.readFileSync(process.argv[2]);\n  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n  const input = JSON.parse(jsonText);\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    throw new Error('input must be an object');\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n  frames.push(...decoder.finish());\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+        }
+      },
+      "output": "wrote 4420 bytes to stream-framer.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `createDecoder` is also referenced in: test/public.test.js\n  `frames` is also referenced in: test/public.test.js",
+      "atMs": 168136,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 2,
+      "id": "action-8"
+    },
+    {
+      "name": "write_batch",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_batch",
+          "files": [
+            {
+              "p": "test/decoder.test.js",
+              "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\n\nconst wire = 'event: delta\\r\\ndata: 雪😀\\r\\ndata: second\\n\\ndata: [DONE]\\n\\n';\nconst expected = [{event: 'delta', data: '雪😀\\nsecond'}];\n\nfunction runChunks(chunks) {\n  const decoder = createDecoder();\n  const frames = [];\n  for (const chunk of chunks) frames.push(...decoder.push(chunk));\n  assert.deepEqual(decoder.finish(), []);\n  return frames;\n}\n\ntest('decoding is invariant across every two-part split and bytewise transport', () => {\n  const bytes = Buffer.from(wire);\n  assert.deepEqual(runChunks([bytes]), expected);\n  for (let split = 0; split <= bytes.length; split++) {\n    assert.deepEqual(runChunks([bytes.subarray(0, split), bytes.subarray(split)]), expected);\n  }\n  assert.deepEqual(runChunks([...bytes].map((byte) => Uint8Array.of(byte))), expected);\n});\n\ntest('field parsing preserves values and resets all frame state', () => {\n  const decoder = createDecoder();\n  const input = [\n    'event: stale', '',\n    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n    'data:  one space remains', 'data:two:colons', '',\n    'event:', 'data', '',\n    'data: a\\rb', '',\n    'data: [DONE]', '',\n  ].join('\\n');\n  assert.deepEqual(decoder.push(Buffer.from(input)), [\n    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n    {event: 'message', data: ''},\n    {event: 'message', data: 'a\\rb'},\n  ]);\n  assert.deepEqual(decoder.finish(), []);\n});\n\ntest('only one initial BOM is ignored and later BOMs are data', () => {\n  const input = '\\uFEFFdata: first\\n\\ndata: \\uFEFFlater\\n\\ndata: [DONE]\\n\\n';\n  assert.deepEqual(runChunks([...Buffer.from(input)].map((byte) => Uint8Array.of(byte))), [\n    {event: 'message', data: 'first'},\n    {event: 'message', data: '\\uFEFFlater'},\n  ]);\n});\n\ntest('chunks must be Uint8Arrays and are not mutated', () => {\n  const decoder = createDecoder();\n  const chunk = Buffer.from('data: [DONE]\\n\\n');\n  const copy = Buffer.from(chunk);\n  assert.deepEqual(decoder.push(chunk), []);\n  assert.deepEqual(chunk, copy);\n  assert.deepEqual(decoder.finish(), []);\n\n  for (const bad of ['bytes', null, {}, [1, 2]]) {\n    const invalid = createDecoder();\n    assert.throws(() => invalid.push(bad), Error);\n    assert.throws(() => invalid.push(new Uint8Array()), Error);\n    assert.throws(() => invalid.finish(), Error);\n  }\n});\n\ntest('strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder', () => {\n  const malformed = createDecoder();\n  assert.throws(() => malformed.push(Uint8Array.of(0xc3, 0x28)), Error);\n  assert.throws(() => malformed.push(Buffer.from('data: [DONE]\\n\\n')), Error);\n  assert.throws(() => malformed.finish(), Error);\n\n  const incomplete = createDecoder();\n  assert.deepEqual(incomplete.push(Uint8Array.of(0xf0, 0x9f, 0x98)), []);\n  assert.throws(() => incomplete.finish(), Error);\n  assert.throws(() => incomplete.finish(), Error);\n\n  const independent = createDecoder();\n  assert.deepEqual(independent.push(Buffer.from('data: ok\\n\\ndata: [DONE]\\n\\n')), [\n    {event: 'message', data: 'ok'},\n  ]);\n  assert.deepEqual(independent.finish(), []);\n});\n\ntest('termination and completion enforce exact lifecycle rules', () => {\n  for (const suffix of [': comment\\n', 'unknown\\n', 'data: [DONE]\\n\\n', 'x\\n']) {\n    const decoder = createDecoder();\n    assert.throws(() => decoder.push(Buffer.from(`data: kept\\n\\ndata: [DONE]\\n\\n${suffix}`)), Error);\n    assert.throws(() => decoder.finish(), Error);\n  }\n\n  const blanks = createDecoder();\n  assert.deepEqual(blanks.push(Buffer.from('data: [DONE]\\n\\n\\n\\r\\n')), []);\n  assert.deepEqual(blanks.finish(), []);\n  assert.throws(() => blanks.push(new Uint8Array()), Error);\n  assert.throws(() => blanks.finish(), Error);\n\n  for (const text of [\n    '',\n    'data: pending\\n',\n    'event: pending\\n',\n    'data: [DONE]\\n',\n    'data: [DONE]\\n\\ntail',\n  ]) {\n    const decoder = createDecoder();\n    decoder.push(Buffer.from(text));\n    assert.throws(() => decoder.finish(), Error);\n    assert.throws(() => decoder.push(new Uint8Array()), Error);\n  }\n});\n\ntest('a failing push returns no partial result and earlier returned values remain stable', () => {\n  const decoder = createDecoder();\n  const first = decoder.push(Buffer.from('data: safe\\n\\n'));\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.push(Buffer.from('data: [DONE]\\n\\nforbidden\\n')), Error);\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.finish(), Error);\n});\n"
+            },
+            {
+              "p": "test/cli.test.js",
+              "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\n\nconst script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n\nfunction invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8'});\n}\n\nfunction assertFailure(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'input.json');\n  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n  const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\n  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n});\n\ntest('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  assertFailure(invoke([]));\n  assertFailure(invoke(['one', 'two']));\n  assertFailure(invoke([path.join(directory, 'missing')]));\n\n  const cases = [\n    Buffer.from('{'),\n    Buffer.from([0xff]),\n    Buffer.from('null'),\n    Buffer.from('[]'),\n    Buffer.from('{}'),\n    Buffer.from('{\"chunks\":null}'),\n    Buffer.from('{\"chunks\":[7]}'),\n  ];\n  cases.forEach((contents, index) => {\n    const file = path.join(directory, `bad-${index}`);\n    fs.writeFileSync(file, contents);\n    assertFailure(invoke([file]));\n  });\n});\n\ntest('CLI rejects malformed or noncanonical base64 and protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', '-w==', '_w==', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});\n\ntest('importing the module does not execute the CLI', () => {\n  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n  assert.equal(result.status, 0);\n  assert.equal(result.stdout, '');\n  assert.equal(result.stderr, '');\n});\n"
+            }
+          ]
+        }
+      },
+      "output": "wrote batch of 2 files (7886 bytes): test/cli.test.js, test/decoder.test.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `decoder` is also referenced in: stream-framer.js\n  `bytes` is also referenced in: stream-framer.js\n  `field` is also referenced in: stream-framer.js\n[peer] `createDecoder` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `runCli` (stream-framer.js:131):\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n  frames.push(...decoder.finish());\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 259736,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 3,
+      "id": "action-9"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: 2 of 15 tests FAILED (13 passed).\nFailing tests:\n  ✗ CLI emits one atomic JSON result for canonical base64 chunks (test/cli.test.js:21) — The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Arra…\n  ✗ field parsing preserves values and resets all frame state (test/decoder.test.js:25) — pending frame fields\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 1\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nnot ok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 2.175986\n  location: '/workers/repair-framer/test/cli.test.js:21:1'\n  failureType: 'testCodeFailure'\n  error: 'The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received type number (101)'\n  code: 'ERR_INVALID_ARG_TYPE'\n  name: 'TypeError'\n  stack: |-\n    Function.from (node:buffer:322:9)\n    file:///workers/repair-framer/test/cli.test.js:26:68\n    Array.map (<anonymous>)\n    TestContext.<anonymous> (file:///workers/repair-framer/test/cli.test.js:26:46)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    node:internal/test_runner/harness:255:12\n    node:internal/process/task_queues:140:7\n    AsyncResource.runInAsyncScope (node:async_hooks:206:9)\n  ...\n# Subtest: CLI validates argument count, files, UTF-8\n... (test output digest: preserved tail, clipped 1961 chars total)\nt decoder\n  ---\n  duration_ms: 0.263002\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 10 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.895316\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 11 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.180611\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 12 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.38948\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 13 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.852956\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 14 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.176202\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 15 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.364063\n  ...\n1..15\n# tests 15\n# suites 0\n# pass 13\n# fail 2\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 542.897782\n\n\n[fix-tests] 2 test(s) fail (13 already pass). Investigate them ONE at a time — compare the failure, test and task contract before choosing a change, then re-run the tests:\n\nFAILING: \"CLI emits one atomic JSON result for canonical base64 chunks\" (cli.test.js:21)\n  The first argument must be of type string or an instance of Buffer, ArrayBuffer, or Array or an Array-like Object. Received type number (101)\n  Test provenance: generated. This test was added during this run; preserving supplied tests does not prohibit task-justified correction of it. The test is evidence, not a guaranteed oracle. Compare its assertion and setup with the user's task and the observed behavior. A test correction requires a specific task-supported defect in its expectation or setup; do not remove coverage or weaken an assertion merely to make it pass. If the contract is insufficient, state what remains unknown.\n  failing test source:\n    test('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n      t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n      const file = path.join(directory, 'input.json');\n      const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n      const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\n      fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n    \n      const result = invoke([file]);\n      assert.equal(result.status, 0);\n      assert.equal(result.stderr, '');\n      assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n\nFAILING: \"field parsing preserves values and resets all frame state\" (decoder.test.js:25)\n  pending frame fields\n  Test provenance: generated. This test was added during this run; preserving supplied tests does not prohibit task-justified correction of it. The test is evidence, not a guaranteed oracle. Compare its assertion and setup with the user's task and the observed behavior. A test correction requires a specific task-supported defect in its expectation or setup; do not remove coverage or weaken an assertion merely to make it pass. If the contract is insufficient, state what remains unknown.\n  failing test source:\n    test('field parsing preserves values and resets all frame state', () => {\n      const decoder = createDecoder();\n      const input = [\n        'event: stale', '',\n        ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n        'data:  one space remains', 'data:two:colons', '',\n        'event:', 'data', '',\n        'data: a\\rb', '',\n        'data: [DONE]', '',\n      ].join('\\n');\n      assert.deepEqual(decoder.push(Buffer.from(input)), [\n        {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n        {event: 'message', data: ''},\n        {event: 'message', data: 'a\\rb'},\n      ]);\n      assert.deepEqual(decoder.finish(), []);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n[baseline] This is the first time this suite has been measured in this run, and 2 edits came before it — so nothing measured this suite before you changed it. These 2 failure(s) may be yours, may be pre-existing, or both, and this run cannot tell you which. If that distinction matters, check one out of the way (git stash, or revert your change in one file) and run the same command again. 13/15 is now the number later runs are compared against.",
+      "atMs": 264527,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 4,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 5). Recorded command: \"npm test\". Recorded tests: 13 passed, 2 failed, 15 total.\nFailing stack site: \"test/cli.test.js\":26. Current source (\">\" marks that line):\n24     const file = path.join(directory, 'input.json');\n25     const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n26 >   const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure.\nFailing stack site: \"test/decoder.test.js\":40. Current source (\">\" marks that line):\n38       {event: 'message', data: 'a\\rb'},\n39     ]);\n40 >   assert.deepEqual(decoder.finish(), []);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"CLI emits one atomic JSON result for canonical base64 chunks\". Failing case: \"field parsing preserves values and resets all frame state\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-10"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 276394,
+      "endedMs": 286276,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-11"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "patch",
+          "edits": [
+            {
+              "p": "test/cli.test.js",
+              "old": "  const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));",
+              "new": "  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n    .map((chunk) => Buffer.from(chunk).toString('base64'));",
+              "line": 26
+            },
+            {
+              "p": "test/decoder.test.js",
+              "old": "    'data: a\\rb', '',\n    'data: [DONE]', '',\n  ].join('\\n');",
+              "new": "    'data: a\\rb', '',\n    'data: [DONE]', '', '',\n  ].join('\\n');",
+              "line": 31
+            }
+          ],
+          "repair": [
+            {
+              "evidenceSha256": "98d381756cb01ec648b7c74719680d1071d11c98df3b88f1832ae73500b1dc3a",
+              "fixture": "const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'))",
+              "priorExpected": "Spreading a Buffer would produce one-byte Buffer chunks.",
+              "proposedExpected": "Construct explicit one-byte Uint8Array chunks before base64 encoding.",
+              "requirement": "The fixture must provide canonical base64 strings for actual byte chunks.",
+              "nextCheck": "npm test"
+            },
+            {
+              "evidenceSha256": "98d381756cb01ec648b7c74719680d1071d11c98df3b88f1832ae73500b1dc3a",
+              "fixture": "lines ending with ['data: [DONE]', ''].join('\\n')",
+              "priorExpected": "One trailing empty array element would encode a blank line after the marker.",
+              "proposedExpected": "Use two trailing empty elements so the marker line and following blank line are both LF-terminated.",
+              "requirement": "[DONE] terminates only when its frame is dispatched by a blank line.",
+              "nextCheck": "npm test"
+            }
+          ]
+        }
+      },
+      "output": "ERROR: patch edit 2 (test/decoder.test.js): \"old\" text not found starting on line 31\n[repair handoff] Proposal was not admitted: it needs bounded complete records linked to an actual earlier failed execution and an applied edit or successful source-bound read. The action result above is unchanged; this proposal supplies no verification evidence.",
+      "atMs": 286252,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 5,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 5). Recorded command: \"npm test\". Recorded tests: 13 passed, 2 failed, 15 total.\nFailing stack site: \"test/cli.test.js\":26. Current source (\">\" marks that line):\n24     const file = path.join(directory, 'input.json');\n25     const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n26 >   const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure.\nFailing stack site: \"test/decoder.test.js\":40. Current source (\">\" marks that line):\n38       {event: 'message', data: 'a\\rb'},\n39     ]);\n40 >   assert.deepEqual(decoder.finish(), []);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"CLI emits one atomic JSON result for canonical base64 chunks\". Failing case: \"field parsing preserves values and resets all frame state\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-12"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "test/decoder.test.js",
+              "start": 20,
+              "limit": 25
+            },
+            {
+              "a": "read_file",
+              "p": "test/cli.test.js",
+              "start": 20,
+              "limit": 14
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"test/decoder.test.js\",\"start\":20,\"limit\":25}\ntest/decoder.test.js (120 lines, showing 20-44):\n20\t    assert.deepEqual(runChunks([bytes.subarray(0, split), bytes.subarray(split)]), expected);\n21\t  }\n22\t  assert.deepEqual(runChunks([...bytes].map((byte) => Uint8Array.of(byte))), expected);\n23\t});\n24\t\n25\ttest('field parsing preserves values and resets all frame state', () => {\n26\t  const decoder = createDecoder();\n27\t  const input = [\n28\t    'event: stale', '',\n29\t    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n30\t    'data:  one space remains', 'data:two:colons', '',\n31\t    'event:', 'data', '',\n32\t    'data: a\\rb', '',\n33\t    'data: [DONE]', '',\n34\t  ].join('\\n');\n35\t  assert.deepEqual(decoder.push(Buffer.from(input)), [\n36\t    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n37\t    {event: 'message', data: ''},\n38\t    {event: 'message', data: 'a\\rb'},\n39\t  ]);\n40\t  assert.deepEqual(decoder.finish(), []);\n41\t});\n42\t\n43\ttest('only one initial BOM is ignored and later BOMs are data', () => {\n44\t  const input = '\\uFEFFdata: first\\n\\ndata: \\uFEFFlater\\n\\ndata: [DONE]\\n\\n';\n... (76 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/cli.test.js\",\"start\":20,\"limit\":14}\ntest/cli.test.js (82 lines, showing 20-33):\n20\t\n21\ttest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n22\t  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n23\t  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n24\t  const file = path.join(directory, 'input.json');\n25\t  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n26\t  const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\n27\t  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n28\t\n29\t  const result = invoke([file]);\n30\t  assert.equal(result.status, 0);\n31\t  assert.equal(result.stderr, '');\n32\t  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n33\t});\n... (49 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)",
+      "atMs": 290274,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 6,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 5). Recorded command: \"npm test\". Recorded tests: 13 passed, 2 failed, 15 total.\nFailing stack site: \"test/cli.test.js\":26. Current source (\">\" marks that line):\n24     const file = path.join(directory, 'input.json');\n25     const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n26 >   const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure.\nFailing stack site: \"test/decoder.test.js\":40. Current source (\">\" marks that line):\n38       {event: 'message', data: 'a\\rb'},\n39     ]);\n40 >   assert.deepEqual(decoder.finish(), []);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"CLI emits one atomic JSON result for canonical base64 chunks\". Failing case: \"field parsing preserves values and resets all frame state\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-13"
+    },
+    {
+      "name": "supervisor-steer",
+      "category": "other",
+      "request": {
+        "action": "steer",
+        "jobs": [],
+        "target": "repair-framer",
+        "text": "Observed two generated fixture defects in npm test evidence: spreading bytes yields numbers, so bytewise CLI chunks must map each byte via Buffer.from([byte]) or Uint8Array.of(byte); field parsing array ending ['data: [DONE]', ''].join('\\n') provides only one terminal LF and lacks the blank dispatch line—append another empty entry/newline. Preserve those behavioral assertions, repair fixture installation and rerun. Review complete output for any other failures."
+      },
+      "output": {
+        "delivery": "Worker will read this between actions; inspect subsequent evidence.",
+        "queued": true,
+        "sequence": 1
+      },
+      "atMs": 294108,
+      "endedMs": 294130,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-14"
+    },
+    {
+      "name": "edit_lines",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "edit_lines",
+          "p": "test/decoder.test.js",
+          "start": 33,
+          "end": 34,
+          "new": "    'data: [DONE]', '', '',\n  ].join('\\n');"
+        }
+      },
+      "output": "replaced lines 33-34 in test/decoder.test.js (2 line(s) out, 2 in).\nRemoved:\n33\t    'data: [DONE]', '',\n34\t  ].join('\\n');\n\ntest/decoder.test.js now reads (>> is what you just wrote — check the boundaries for duplicated or orphaned lines):\n   29\t    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n   30\t    'data:  one space remains', 'data:two:colons', '',\n   31\t    'event:', 'data', '',\n   32\t    'data: a\\rb', '',\n>> 33\t    'data: [DONE]', '', '',\n>> 34\t  ].join('\\n');\n   35\t  assert.deepEqual(decoder.push(Buffer.from(input)), [\n   36\t    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n   37\t    {event: 'message', data: ''},\n   38\t    {event: 'message', data: 'a\\rb'},\n[regression-guard] Test inputs changed (test/decoder.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.",
+      "atMs": 294130,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 7,
+      "id": "action-15"
+    },
+    {
+      "name": "unparsed-action",
+      "category": "other",
+      "request": {
+        "job": "repair-framer",
+        "action": null
+      },
+      "output": "[Factory supervisor feedback for your current milestone — inspect the evidence, correct course, and continue from your current files. This does not change the operator's requirements or grant new permissions.]: Observed two generated fixture defects in npm test evidence: spreading bytes yields numbers, so bytewise CLI chunks must map each byte via Buffer.from([byte]) or Uint8Array.of(byte); field parsing array ending ['data: [DONE]', ''].join('\\n') provides only one terminal LF and lacks the blank dispatch line—append another empty entry/newline. Preserve those behavioral assertions, repair fixture installation and rerun. Review complete output for any other failures.",
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 8,
+      "id": "action-16"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 296626,
+      "endedMs": 338842,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-17"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/cli.test.js",
+          "old": "  const chunks = [Buffer.alloc(0), ...bytes].map((chunk) => Buffer.from(chunk).toString('base64'));",
+          "new": "  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n    .map((chunk) => Buffer.from(chunk).toString('base64'));",
+          "line": 26
+        }
+      },
+      "output": "replaced 1 occurrence in test/cli.test.js at line 26\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `chunks` is also referenced in: stream-framer.js, test/public.test.js, test/decoder.test.js\n  `chunk` is also referenced in: stream-framer.js, test/public.test.js, test/decoder.test.js\n[peer] `chunks` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `runCli` (stream-framer.js:129):\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    throw new Error('input must be an object');\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];",
+      "atMs": 299066,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 9,
+      "id": "action-18"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 15 tests passed.\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 30.660364\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 214.312279\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 and protocol failures\nok 3 - CLI rejects malformed or noncanonical base64 and protocol failures\n  ---\n  duration_ms: 260.82769\n  ...\n# Subtest: importing the module does not execute the CLI\nok 4 - importing the module does not execute the CLI\n  ---\n  duration_ms: 18.561526\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 5 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 4.929047\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 6 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.171231\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 7 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.192171\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 8 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.497503\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 9 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.273332\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 10 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.864666\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 11 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.220092\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 12 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.37942\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 13 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.817466\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 14 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.181451\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 15 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.359433\n  ...\n1..15\n# tests 15\n# suites 0\n# pass 15\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 564.411334",
+      "atMs": 302602,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "blocked",
+      "source": "factory-worker-sol",
+      "turn": 10,
+      "id": "action-19"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "done",
+          "summary": "Repaired stream-framer.js with independent stateful decoders, strict streaming UTF-8/BOM handling, transport-independent LF/CRLF framing, exact field parsing and dispatch semantics, [DONE] termination enforcement, poisoned lifecycle failures, and canonical CLI input/base64 validation with atomic output. Added deterministic node:test coverage for all split points, bytewise UTF-8, parsing, lifecycle/error isolation, mutation safety, and CLI success/failure behavior using os.tmpdir fixtures. Verified with npm test: 15/15 tests passed."
+        }
+      },
+      "output": "\n\n[context-audit] That turn took 32s against a 7s median. A long turn alone does not establish a context problem. Check whether the time was expected for this command or model request. If a repair is stalled, re-read the current file region and the actual failing evidence before retrying.",
+      "atMs": 335391,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 11,
+      "id": "action-20"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "repair-framer"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "stream-framer.js",
+          "test/cli.test.js",
+          "test/decoder.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 26.394443\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 217.010831\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 and protocol failures\nok 3 - CLI rejects malformed or noncanonical base64 and protocol failures\n  ---\n  duration_ms: 265.092784\n  ...\n# Subtest: importing the module does not execute the CLI\nok 4 - importing the module does not execute the CLI\n  ---\n  duration_ms: 19.275221\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 5 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 3.228194\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 6 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.162241\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 7 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.189961\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 8 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.503683\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 9 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.261461\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 10 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.849316\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 11 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.220002\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 12 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.37995\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 13 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.855746\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 14 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.173671\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 15 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.372263\n  ...\n1..15\n# tests 15\n# suites 0\n# pass 15\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 569.752227\n",
+          "stderr": ""
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 338835,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-21"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat stream-framer.js && printf '\\n--- decoder tests ---\\n' && cat test/decoder.test.js && printf '\\n--- CLI tests ---\\n' && cat test/cli.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "a09efed88e69a8a04cea12d95b0c60003beecd0c",
+        "stderr": "",
+        "stdout": ");\n    process.exitCode = 2;\n  }\n}\n\n--- decoder tests ---\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\n\nconst wire = 'event: delta\\r\\ndata: 雪😀\\r\\ndata: second\\n\\ndata: [DONE]\\n\\n';\nconst expected = [{event: 'delta', data: '雪😀\\nsecond'}];\n\nfunction runChunks(chunks) {\n  const decoder = createDecoder();\n  const frames = [];\n  for (const chunk of chunks) frames.push(...decoder.push(chunk));\n  assert.deepEqual(decoder.finish(), []);\n  return frames;\n}\n\ntest('decoding is invariant across every two-part split and bytewise transport', () => {\n  const bytes = Buffer.from(wire);\n  assert.deepEqual(runChunks([bytes]), expected);\n  for (let split = 0; split <= bytes.length; split++) {\n    assert.deepEqual(runChunks([bytes.subarray(0, split), bytes.subarray(split)]), expected);\n  }\n  assert.deepEqual(runChunks([...bytes].map((byte) => Uint8Array.of(byte))), expected);\n});\n\ntest('field parsing preserves values and resets all frame state', () => {\n  const decoder = createDecoder();\n  const input = [\n    'event: stale', '',\n    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n    'data:  one space remains', 'data:two:colons', '',\n    'event:', 'data', '',\n    'data: a\\rb', '',\n    'data: [DONE]', '', '',\n  ].join('\\n');\n  assert.deepEqual(decoder.push(Buffer.from(input)), [\n    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n    {event: 'message', data: ''},\n    {event: 'message', data: 'a\\rb'},\n  ]);\n  assert.deepEqual(decoder.finish(), []);\n});\n\ntest('only one initial BOM is ignored and later BOMs are data', () => {\n  const input = '\\uFEFFdata: first\\n\\ndata: \\uFEFFlater\\n\\ndata: [DONE]\\n\\n';\n  assert.deepEqual(runChunks([...Buffer.from(input)].map((byte) => Uint8Array.of(byte))), [\n    {event: 'message', data: 'first'},\n    {event: 'message', data: '\\uFEFFlater'},\n  ]);\n});\n\ntest('chunks must be Uint8Arrays and are not mutated', () => {\n  const decoder = createDecoder();\n  const chunk = Buffer.from('data: [DONE]\\n\\n');\n  const copy = Buffer.from(chunk);\n  assert.deepEqual(decoder.push(chunk), []);\n  assert.deepEqual(chunk, copy);\n  assert.deepEqual(decoder.finish(), []);\n\n  for (const bad of ['bytes', null, {}, [1, 2]]) {\n    const invalid = createDecoder();\n    assert.throws(() => invalid.push(bad), Error);\n    assert.throws(() => invalid.push(new Uint8Array()), Error);\n    assert.throws(() => invalid.finish(), Error);\n  }\n});\n\ntest('strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder', () => {\n  const malformed = createDecoder();\n  assert.throws(() => malformed.push(Uint8Array.of(0xc3, 0x28)), Error);\n  assert.throws(() => malformed.push(Buffer.from('data: [DONE]\\n\\n')), Error);\n  assert.throws(() => malformed.finish(), Error);\n\n  const incomplete = createDecoder();\n  assert.deepEqual(incomplete.push(Uint8Array.of(0xf0, 0x9f, 0x98)), []);\n  assert.throws(() => incomplete.finish(), Error);\n  assert.throws(() => incomplete.finish(), Error);\n\n  const independent = createDecoder();\n  assert.deepEqual(independent.push(Buffer.from('data: ok\\n\\ndata: [DONE]\\n\\n')), [\n    {event: 'message', data: 'ok'},\n  ]);\n  assert.deepEqual(independent.finish(), []);\n});\n\ntest('termination and completion enforce exact lifecycle rules', () => {\n  for (const suffix of [': comment\\n', 'unknown\\n', 'data: [DONE]\\n\\n', 'x\\n']) {\n    const decoder = createDecoder();\n    assert.throws(() => decoder.push(Buffer.from(`data: kept\\n\\ndata: [DONE]\\n\\n${suffix}`)), Error);\n    assert.throws(() => decoder.finish(), Error);\n  }\n\n  const blanks = createDecoder();\n  assert.deepEqual(blanks.push(Buffer.from('data: [DONE]\\n\\n\\n\\r\\n')), []);\n  assert.deepEqual(blanks.finish(), []);\n  assert.throws(() => blanks.push(new Uint8Array()), Error);\n  assert.throws(() => blanks.finish(), Error);\n\n  for (const text of [\n    '',\n    'data: pending\\n',\n    'event: pending\\n',\n    'data: [DONE]\\n',\n    'data: [DONE]\\n\\ntail',\n  ]) {\n    const decoder = createDecoder();\n    decoder.push(Buffer.from(text));\n    assert.throws(() => decoder.finish(), Error);\n    assert.throws(() => decoder.push(new Uint8Array()), Error);\n  }\n});\n\ntest('a failing push returns no partial result and earlier returned values remain stable', () => {\n  const decoder = createDecoder();\n  const first = decoder.push(Buffer.from('data: safe\\n\\n'));\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.push(Buffer.from('data: [DONE]\\n\\nforbidden\\n')), Error);\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.finish(), Error);\n});\n\n--- CLI tests ---\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\n\nconst script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n\nfunction invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8'});\n}\n\nfunction assertFailure(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'input.json');\n  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n    .map((chunk) => Buffer.from(chunk).toString('base64'));\n  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n});\n\ntest('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  assertFailure(invoke([]));\n  assertFailure(invoke(['one', 'two']));\n  assertFailure(invoke([path.join(directory, 'missing')]));\n\n  const cases = [\n    Buffer.from('{'),\n    Buffer.from([0xff]),\n    Buffer.from('null'),\n    Buffer.from('[]'),\n    Buffer.from('{}'),\n    Buffer.from('{\"chunks\":null}'),\n    Buffer.from('{\"chunks\":[7]}'),\n  ];\n  cases.forEach((contents, index) => {\n    const file = path.join(directory, `bad-${index}`);\n    fs.writeFileSync(file, contents);\n    assertFailure(invoke([file]));\n  });\n});\n\ntest('CLI rejects malformed or noncanonical base64 and protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', '-w==', '_w==', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});\n\ntest('importing the module does not execute the CLI', () => {\n  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n  assert.equal(result.status, 0);\n  assert.equal(result.stdout, '');\n  assert.equal(result.stderr, '');\n});\n",
+        "timedOut": false
+      },
+      "atMs": 343787,
+      "endedMs": 344278,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-22"
+    },
+    {
+      "name": "supervisor-read",
+      "category": "inspect",
+      "request": {
+        "action": "read",
+        "jobs": [],
+        "target": "stream-framer.js",
+        "text": ""
+      },
+      "output": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nexport function createDecoder() {\n  const utf8 = new TextDecoder('utf-8', {fatal: true});\n  let lineBuffer = '';\n  let dataValues = [];\n  let eventSeen = false;\n  let eventValue = '';\n  let terminated = false;\n  let finished = false;\n  let poisoned = false;\n\n  function reject(message, cause) {\n    poisoned = true;\n    throw new Error(message, cause === undefined ? undefined : {cause});\n  }\n\n  function ensureActive() {\n    if (poisoned) reject('decoder is poisoned');\n    if (finished) reject('decoder is already finished');\n  }\n\n  function resetFrame() {\n    dataValues = [];\n    eventSeen = false;\n    eventValue = '';\n  }\n\n  function consumeLine(line, frames) {\n    if (terminated) {\n      if (line !== '') throw new Error('nonblank line after termination');\n      return;\n    }\n\n    if (line === '') {\n      if (dataValues.length > 0) {\n        const data = dataValues.join('\\n');\n        if (data === '[DONE]') {\n          terminated = true;\n        } else {\n          frames.push({\n            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n            data,\n          });\n        }\n      }\n      resetFrame();\n      return;\n    }\n\n    if (line.startsWith(':')) return;\n    const colon = line.indexOf(':');\n    const field = colon === -1 ? line : line.slice(0, colon);\n    let value = colon === -1 ? '' : line.slice(colon + 1);\n    if (value.startsWith(' ')) value = value.slice(1);\n\n    if (field === 'data') {\n      dataValues.push(value);\n    } else if (field === 'event') {\n      eventSeen = true;\n      eventValue = value;\n    }\n  }\n\n  function consumeText(text, frames) {\n    lineBuffer += text;\n    let newline;\n    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n      let line = lineBuffer.slice(0, newline);\n      lineBuffer = lineBuffer.slice(newline + 1);\n      if (line.endsWith('\\r')) line = line.slice(0, -1);\n      consumeLine(line, frames);\n    }\n  }\n\n  return {\n    push(chunk) {\n      ensureActive();\n      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n      const frames = [];\n      try {\n        consumeText(utf8.decode(chunk, {stream: true}), frames);\n        return frames;\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n\n    finish() {\n      ensureActive();\n      try {\n        const frames = [];\n        consumeText(utf8.decode(), frames);\n        if (lineBuffer !== '') throw new Error('unterminated final line');\n        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n        if (!terminated) throw new Error('stream is not terminated');\n        if (frames.length > 0) throw new Error('frame completed during finish');\n        finished = true;\n        return [];\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n  };\n}\n\nfunction decodeCanonicalBase64(value) {\n  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n    throw new Error('invalid base64');\n  }\n  const bytes = Buffer.from(value, 'base64');\n  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n  return bytes;\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n  const fileBytes = fs.readFileSync(process.argv[2]);\n  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n  const input = JSON.parse(jsonText);\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    throw new Error('input must be an object');\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n  frames.push(...decoder.finish());\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "atMs": 346856,
+      "endedMs": 346863,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-23"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "node --input-type=module <<'NODE'\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nconst dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-review-'));\ntry {\n const file=path.join(dir,'input.json');\n const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n const r=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16000000});\n console.log(JSON.stringify({status:r.status,stderr:r.stderr,stdoutLength:r.stdout.length}));\n if(r.status!==0) process.exitCode=1;\n} finally {fs.rmSync(dir,{recursive:true,force:true});}\nNODE"
+      },
+      "output": {
+        "code": 1,
+        "pass": false,
+        "snapshot": "71d134c674f91093fd279f35daac47299d5fc5e9",
+        "stderr": "",
+        "stdout": "{\"status\":2,\"stderr\":\"Maximum call stack size exceeded\\n\",\"stdoutLength\":0}\n",
+        "timedOut": false
+      },
+      "atMs": 360238,
+      "endedMs": 360993,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-24"
+    },
+    {
+      "name": "supervisor-enqueue",
+      "category": "other",
+      "request": {
+        "action": "enqueue",
+        "jobs": [
+          {
+            "id": "cli-volume-and-base64-tests",
+            "worker": "sol",
+            "task": "Fix CLI argument-spread frame accumulation limit and retain regression for a single chunk dispatching 150000 frames. Strengthen malformed-base64 tests to distinguish actual base64 validation from unrelated missing-termination failure. Keep protocol decoder behavior unchanged; run npm test.",
+            "context": "Integrated prior job passed. Supervisor reproduced actual CLI defect: JSON chunks:[Buffer.from('data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n').toString('base64')] yields exit 2, stderr 'Maximum call stack size exceeded', empty stdout. runCli frames.push(...decoder.push(...)) exceeds JS argument limits; append frames iteratively. Regression fixtures in os.tmpdir, cleaned; spawnSync maxBuffer large enough (e.g. 16MB), assert status0/stderr empty/150000 correct frames. Existing malformed-base64 tests send invalid encoding alone: even a permissive decoder would fail for missing DONE, so these do not establish base64 rejection. Put malformed encodings in otherwise valid terminated streams, e.g. after base64('data: ') and before base64('\\n\\ndata: [DONE]\\n\\n'); for encodings decoding invalid UTF8 choose ASCII URL-safe examples or appropriate fixture so permissive decoding would succeed. Include correct canonical counterpart acceptance and noncanonical pad bits ('Zh==' -> 'f', 'Zm9=' -> 'fo') rejection. Do not edit public tests/package.json. Original brief has no frame count bound.",
+            "verify": "npm test",
+            "dependsOn": [
+              "repair-framer"
+            ],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "cli-volume-and-base64-tests"
+        ]
+      },
+      "atMs": 375345,
+      "endedMs": 375867,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-25"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 379302,
+      "endedMs": 493718,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-26"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "start": 1,
+              "limit": 260
+            },
+            {
+              "a": "read_file",
+              "p": "test/cli.test.js",
+              "start": 1,
+              "limit": 320
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "start": 1,
+              "limit": 120
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"start\":1,\"limit\":260}\nstream-framer.js (146 lines, showing 1-146):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport {fileURLToPath} from 'node:url';\n4\t\n5\texport function createDecoder() {\n6\t  const utf8 = new TextDecoder('utf-8', {fatal: true});\n7\t  let lineBuffer = '';\n8\t  let dataValues = [];\n9\t  let eventSeen = false;\n10\t  let eventValue = '';\n11\t  let terminated = false;\n12\t  let finished = false;\n13\t  let poisoned = false;\n14\t\n15\t  function reject(message, cause) {\n16\t    poisoned = true;\n17\t    throw new Error(message, cause === undefined ? undefined : {cause});\n18\t  }\n19\t\n20\t  function ensureActive() {\n21\t    if (poisoned) reject('decoder is poisoned');\n22\t    if (finished) reject('decoder is already finished');\n23\t  }\n24\t\n25\t  function resetFrame() {\n26\t    dataValues = [];\n27\t    eventSeen = false;\n28\t    eventValue = '';\n29\t  }\n30\t\n31\t  function consumeLine(line, frames) {\n32\t    if (terminated) {\n33\t      if (line !== '') throw new Error('nonblank line after termination');\n34\t      return;\n35\t    }\n36\t\n37\t    if (line === '') {\n38\t      if (dataValues.length > 0) {\n39\t        const data = dataValues.join('\\n');\n40\t        if (data === '[DONE]') {\n41\t          terminated = true;\n42\t        } else {\n43\t          frames.push({\n44\t            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n45\t            data,\n46\t          });\n47\t        }\n48\t      }\n49\t      resetFrame();\n50\t      return;\n51\t    }\n52\t\n53\t    if (line.startsWith(':')) return;\n54\t    const colon = line.indexOf(':');\n55\t    const field = colon === -1 ? line : line.slice(0, colon);\n56\t    let value = colon === -1 ? '' : line.slice(colon + 1);\n57\t    if (value.startsWith(' ')) value = value.slice(1);\n58\t\n59\t    if (field === 'data') {\n60\t      dataValues.push(value);\n61\t    } else if (field === 'event') {\n62\t      eventSeen = true;\n63\t      eventValue = value;\n64\t    }\n65\t  }\n66\t\n67\t  function consumeText(text, frames) {\n68\t    lineBuffer += text;\n69\t    let newline;\n70\t    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n71\t      let line = lineBuffer.slice(0, newline);\n72\t      lineBuffer = lineBuffer.slice(newline + 1);\n73\t      if (line.endsWith('\\r')) line = line.slice(0, -1);\n74\t      consumeLine(line, frames);\n75\t    }\n76\t  }\n77\t\n78\t  return {\n79\t    push(chunk) {\n80\t      ensureActive();\n81\t      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n82\t      const frames = [];\n83\t      try {\n84\t        consumeText(utf8.decode(chunk, {stream: true}), frames);\n85\t        return frames;\n86\t      } catch (error) {\n87\t        poisoned = true;\n88\t        throw error instanceof Error ? error : new Error(St\n... [5401 chars clipped] ...\n].entries()) {\n70\t    const file = path.join(directory, `protocol-${index}.json`);\n71\t    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n72\t    assertFailure(invoke([file]));\n73\t  }\n74\t});\n75\t\n76\ttest('importing the module does not execute the CLI', () => {\n77\t  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n78\t  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n79\t  assert.equal(result.status, 0);\n80\t  assert.equal(result.stdout, '');\n81\t  assert.equal(result.stderr, '');\n82\t});\n83\t\n— end of file (83 lines); nothing beyond line 83, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\",\"start\":1,\"limit\":120}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.\n[clipped ops: #1 read_file stream-framer.js, #2 read_file test/cli.test.js — re-request them in a smaller inspect to see them whole]",
+      "atMs": 384052,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 0,
+      "id": "action-27"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "start": 75,
+              "limit": 90
+            },
+            {
+              "a": "read_file",
+              "p": "test/cli.test.js",
+              "start": 1,
+              "limit": 110
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"start\":75,\"limit\":90}\nstream-framer.js (146 lines, showing 75-146):\n75\t    }\n76\t  }\n77\t\n78\t  return {\n79\t    push(chunk) {\n80\t      ensureActive();\n81\t      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n82\t      const frames = [];\n83\t      try {\n84\t        consumeText(utf8.decode(chunk, {stream: true}), frames);\n85\t        return frames;\n86\t      } catch (error) {\n87\t        poisoned = true;\n88\t        throw error instanceof Error ? error : new Error(String(error));\n89\t      }\n90\t    },\n91\t\n92\t    finish() {\n93\t      ensureActive();\n94\t      try {\n95\t        const frames = [];\n96\t        consumeText(utf8.decode(), frames);\n97\t        if (lineBuffer !== '') throw new Error('unterminated final line');\n98\t        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n99\t        if (!terminated) throw new Error('stream is not terminated');\n100\t        if (frames.length > 0) throw new Error('frame completed during finish');\n101\t        finished = true;\n102\t        return [];\n103\t      } catch (error) {\n104\t        poisoned = true;\n105\t        throw error instanceof Error ? error : new Error(String(error));\n106\t      }\n107\t    },\n108\t  };\n109\t}\n110\t\n111\tfunction decodeCanonicalBase64(value) {\n112\t  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n113\t  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n114\t    throw new Error('invalid base64');\n115\t  }\n116\t  const bytes = Buffer.from(value, 'base64');\n117\t  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n118\t  return bytes;\n119\t}\n120\t\n121\tfunction runCli() {\n122\t  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n123\t  const fileBytes = fs.readFileSync(process.argv[2]);\n124\t  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n125\t  const input = JSON.parse(jsonText);\n126\t  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n127\t    throw new Error('input must be an object');\n128\t  }\n129\t  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n130\t\n131\t  const decoder = createDecoder();\n132\t  const frames = [];\n133\t  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n134\t  frames.push(...decoder.finish());\n135\t  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n136\t}\n137\t\n138\tif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n139\t  try {\n140\t    runCli();\n141\t  } catch (error) {\n142\t    process.stderr.write(`${error instanceof Error ? error.\n... [2905 chars clipped] ...\nvalid.entries()) {\n64\t    const file = path.join(directory, `base64-${index}.json`);\n65\t    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n66\t    assertFailure(invoke([file]));\n67\t  }\n68\t\n69\t  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n70\t    const file = path.join(directory, `protocol-${index}.json`);\n71\t    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n72\t    assertFailure(invoke([file]));\n73\t  }\n74\t});\n75\t\n76\ttest('importing the module does not execute the CLI', () => {\n77\t  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n78\t  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n79\t  assert.equal(result.status, 0);\n80\t  assert.equal(result.stdout, '');\n81\t  assert.equal(result.stderr, '');\n82\t});\n83\t\n— end of file (83 lines); nothing beyond line 83, do not re-read this range.\n[clipped ops: #1 read_file stream-framer.js, #2 read_file test/cli.test.js — re-request them in a smaller inspect to see them whole]",
+      "atMs": 387783,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 1,
+      "id": "action-28"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "read_file",
+          "p": "test/cli.test.js",
+          "start": 1,
+          "limit": 83
+        }
+      },
+      "output": "test/cli.test.js (83 lines, showing 1-83):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os from 'node:os';\n5\timport path from 'node:path';\n6\timport {spawnSync} from 'node:child_process';\n7\timport {fileURLToPath} from 'node:url';\n8\t\n9\tconst script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n10\t\n11\tfunction invoke(args) {\n12\t  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8'});\n13\t}\n14\t\n15\tfunction assertFailure(result) {\n16\t  assert.equal(result.status, 2);\n17\t  assert.equal(result.stdout, '');\n18\t  assert.notEqual(result.stderr, '');\n19\t}\n20\t\n21\ttest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n22\t  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n23\t  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n24\t  const file = path.join(directory, 'input.json');\n25\t  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n26\t  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n27\t    .map((chunk) => Buffer.from(chunk).toString('base64'));\n28\t  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n29\t\n30\t  const result = invoke([file]);\n31\t  assert.equal(result.status, 0);\n32\t  assert.equal(result.stderr, '');\n33\t  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n34\t});\n35\t\n36\ttest('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n37\t  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n38\t  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n39\t  assertFailure(invoke([]));\n40\t  assertFailure(invoke(['one', 'two']));\n41\t  assertFailure(invoke([path.join(directory, 'missing')]));\n42\t\n43\t  const cases = [\n44\t    Buffer.from('{'),\n45\t    Buffer.from([0xff]),\n46\t    Buffer.from('null'),\n47\t    Buffer.from('[]'),\n48\t    Buffer.from('{}'),\n49\t    Buffer.from('{\"chunks\":null}'),\n50\t    Buffer.from('{\"chunks\":[7]}'),\n51\t  ];\n52\t  cases.forEach((contents, index) => {\n53\t    const file = path.join(directory, `bad-${index}`);\n54\t    fs.writeFileSync(file, contents);\n55\t    assertFailure(invoke([file]));\n56\t  });\n57\t});\n58\t\n59\ttest('CLI rejects malformed or noncanonical base64 and protocol failures', (t) => {\n60\t  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n61\t  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n62\t  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', '-w==', '_w==', '!!!!'];\n63\t  for (const [index, encoded] of invalid.entries()) {\n64\t    const file = path.join(directory, `base64-${index}.json`);\n65\t    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n66\t    assertFailure(invoke([file]));\n67\t  }\n68\t\n69\t  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n70\t    const file = path.join(directory, `protocol-${index}.json`);\n71\t    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n72\t    assertFailure(invoke([file]));\n73\t  }\n74\t});\n75\t\n76\ttest('importing the module does not execute the CLI', () => {\n77\t  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n78\t  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n79\t  assert.equal(result.status, 0);\n80\t  assert.equal(result.stdout, '');\n81\t  assert.equal(result.stderr, '');\n82\t});\n83\t\n— end of file (83 lines); nothing beyond line 83, do not re-read this range.",
+      "atMs": 391466,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 2,
+      "id": "action-29"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "read_file",
+          "p": "test/cli.test.js",
+          "start": 57,
+          "limit": 18
+        }
+      },
+      "output": "test/cli.test.js (83 lines, showing 57-74):\n57\t});\n58\t\n59\ttest('CLI rejects malformed or noncanonical base64 and protocol failures', (t) => {\n60\t  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n61\t  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n62\t  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', '-w==', '_w==', '!!!!'];\n63\t  for (const [index, encoded] of invalid.entries()) {\n64\t    const file = path.join(directory, `base64-${index}.json`);\n65\t    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n66\t    assertFailure(invoke([file]));\n67\t  }\n68\t\n69\t  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n70\t    const file = path.join(directory, `protocol-${index}.json`);\n71\t    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n72\t    assertFailure(invoke([file]));\n73\t  }\n74\t});\n... (9 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)",
+      "atMs": 396755,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "blocked",
+      "source": "factory-worker-sol",
+      "turn": 3,
+      "id": "action-30"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "replace",
+          "p": "stream-framer.js",
+          "old": "  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) frames.push(...decoder.push(decodeCanonicalBase64(encoded)));\n  frames.push(...decoder.finish());\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);",
+          "new": "  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) {\n    for (const frame of decoder.push(decodeCanonicalBase64(encoded))) frames.push(frame);\n  }\n  for (const frame of decoder.finish()) frames.push(frame);\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);",
+          "line": 131
+        }
+      },
+      "output": "replaced 1 occurrence in stream-framer.js at line 131\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `decoder` is also referenced in: test/decoder.test.js\n  `createDecoder` is also referenced in: test/decoder.test.js, test/public.test.js\n  `frames` is also referenced in: test/cli.test.js, test/decoder.test.js, test/public.test.js\n[peer] `decoder` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `ensureActive` (stream-framer.js:21):\n  }\n\n  function ensureActive() {\n    if (poisoned) reject('decoder is poisoned');\n    if (finished) reject('decoder is already finished');\n  }",
+      "atMs": 433152,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "blocked",
+      "source": "factory-worker-sol",
+      "turn": 4,
+      "id": "action-31"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "replace",
+          "p": "test/cli.test.js",
+          "old": "function invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8'});\n}",
+          "new": "function invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});\n}",
+          "line": 11
+        }
+      },
+      "output": "replaced 1 occurrence in test/cli.test.js at line 11",
+      "atMs": 438419,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 5,
+      "id": "action-32"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "replace",
+          "p": "test/cli.test.js",
+          "old": "test('CLI rejects malformed or noncanonical base64 and protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', '-w==', '_w==', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [encoded]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});",
+          "new": "test('CLI rejects malformed or noncanonical base64 independently of protocol completion', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const prefix = Buffer.from('data: ').toString('base64');\n  const suffix = Buffer.from('\\n\\ndata: [DONE]\\n\\n').toString('base64');\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', 'Pz8_', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, [encoded, data]] of [['Zg==', 'f'], ['Zm8=', 'fo'], ['Pz8/', '???']].entries()) {\n    const file = path.join(directory, `canonical-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    const result = invoke([file]);\n    assert.equal(result.status, 0);\n    assert.equal(result.stderr, '');\n    assert.deepEqual(JSON.parse(result.stdout), {frames: [{event: 'message', data}]});\n  }\n});\n\ntest('CLI rejects protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});\n\ntest('CLI dispatches 150000 frames from one chunk without argument spreading', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'many-frames.json');\n  const bytes = Buffer.from(`${'data: x\\n\\n'.repeat(150000)}data: [DONE]\\n\\n`);\n  fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  const output = JSON.parse(result.stdout);\n  assert.equal(output.frames.length, 150000);\n  for (const frame of output.frames) assert.deepEqual(frame, {event: 'message', data: 'x'});\n});",
+          "line": 59
+        }
+      },
+      "output": "replaced 1 occurrence in test/cli.test.js at line 59\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `malformed` is also referenced in: test/decoder.test.js\n  `invalid` is also referenced in: stream-framer.js, test/decoder.test.js\n  `chunks` is also referenced in: stream-framer.js, test/decoder.test.js, test/public.test.js\n[peer] `invalid` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `decodeCanonicalBase64` (stream-framer.js:114):\nfunction decodeCanonicalBase64(value) {\n  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n    throw new Error('invalid base64');\n  }\n  const bytes = Buffer.from(value, 'base64');\n  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n\n[context-audit] That turn took 41s against a 5s median. A long turn alone does not establish a context problem. Check whether the time was expected for this command or model request. If a repair is stalled, re-read the current file region and the actual failing evidence before retrying.",
+      "atMs": 479229,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "blocked",
+      "source": "factory-worker-sol",
+      "turn": 6,
+      "id": "action-33"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 17 tests passed.\n$ npm test\ncwd: /workers/cli-volume-and-base64-tests\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 26.782786\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 215.301414\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 independently of protocol completion\nok 3 - CLI rejects malformed or noncanonical base64 independently of protocol completion\n  ---\n  duration_ms: 263.343427\n  ...\n# Subtest: CLI rejects protocol failures\nok 4 - CLI rejects protocol failures\n  ---\n  duration_ms: 45.550925\n  ...\n# Subtest: CLI dispatches 150000 frames from one chunk without argument spreading\nok 5 - CLI dispatches 150000 frames from one chunk without argument spreading\n  ---\n  duration_ms: 231.594543\n  ...\n# Subtest: importing the module does not execute the CLI\nok 6 - importing the module does not execute the CLI\n  ---\n  duration_ms: 20.881154\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 7 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 3.188913\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 8 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.157811\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 9 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.197731\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 10 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.486834\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 11 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.606385\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 12 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.785656\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 13 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.217961\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 14 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.38551\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 15 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.782306\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 16 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.175942\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 17 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.356463\n  ...\n1..17\n# tests 17\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 851.526842",
+      "atMs": 482578,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "blocked",
+      "source": "factory-worker-sol",
+      "turn": 7,
+      "id": "action-34"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "cli-volume-and-base64-tests",
+        "action": {
+          "a": "done",
+          "summary": "Fixed CLI frame accumulation by appending decoded frames iteratively instead of spreading large arrays. Added a regression proving one chunk can dispatch 150000 correct frames, increased the CLI test subprocess buffer, and strengthened malformed/noncanonical base64 tests by embedding candidates in otherwise valid terminated streams with canonical counterpart acceptance checks. Protocol decoder behavior was unchanged. Verified with `npm test`: all 17 tests passed."
+        }
+      },
+      "output": "",
+      "atMs": 489889,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 8,
+      "id": "action-35"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "cli-volume-and-base64-tests"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "stream-framer.js",
+          "test/cli.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 27.236471\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 217.52936\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 independently of protocol completion\nok 3 - CLI rejects malformed or noncanonical base64 independently of protocol completion\n  ---\n  duration_ms: 265.656434\n  ...\n# Subtest: CLI rejects protocol failures\nok 4 - CLI rejects protocol failures\n  ---\n  duration_ms: 44.011933\n  ...\n# Subtest: CLI dispatches 150000 frames from one chunk without argument spreading\nok 5 - CLI dispatches 150000 frames from one chunk without argument spreading\n  ---\n  duration_ms: 237.645858\n  ...\n# Subtest: importing the module does not execute the CLI\nok 6 - importing the module does not execute the CLI\n  ---\n  duration_ms: 20.204109\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 7 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 3.315554\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 8 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.162121\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 9 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.201091\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 10 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.493904\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 11 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.262052\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 12 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.914537\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 13 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.234862\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 14 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.38023\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 15 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.798856\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 16 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.170021\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 17 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.358723\n  ...\n1..17\n# tests 17\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 859.946756\n",
+          "stderr": ""
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 493711,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-36"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "sed -n '130,165p' stream-framer.js && cat test/cli.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "7866fd1733a73354c9e9f1ccedca8c1ec42dbca6",
+        "stderr": "",
+        "stdout": "\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) {\n    for (const frame of decoder.push(decodeCanonicalBase64(encoded))) frames.push(frame);\n  }\n  for (const frame of decoder.finish()) frames.push(frame);\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\n\nconst script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n\nfunction invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});\n}\n\nfunction assertFailure(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'input.json');\n  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n    .map((chunk) => Buffer.from(chunk).toString('base64'));\n  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n});\n\ntest('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  assertFailure(invoke([]));\n  assertFailure(invoke(['one', 'two']));\n  assertFailure(invoke([path.join(directory, 'missing')]));\n\n  const cases = [\n    Buffer.from('{'),\n    Buffer.from([0xff]),\n    Buffer.from('null'),\n    Buffer.from('[]'),\n    Buffer.from('{}'),\n    Buffer.from('{\"chunks\":null}'),\n    Buffer.from('{\"chunks\":[7]}'),\n  ];\n  cases.forEach((contents, index) => {\n    const file = path.join(directory, `bad-${index}`);\n    fs.writeFileSync(file, contents);\n    assertFailure(invoke([file]));\n  });\n});\n\ntest('CLI rejects malformed or noncanonical base64 independently of protocol completion', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const prefix = Buffer.from('data: ').toString('base64');\n  const suffix = Buffer.from('\\n\\ndata: [DONE]\\n\\n').toString('base64');\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', 'Pz8_', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, [encoded, data]] of [['Zg==', 'f'], ['Zm8=', 'fo'], ['Pz8/', '???']].entries()) {\n    const file = path.join(directory, `canonical-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    const result = invoke([file]);\n    assert.equal(result.status, 0);\n    assert.equal(result.stderr, '');\n    assert.deepEqual(JSON.parse(result.stdout), {frames: [{event: 'message', data}]});\n  }\n});\n\ntest('CLI rejects protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});\n\ntest('CLI dispatches 150000 frames from one chunk without argument spreading', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'many-frames.json');\n  const bytes = Buffer.from(`${'data: x\\n\\n'.repeat(150000)}data: [DONE]\\n\\n`);\n  fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  const output = JSON.parse(result.stdout);\n  assert.equal(output.frames.length, 150000);\n  for (const frame of output.frames) assert.deepEqual(frame, {event: 'message', data: 'x'});\n});\n\ntest('importing the module does not execute the CLI', () => {\n  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n  assert.equal(result.status, 0);\n  assert.equal(result.stdout, '');\n  assert.equal(result.stderr, '');\n});\n",
+        "timedOut": false
+      },
+      "atMs": 496979,
+      "endedMs": 497474,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-37"
+    },
+    {
+      "name": "supervisor-finish",
+      "category": "other",
+      "request": {
+        "action": "finish",
+        "jobs": [],
+        "target": "",
+        "text": "Repaired streaming UTF-8 decoding, framing, termination and poisoned lifecycle handling, plus strict CLI validation. Added transport-boundary, failure, base64 and high-volume regressions. npm test passes all 17 tests; package.json and public tests unchanged."
+      },
+      "output": {
+        "pass": true,
+        "code": 0,
+        "timedOut": false,
+        "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 30.446664\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 217.983863\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 independently of protocol completion\nok 3 - CLI rejects malformed or noncanonical base64 independently of protocol completion\n  ---\n  duration_ms: 263.403678\n  ...\n# Subtest: CLI rejects protocol failures\nok 4 - CLI rejects protocol failures\n  ---\n  duration_ms: 43.782992\n  ...\n# Subtest: CLI dispatches 150000 frames from one chunk without argument spreading\nok 5 - CLI dispatches 150000 frames from one chunk without argument spreading\n  ---\n  duration_ms: 238.276093\n  ...\n# Subtest: importing the module does not execute the CLI\nok 6 - importing the module does not execute the CLI\n  ---\n  duration_ms: 20.49026\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 7 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 4.434872\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 8 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.200712\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 9 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.225822\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 10 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.509334\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 11 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.272622\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 12 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.389142\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 13 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.757595\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 14 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.36964\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 15 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.346272\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 16 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.589174\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 17 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.367413\n  ...\n1..17\n# tests 17\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 858.869668\n",
+        "stderr": ""
+      },
+      "atMs": 503126,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-38"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 25096,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 25102,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 25109,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 25116,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 25123,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 336734,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 336743,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 336751,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 336759,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 336767,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 336775,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 336783,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 336792,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 376214,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 376221,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 376228,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 376234,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 376241,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 491477,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 491485,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 491493,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 491500,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 491507,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 491515,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 491523,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 491530,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Repaired streaming UTF-8 decoding, framing, termination and poisoned lifecycle handling, plus strict CLI validation. Added transport-boundary, failure, base64 and high-volume regressions. npm test passes all 17 tests; package.json and public tests unchanged.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "afterSha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "before": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "diff": ""
+    },
+    {
+      "path": "stream-framer.js",
+      "state": "changed",
+      "beforeSha256": "04e3d63b176c064b3c6137eb0fb73a9e1b37b68ef4050b27ddc913cee253b9fb",
+      "afterSha256": "3651a0121f06ca8da11d7be4c8c8962202a423a34de4c15f651f75a3f29617c2",
+      "before": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n// Deliberately flawed: transport chunks are not complete lines or frames.\nexport function createDecoder(){\n  let ended=false;\n  return {\n    push(chunk){\n      const frames=[];\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n        if(line.startsWith('data:')){\n          const data=line.slice(5).trim();\n          if(data==='[DONE]')ended=true;\n          else frames.push({event:'message',data});\n        }\n      }\n      return frames;\n    },\n    finish(){return [];},\n  };\n}\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n  try{\n    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    const decoder=createDecoder(),frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n}\n",
+      "after": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\nexport function createDecoder() {\n  const utf8 = new TextDecoder('utf-8', {fatal: true});\n  let lineBuffer = '';\n  let dataValues = [];\n  let eventSeen = false;\n  let eventValue = '';\n  let terminated = false;\n  let finished = false;\n  let poisoned = false;\n\n  function reject(message, cause) {\n    poisoned = true;\n    throw new Error(message, cause === undefined ? undefined : {cause});\n  }\n\n  function ensureActive() {\n    if (poisoned) reject('decoder is poisoned');\n    if (finished) reject('decoder is already finished');\n  }\n\n  function resetFrame() {\n    dataValues = [];\n    eventSeen = false;\n    eventValue = '';\n  }\n\n  function consumeLine(line, frames) {\n    if (terminated) {\n      if (line !== '') throw new Error('nonblank line after termination');\n      return;\n    }\n\n    if (line === '') {\n      if (dataValues.length > 0) {\n        const data = dataValues.join('\\n');\n        if (data === '[DONE]') {\n          terminated = true;\n        } else {\n          frames.push({\n            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n            data,\n          });\n        }\n      }\n      resetFrame();\n      return;\n    }\n\n    if (line.startsWith(':')) return;\n    const colon = line.indexOf(':');\n    const field = colon === -1 ? line : line.slice(0, colon);\n    let value = colon === -1 ? '' : line.slice(colon + 1);\n    if (value.startsWith(' ')) value = value.slice(1);\n\n    if (field === 'data') {\n      dataValues.push(value);\n    } else if (field === 'event') {\n      eventSeen = true;\n      eventValue = value;\n    }\n  }\n\n  function consumeText(text, frames) {\n    lineBuffer += text;\n    let newline;\n    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n      let line = lineBuffer.slice(0, newline);\n      lineBuffer = lineBuffer.slice(newline + 1);\n      if (line.endsWith('\\r')) line = line.slice(0, -1);\n      consumeLine(line, frames);\n    }\n  }\n\n  return {\n    push(chunk) {\n      ensureActive();\n      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n      const frames = [];\n      try {\n        consumeText(utf8.decode(chunk, {stream: true}), frames);\n        return frames;\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n\n    finish() {\n      ensureActive();\n      try {\n        const frames = [];\n        consumeText(utf8.decode(), frames);\n        if (lineBuffer !== '') throw new Error('unterminated final line');\n        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n        if (!terminated) throw new Error('stream is not terminated');\n        if (frames.length > 0) throw new Error('frame completed during finish');\n        finished = true;\n        return [];\n      } catch (error) {\n        poisoned = true;\n        throw error instanceof Error ? error : new Error(String(error));\n      }\n    },\n  };\n}\n\nfunction decodeCanonicalBase64(value) {\n  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n    throw new Error('invalid base64');\n  }\n  const bytes = Buffer.from(value, 'base64');\n  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n  return bytes;\n}\n\nfunction runCli() {\n  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n  const fileBytes = fs.readFileSync(process.argv[2]);\n  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n  const input = JSON.parse(jsonText);\n  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n    throw new Error('input must be an object');\n  }\n  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n\n  const decoder = createDecoder();\n  const frames = [];\n  for (const encoded of input.chunks) {\n    for (const frame of decoder.push(decodeCanonicalBase64(encoded))) frames.push(frame);\n  }\n  for (const frame of decoder.finish()) frames.push(frame);\n  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    runCli();\n  } catch (error) {\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "3651a0121f06ca8da11d7be4c8c8962202a423a34de4c15f651f75a3f29617c2",
+      "diff": "--- starter/stream-framer.js\n+++ delivered/stream-framer.js\n@@ -2,30 +2,146 @@\n import path from 'node:path';\n import {fileURLToPath} from 'node:url';\n \n-// Deliberately flawed: transport chunks are not complete lines or frames.\n-export function createDecoder(){\n-  let ended=false;\n-  return {\n-    push(chunk){\n-      const frames=[];\n-      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n-        if(line.startsWith('data:')){\n-          const data=line.slice(5).trim();\n-          if(data==='[DONE]')ended=true;\n-          else frames.push({event:'message',data});\n+export function createDecoder() {\n+  const utf8 = new TextDecoder('utf-8', {fatal: true});\n+  let lineBuffer = '';\n+  let dataValues = [];\n+  let eventSeen = false;\n+  let eventValue = '';\n+  let terminated = false;\n+  let finished = false;\n+  let poisoned = false;\n+\n+  function reject(message, cause) {\n+    poisoned = true;\n+    throw new Error(message, cause === undefined ? undefined : {cause});\n+  }\n+\n+  function ensureActive() {\n+    if (poisoned) reject('decoder is poisoned');\n+    if (finished) reject('decoder is already finished');\n+  }\n+\n+  function resetFrame() {\n+    dataValues = [];\n+    eventSeen = false;\n+    eventValue = '';\n+  }\n+\n+  function consumeLine(line, frames) {\n+    if (terminated) {\n+      if (line !== '') throw new Error('nonblank line after termination');\n+      return;\n+    }\n+\n+    if (line === '') {\n+      if (dataValues.length > 0) {\n+        const data = dataValues.join('\\n');\n+        if (data === '[DONE]') {\n+          terminated = true;\n+        } else {\n+          frames.push({\n+            event: !eventSeen || eventValue === '' ? 'message' : eventValue,\n+            data,\n+          });\n         }\n       }\n-      return frames;\n+      resetFrame();\n+      return;\n+    }\n+\n+    if (line.startsWith(':')) return;\n+    const colon = line.indexOf(':');\n+    const field = colon === -1 ? line : line.slice(0, colon);\n+    let value = colon === -1 ? '' : line.slice(colon + 1);\n+    if (value.startsWith(' ')) value = value.slice(1);\n+\n+    if (field === 'data') {\n+      dataValues.push(value);\n+    } else if (field === 'event') {\n+      eventSeen = true;\n+      eventValue = value;\n+    }\n+  }\n+\n+  function consumeText(text, frames) {\n+    lineBuffer += text;\n+    let newline;\n+    while ((newline = lineBuffer.indexOf('\\n')) !== -1) {\n+      let line = lineBuffer.slice(0, newline);\n+      lineBuffer = lineBuffer.slice(newline + 1);\n+      if (line.endsWith('\\r')) line = line.slice(0, -1);\n+      consumeLine(line, frames);\n+    }\n+  }\n+\n+  return {\n+    push(chunk) {\n+      ensureActive();\n+      if (!(chunk instanceof Uint8Array)) reject('chunk must be a Uint8Array');\n+      const frames = [];\n+      try {\n+        consumeText(utf8.decode(chunk, {stream: true}), frames);\n+        return frames;\n+      } catch (error) {\n+        poisoned = true;\n+        throw error instanceof Error ? error : new Error(String(error));\n+      }\n     },\n-    finish(){return [];},\n+\n+    finish() {\n+      ensureActive();\n+      try {\n+        const frames = [];\n+        consumeText(utf8.decode(), frames);\n+        if (lineBuffer !== '') throw new Error('unterminated final line');\n+        if (dataValues.length > 0 || eventSeen) throw new Error('pending frame fields');\n+        if (!terminated) throw new Error('stream is not terminated');\n+        if (frames.length > 0) throw new Error('frame completed during finish');\n+        finished = true;\n+        return [];\n+      } catch (error) {\n+        poisoned = true;\n+        throw error instanceof Error ? error : new Error(String(error));\n+      }\n+    },\n   };\n }\n-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n-  try{\n-    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n-    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n-    const decoder=createDecoder(),frames=[];\n-    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n-    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n-  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n+\n+function decodeCanonicalBase64(value) {\n+  if (typeof value !== 'string') throw new Error('chunk encodings must be strings');\n+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {\n+    throw new Error('invalid base64');\n+  }\n+  const bytes = Buffer.from(value, 'base64');\n+  if (bytes.toString('base64') !== value) throw new Error('noncanonical base64');\n+  return bytes;\n }\n+\n+function runCli() {\n+  if (process.argv.length !== 3) throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n+  const fileBytes = fs.readFileSync(process.argv[2]);\n+  const jsonText = new TextDecoder('utf-8', {fatal: true}).decode(fileBytes);\n+  const input = JSON.parse(jsonText);\n+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {\n+    throw new Error('input must be an object');\n+  }\n+  if (!Array.isArray(input.chunks)) throw new Error('chunks must be an array');\n+\n+  const decoder = createDecoder();\n+  const frames = [];\n+  for (const encoded of input.chunks) {\n+    for (const frame of decoder.push(decodeCanonicalBase64(encoded))) frames.push(frame);\n+  }\n+  for (const frame of decoder.finish()) frames.push(frame);\n+  process.stdout.write(`${JSON.stringify({frames})}\\n`);\n+}\n+\n+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n+  try {\n+    runCli();\n+  } catch (error) {\n+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "test/cli.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "d3f6a304f4929db0853895a4a64a71354e24be23eef6294362b926fc6c3d1273",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\n\nconst script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n\nfunction invoke(args) {\n  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});\n}\n\nfunction assertFailure(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'input.json');\n  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n    .map((chunk) => Buffer.from(chunk).toString('base64'));\n  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n});\n\ntest('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  assertFailure(invoke([]));\n  assertFailure(invoke(['one', 'two']));\n  assertFailure(invoke([path.join(directory, 'missing')]));\n\n  const cases = [\n    Buffer.from('{'),\n    Buffer.from([0xff]),\n    Buffer.from('null'),\n    Buffer.from('[]'),\n    Buffer.from('{}'),\n    Buffer.from('{\"chunks\":null}'),\n    Buffer.from('{\"chunks\":[7]}'),\n  ];\n  cases.forEach((contents, index) => {\n    const file = path.join(directory, `bad-${index}`);\n    fs.writeFileSync(file, contents);\n    assertFailure(invoke([file]));\n  });\n});\n\ntest('CLI rejects malformed or noncanonical base64 independently of protocol completion', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const prefix = Buffer.from('data: ').toString('base64');\n  const suffix = Buffer.from('\\n\\ndata: [DONE]\\n\\n').toString('base64');\n  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', 'Pz8_', '!!!!'];\n  for (const [index, encoded] of invalid.entries()) {\n    const file = path.join(directory, `base64-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    assertFailure(invoke([file]));\n  }\n\n  for (const [index, [encoded, data]] of [['Zg==', 'f'], ['Zm8=', 'fo'], ['Pz8/', '???']].entries()) {\n    const file = path.join(directory, `canonical-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n    const result = invoke([file]);\n    assert.equal(result.status, 0);\n    assert.equal(result.stderr, '');\n    assert.deepEqual(JSON.parse(result.stdout), {frames: [{event: 'message', data}]});\n  }\n});\n\ntest('CLI rejects protocol failures', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n    const file = path.join(directory, `protocol-${index}.json`);\n    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n    assertFailure(invoke([file]));\n  }\n});\n\ntest('CLI dispatches 150000 frames from one chunk without argument spreading', (t) => {\n  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n  const file = path.join(directory, 'many-frames.json');\n  const bytes = Buffer.from(`${'data: x\\n\\n'.repeat(150000)}data: [DONE]\\n\\n`);\n  fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n\n  const result = invoke([file]);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  const output = JSON.parse(result.stdout);\n  assert.equal(output.frames.length, 150000);\n  for (const frame of output.frames) assert.deepEqual(frame, {event: 'message', data: 'x'});\n});\n\ntest('importing the module does not execute the CLI', () => {\n  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n  assert.equal(result.status, 0);\n  assert.equal(result.stdout, '');\n  assert.equal(result.stderr, '');\n});\n",
+      "displaySha256": "d3f6a304f4929db0853895a4a64a71354e24be23eef6294362b926fc6c3d1273",
+      "diff": "--- starter/test/cli.test.js\n+++ delivered/test/cli.test.js\n@@ -0,0 +1,112 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import {spawnSync} from 'node:child_process';\n+import {fileURLToPath} from 'node:url';\n+\n+const script = fileURLToPath(new URL('../stream-framer.js', import.meta.url));\n+\n+function invoke(args) {\n+  return spawnSync(process.execPath, [script, ...args], {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});\n+}\n+\n+function assertFailure(result) {\n+  assert.equal(result.status, 2);\n+  assert.equal(result.stdout, '');\n+  assert.notEqual(result.stderr, '');\n+}\n+\n+test('CLI emits one atomic JSON result for canonical base64 chunks', (t) => {\n+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n+  const file = path.join(directory, 'input.json');\n+  const bytes = Buffer.from('event: update\\ndata: 雪\\n\\ndata: [DONE]\\n\\n');\n+  const chunks = [Buffer.alloc(0), ...[...bytes].map((byte) => Uint8Array.of(byte))]\n+    .map((chunk) => Buffer.from(chunk).toString('base64'));\n+  fs.writeFileSync(file, JSON.stringify({chunks, ignored: true}));\n+\n+  const result = invoke([file]);\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stderr, '');\n+  assert.equal(result.stdout, `${JSON.stringify({frames: [{event: 'update', data: '雪'}]})}\\n`);\n+});\n+\n+test('CLI validates argument count, files, UTF-8 JSON and input shape', (t) => {\n+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n+  assertFailure(invoke([]));\n+  assertFailure(invoke(['one', 'two']));\n+  assertFailure(invoke([path.join(directory, 'missing')]));\n+\n+  const cases = [\n+    Buffer.from('{'),\n+    Buffer.from([0xff]),\n+    Buffer.from('null'),\n+    Buffer.from('[]'),\n+    Buffer.from('{}'),\n+    Buffer.from('{\"chunks\":null}'),\n+    Buffer.from('{\"chunks\":[7]}'),\n+  ];\n+  cases.forEach((contents, index) => {\n+    const file = path.join(directory, `bad-${index}`);\n+    fs.writeFileSync(file, contents);\n+    assertFailure(invoke([file]));\n+  });\n+});\n+\n+test('CLI rejects malformed or noncanonical base64 independently of protocol completion', (t) => {\n+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n+  const prefix = Buffer.from('data: ').toString('base64');\n+  const suffix = Buffer.from('\\n\\ndata: [DONE]\\n\\n').toString('base64');\n+  const invalid = ['Zg', 'Zg=', 'Zg===', 'Zh==', 'Zm9=', ' Zg==', 'Zg==\\n', 'Pz8_', '!!!!'];\n+  for (const [index, encoded] of invalid.entries()) {\n+    const file = path.join(directory, `base64-${index}.json`);\n+    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n+    assertFailure(invoke([file]));\n+  }\n+\n+  for (const [index, [encoded, data]] of [['Zg==', 'f'], ['Zm8=', 'fo'], ['Pz8/', '???']].entries()) {\n+    const file = path.join(directory, `canonical-${index}.json`);\n+    fs.writeFileSync(file, JSON.stringify({chunks: [prefix, encoded, suffix]}));\n+    const result = invoke([file]);\n+    assert.equal(result.status, 0);\n+    assert.equal(result.stderr, '');\n+    assert.deepEqual(JSON.parse(result.stdout), {frames: [{event: 'message', data}]});\n+  }\n+});\n+\n+test('CLI rejects protocol failures', (t) => {\n+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n+  for (const [index, bytes] of [Buffer.from('data: no terminator\\n\\n'), Buffer.from([0xff])].entries()) {\n+    const file = path.join(directory, `protocol-${index}.json`);\n+    fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n+    assertFailure(invoke([file]));\n+  }\n+});\n+\n+test('CLI dispatches 150000 frames from one chunk without argument spreading', (t) => {\n+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stream-framer-'));\n+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));\n+  const file = path.join(directory, 'many-frames.json');\n+  const bytes = Buffer.from(`${'data: x\\n\\n'.repeat(150000)}data: [DONE]\\n\\n`);\n+  fs.writeFileSync(file, JSON.stringify({chunks: [bytes.toString('base64')]}));\n+\n+  const result = invoke([file]);\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stderr, '');\n+  const output = JSON.parse(result.stdout);\n+  assert.equal(output.frames.length, 150000);\n+  for (const frame of output.frames) assert.deepEqual(frame, {event: 'message', data: 'x'});\n+});\n+\n+test('importing the module does not execute the CLI', () => {\n+  const source = `import ${JSON.stringify(new URL('../stream-framer.js', import.meta.url).href)};`;\n+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {encoding: 'utf8'});\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stdout, '');\n+  assert.equal(result.stderr, '');\n+});\n"
+    },
+    {
+      "path": "test/decoder.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "2cc62477bbb4f0c8ac2e4615ceaee28419dda6299411f1679c6179dc741938ca",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\n\nconst wire = 'event: delta\\r\\ndata: 雪😀\\r\\ndata: second\\n\\ndata: [DONE]\\n\\n';\nconst expected = [{event: 'delta', data: '雪😀\\nsecond'}];\n\nfunction runChunks(chunks) {\n  const decoder = createDecoder();\n  const frames = [];\n  for (const chunk of chunks) frames.push(...decoder.push(chunk));\n  assert.deepEqual(decoder.finish(), []);\n  return frames;\n}\n\ntest('decoding is invariant across every two-part split and bytewise transport', () => {\n  const bytes = Buffer.from(wire);\n  assert.deepEqual(runChunks([bytes]), expected);\n  for (let split = 0; split <= bytes.length; split++) {\n    assert.deepEqual(runChunks([bytes.subarray(0, split), bytes.subarray(split)]), expected);\n  }\n  assert.deepEqual(runChunks([...bytes].map((byte) => Uint8Array.of(byte))), expected);\n});\n\ntest('field parsing preserves values and resets all frame state', () => {\n  const decoder = createDecoder();\n  const input = [\n    'event: stale', '',\n    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n    'data:  one space remains', 'data:two:colons', '',\n    'event:', 'data', '',\n    'data: a\\rb', '',\n    'data: [DONE]', '', '',\n  ].join('\\n');\n  assert.deepEqual(decoder.push(Buffer.from(input)), [\n    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n    {event: 'message', data: ''},\n    {event: 'message', data: 'a\\rb'},\n  ]);\n  assert.deepEqual(decoder.finish(), []);\n});\n\ntest('only one initial BOM is ignored and later BOMs are data', () => {\n  const input = '\\uFEFFdata: first\\n\\ndata: \\uFEFFlater\\n\\ndata: [DONE]\\n\\n';\n  assert.deepEqual(runChunks([...Buffer.from(input)].map((byte) => Uint8Array.of(byte))), [\n    {event: 'message', data: 'first'},\n    {event: 'message', data: '\\uFEFFlater'},\n  ]);\n});\n\ntest('chunks must be Uint8Arrays and are not mutated', () => {\n  const decoder = createDecoder();\n  const chunk = Buffer.from('data: [DONE]\\n\\n');\n  const copy = Buffer.from(chunk);\n  assert.deepEqual(decoder.push(chunk), []);\n  assert.deepEqual(chunk, copy);\n  assert.deepEqual(decoder.finish(), []);\n\n  for (const bad of ['bytes', null, {}, [1, 2]]) {\n    const invalid = createDecoder();\n    assert.throws(() => invalid.push(bad), Error);\n    assert.throws(() => invalid.push(new Uint8Array()), Error);\n    assert.throws(() => invalid.finish(), Error);\n  }\n});\n\ntest('strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder', () => {\n  const malformed = createDecoder();\n  assert.throws(() => malformed.push(Uint8Array.of(0xc3, 0x28)), Error);\n  assert.throws(() => malformed.push(Buffer.from('data: [DONE]\\n\\n')), Error);\n  assert.throws(() => malformed.finish(), Error);\n\n  const incomplete = createDecoder();\n  assert.deepEqual(incomplete.push(Uint8Array.of(0xf0, 0x9f, 0x98)), []);\n  assert.throws(() => incomplete.finish(), Error);\n  assert.throws(() => incomplete.finish(), Error);\n\n  const independent = createDecoder();\n  assert.deepEqual(independent.push(Buffer.from('data: ok\\n\\ndata: [DONE]\\n\\n')), [\n    {event: 'message', data: 'ok'},\n  ]);\n  assert.deepEqual(independent.finish(), []);\n});\n\ntest('termination and completion enforce exact lifecycle rules', () => {\n  for (const suffix of [': comment\\n', 'unknown\\n', 'data: [DONE]\\n\\n', 'x\\n']) {\n    const decoder = createDecoder();\n    assert.throws(() => decoder.push(Buffer.from(`data: kept\\n\\ndata: [DONE]\\n\\n${suffix}`)), Error);\n    assert.throws(() => decoder.finish(), Error);\n  }\n\n  const blanks = createDecoder();\n  assert.deepEqual(blanks.push(Buffer.from('data: [DONE]\\n\\n\\n\\r\\n')), []);\n  assert.deepEqual(blanks.finish(), []);\n  assert.throws(() => blanks.push(new Uint8Array()), Error);\n  assert.throws(() => blanks.finish(), Error);\n\n  for (const text of [\n    '',\n    'data: pending\\n',\n    'event: pending\\n',\n    'data: [DONE]\\n',\n    'data: [DONE]\\n\\ntail',\n  ]) {\n    const decoder = createDecoder();\n    decoder.push(Buffer.from(text));\n    assert.throws(() => decoder.finish(), Error);\n    assert.throws(() => decoder.push(new Uint8Array()), Error);\n  }\n});\n\ntest('a failing push returns no partial result and earlier returned values remain stable', () => {\n  const decoder = createDecoder();\n  const first = decoder.push(Buffer.from('data: safe\\n\\n'));\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.push(Buffer.from('data: [DONE]\\n\\nforbidden\\n')), Error);\n  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n  assert.throws(() => decoder.finish(), Error);\n});\n",
+      "displaySha256": "2cc62477bbb4f0c8ac2e4615ceaee28419dda6299411f1679c6179dc741938ca",
+      "diff": "--- starter/test/decoder.test.js\n+++ delivered/test/decoder.test.js\n@@ -0,0 +1,119 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import {createDecoder} from '../stream-framer.js';\n+\n+const wire = 'event: delta\\r\\ndata: 雪😀\\r\\ndata: second\\n\\ndata: [DONE]\\n\\n';\n+const expected = [{event: 'delta', data: '雪😀\\nsecond'}];\n+\n+function runChunks(chunks) {\n+  const decoder = createDecoder();\n+  const frames = [];\n+  for (const chunk of chunks) frames.push(...decoder.push(chunk));\n+  assert.deepEqual(decoder.finish(), []);\n+  return frames;\n+}\n+\n+test('decoding is invariant across every two-part split and bytewise transport', () => {\n+  const bytes = Buffer.from(wire);\n+  assert.deepEqual(runChunks([bytes]), expected);\n+  for (let split = 0; split <= bytes.length; split++) {\n+    assert.deepEqual(runChunks([bytes.subarray(0, split), bytes.subarray(split)]), expected);\n+  }\n+  assert.deepEqual(runChunks([...bytes].map((byte) => Uint8Array.of(byte))), expected);\n+});\n+\n+test('field parsing preserves values and resets all frame state', () => {\n+  const decoder = createDecoder();\n+  const input = [\n+    'event: stale', '',\n+    ': ignored', 'unknown: value', 'Data: wrong', 'event: first', 'event: final:name',\n+    'data:  one space remains', 'data:two:colons', '',\n+    'event:', 'data', '',\n+    'data: a\\rb', '',\n+    'data: [DONE]', '', '',\n+  ].join('\\n');\n+  assert.deepEqual(decoder.push(Buffer.from(input)), [\n+    {event: 'final:name', data: ' one space remains\\ntwo:colons'},\n+    {event: 'message', data: ''},\n+    {event: 'message', data: 'a\\rb'},\n+  ]);\n+  assert.deepEqual(decoder.finish(), []);\n+});\n+\n+test('only one initial BOM is ignored and later BOMs are data', () => {\n+  const input = '\\uFEFFdata: first\\n\\ndata: \\uFEFFlater\\n\\ndata: [DONE]\\n\\n';\n+  assert.deepEqual(runChunks([...Buffer.from(input)].map((byte) => Uint8Array.of(byte))), [\n+    {event: 'message', data: 'first'},\n+    {event: 'message', data: '\\uFEFFlater'},\n+  ]);\n+});\n+\n+test('chunks must be Uint8Arrays and are not mutated', () => {\n+  const decoder = createDecoder();\n+  const chunk = Buffer.from('data: [DONE]\\n\\n');\n+  const copy = Buffer.from(chunk);\n+  assert.deepEqual(decoder.push(chunk), []);\n+  assert.deepEqual(chunk, copy);\n+  assert.deepEqual(decoder.finish(), []);\n+\n+  for (const bad of ['bytes', null, {}, [1, 2]]) {\n+    const invalid = createDecoder();\n+    assert.throws(() => invalid.push(bad), Error);\n+    assert.throws(() => invalid.push(new Uint8Array()), Error);\n+    assert.throws(() => invalid.finish(), Error);\n+  }\n+});\n+\n+test('strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder', () => {\n+  const malformed = createDecoder();\n+  assert.throws(() => malformed.push(Uint8Array.of(0xc3, 0x28)), Error);\n+  assert.throws(() => malformed.push(Buffer.from('data: [DONE]\\n\\n')), Error);\n+  assert.throws(() => malformed.finish(), Error);\n+\n+  const incomplete = createDecoder();\n+  assert.deepEqual(incomplete.push(Uint8Array.of(0xf0, 0x9f, 0x98)), []);\n+  assert.throws(() => incomplete.finish(), Error);\n+  assert.throws(() => incomplete.finish(), Error);\n+\n+  const independent = createDecoder();\n+  assert.deepEqual(independent.push(Buffer.from('data: ok\\n\\ndata: [DONE]\\n\\n')), [\n+    {event: 'message', data: 'ok'},\n+  ]);\n+  assert.deepEqual(independent.finish(), []);\n+});\n+\n+test('termination and completion enforce exact lifecycle rules', () => {\n+  for (const suffix of [': comment\\n', 'unknown\\n', 'data: [DONE]\\n\\n', 'x\\n']) {\n+    const decoder = createDecoder();\n+    assert.throws(() => decoder.push(Buffer.from(`data: kept\\n\\ndata: [DONE]\\n\\n${suffix}`)), Error);\n+    assert.throws(() => decoder.finish(), Error);\n+  }\n+\n+  const blanks = createDecoder();\n+  assert.deepEqual(blanks.push(Buffer.from('data: [DONE]\\n\\n\\n\\r\\n')), []);\n+  assert.deepEqual(blanks.finish(), []);\n+  assert.throws(() => blanks.push(new Uint8Array()), Error);\n+  assert.throws(() => blanks.finish(), Error);\n+\n+  for (const text of [\n+    '',\n+    'data: pending\\n',\n+    'event: pending\\n',\n+    'data: [DONE]\\n',\n+    'data: [DONE]\\n\\ntail',\n+  ]) {\n+    const decoder = createDecoder();\n+    decoder.push(Buffer.from(text));\n+    assert.throws(() => decoder.finish(), Error);\n+    assert.throws(() => decoder.push(new Uint8Array()), Error);\n+  }\n+});\n+\n+test('a failing push returns no partial result and earlier returned values remain stable', () => {\n+  const decoder = createDecoder();\n+  const first = decoder.push(Buffer.from('data: safe\\n\\n'));\n+  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n+  assert.throws(() => decoder.push(Buffer.from('data: [DONE]\\n\\nforbidden\\n')), Error);\n+  assert.deepEqual(first, [{event: 'message', data: 'safe'}]);\n+  assert.throws(() => decoder.finish(), Error);\n+});\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "afterSha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+      "displaySha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: CLI emits one atomic JSON result for canonical base64 chunks\nok 1 - CLI emits one atomic JSON result for canonical base64 chunks\n  ---\n  duration_ms: 25.063815\n  ...\n# Subtest: CLI validates argument count, files, UTF-8 JSON and input shape\nok 2 - CLI validates argument count, files, UTF-8 JSON and input shape\n  ---\n  duration_ms: 216.486913\n  ...\n# Subtest: CLI rejects malformed or noncanonical base64 independently of protocol completion\nok 3 - CLI rejects malformed or noncanonical base64 independently of protocol completion\n  ---\n  duration_ms: 267.435278\n  ...\n# Subtest: CLI rejects protocol failures\nok 4 - CLI rejects protocol failures\n  ---\n  duration_ms: 45.300393\n  ...\n# Subtest: CLI dispatches 150000 frames from one chunk without argument spreading\nok 5 - CLI dispatches 150000 frames from one chunk without argument spreading\n  ---\n  duration_ms: 235.306612\n  ...\n# Subtest: importing the module does not execute the CLI\nok 6 - importing the module does not execute the CLI\n  ---\n  duration_ms: 21.324997\n  ...\n# Subtest: decoding is invariant across every two-part split and bytewise transport\nok 7 - decoding is invariant across every two-part split and bytewise transport\n  ---\n  duration_ms: 4.09795\n  ...\n# Subtest: field parsing preserves values and resets all frame state\nok 8 - field parsing preserves values and resets all frame state\n  ---\n  duration_ms: 0.156481\n  ...\n# Subtest: only one initial BOM is ignored and later BOMs are data\nok 9 - only one initial BOM is ignored and later BOMs are data\n  ---\n  duration_ms: 0.198392\n  ...\n# Subtest: chunks must be Uint8Arrays and are not mutated\nok 10 - chunks must be Uint8Arrays and are not mutated\n  ---\n  duration_ms: 0.502904\n  ...\n# Subtest: strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\nok 11 - strict UTF-8 rejects malformed and incomplete sequences and poisons only that decoder\n  ---\n  duration_ms: 0.261972\n  ...\n# Subtest: termination and completion enforce exact lifecycle rules\nok 12 - termination and completion enforce exact lifecycle rules\n  ---\n  duration_ms: 0.834836\n  ...\n# Subtest: a failing push returns no partial result and earlier returned values remain stable\nok 13 - a failing push returns no partial result and earlier returned values remain stable\n  ---\n  duration_ms: 0.302422\n  ...\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 14 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.42371\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 15 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.345312\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 16 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.699986\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 17 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.367323\n  ...\n1..17\n# tests 17\n# suites 0\n# pass 17\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 857.019645\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"stream-framer\",\"pass\":true,\"groups\":[{\"name\":\"utf8-and-arbitrary-chunk-boundaries\",\"pass\":true},{\"name\":\"field-parsing-and-frame-dispatch\",\"pass\":true},{\"name\":\"termination-and-finish-state\",\"pass\":true},{\"name\":\"invalid-input-and-poisoned-decoder\",\"pass\":true},{\"name\":\"cli-canonical-chunks-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "ca0cab6ca4c04347041261d491ed63c768f1f76ef6d5409c4adae858e67e3e55"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "0420b0216b3dbecc8e1afa783fa5a2639ce4fbfafbeba7c654a39562a89df91e"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "b9ee3fad24aad92d4ae37c4d551d3f9ef234e332e78c0dcfa75bc2e810f6ef21"
+    },
+    {
+      "kind": "supervisor-completion-record",
+      "sha256": "70b236abc6984d5a3c8c7b93a4fe8e17e79ec9275b7224d5296f6de7be1f343b"
+    },
+    {
+      "kind": "supervisor-action-journal",
+      "sha256": "0933d4a420d776b623c8ee3f0e299b9ff04cc23116b6039eeffb9dccf79e1a2d"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "a7530307812e9beacf61d7cc0a7b6b20af9bdb04bb7fe1b4ad32153e1abef316"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "c0d5e4b617b9369ef0c1ff3f04086e01e55146bf604db2315cc0b31af577136a"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "cbfced31aeb4c3091e662cdb73b5e371745c154b0257bd5907463e5937fe8260"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "a9ddc495902bbd6332dca0d6946384965ff70db355543e6f8a400de9d2440892"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "b8e70cf8c8a11ff352cbe880d29887ad6e71605bbfc2ee8f245b5c70071ba312"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 38,
+    "withResults": 38,
+    "normalizedPathOccurrences": 6,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Astra catches the high-volume crash.",
+    "paragraphs": [
+      {
+        "text": "Sol repaired the decoder and added tests. Astra’s review then sent 150,000 frames through the CLI in one chunk and reproduced an argument-limit crash.",
+        "actions": [
+          "action-3",
+          "action-21",
+          "action-24"
+        ]
+      },
+      {
+        "text": "Astra assigned a focused repair. Sol replaced argument spreading with iterative collection, retained a large-chunk regression, and strengthened the base64 tests. The integrated product passed all five acceptance groups. Totals include both models.",
+        "actions": [
+          "action-25",
+          "action-31",
+          "action-33",
+          "action-36",
+          "action-38"
+        ]
+      }
+    ]
+  }
+}

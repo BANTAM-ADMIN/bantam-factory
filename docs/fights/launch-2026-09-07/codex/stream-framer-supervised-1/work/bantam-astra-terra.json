@@ -1,0 +1,1503 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "stream-framer",
+  "arm": "bantam-astra-terra",
+  "wallMs": 375812,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-09T05:07:58.139Z",
+  "task": "# Stream framer: repair a transport-independent decoder\n\nRepair `stream-framer.js`, using Node.js builtins only. The starter mishandles\ntransport boundaries and completion. A model gateway must recover the same\nframes whether bytes arrive all at once or one at a time. This is the bounded\nprotocol below, not an implementation of the complete SSE/EventSource standard.\n\nExport `createDecoder()`. Each call returns an independent decoder with methods:\n\n```\npush(chunk: Uint8Array) -> [{event: STRING, data: STRING}]\nfinish() -> []\n```\n\nBuffers are accepted because they are Uint8Arrays. Strings and other types\nare rejected. Never mutate a supplied chunk. Decode strict UTF-8 across pushes;\ninvalid sequences throw an Error, including incomplete multibyte sequences\nat finish. One optional leading UTF-8 BOM is ignored. Subsequent BOM characters\nare ordinary data. Empty chunks are allowed before finish.\n\nLines end at LF or CRLF, even if CR and LF arrive in separate chunks. Strip\nthe one CR immediately preceding LF. Other CR characters remain data. A\nnonterminated final line is an error, not an implicit newline.\n\nFor each complete line:\n\n- A blank line dispatches the current frame only if it has at least one data\n  field. Join data-field values with exactly one LF between them. The event\n  name is the last event-field value in that frame, or `message` if none was\n  supplied or the last value was empty. Then reset all frame fields.\n- A line beginning with `:` is a comment and has no effect.\n- Otherwise split at the first `:`. With no colon the whole line is the field\n  name and the value is ''. Remove at most one leading ASCII space from a\n  field value. Field names are case-sensitive. Only `data` and `event` are\n  recognized; ignore other fields.\n- A data value of '' is still a data field and can dispatch an empty string.\n  Blank/comment/unknown-field-only frames emit nothing; an event name must\n  never leak from an earlier dispatched or empty frame into a later frame.\n\nWhen the joined data value of a dispatched frame is exactly `[DONE]`, mark\nthe stream terminated and emit no frame for it, regardless of event name.\nAfter that marker, only blank lines are allowed. A second marker, comments,\nunknown fields or any other nonblank line after termination throw an Error.\n\n`finish()` is required and may succeed once only. It succeeds only after a\ntermination marker, with no unterminated line and no pending data/event fields.\nIt returns an empty array; it does not auto-dispatch pending data. Repeated\nfinish or any push after successful finish throws an Error, even an empty push.\nAny rejected push/finish poisons that decoder: all subsequent push/finish calls\nthrow an Error. Failures in one decoder must not affect another.\n\n`push` returns only frames completed during that call. Empty strings and\nmultiline data are not parsed as JSON or trimmed. If a push fails, do not return\na partial array from that call. Earlier returned frames remain ordinary values.\n\nKeep and repair the CLI: `node stream-framer.js INPUT_JSON_FILE`. The UTF-8 JSON\ncontains `{chunks:[BASE64_STRING,...]}`; extra object fields are ignored. The\nouter input must be a non-null non-array object and chunks must be an array.\nEach string must be canonical standard padded base64 as produced by\n`Buffer.toString('base64')`; '' is valid. Reject whitespace, URL-safe alphabet,\nbad padding and noncanonical pad bits. Feed chunks in order and call finish.\nSuccess prints exactly `{frames:[ALL_EMITTED_FRAMES]}` as one JSON value plus\nnewline, exits 0 and has no stderr. Require exactly one file argument. Invalid\narguments/files/JSON/base64/protocol exit 2, with nonempty stderr and no stdout.\nImporting the module must not run the CLI.\n\nDo not add dependencies or edit `package.json` or existing public tests. You\nmay add tests. Verification runs in a read-only workspace: place fixtures in\n`os.tmpdir()` and clean them up. Run `npm test` before finishing. Hidden checks\nchange chunk sizes and input values, not this public contract.\n",
+  "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+  "source": "supervisor-actions-worker-turns-and-committed-integrations",
+  "actions": [
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat package.json; printf '\\n--- implementation ---\\n'; cat stream-framer.js; printf '\\n--- tests ---\\n'; find test -type f -maxdepth 2 -print -exec cat {} \\;"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "b882f7ba82a5ecb10925cef470957701ef0c6b18",
+        "stderr": "",
+        "stdout": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n\n--- implementation ---\nimport fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n// Deliberately flawed: transport chunks are not complete lines or frames.\nexport function createDecoder(){\n  let ended=false;\n  return {\n    push(chunk){\n      const frames=[];\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n        if(line.startsWith('data:')){\n          const data=line.slice(5).trim();\n          if(data==='[DONE]')ended=true;\n          else frames.push({event:'message',data});\n        }\n      }\n      return frames;\n    },\n    finish(){return [];},\n  };\n}\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n  try{\n    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    const decoder=createDecoder(),frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n}\n\n--- tests ---\ntest/public.test.js\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+        "timedOut": false
+      },
+      "atMs": 8126,
+      "endedMs": 8619,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-1"
+    },
+    {
+      "name": "supervisor-enqueue",
+      "category": "other",
+      "request": {
+        "action": "enqueue",
+        "jobs": [
+          {
+            "id": "repair-framer",
+            "worker": "terra",
+            "task": "Repair stream-framer.js completely to the original bounded protocol and CLI contract. Retain existing public tests unchanged and add comprehensive deterministic behavioral tests covering transport partition invariance, strict UTF-8/BOM, frame parsing/reset, DONE and lifecycle/poisoning, and CLI validation. This is one coherent utility milestone including its own tests.",
+            "context": "Inspected starter: ESM module, npm test = node --test; implementation currently independently converts each chunk, splits lines and trims data, ignores event framing, and finish always succeeds. CLI currently permissively decodes base64 and lacks envelope validation. Existing test/public.test.js has four tests for blank dispatch, single-byte Unicode/CRLF, events/multiline/empty data, missing termination/postfinish. Use Node builtins only; do not edit package.json or existing tests. Full original brief is authoritative, including strict UTF-8 final flush, optional single leading BOM, preserving all other CR/space, pending fields, termination only on dispatched exact joined [DONE], and poisoning on every rejection. Validate canonical padded base64 by exact roundtrip and proper type/envelope checks. CLI must produce no stdout on any failure, exactly one argument, no import side effects. Test files/fixtures must use os.tmpdir() with cleanup, so npm test works read-only. Include deterministic partition tests across all split positions and one-byte chunks, invalid UTF8 and unfinished line/marker cases, earlier outputs surviving a failing later call, isolated decoders, and subprocess CLI success/failure including malformed/noncanonical base64 and malformed input.",
+            "verify": "npm test",
+            "dependsOn": [],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "repair-framer"
+        ]
+      },
+      "atMs": 21344,
+      "endedMs": 21961,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-2"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 25000,
+      "endedMs": 134301,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-3"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "test/public.test.js",
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "limit": 120
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"limit\":400}\nstream-framer.js (32 lines, showing 1-32):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport {fileURLToPath} from 'node:url';\n4\t\n5\t// Deliberately flawed: transport chunks are not complete lines or frames.\n6\texport function createDecoder(){\n7\t  let ended=false;\n8\t  return {\n9\t    push(chunk){\n10\t      const frames=[];\n11\t      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n12\t        if(line.startsWith('data:')){\n13\t          const data=line.slice(5).trim();\n14\t          if(data==='[DONE]')ended=true;\n15\t          else frames.push({event:'message',data});\n16\t        }\n17\t      }\n18\t      return frames;\n19\t    },\n20\t    finish(){return [];},\n21\t  };\n22\t}\n23\tif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n24\t  try{\n25\t    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n26\t    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n27\t    const decoder=createDecoder(),frames=[];\n28\t    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n29\t    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n30\t  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n31\t}\n32\t\n— end of file (32 lines); nothing beyond line 32, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/public.test.js\",\"limit\":400}\ntest/public.test.js (26 lines, showing 1-26):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport {createDecoder} from '../stream-framer.js';\n4\ttest('dispatch only at a blank line, then require explicit termination',()=>{\n5\t  const d=createDecoder();\n6\t  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n7\t  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n8\t  assert.deepEqual(d.finish(),[]);\n9\t});\n10\ttest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n11\t  const d=createDecoder(),frames=[];\n12\t  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n13\t  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n14\t});\n15\ttest('event names, multiple data lines, and empty data',()=>{\n16\t  const d=createDecoder();\n17\t  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n18\t    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n19\t  assert.deepEqual(d.finish(),[]);\n20\t});\n21\ttest('missing termination and post-finish activity are errors',()=>{\n22\t  assert.throws(()=>createDecoder().finish(),Error);\n23\t  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n24\t  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n25\t});\n26\t\n— end of file (26 lines); nothing beyond line 26, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\",\"limit\":120}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.",
+      "atMs": 29514,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 0,
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "stream-framer.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n/** Create an independent decoder for the small line-framed protocol. */\nexport function createDecoder(){\n  const utf8=new TextDecoder('utf-8',{fatal:true});\n  let text='';\n  let data=[];\n  let event;\n  let terminated=false;\n  let finished=false;\n  let poisoned=false;\n\n  const fail=(error)=>{\n    poisoned=true;\n    throw error instanceof Error ? error : new Error(String(error));\n  };\n  const reset=()=>{ data=[]; event=undefined; };\n  const line=(value,frames)=>{\n    if(terminated){\n      if(value!=='')throw new Error('content after termination');\n      return;\n    }\n    if(value===''){\n      if(data.length){\n        const joined=data.join('\\n');\n        const name=event ? event : 'message';\n        reset();\n        if(joined==='[DONE]')terminated=true;\n        else frames.push({event:name,data:joined});\n      }else reset();\n      return;\n    }\n    if(value.startsWith(':'))return;\n    const colon=value.indexOf(':');\n    const field=colon<0 ? value : value.slice(0,colon);\n    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n    if(field==='data')data.push(fieldValue);\n    else if(field==='event')event=fieldValue;\n  };\n  const ensureActive=()=>{\n    if(poisoned)throw new Error('decoder is poisoned');\n    if(finished)fail(new Error('decoder is finished'));\n  };\n\n  return {\n    push(chunk){\n      try{\n        ensureActive();\n        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n        text+=utf8.decode(chunk,{stream:true});\n        const frames=[];\n        let newline;\n        while((newline=text.indexOf('\\n'))>=0){\n          let complete=text.slice(0,newline);\n          text=text.slice(newline+1);\n          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n          line(complete,frames);\n        }\n        return frames;\n      }catch(error){ return fail(error); }\n    },\n    finish(){\n      try{\n        ensureActive();\n        text+=utf8.decode();\n        if(text!=='')throw new Error('unterminated line');\n        if(data.length || event!==undefined)throw new Error('pending frame');\n        if(!terminated)throw new Error('missing termination marker');\n        finished=true;\n        return [];\n      }catch(error){ return fail(error); }\n    },\n  };\n}\n\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}\n\nfunction runCli(){\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n    frames.push(...decoder.finish());\n    process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode=2;\n  }\n}\n\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n"
+        }
+      },
+      "output": "[edit-preservation] Staged bytes remove 6 executable statement(s) by AST comparison; 2 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: decodeBase64 (AFTER L79), runCli (AFTER L86).\n- BEFORE stream-framer.js:7 in createDecoder: \"let ended=false;\"\n  STAGED AFTER stream-framer.js:6 (retained function).\n- BEFORE stream-framer.js:8 in createDecoder: \"return {\\n    push(chunk){\\n      const frames=[];\\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\\\n')){\\n        if(line.start… [display clipped] [excerpt clipped]\n  STAGED AFTER stream-framer.js:6 (retained function).\n- BEFORE stream-framer.js:25 in <module>: \"throw Error('usage: stream-framer.js INPUT_JSON_FILE');\"\n  No retained function anchor is established.\n- BEFORE stream-framer.js:27 in <module>: \"const decoder=createDecoder(),frames=[];\"\n  No retained function anchor is established.\n- BEFORE stream-framer.js:28 in <module>: \"frames.push(...decoder.push(Buffer.from(encoded,'base64')));\"\n  No retained function anchor is established.\n- BEFORE stream-framer.js:30 in <module>: \"process.stderr.write(String(error.message)+'\\\\n');\"\n  No retained function anchor is established.\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:689b76c6b7f4f379abd7768eededb0132c7dd34dfb6a749d4098e2d07d4f186a.",
+      "atMs": 57658,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 1,
+      "id": "action-5"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "stream-framer.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n/** Create an independent decoder for the small line-framed protocol. */\nexport function createDecoder(){\n  const utf8=new TextDecoder('utf-8',{fatal:true});\n  let text='';\n  let data=[];\n  let event;\n  let terminated=false;\n  let finished=false;\n  let poisoned=false;\n\n  const fail=(error)=>{\n    poisoned=true;\n    throw error instanceof Error ? error : new Error(String(error));\n  };\n  const reset=()=>{ data=[]; event=undefined; };\n  const line=(value,frames)=>{\n    if(terminated){\n      if(value!=='')throw new Error('content after termination');\n      return;\n    }\n    if(value===''){\n      if(data.length){\n        const joined=data.join('\\n');\n        const name=event ? event : 'message';\n        reset();\n        if(joined==='[DONE]')terminated=true;\n        else frames.push({event:name,data:joined});\n      }else reset();\n      return;\n    }\n    if(value.startsWith(':'))return;\n    const colon=value.indexOf(':');\n    const field=colon<0 ? value : value.slice(0,colon);\n    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n    if(field==='data')data.push(fieldValue);\n    else if(field==='event')event=fieldValue;\n  };\n  const ensureActive=()=>{\n    if(poisoned)throw new Error('decoder is poisoned');\n    if(finished)fail(new Error('decoder is finished'));\n  };\n\n  return {\n    push(chunk){\n      try{\n        ensureActive();\n        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n        text+=utf8.decode(chunk,{stream:true});\n        const frames=[];\n        let newline;\n        while((newline=text.indexOf('\\n'))>=0){\n          let complete=text.slice(0,newline);\n          text=text.slice(newline+1);\n          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n          line(complete,frames);\n        }\n        return frames;\n      }catch(error){ return fail(error); }\n    },\n    finish(){\n      try{\n        ensureActive();\n        text+=utf8.decode();\n        if(text!=='')throw new Error('unterminated line');\n        if(data.length || event!==undefined)throw new Error('pending frame');\n        if(!terminated)throw new Error('missing termination marker');\n        finished=true;\n        return [];\n      }catch(error){ return fail(error); }\n    },\n  };\n}\n\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}\n\nfunction runCli(){\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n    frames.push(...decoder.finish());\n    process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode=2;\n  }\n}\n\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n"
+        }
+      },
+      "output": "wrote 3481 bytes to stream-framer.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `createDecoder` is also referenced in: test/public.test.js\n  `frames` is also referenced in: test/public.test.js",
+      "atMs": 77949,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 2,
+      "id": "action-6"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "test/stream-framer.test.js",
+          "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\nfunction decode(parts){\n  const d=createDecoder(),out=[];\n  for(const part of parts)out.push(...d.push(part));\n  assert.deepEqual(d.finish(),[]);\n  return out;\n}\n\ntest('all transport partitions, including bytes, give identical frames',()=>{\n  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n  assert.deepEqual(decode([wire]),expected);\n  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n});\n\ntest('parsing preserves protocol details and resets empty frames',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n    {event:'message',data:'a\\rb\\n'}]);\n  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n  assert.deepEqual(d.finish(),[]);\n});\n\ntest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n  const bad=createDecoder();\n  assert.throws(()=>bad.push(Uint8Array.of(0xc3)),Error);\n  assert.throws(()=>bad.finish(),Error);\n  const incomplete=createDecoder();\n  incomplete.push(Buffer.from('data: x'));\n  assert.throws(()=>incomplete.finish(),Error);\n  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n  const okay=createDecoder();\n  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n  assert.deepEqual(okay.finish(),[]);\n  assert.throws(()=>createDecoder().push('not bytes'),Error);\n});\n\ntest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const run=(input)=>{\n      const file=path.join(dir,'input.json');\n      fs.writeFileSync(file,JSON.stringify(input));\n      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n    };\n    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n    assert.equal(good.status,0);assert.equal(good.stderr,'');\n    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n    for(const input of [null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')}]){\n      const result=run(input);\n      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n    }\n    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n"
+        }
+      },
+      "output": "ERROR: refused — new JavaScript files must parse before they are created. The complete staged result for test/stream-framer.test.js:60:161 failed to parse: Unexpected token.\nParser stopped at: for(const input of [null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')}]){\nNo files were changed. Fix the proposed edit, then submit the complete action again.",
+      "atMs": 102957,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 3,
+      "id": "action-7"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "write_file",
+          "p": "test/stream-framer.test.js",
+          "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\nfunction decode(parts){\n  const d=createDecoder(),out=[];\n  for(const part of parts)out.push(...d.push(part));\n  assert.deepEqual(d.finish(),[]);\n  return out;\n}\n\ntest('all transport partitions, including bytes, give identical frames',()=>{\n  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n  assert.deepEqual(decode([wire]),expected);\n  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n});\n\ntest('parsing preserves protocol details and resets empty frames',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n    {event:'message',data:'a\\rb\\n'}]);\n  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n  assert.deepEqual(d.finish(),[]);\n});\n\ntest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n  const bad=createDecoder();\n  assert.throws(()=>bad.push(Uint8Array.of(0xc3)),Error);\n  assert.throws(()=>bad.finish(),Error);\n  const incomplete=createDecoder();\n  incomplete.push(Buffer.from('data: x'));\n  assert.throws(()=>incomplete.finish(),Error);\n  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n  const okay=createDecoder();\n  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n  assert.deepEqual(okay.finish(),[]);\n  assert.throws(()=>createDecoder().push('not bytes'),Error);\n});\n\ntest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const run=(input)=>{\n      const file=path.join(dir,'input.json');\n      fs.writeFileSync(file,JSON.stringify(input));\n      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n    };\n    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n    assert.equal(good.status,0);assert.equal(good.stderr,'');\n    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n    for(const input of invalid){\n      const result=run(input);\n      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n    }\n    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n"
+        }
+      },
+      "output": "wrote 3258 bytes to test/stream-framer.test.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `bytes` is also referenced in: stream-framer.js\n  `input` is also referenced in: stream-framer.js\n  `decoder` is also referenced in: stream-framer.js\n[peer] `createDecoder` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `runCli` (stream-framer.js:93):\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n    frames.push(...decoder.finish());\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 124483,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 4,
+      "id": "action-8"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: 1 of 8 tests FAILED (7 passed).\nFailing tests:\n  ✗ strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder (test/stream-framer.test.js:32) — Missing expected exception (Error).\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 1\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.345379\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.817429\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.16971\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.35197\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.670108\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15467\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nnot ok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.60808\n  location: '/workers/repair-framer/test/stream-framer.test.js:32:1'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception (Error).'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  stack: |-\n    TestContext.<anonymous> (file:///workers/repair-framer/test/stream-framer.test.js:34:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    Test.postRun (node:internal/test_runner/test:889:19)\n    Test.run (node:internal/test_runner/test:835:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 214.991358\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 7\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 261.708924\n\n\n[fix-tests] 1 test(s) fail (7 already pass). Investigate them ONE at a time — compare the failure, test and task contract before choosing a change, then re-run the tests:\n\nFAILING: \"strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\" (stream-framer.test.js:32)\n  Missing expected exception (Error).\n  Test provenance: generated. This test was added during this run; preserving supplied tests does not prohibit task-justified correction of it. The test is evidence, not a guaranteed oracle. Compare its assertion and setup with the user's task and the observed behavior. A test correction requires a specific task-supported defect in its expectation or setup; do not remove coverage or weaken an assertion merely to make it pass. If the contract is insufficient, state what remains unknown.\n  failing test source:\n    test('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n      const bad=createDecoder();\n      assert.throws(()=>bad.push(Uint8Array.of(0xc3)),Error);\n      assert.throws(()=>bad.finish(),Error);\n      const incomplete=createDecoder();\n      incomplete.push(Buffer.from('data: x'));\n      assert.throws(()=>incomplete.finish(),Error);\n      assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n      const d=createDecoder();\n      assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n      assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n      const okay=createDecoder();\n      okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n      assert.deepEqual(okay.finish(),[]);\n      assert.throws(()=>createDecoder().push('not bytes'),Error);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n[baseline] This is the first time this suite has been measured in this run, and 2 edits came before it — so nothing measured this suite before you changed it. These 1 failure(s) may be yours, may be pre-existing, or both, and this run cannot tell you which. If that distinction matters, check one out of the way (git stash, or revert your change in one file) and run the same command again. 7/8 is now the number later runs are compared against.",
+      "atMs": 126513,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 5,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 6). Recorded command: \"npm test\". Recorded tests: 7 passed, 1 failed, 8 total.\nFailing stack site: \"test/stream-framer.test.js\":34. Current source (\">\" marks that line):\n32   test('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n33     const bad=createDecoder();\n34 >   assert.throws(()=>bad.push(Uint8Array.of(0xc3)),Error);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-9"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/stream-framer.test.js",
+          "old": "  assert.throws(()=>bad.push(Uint8Array.of(0xc3)),Error);\n  assert.throws(()=>bad.finish(),Error);",
+          "new": "  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n  assert.throws(()=>bad.finish(),Error);\n  assert.throws(()=>bad.push(new Uint8Array()),Error);",
+          "line": 34,
+          "repair": [
+            {
+              "evidenceSha256": "e9274f0b2285505569f4f2c361ca68da05efa293e68c09cdae78f786acb05442",
+              "fixture": "const bad=createDecoder(); bad.push(Uint8Array.of(0xc3)); bad.finish()",
+              "priorExpected": "The test required push of an incomplete UTF-8 prefix to throw immediately.",
+              "proposedExpected": "A streamed incomplete UTF-8 sequence is buffered by push and throws on finish; the failed finish poisons later calls.",
+              "requirement": "The contract requires strict UTF-8 across pushes and specifically calls incomplete multibyte sequences at finish invalid.",
+              "nextCheck": "npm test"
+            }
+          ]
+        }
+      },
+      "output": "replaced 1 occurrence in test/stream-framer.test.js at line 34\n[regression-guard] Test inputs changed (test/stream-framer.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.\n\n[contract-arbitration] This edit rewrites an ASSERTION in test/stream-framer.test.js while that suite is RED. Changing a failing assertion can be exactly right (a stale test lying about the contract) or exactly wrong (encoding the bug into the oracle) — the difference is which side OWNS the contract. Before this lands: name the owner. If the spec/header/docs own it, say so and cite the line, then fix the test to match. If the test encodes the contract, the IMPLEMENTATION is wrong — leave the assertion and fix the code instead. Put the one-line ruling (owner + citation) in a DECISION note or comment with the edit.\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 134277,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 6,
+      "id": "action-10"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 8 tests passed.\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.329549\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.79348\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.16489\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.366959\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.718538\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15358\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.5005\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 222.122825\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 8\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 268.202828",
+      "atMs": 137300,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 7,
+      "id": "action-11"
+    },
+    {
+      "name": "supervisor-steer",
+      "category": "other",
+      "request": {
+        "action": "steer",
+        "jobs": [],
+        "target": "repair-framer",
+        "text": "Observed generated invalid UTF-8 fixture asserts push([0xc3]) throws, but 0xc3 is a valid incomplete prefix and must buffer until next push/finish. Correct to assert push returns [], finish throws, and subsequent calls throw; retain a separate immediately-invalid sequence case (e.g. 0xc3,0x28). Include completion of split valid prefix to ensure strict decoder doesn't reject incomplete pushes. Broaden lifecycle/CLI cases if not already covered (post-DONE nonblank variants, canonical pad bits, invalid args/import side effects)."
+      },
+      "output": {
+        "delivery": "Worker will read this between actions; inspect subsequent evidence.",
+        "queued": true,
+        "sequence": 1
+      },
+      "atMs": 140907,
+      "endedMs": 140930,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-12"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 143767,
+      "endedMs": 227093,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-13"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/stream-framer.test.js",
+          "old": "    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];",
+          "new": "    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];",
+          "line": 59
+        }
+      },
+      "output": "ERROR: \"old\" text not found starting on line 59 in test/stream-framer.test.js. That text is at line 61 of test/stream-framer.test.js; retry with that line.",
+      "atMs": 152690,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 8,
+      "id": "action-14"
+    },
+    {
+      "name": "unparsed-action",
+      "category": "other",
+      "request": {
+        "job": "repair-framer",
+        "action": null
+      },
+      "output": "[Factory supervisor feedback for your current milestone — inspect the evidence, correct course, and continue from your current files. This does not change the operator's requirements or grant new permissions.]: Observed generated invalid UTF-8 fixture asserts push([0xc3]) throws, but 0xc3 is a valid incomplete prefix and must buffer until next push/finish. Correct to assert push returns [], finish throws, and subsequent calls throw; retain a separate immediately-invalid sequence case (e.g. 0xc3,0x28). Include completion of split valid prefix to ensure strict decoder doesn't reject incomplete pushes. Broaden lifecycle/CLI cases if not already covered (post-DONE nonblank variants, canonical pad bits, invalid args/import side effects).",
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 9,
+      "id": "action-15"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "read_file",
+          "p": "test/stream-framer.test.js",
+          "start": 30,
+          "limit": 38
+        }
+      },
+      "output": "test/stream-framer.test.js (70 lines, showing 30-67):\n30\t});\n31\t\n32\ttest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n33\t  const bad=createDecoder();\n34\t  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n35\t  assert.throws(()=>bad.finish(),Error);\n36\t  assert.throws(()=>bad.push(new Uint8Array()),Error);\n37\t  const incomplete=createDecoder();\n38\t  incomplete.push(Buffer.from('data: x'));\n39\t  assert.throws(()=>incomplete.finish(),Error);\n40\t  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n41\t  const d=createDecoder();\n42\t  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n43\t  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n44\t  const okay=createDecoder();\n45\t  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n46\t  assert.deepEqual(okay.finish(),[]);\n47\t  assert.throws(()=>createDecoder().push('not bytes'),Error);\n48\t});\n49\t\n50\ttest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n51\t  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n52\t  try{\n53\t    const run=(input)=>{\n54\t      const file=path.join(dir,'input.json');\n55\t      fs.writeFileSync(file,JSON.stringify(input));\n56\t      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n57\t    };\n58\t    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n59\t    assert.equal(good.status,0);assert.equal(good.stderr,'');\n60\t    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n61\t    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n62\t    for(const input of invalid){\n63\t      const result=run(input);\n64\t      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n65\t    }\n66\t    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n67\t    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n... (3 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)",
+      "atMs": 155300,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 10,
+      "id": "action-16"
+    },
+    {
+      "name": "edit_lines",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "edit_lines",
+          "p": "test/stream-framer.test.js",
+          "start": 33,
+          "end": 36,
+          "new": "  const bad=createDecoder();\n  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n  assert.throws(()=>bad.finish(),Error);\n  assert.throws(()=>bad.push(new Uint8Array()),Error);\n  const invalidUtf8=createDecoder();\n  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n  const split=createDecoder();\n  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);"
+        }
+      },
+      "output": "replaced lines 33-36 in test/stream-framer.test.js (4 line(s) out, 9 in).\nRemoved:\n33\t  const bad=createDecoder();\n34\t  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n35\t  assert.throws(()=>bad.finish(),Error);\n36\t  assert.throws(()=>bad.push(new Uint8Array()),Error);\n\ntest/stream-framer.test.js now reads (>> is what you just wrote — check the boundaries for duplicated or orphaned lines):\n   29\t  assert.deepEqual(d.finish(),[]);\n   30\t});\n   31\t\n   32\ttest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n>> 33\t  const bad=createDecoder();\n>> 34\t  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n>> 35\t  assert.throws(()=>bad.finish(),Error);\n>> 36\t  assert.throws(()=>bad.push(new Uint8Array()),Error);\n>> 37\t  const invalidUtf8=createDecoder();\n>> 38\t  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n>> 39\t  const split=createDecoder();\n>> 40\t  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n>> 41\t  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n   42\t  const incomplete=createDecoder();\n   43\t  incomplete.push(Buffer.from('data: x'));\n   44\t  assert.throws(()=>incomplete.finish(),Error);\n   45\t  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n[regression-guard] Test inputs changed (test/stream-framer.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 164567,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 11,
+      "id": "action-17"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/stream-framer.test.js",
+          "old": "  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);",
+          "new": "  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n  assert.deepEqual(split.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[]);\n  assert.deepEqual(split.finish(),[]);",
+          "line": 41
+        }
+      },
+      "output": "replaced 1 occurrence in test/stream-framer.test.js at line 41",
+      "atMs": 183957,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 12,
+      "id": "action-18"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/stream-framer.test.js",
+          "old": "    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];",
+          "new": "    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];",
+          "line": 66
+        }
+      },
+      "output": "ERROR: \"old\" text not found starting on line 66 in test/stream-framer.test.js. That text is at line 68 of test/stream-framer.test.js; retry with that line.",
+      "atMs": 191728,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 13,
+      "id": "action-19"
+    },
+    {
+      "name": "edit_lines",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "edit_lines",
+          "p": "test/stream-framer.test.js",
+          "start": 68,
+          "end": 68,
+          "new": "    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];"
+        }
+      },
+      "output": "replaced lines 68-68 in test/stream-framer.test.js (1 line(s) out, 1 in).\nRemoved:\n68\t    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zm8= ']}, {chunks:['data']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n\ntest/stream-framer.test.js now reads (>> is what you just wrote — check the boundaries for duplicated or orphaned lines):\n   64\t    };\n   65\t    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n   66\t    assert.equal(good.status,0);assert.equal(good.stderr,'');\n   67\t    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n>> 68\t    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n   69\t    for(const input of invalid){\n   70\t      const result=run(input);\n   71\t      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n   72\t    }\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `invalid` is also referenced in: stream-framer.js\n[peer] `invalid` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `decodeBase64` (stream-framer.js:82):\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}",
+      "atMs": 195013,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 14,
+      "id": "action-20"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 8 tests passed.\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.39068\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.85812\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.16688\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.35022\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.681591\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15654\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.53955\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 236.530969\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 8\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 283.390207",
+      "atMs": 196524,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 15,
+      "id": "action-21"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "replace",
+          "p": "test/stream-framer.test.js",
+          "old": "    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');",
+          "new": "    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');",
+          "line": 73
+        }
+      },
+      "output": "replaced 1 occurrence in test/stream-framer.test.js at line 73\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `missing` is also referenced in: stream-framer.js, test/public.test.js\n[peer] `input` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `runCli` (stream-framer.js:90):\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n[regression-guard] Test inputs changed (test/stream-framer.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.",
+      "atMs": 217604,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 16,
+      "id": "action-22"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 8 tests passed.\n$ npm test\ncwd: /workers/repair-framer\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.339751\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.72965\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.16966\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.34776\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.649922\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15334\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.54281\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 282.072444\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 8\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 330.997546",
+      "atMs": 219569,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 17,
+      "id": "action-23"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "repair-framer",
+        "action": {
+          "a": "done",
+          "summary": "Repaired stream-framer decoder and CLI with strict streamed UTF-8, framing/reset/DONE lifecycle poisoning, canonical base64 validation, and CLI error handling. Added deterministic partition, UTF-8, lifecycle, and CLI tests using temporary fixtures. Verified: npm test (8 passing)."
+        }
+      },
+      "output": "",
+      "atMs": 223527,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 18,
+      "id": "action-24"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "repair-framer"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "stream-framer.js",
+          "test/stream-framer.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.38417\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.765871\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.34929\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.36401\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.740731\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.155431\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.56433\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 280.038653\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 8\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 328.291208\n",
+          "stderr": ""
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 227086,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-25"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat stream-framer.js; printf '\\n--- retained tests ---\\n'; cat test/stream-framer.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "7df35c3f7ee1c71740fe38a02cd622f779cf9629",
+        "stderr": "",
+        "stdout": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n/** Create an independent decoder for the small line-framed protocol. */\nexport function createDecoder(){\n  const utf8=new TextDecoder('utf-8',{fatal:true});\n  let text='';\n  let data=[];\n  let event;\n  let terminated=false;\n  let finished=false;\n  let poisoned=false;\n\n  const fail=(error)=>{\n    poisoned=true;\n    throw error instanceof Error ? error : new Error(String(error));\n  };\n  const reset=()=>{ data=[]; event=undefined; };\n  const line=(value,frames)=>{\n    if(terminated){\n      if(value!=='')throw new Error('content after termination');\n      return;\n    }\n    if(value===''){\n      if(data.length){\n        const joined=data.join('\\n');\n        const name=event ? event : 'message';\n        reset();\n        if(joined==='[DONE]')terminated=true;\n        else frames.push({event:name,data:joined});\n      }else reset();\n      return;\n    }\n    if(value.startsWith(':'))return;\n    const colon=value.indexOf(':');\n    const field=colon<0 ? value : value.slice(0,colon);\n    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n    if(field==='data')data.push(fieldValue);\n    else if(field==='event')event=fieldValue;\n  };\n  const ensureActive=()=>{\n    if(poisoned)throw new Error('decoder is poisoned');\n    if(finished)fail(new Error('decoder is finished'));\n  };\n\n  return {\n    push(chunk){\n      try{\n        ensureActive();\n        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n        text+=utf8.decode(chunk,{stream:true});\n        const frames=[];\n        let newline;\n        while((newline=text.indexOf('\\n'))>=0){\n          let complete=text.slice(0,newline);\n          text=text.slice(newline+1);\n          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n          line(complete,frames);\n        }\n        return frames;\n      }catch(error){ return fail(error); }\n    },\n    finish(){\n      try{\n        ensureActive();\n        text+=utf8.decode();\n        if(text!=='')throw new Error('unterminated line');\n        if(data.length || event!==undefined)throw new Error('pending frame');\n        if(!terminated)throw new Error('missing termination marker');\n        finished=true;\n        return [];\n      }catch(error){ return fail(error); }\n    },\n  };\n}\n\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}\n\nfunction runCli(){\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n    frames.push(...decoder.finish());\n    process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode=2;\n  }\n}\n\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n\n--- retained tests ---\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\nfunction decode(parts){\n  const d=createDecoder(),out=[];\n  for(const part of parts)out.push(...d.push(part));\n  assert.deepEqual(d.finish(),[]);\n  return out;\n}\n\ntest('all transport partitions, including bytes, give identical frames',()=>{\n  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n  assert.deepEqual(decode([wire]),expected);\n  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n});\n\ntest('parsing preserves protocol details and resets empty frames',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n    {event:'message',data:'a\\rb\\n'}]);\n  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n  assert.deepEqual(d.finish(),[]);\n});\n\ntest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n  const bad=createDecoder();\n  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n  assert.throws(()=>bad.finish(),Error);\n  assert.throws(()=>bad.push(new Uint8Array()),Error);\n  const invalidUtf8=createDecoder();\n  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n  const split=createDecoder();\n  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n  assert.deepEqual(split.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[]);\n  assert.deepEqual(split.finish(),[]);\n  const incomplete=createDecoder();\n  incomplete.push(Buffer.from('data: x'));\n  assert.throws(()=>incomplete.finish(),Error);\n  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n  const okay=createDecoder();\n  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n  assert.deepEqual(okay.finish(),[]);\n  assert.throws(()=>createDecoder().push('not bytes'),Error);\n});\n\ntest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const run=(input)=>{\n      const file=path.join(dir,'input.json');\n      fs.writeFileSync(file,JSON.stringify(input));\n      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n    };\n    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n    assert.equal(good.status,0);assert.equal(good.stderr,'');\n    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n    for(const input of invalid){\n      const result=run(input);\n      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n    }\n    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n",
+        "timedOut": false
+      },
+      "atMs": 230180,
+      "endedMs": 230691,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-26"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "node --input-type=module <<'NODE'\nimport fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import {spawnSync} from 'node:child_process';\nconst dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-review-'));\ntry {\n const file=path.join(dir,'input.json');\n fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from('data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n').toString('base64')]}));\n let r=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16000000});\n console.log(JSON.stringify({case:'150000 valid frames in one chunk',status:r.status,stderr:r.stderr,stdoutLength:r.stdout.length}));\n fs.writeFileSync(file,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n r=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n console.log(JSON.stringify({case:'invalid UTF8 JSON file',status:r.status,stderr:r.stderr,stdout:r.stdout}));\n} finally {fs.rmSync(dir,{recursive:true,force:true});}\nNODE"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "d8660dd55e1fbd93086ec63ba4870b36ed5ae4dd",
+        "stderr": "",
+        "stdout": "{\"case\":\"150000 valid frames in one chunk\",\"status\":2,\"stderr\":\"Maximum call stack size exceeded\\n\",\"stdoutLength\":0}\n{\"case\":\"invalid UTF8 JSON file\",\"status\":0,\"stderr\":\"\",\"stdout\":\"{\\\"frames\\\":[]}\\n\"}\n",
+        "timedOut": false
+      },
+      "atMs": 244803,
+      "endedMs": 245506,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-27"
+    },
+    {
+      "name": "supervisor-enqueue",
+      "category": "other",
+      "request": {
+        "action": "enqueue",
+        "jobs": [
+          {
+            "id": "repair-cli-edge-cases",
+            "worker": "terra",
+            "task": "Repair two observed CLI validation/transport-size defects and retain regressions. Replace unbounded argument spreading when collecting decoder frames with iteration (no artificial frame cap). Read JSON file as strict UTF-8, rejecting malformed byte sequences rather than replacing them. Add focused regressions plus remaining key decoder edge assertions described in context. Do not change package.json or public tests.",
+            "context": "Integrated repair-framer passes 8 tests. Supervisor deterministic check found a valid file containing one chunk encoding 'data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n' exits 2 Maximum call stack size exceeded due to frames.push(...decoder.push(...)). Contract has no frame cap and transport boundaries must not affect valid decoding. A JSON file formed from Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'), Buffer.from([0xff]), Buffer.from('\"}')]) exits 0, because readFileSync(...,'utf8') replaces invalid file bytes. Input is specified as UTF-8 JSON; decode file strictly. Preserve JSON BOM behavior intentionally (avoid unintentionally accepting a leading JSON BOM when switching to TextDecoder). Fixtures os.tmpdir and cleanup, child maxBuffer sufficient for ~5MB output. Retain exact frame count/content assertion for large valid case and malformed UTF8 file failure/no stdout. Add compact table-driven retained cases for post-DONE second marker/comment/unknown/event/data nonblank rejection, event reset/last-event and exact one-space removal, doubled CR preservation, incomplete UTF8 after DONE, pending marker without blank, and successful finish only once. Check failed push doesn't yield partial results and earlier returned objects are unchanged. Existing files are current integrated baseline; no recovery required.",
+            "verify": "npm test",
+            "dependsOn": [
+              "repair-framer"
+            ],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "repair-cli-edge-cases"
+        ]
+      },
+      "atMs": 260096,
+      "endedMs": 260673,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-28"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 263460,
+      "endedMs": 328717,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-29"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "limit": 500
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "limit": 120
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"limit\":400}\nstream-framer.js (105 lines, showing 1-105):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport {fileURLToPath} from 'node:url';\n4\t\n5\t/** Create an independent decoder for the small line-framed protocol. */\n6\texport function createDecoder(){\n7\t  const utf8=new TextDecoder('utf-8',{fatal:true});\n8\t  let text='';\n9\t  let data=[];\n10\t  let event;\n11\t  let terminated=false;\n12\t  let finished=false;\n13\t  let poisoned=false;\n14\t\n15\t  const fail=(error)=>{\n16\t    poisoned=true;\n17\t    throw error instanceof Error ? error : new Error(String(error));\n18\t  };\n19\t  const reset=()=>{ data=[]; event=undefined; };\n20\t  const line=(value,frames)=>{\n21\t    if(terminated){\n22\t      if(value!=='')throw new Error('content after termination');\n23\t      return;\n24\t    }\n25\t    if(value===''){\n26\t      if(data.length){\n27\t        const joined=data.join('\\n');\n28\t        const name=event ? event : 'message';\n29\t        reset();\n30\t        if(joined==='[DONE]')terminated=true;\n31\t        else frames.push({event:name,data:joined});\n32\t      }else reset();\n33\t      return;\n34\t    }\n35\t    if(value.startsWith(':'))return;\n36\t    const colon=value.indexOf(':');\n37\t    const field=colon<0 ? value : value.slice(0,colon);\n38\t    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n39\t    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n40\t    if(field==='data')data.push(fieldValue);\n41\t    else if(field==='event')event=fieldValue;\n42\t  };\n43\t  const ensureActive=()=>{\n44\t    if(poisoned)throw new Error('decoder is poisoned');\n45\t    if(finished)fail(new Error('decoder is finished'));\n46\t  };\n47\t\n48\t  return {\n49\t    push(chunk){\n50\t      try{\n51\t        ensureActive();\n52\t        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n53\t        text+=utf8.decode(chunk,{stream:true});\n54\t        const frames=[];\n55\t        let newline;\n56\t        while((newline=text.indexOf('\\n'))>=0){\n57\t          let complete=text.slice(0,newline);\n58\t          text=text.slice(newline+1);\n59\t          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n60\t          line(complete,frames);\n61\t        }\n62\t        return frames;\n63\t      }catch(error){ return fail(error); }\n64\t    },\n65\t    finish(){\n66\t      try{\n67\t        ensureActive();\n68\t        text+=utf8.decode();\n69\t        if(text!=='')throw new Error('unterminated line');\n70\t        if(data.length || event!==undefined)throw new Error('pending frame');\n71\t        if(!terminated)throw new Error('missing termination marker');\n72\t        finished=true;\n73\t        return [];\n74\t      }catch(error){ return fail(error); }\n75\t    },\n76\t  };\n77\t}\n78\t\n79\tfunction\n... [5147 chars clipped] ...\n(dir,'bad.json')],{encoding:'utf8'});\n75\t    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n76\t    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n77\t    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n78\t    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n79\t    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n80\t  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n81\t});\n82\t\n— end of file (82 lines); nothing beyond line 82, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\",\"limit\":120}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.\n[clipped ops: #1 read_file stream-framer.js, #2 read_file test/stream-framer.test.js — re-request them in a smaller inspect to see them whole]",
+      "atMs": 267649,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 0,
+      "id": "action-30"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "stream-framer.js",
+              "start": 45,
+              "limit": 100
+            },
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "start": 1,
+              "limit": 180
+            },
+            {
+              "a": "read_file",
+              "p": "test/public.test.js",
+              "start": 1,
+              "limit": 300
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"stream-framer.js\",\"start\":45,\"limit\":100}\nstream-framer.js (105 lines, showing 45-105):\n45\t    if(finished)fail(new Error('decoder is finished'));\n46\t  };\n47\t\n48\t  return {\n49\t    push(chunk){\n50\t      try{\n51\t        ensureActive();\n52\t        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n53\t        text+=utf8.decode(chunk,{stream:true});\n54\t        const frames=[];\n55\t        let newline;\n56\t        while((newline=text.indexOf('\\n'))>=0){\n57\t          let complete=text.slice(0,newline);\n58\t          text=text.slice(newline+1);\n59\t          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n60\t          line(complete,frames);\n61\t        }\n62\t        return frames;\n63\t      }catch(error){ return fail(error); }\n64\t    },\n65\t    finish(){\n66\t      try{\n67\t        ensureActive();\n68\t        text+=utf8.decode();\n69\t        if(text!=='')throw new Error('unterminated line');\n70\t        if(data.length || event!==undefined)throw new Error('pending frame');\n71\t        if(!terminated)throw new Error('missing termination marker');\n72\t        finished=true;\n73\t        return [];\n74\t      }catch(error){ return fail(error); }\n75\t    },\n76\t  };\n77\t}\n78\t\n79\tfunction decodeBase64(value){\n80\t  if(typeof value!=='string')throw new Error('chunks must contain strings');\n81\t  const bytes=Buffer.from(value,'base64');\n82\t  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n83\t  return bytes;\n84\t}\n85\t\n86\tfunction runCli(){\n87\t  try{\n88\t    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n89\t    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n90\t    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n91\t      throw new Error('input must be an object with chunks array');\n92\t    }\n93\t    const decoder=createDecoder();\n94\t    const frames=[];\n95\t    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n96\t    frames.push(...decoder.finish());\n97\t    process.stdout.write(JSON.stringify({frames})+'\\n');\n98\t  }catch(error){\n99\t    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n100\t    process.exitCode=2;\n101\t  }\n102\t}\n103\t\n104\tif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n105\t\n— end of file (105 lines); nothing beyond line 105, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/stream-framer.test.js\",\"start\":1,\"limit\":180}\ntest/stream-framer.test.js (82 lines, showing 1-82):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os fro\n... [4957 chars clipped] ...\nLF survive one-byte transport chunks',()=>{\n11\t  const d=createDecoder(),frames=[];\n12\t  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n13\t  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n14\t});\n15\ttest('event names, multiple data lines, and empty data',()=>{\n16\t  const d=createDecoder();\n17\t  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n18\t    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n19\t  assert.deepEqual(d.finish(),[]);\n20\t});\n21\ttest('missing termination and post-finish activity are errors',()=>{\n22\t  assert.throws(()=>createDecoder().finish(),Error);\n23\t  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n24\t  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n25\t});\n26\t\n— end of file (26 lines); nothing beyond line 26, do not re-read this range.\n[clipped ops: #2 read_file test/stream-framer.test.js, #3 read_file test/public.test.js — re-request them in a smaller inspect to see them whole]",
+      "atMs": 270671,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 1,
+      "id": "action-31"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "start": 1,
+              "limit": 12
+            },
+            {
+              "a": "read_file",
+              "p": "test/public.test.js",
+              "start": 1,
+              "limit": 160
+            },
+            {
+              "a": "read_file",
+              "p": "test/public.test.js",
+              "start": 161,
+              "limit": 160
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"test/stream-framer.test.js\",\"start\":1,\"limit\":12}\ntest/stream-framer.test.js (82 lines, showing 1-12):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os from 'node:os';\n5\timport path from 'node:path';\n6\timport {spawnSync} from 'node:child_process';\n7\timport {createDecoder} from '../stream-framer.js';\n8\t\n9\tfunction decode(parts){\n10\t  const d=createDecoder(),out=[];\n11\t  for(const part of parts)out.push(...d.push(part));\n12\t  assert.deepEqual(d.finish(),[]);\n... (70 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/public.test.js\",\"start\":1,\"limit\":160}\ntest/public.test.js (26 lines, showing 1-26):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport {createDecoder} from '../stream-framer.js';\n4\ttest('dispatch only at a blank line, then require explicit termination',()=>{\n5\t  const d=createDecoder();\n6\t  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n7\t  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n8\t  assert.deepEqual(d.finish(),[]);\n9\t});\n10\ttest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n11\t  const d=createDecoder(),frames=[];\n12\t  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n13\t  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n14\t});\n15\ttest('event names, multiple data lines, and empty data',()=>{\n16\t  const d=createDecoder();\n17\t  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n18\t    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n19\t  assert.deepEqual(d.finish(),[]);\n20\t});\n21\ttest('missing termination and post-finish activity are errors',()=>{\n22\t  assert.throws(()=>createDecoder().finish(),Error);\n23\t  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n24\t  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n25\t});\n26\t\n— end of file (26 lines); nothing beyond line 26, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"test/public.test.js\",\"start\":161,\"limit\":160}\nERROR: start line 161 is out of range in test/public.test.js (26 lines).",
+      "atMs": 276747,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 2,
+      "id": "action-32"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "start": 13,
+              "limit": 25
+            },
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "start": 38,
+              "limit": 25
+            },
+            {
+              "a": "read_file",
+              "p": "test/stream-framer.test.js",
+              "start": 63,
+              "limit": 25
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"test/stream-framer.test.js\",\"start\":13,\"limit\":25}\ntest/stream-framer.test.js (82 lines, showing 13-37):\n13\t  return out;\n14\t}\n15\t\n16\ttest('all transport partitions, including bytes, give identical frames',()=>{\n17\t  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n18\t  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n19\t  assert.deepEqual(decode([wire]),expected);\n20\t  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n21\t  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n22\t});\n23\t\n24\ttest('parsing preserves protocol details and resets empty frames',()=>{\n25\t  const d=createDecoder();\n26\t  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n27\t    {event:'message',data:'a\\rb\\n'}]);\n28\t  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n29\t  assert.deepEqual(d.finish(),[]);\n30\t});\n31\t\n32\ttest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n33\t  const bad=createDecoder();\n34\t  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n35\t  assert.throws(()=>bad.finish(),Error);\n36\t  assert.throws(()=>bad.push(new Uint8Array()),Error);\n37\t  const invalidUtf8=createDecoder();\n... (45 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/stream-framer.test.js\",\"start\":38,\"limit\":25}\ntest/stream-framer.test.js (82 lines, showing 38-62):\n38\t  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n39\t  const split=createDecoder();\n40\t  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n41\t  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n42\t  assert.deepEqual(split.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[]);\n43\t  assert.deepEqual(split.finish(),[]);\n44\t  const incomplete=createDecoder();\n45\t  incomplete.push(Buffer.from('data: x'));\n46\t  assert.throws(()=>incomplete.finish(),Error);\n47\t  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n48\t  const d=createDecoder();\n49\t  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n50\t  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n51\t  const okay=createDecoder();\n52\t  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n53\t  assert.deepEqual(okay.finish(),[]);\n54\t  assert.throws(()=>createDecoder().push('not bytes'),Error);\n55\t});\n56\t\n57\ttest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n58\t  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n59\t  try{\n60\t    const\n... [910 chars clipped] ...\n){\n70\t      const result=run(input);\n71\t      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n72\t    }\n73\t    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n74\t    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n75\t    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n76\t    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n77\t    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n78\t    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n79\t    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n80\t  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n81\t});\n82\t\n— end of file (82 lines); nothing beyond line 82, do not re-read this range.\n[clipped ops: #2 read_file test/stream-framer.test.js, #3 read_file test/stream-framer.test.js — re-request them in a smaller inspect to see them whole]",
+      "atMs": 280110,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 3,
+      "id": "action-33"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "read_file",
+          "p": "test/stream-framer.test.js",
+          "start": 57,
+          "limit": 26
+        }
+      },
+      "output": "test/stream-framer.test.js (82 lines, showing 57-82):\n57\ttest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n58\t  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n59\t  try{\n60\t    const run=(input)=>{\n61\t      const file=path.join(dir,'input.json');\n62\t      fs.writeFileSync(file,JSON.stringify(input));\n63\t      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n64\t    };\n65\t    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n66\t    assert.equal(good.status,0);assert.equal(good.stderr,'');\n67\t    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n68\t    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n69\t    for(const input of invalid){\n70\t      const result=run(input);\n71\t      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n72\t    }\n73\t    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n74\t    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n75\t    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n76\t    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n77\t    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n78\t    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n79\t    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n80\t  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n81\t});\n82\t\n— end of file (82 lines); nothing beyond line 82, do not re-read this range.",
+      "atMs": 281773,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 4,
+      "id": "action-34"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "patch",
+          "edits": [
+            {
+              "p": "stream-framer.js",
+              "old": "    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));",
+              "new": "    const source=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(fs.readFileSync(process.argv[2]));\n    const input=JSON.parse(source);",
+              "line": 89
+            },
+            {
+              "p": "stream-framer.js",
+              "old": "    for(const encoded of input.chunks)frames.push(...decoder.push(decodeBase64(encoded)));\n    frames.push(...decoder.finish());",
+              "new": "    for(const encoded of input.chunks){\n      for(const frame of decoder.push(decodeBase64(encoded)))frames.push(frame);\n    }\n    for(const frame of decoder.finish())frames.push(frame);",
+              "line": 95
+            }
+          ]
+        }
+      },
+      "output": "patched 2 edits across 1 file: stream-framer.js",
+      "atMs": 290052,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 5,
+      "id": "action-35"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "patch",
+          "edits": [
+            {
+              "p": "test/stream-framer.test.js",
+              "old": "});\n",
+              "new": "});\n\ntest('decoder rejects post-DONE content and preserves edge-state rules',()=>{\n  for(const suffix of ['data: [DONE]\\n\\n',' : comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n    const d=createDecoder();\n    assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n    assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n  }\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:'one\\na\\r'}]);\n  assert.throws(()=>d.finish(),Error);\n  const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n  assert.throws(()=>pending.finish(),Error);\n  const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n  utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n  const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n  const partial=createDecoder();\n  const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n  assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n});\n\ntest('CLI handles large frame batches and rejects malformed UTF-8 files',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const file=path.join(dir,'large.json');\n    const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n    fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n    const large=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16*1024*1024});\n    assert.equal(large.status,0);assert.equal(large.stderr,'');\n    const frames=JSON.parse(large.stdout).frames;\n    assert.equal(frames.length,150000);\n    assert.deepEqual(frames[0],{event:'message',data:'x'});\n    assert.deepEqual(frames.at(-1),{event:'message',data:'x'});\n    const malformed=path.join(dir,'malformed.json');\n    fs.writeFileSync(malformed,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n    const bad=spawnSync(process.execPath,['stream-framer.js',malformed],{encoding:'utf8'});\n    assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.notEqual(bad.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n",
+              "line": 82
+            }
+          ]
+        }
+      },
+      "output": "[scope] test/stream-framer.test.js is immutable: the task explicitly forbids changing it. The edit was NOT applied. Existing supplied tests must stay unchanged. Add any extra checks in a NEW permitted test file, not by appending to or replacing a supplied file. Fix production source only where a check demonstrates a defect.",
+      "atMs": 309792,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 6,
+      "id": "action-36"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "write_file",
+          "p": "test/transport-regressions.test.js",
+          "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\ntest('decoder retains completion and failure edge cases',()=>{\n  for(const suffix of ['data: [DONE]\\n\\n',': comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n    const d=createDecoder();\n    assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n    assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n  }\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:'one\\na\\r'}]);\n  assert.throws(()=>d.finish(),Error);\n  const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n  assert.throws(()=>pending.finish(),Error);\n  const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n  utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n  const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n  const partial=createDecoder();\n  const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n  assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n});\n\ntest('CLI handles large frame batches and rejects malformed UTF-8 files',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const file=path.join(dir,'large.json');\n    const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n    fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n    const large=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16*1024*1024});\n    assert.equal(large.status,0);assert.equal(large.stderr,'');\n    const frames=JSON.parse(large.stdout).frames;\n    assert.equal(frames.length,150000);\n    assert.deepEqual(frames[0],{event:'message',data:'x'});\n    assert.deepEqual(frames.at(-1),{event:'message',data:'x'});\n    const malformed=path.join(dir,'malformed.json');\n    fs.writeFileSync(malformed,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n    const bad=spawnSync(process.execPath,['stream-framer.js',malformed],{encoding:'utf8'});\n    assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.notEqual(bad.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n"
+        }
+      },
+      "output": "wrote 2660 bytes to test/transport-regressions.test.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `createDecoder` is also referenced in: stream-framer.js, test/public.test.js, test/stream-framer.test.js\n  `decoder` is also referenced in: stream-framer.js, test/stream-framer.test.js\n  `malformed` is also referenced in: test/stream-framer.test.js\n[peer] `createDecoder` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `runCli` (stream-framer.js:94):\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks){\n      for(const frame of decoder.push(decodeBase64(encoded)))frames.push(frame);\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.\n[auto-verify] You have edited but not run the tests in 8 turns — reading and reasoning is not verification, so I ran them for you — FAIL:\nVERDICT: 1 of 10 tests FAILED (9 passed).\nFailing tests:\n  ✗ decoder retains completion and failure edge cases (test/transport-regressions.test.js:9) — expected data: 'one\\na\\r',, got data: ' one\\na\\r',\n\n> fa\n... (verification output clipped; failure region kept) ...\nnot ok 9 - decoder retains completion and failure edge cases\n  ---\n  duration_ms: 3.144355\n  location: '/workers/repair-cli-edge-cases/test/transport-regressions.test.js:9:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly deep-equal:\n    + actual - expected\n    \n      [\n        {\n    +     data: ' one\\na\\r',\n    -     data: 'one\\na\\r',\n          event: 'last'\n        }\n      ]\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n    0:\n      event: 'last'\n      data: |-\n        one\n        a\r\n  actual:\n    0:\n      event: 'last'\n      data: |-\n         one\n        a\r\n  operator: 'deepStrictEqual'\n  stack: |-\n  \n... (verification output clipped; tail preserved) ...\n  TestContext.<anonymous> (file:///workers/repair-cli-edge-cases/test/transport-regressions.test.js:16:10)\n    Test.runInAsyncScope (node:async_hooks:206:9)\n    Test.run (node:internal/test_runner/test:796:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:526:18)\n    node:internal/test_runner/harness:255:12\n    node:internal/process/task_queues:140:7\n    AsyncResource.runInAsyncScope (node:async_hooks:206:9)\n    AsyncResource.runMicrotask (node:internal/process/task_queues:137:8)\n  ...\n# Subtest: CLI handles large frame batches and rejects malformed UTF-8 files\nok 10 - CLI handles large frame batches and rejects malformed UTF-8 files\n  ---\n  duration_ms: 173.178625\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 359.578271\n\nUse this result to fix what is still failing; do not keep editing blindly.\n\n[fix-tests] 1 test(s) fail (9 already pass). Investigate them ONE at a time — compare the failure, test and task contract before choosing a change, then re-run the tests:\n\nFAILING: \"decoder retains completion and failure edge cases\" (transport-regressions.test.js:9)\n  your code produced { data: ' one\\na\\r', }, but the test requires { data: 'one\\na\\r', }\n  Test provenance: generated. This test was added during this run; preserving supplied tests does not prohibit task-justified correction of it. The test is evidence, not a guaranteed oracle. Compare its assertion and setup with the user's task and the observed behavior. A test correction requires a specific task-supported defect in its expectation or setup; do not remove coverage or weaken an assertion merely to make it pass. If the contract is insufficient, state what remains unknown.\n  failing test source:\n    test('decoder retains completion and failure edge cases',()=>{\n      for(const suffix of ['data: [DONE]\\n\\n',': comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n        const d=createDecoder();\n        assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n        assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n      }\n      const d=createDecoder();\n      assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:'one\\na\\r'}]);\n      assert.throws(()=>d.finish(),Error);\n      const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n      assert.throws(()=>pending.finish(),Error);\n      const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n      utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n      const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n      const partial=createDecoder();\n      const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n      assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n      assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n      assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n    });\n  Trace the concrete disagreement to the responsible code, test setup or environment; make only the change supported by the task and evidence, then re-run.\n[baseline] This is the first time this suite has been measured in this run, and 2 edits came before it — so nothing measured this suite before you changed it. These 1 failure(s) may be yours, may be pre-existing, or both, and this run cannot tell you which. If that distinction matters, check one out of the way (git stash, or revert your change in one file) and run the same command again. 9/10 is now the number later runs are compared against.",
+      "atMs": 328693,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 7,
+      "supervisor": {
+        "phase": "failure",
+        "generation": 2,
+        "text": "EXECUTION FAILURE: the configured verifier exited 1 on the CURRENT tree (generation 2, turn 8). Recorded command: \"npm test\". Recorded tests: 9 passed, 1 failed, 10 total.\nFailing stack site: \"test/transport-regressions.test.js\":16. Current source (\">\" marks that line):\n14     }\n15     const d=createDecoder();\n16 >   assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:'one\\na\\r'}]);\nReproduce this exact call and input, including transformations; a neighboring passing call does not explain this failure. Failing case: \"decoder retains completion and failure edge cases\". A new working hypothesis is not execution evidence. Inspect the actual failing API call and operand in the current source; a retyped helper or print-only probe is not the failing program. Repair a demonstrated source or fixture defect, then run the configured verifier directly. Unrelated green checks cannot settle this failure. This is observed execution state, not an oracle or permission to finish."
+      },
+      "id": "action-37"
+    },
+    {
+      "name": "factory-verification",
+      "category": "other",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "command": "npm test"
+        }
+      },
+      "output": {
+        "status": "fail",
+        "counts": {
+          "passed": 9,
+          "failed": 1,
+          "total": 10
+        },
+        "failingTests": [
+          "decoder retains completion and failure edge cases"
+        ],
+        "outputSha256": "0a2cd8624211dc0c9321063a619c6df75d203bcfe965e7fe442510a290df26aa"
+      },
+      "atMs": null,
+      "endedMs": null,
+      "exitCode": 1,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 7,
+      "id": "action-38"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 331056,
+      "endedMs": 345324,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-39"
+    },
+    {
+      "name": "patch",
+      "category": "edit",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "patch",
+          "edits": [
+            {
+              "p": "test/transport-regressions.test.js",
+              "old": "[{event:'last',data:'one\\na\\r'}]",
+              "new": "[{event:'last',data:' one\\na\\r'}]",
+              "line": 16
+            }
+          ],
+          "repair": [
+            {
+              "evidenceSha256": "0a2cd8624211dc0c9321063a619c6df75d203bcfe965e7fe442510a290df26aa",
+              "fixture": "d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n'))",
+              "priorExpected": "data: 'one\\na\\r'",
+              "proposedExpected": "data: ' one\\na\\r'",
+              "requirement": "Field parsing removes at most one leading ASCII space, so two spaces preserve one.",
+              "nextCheck": "npm test"
+            }
+          ]
+        }
+      },
+      "output": "patched 1 edit across 1 file: test/transport-regressions.test.js\n[regression-guard] Test inputs changed (test/transport-regressions.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.",
+      "atMs": 335513,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 8,
+      "id": "action-40"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 10 tests passed.\n$ npm test\ncwd: /workers/repair-cli-edge-cases\nsandbox: docker:alpine:3\nexit 0\n\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.407352\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.787012\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.17185\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.383401\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.798095\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.17003\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.580361\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 307.195706\n  ...\n# Subtest: decoder retains completion and failure edge cases\nok 9 - decoder retains completion and failure edge cases\n  ---\n  duration_ms: 2.698204\n  ...\n# Subtest: CLI handles large frame batches and rejects malformed UTF-8 files\nok 10 - CLI handles large frame batches and rejects malformed UTF-8 files\n  ---\n  duration_ms: 180.512693\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 356.5161",
+      "atMs": 338428,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 9,
+      "id": "action-41"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "repair-cli-edge-cases",
+        "action": {
+          "a": "done",
+          "summary": "Repaired CLI frame collection to iterate without argument spreading and strictly decoded JSON input as UTF-8 with fatal malformed-byte rejection while preserving JSON BOM rejection. Added isolated temp-directory regressions for large frame output, malformed UTF-8 input, and decoder completion edge cases. Verified: npm test (10/10 passed)."
+        }
+      },
+      "output": "",
+      "atMs": 342385,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-terra",
+      "turn": 10,
+      "id": "action-42"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "repair-cli-edge-cases"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "stream-framer.js",
+          "test/transport-regressions.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.375923\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.825102\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.17845\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.354871\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.813685\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.161511\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.644511\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 295.784211\n  ...\n# Subtest: decoder retains completion and failure edge cases\nok 9 - decoder retains completion and failure edge cases\n  ---\n  duration_ms: 2.220354\n  ...\n# Subtest: CLI handles large frame batches and rejects malformed UTF-8 files\nok 10 - CLI handles large frame batches and rejects malformed UTF-8 files\n  ---\n  duration_ms: 185.867751\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 343.999374\n",
+          "stderr": ""
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 345317,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-43"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat stream-framer.js; printf '\\n--- edge regressions ---\\n'; cat test/transport-regressions.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "ae89501d299c85d2c0afd023736ef7c59278d67f",
+        "stderr": "",
+        "stdout": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n/** Create an independent decoder for the small line-framed protocol. */\nexport function createDecoder(){\n  const utf8=new TextDecoder('utf-8',{fatal:true});\n  let text='';\n  let data=[];\n  let event;\n  let terminated=false;\n  let finished=false;\n  let poisoned=false;\n\n  const fail=(error)=>{\n    poisoned=true;\n    throw error instanceof Error ? error : new Error(String(error));\n  };\n  const reset=()=>{ data=[]; event=undefined; };\n  const line=(value,frames)=>{\n    if(terminated){\n      if(value!=='')throw new Error('content after termination');\n      return;\n    }\n    if(value===''){\n      if(data.length){\n        const joined=data.join('\\n');\n        const name=event ? event : 'message';\n        reset();\n        if(joined==='[DONE]')terminated=true;\n        else frames.push({event:name,data:joined});\n      }else reset();\n      return;\n    }\n    if(value.startsWith(':'))return;\n    const colon=value.indexOf(':');\n    const field=colon<0 ? value : value.slice(0,colon);\n    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n    if(field==='data')data.push(fieldValue);\n    else if(field==='event')event=fieldValue;\n  };\n  const ensureActive=()=>{\n    if(poisoned)throw new Error('decoder is poisoned');\n    if(finished)fail(new Error('decoder is finished'));\n  };\n\n  return {\n    push(chunk){\n      try{\n        ensureActive();\n        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n        text+=utf8.decode(chunk,{stream:true});\n        const frames=[];\n        let newline;\n        while((newline=text.indexOf('\\n'))>=0){\n          let complete=text.slice(0,newline);\n          text=text.slice(newline+1);\n          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n          line(complete,frames);\n        }\n        return frames;\n      }catch(error){ return fail(error); }\n    },\n    finish(){\n      try{\n        ensureActive();\n        text+=utf8.decode();\n        if(text!=='')throw new Error('unterminated line');\n        if(data.length || event!==undefined)throw new Error('pending frame');\n        if(!terminated)throw new Error('missing termination marker');\n        finished=true;\n        return [];\n      }catch(error){ return fail(error); }\n    },\n  };\n}\n\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}\n\nfunction runCli(){\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const source=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(fs.readFileSync(process.argv[2]));\n    const input=JSON.parse(source);\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks){\n      for(const frame of decoder.push(decodeBase64(encoded)))frames.push(frame);\n    }\n    for(const frame of decoder.finish())frames.push(frame);\n    process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode=2;\n  }\n}\n\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n\n--- edge regressions ---\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\ntest('decoder retains completion and failure edge cases',()=>{\n  for(const suffix of ['data: [DONE]\\n\\n',': comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n    const d=createDecoder();\n    assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n    assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n  }\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:' one\\na\\r'}]);\n  assert.throws(()=>d.finish(),Error);\n  const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n  assert.throws(()=>pending.finish(),Error);\n  const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n  utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n  const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n  const partial=createDecoder();\n  const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n  assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n});\n\ntest('CLI handles large frame batches and rejects malformed UTF-8 files',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const file=path.join(dir,'large.json');\n    const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n    fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n    const large=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16*1024*1024});\n    assert.equal(large.status,0);assert.equal(large.stderr,'');\n    const frames=JSON.parse(large.stdout).frames;\n    assert.equal(frames.length,150000);\n    assert.deepEqual(frames[0],{event:'message',data:'x'});\n    assert.deepEqual(frames.at(-1),{event:'message',data:'x'});\n    const malformed=path.join(dir,'malformed.json');\n    fs.writeFileSync(malformed,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n    const bad=spawnSync(process.execPath,['stream-framer.js',malformed],{encoding:'utf8'});\n    assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.notEqual(bad.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n",
+        "timedOut": false
+      },
+      "atMs": 348525,
+      "endedMs": 349303,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-44"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from './stream-framer.js';\nconst bytes=Buffer.from('\\ufeff\\ufeffdata: ignored\\ndata:  a:b \\ndata: [DONE]x\\n\\nevent: special\\ndata: [DONE]\\n\\n\\r\\n');\nconst expected=[{event:'message',data:' a:b \\n[DONE]x'}];\nfor(let size=1;size<=bytes.length;size++){\n const d=createDecoder(),out=[]; assert.deepEqual(d.push(new Uint8Array()),[]);\n const before=Buffer.from(bytes);\n for(let i=0;i<bytes.length;i+=size)out.push(...d.push(bytes.subarray(i,i+size)));\n assert.deepEqual(out,expected); assert.deepEqual(d.finish(),[]); assert.deepEqual(bytes,before);\n}\nfor(const sequence of [[0xff],[0xc0,0xaf],[0xed,0xa0,0x80],[0xf4,0x90,0x80,0x80],[0x80]]){\n const d=createDecoder();assert.throws(()=>d.push(Uint8Array.from(sequence)),Error);assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n}\nfor(const value of ['',null,undefined,[],{},new ArrayBuffer(1),new Uint16Array(1)]){\n const d=createDecoder();assert.throws(()=>d.push(value),Error);assert.throws(()=>d.finish(),Error);\n}\nconst d=createDecoder(); const previous=d.push(Buffer.from('data: previous\\n\\n'));\nlet result='not returned';assert.throws(()=>{result=d.push(Buffer.from('data: hidden\\n\\ndata: [DONE]\\n\\nunknown\\n'));},Error);\nassert.equal(result,'not returned');assert.deepEqual(previous,[{event:'message',data:'previous'}]);assert.throws(()=>d.finish(),Error);\nconst imported=spawnSync(process.execPath,['--input-type=module','-e',\"await import('./stream-framer.js')\"],{encoding:'utf8'});\nassert.equal(imported.status,0);assert.equal(imported.stdout,'');assert.equal(imported.stderr,'');\nconsole.log('Additional partition, BOM, mutation, UTF-8, poisoning, atomic-return and import checks passed.');\nNODE"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "31d091bf1ff605f15dffba5b94e46d93ec021732",
+        "stderr": "",
+        "stdout": "Additional partition, BOM, mutation, UTF-8, poisoning, atomic-return and import checks passed.\n",
+        "timedOut": false
+      },
+      "atMs": 368763,
+      "endedMs": 369335,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-45"
+    },
+    {
+      "name": "supervisor-finish",
+      "category": "other",
+      "request": {
+        "action": "finish",
+        "jobs": [],
+        "target": "",
+        "text": "Repaired decoder framing, streaming strict UTF-8, termination and poisoned lifecycle handling. Hardened CLI validation and large-frame collection. Added deterministic regression tests with temporary fixtures; npm test passes all 10 tests, and additional protocol/import checks pass."
+      },
+      "output": {
+        "pass": true,
+        "code": 0,
+        "timedOut": false,
+        "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.382973\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.33667\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.692532\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.426071\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.667515\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15341\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.551501\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 289.252919\n  ...\n# Subtest: decoder retains completion and failure edge cases\nok 9 - decoder retains completion and failure edge cases\n  ---\n  duration_ms: 2.064565\n  ...\n# Subtest: CLI handles large frame batches and rejects malformed UTF-8 files\nok 10 - CLI handles large frame batches and rejects malformed UTF-8 files\n  ---\n  duration_ms: 178.202277\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 333.765288\n",
+        "stderr": ""
+      },
+      "atMs": 374491,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-46"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 22273,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 22280,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 22286,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 22293,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 22300,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 224592,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 224601,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 224608,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 224616,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 224650,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 224694,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 224738,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 224772,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 261067,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 261074,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 261081,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 261089,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 261096,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 343452,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 343459,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 343467,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 343475,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 343483,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 343491,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 343499,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 343506,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Repaired decoder framing, streaming strict UTF-8, termination and poisoned lifecycle handling. Hardened CLI validation and large-frame collection. Added deterministic regression tests with temporary fixtures; npm test passes all 10 tests, and additional protocol/import checks pass.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "afterSha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "before": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-stream-framer\",\"version\":\"1.0.0\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "666a1f1f17514b8a512d7e13df5be17f2924f647d64e57b68f205164b4cee182",
+      "diff": ""
+    },
+    {
+      "path": "stream-framer.js",
+      "state": "changed",
+      "beforeSha256": "04e3d63b176c064b3c6137eb0fb73a9e1b37b68ef4050b27ddc913cee253b9fb",
+      "afterSha256": "15863c40e54aa942abb30f30f3d3c8c73157d116392aaf5d26e31991466251ea",
+      "before": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n// Deliberately flawed: transport chunks are not complete lines or frames.\nexport function createDecoder(){\n  let ended=false;\n  return {\n    push(chunk){\n      const frames=[];\n      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n        if(line.startsWith('data:')){\n          const data=line.slice(5).trim();\n          if(data==='[DONE]')ended=true;\n          else frames.push({event:'message',data});\n        }\n      }\n      return frames;\n    },\n    finish(){return [];},\n  };\n}\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n  try{\n    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n    const decoder=createDecoder(),frames=[];\n    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n}\n",
+      "after": "import fs from 'node:fs';\nimport path from 'node:path';\nimport {fileURLToPath} from 'node:url';\n\n/** Create an independent decoder for the small line-framed protocol. */\nexport function createDecoder(){\n  const utf8=new TextDecoder('utf-8',{fatal:true});\n  let text='';\n  let data=[];\n  let event;\n  let terminated=false;\n  let finished=false;\n  let poisoned=false;\n\n  const fail=(error)=>{\n    poisoned=true;\n    throw error instanceof Error ? error : new Error(String(error));\n  };\n  const reset=()=>{ data=[]; event=undefined; };\n  const line=(value,frames)=>{\n    if(terminated){\n      if(value!=='')throw new Error('content after termination');\n      return;\n    }\n    if(value===''){\n      if(data.length){\n        const joined=data.join('\\n');\n        const name=event ? event : 'message';\n        reset();\n        if(joined==='[DONE]')terminated=true;\n        else frames.push({event:name,data:joined});\n      }else reset();\n      return;\n    }\n    if(value.startsWith(':'))return;\n    const colon=value.indexOf(':');\n    const field=colon<0 ? value : value.slice(0,colon);\n    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n    if(field==='data')data.push(fieldValue);\n    else if(field==='event')event=fieldValue;\n  };\n  const ensureActive=()=>{\n    if(poisoned)throw new Error('decoder is poisoned');\n    if(finished)fail(new Error('decoder is finished'));\n  };\n\n  return {\n    push(chunk){\n      try{\n        ensureActive();\n        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n        text+=utf8.decode(chunk,{stream:true});\n        const frames=[];\n        let newline;\n        while((newline=text.indexOf('\\n'))>=0){\n          let complete=text.slice(0,newline);\n          text=text.slice(newline+1);\n          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n          line(complete,frames);\n        }\n        return frames;\n      }catch(error){ return fail(error); }\n    },\n    finish(){\n      try{\n        ensureActive();\n        text+=utf8.decode();\n        if(text!=='')throw new Error('unterminated line');\n        if(data.length || event!==undefined)throw new Error('pending frame');\n        if(!terminated)throw new Error('missing termination marker');\n        finished=true;\n        return [];\n      }catch(error){ return fail(error); }\n    },\n  };\n}\n\nfunction decodeBase64(value){\n  if(typeof value!=='string')throw new Error('chunks must contain strings');\n  const bytes=Buffer.from(value,'base64');\n  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n  return bytes;\n}\n\nfunction runCli(){\n  try{\n    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n    const source=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(fs.readFileSync(process.argv[2]));\n    const input=JSON.parse(source);\n    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n      throw new Error('input must be an object with chunks array');\n    }\n    const decoder=createDecoder();\n    const frames=[];\n    for(const encoded of input.chunks){\n      for(const frame of decoder.push(decodeBase64(encoded)))frames.push(frame);\n    }\n    for(const frame of decoder.finish())frames.push(frame);\n    process.stdout.write(JSON.stringify({frames})+'\\n');\n  }catch(error){\n    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n    process.exitCode=2;\n  }\n}\n\nif(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n",
+      "displaySha256": "15863c40e54aa942abb30f30f3d3c8c73157d116392aaf5d26e31991466251ea",
+      "diff": "--- starter/stream-framer.js\n+++ delivered/stream-framer.js\n@@ -2,30 +2,106 @@\n import path from 'node:path';\n import {fileURLToPath} from 'node:url';\n \n-// Deliberately flawed: transport chunks are not complete lines or frames.\n+/** Create an independent decoder for the small line-framed protocol. */\n export function createDecoder(){\n-  let ended=false;\n+  const utf8=new TextDecoder('utf-8',{fatal:true});\n+  let text='';\n+  let data=[];\n+  let event;\n+  let terminated=false;\n+  let finished=false;\n+  let poisoned=false;\n+\n+  const fail=(error)=>{\n+    poisoned=true;\n+    throw error instanceof Error ? error : new Error(String(error));\n+  };\n+  const reset=()=>{ data=[]; event=undefined; };\n+  const line=(value,frames)=>{\n+    if(terminated){\n+      if(value!=='')throw new Error('content after termination');\n+      return;\n+    }\n+    if(value===''){\n+      if(data.length){\n+        const joined=data.join('\\n');\n+        const name=event ? event : 'message';\n+        reset();\n+        if(joined==='[DONE]')terminated=true;\n+        else frames.push({event:name,data:joined});\n+      }else reset();\n+      return;\n+    }\n+    if(value.startsWith(':'))return;\n+    const colon=value.indexOf(':');\n+    const field=colon<0 ? value : value.slice(0,colon);\n+    let fieldValue=colon<0 ? '' : value.slice(colon+1);\n+    if(fieldValue.startsWith(' '))fieldValue=fieldValue.slice(1);\n+    if(field==='data')data.push(fieldValue);\n+    else if(field==='event')event=fieldValue;\n+  };\n+  const ensureActive=()=>{\n+    if(poisoned)throw new Error('decoder is poisoned');\n+    if(finished)fail(new Error('decoder is finished'));\n+  };\n+\n   return {\n     push(chunk){\n-      const frames=[];\n-      for(const line of Buffer.from(chunk).toString('utf8').split('\\n')){\n-        if(line.startsWith('data:')){\n-          const data=line.slice(5).trim();\n-          if(data==='[DONE]')ended=true;\n-          else frames.push({event:'message',data});\n+      try{\n+        ensureActive();\n+        if(!(chunk instanceof Uint8Array))throw new Error('chunk must be a Uint8Array');\n+        text+=utf8.decode(chunk,{stream:true});\n+        const frames=[];\n+        let newline;\n+        while((newline=text.indexOf('\\n'))>=0){\n+          let complete=text.slice(0,newline);\n+          text=text.slice(newline+1);\n+          if(complete.endsWith('\\r'))complete=complete.slice(0,-1);\n+          line(complete,frames);\n         }\n-      }\n-      return frames;\n+        return frames;\n+      }catch(error){ return fail(error); }\n     },\n-    finish(){return [];},\n+    finish(){\n+      try{\n+        ensureActive();\n+        text+=utf8.decode();\n+        if(text!=='')throw new Error('unterminated line');\n+        if(data.length || event!==undefined)throw new Error('pending frame');\n+        if(!terminated)throw new Error('missing termination marker');\n+        finished=true;\n+        return [];\n+      }catch(error){ return fail(error); }\n+    },\n   };\n }\n-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){\n+\n+function decodeBase64(value){\n+  if(typeof value!=='string')throw new Error('chunks must contain strings');\n+  const bytes=Buffer.from(value,'base64');\n+  if(bytes.toString('base64')!==value)throw new Error('invalid canonical base64');\n+  return bytes;\n+}\n+\n+function runCli(){\n   try{\n-    if(process.argv.length!==3)throw Error('usage: stream-framer.js INPUT_JSON_FILE');\n-    const input=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));\n-    const decoder=createDecoder(),frames=[];\n-    for(const encoded of input.chunks)frames.push(...decoder.push(Buffer.from(encoded,'base64')));\n-    frames.push(...decoder.finish());process.stdout.write(JSON.stringify({frames})+'\\n');\n-  }catch(error){process.stderr.write(String(error.message)+'\\n');process.exitCode=2;}\n+    if(process.argv.length!==3)throw new Error('usage: stream-framer.js INPUT_JSON_FILE');\n+    const source=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(fs.readFileSync(process.argv[2]));\n+    const input=JSON.parse(source);\n+    if(input===null || Array.isArray(input) || typeof input!=='object' || !Array.isArray(input.chunks)){\n+      throw new Error('input must be an object with chunks array');\n+    }\n+    const decoder=createDecoder();\n+    const frames=[];\n+    for(const encoded of input.chunks){\n+      for(const frame of decoder.push(decodeBase64(encoded)))frames.push(frame);\n+    }\n+    for(const frame of decoder.finish())frames.push(frame);\n+    process.stdout.write(JSON.stringify({frames})+'\\n');\n+  }catch(error){\n+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);\n+    process.exitCode=2;\n+  }\n }\n+\n+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))runCli();\n"
+    },
+    {
+      "path": "test/public.test.js",
+      "state": "unchanged",
+      "beforeSha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "afterSha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport {createDecoder} from '../stream-framer.js';\ntest('dispatch only at a blank line, then require explicit termination',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: hello\\n')),[]);\n  assert.deepEqual(d.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[{event:'message',data:'hello'}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('UTF-8 and CRLF survive one-byte transport chunks',()=>{\n  const d=createDecoder(),frames=[];\n  for(const byte of Buffer.from('data: 雪😀\\r\\n\\r\\ndata: [DONE]\\n\\n'))frames.push(...d.push(Uint8Array.of(byte)));\n  assert.deepEqual(d.finish(),[]);assert.deepEqual(frames,[{event:'message',data:'雪😀'}]);\n});\ntest('event names, multiple data lines, and empty data',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: delta\\ndata: a\\ndata: b\\n\\ndata\\n\\ndata: [DONE]\\n\\n')),[\n    {event:'delta',data:'a\\nb'},{event:'message',data:''}]);\n  assert.deepEqual(d.finish(),[]);\n});\ntest('missing termination and post-finish activity are errors',()=>{\n  assert.throws(()=>createDecoder().finish(),Error);\n  const d=createDecoder();d.push(Buffer.from('data: [DONE]\\n\\n'));d.finish();\n  assert.throws(()=>d.push(new Uint8Array()),Error);assert.throws(()=>d.finish(),Error);\n});\n",
+      "displaySha256": "6cfcb1e9081e5dade6aff4e6273c20a0c9e5a4a058034b598f6f89371a212cc1",
+      "diff": ""
+    },
+    {
+      "path": "test/stream-framer.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "f1e3dbf71421e47de7a110fb2bdeaed7496a55de8890b82f2f1e3689024d4b98",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\nfunction decode(parts){\n  const d=createDecoder(),out=[];\n  for(const part of parts)out.push(...d.push(part));\n  assert.deepEqual(d.finish(),[]);\n  return out;\n}\n\ntest('all transport partitions, including bytes, give identical frames',()=>{\n  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n  assert.deepEqual(decode([wire]),expected);\n  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n});\n\ntest('parsing preserves protocol details and resets empty frames',()=>{\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n    {event:'message',data:'a\\rb\\n'}]);\n  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n  assert.deepEqual(d.finish(),[]);\n});\n\ntest('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n  const bad=createDecoder();\n  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n  assert.throws(()=>bad.finish(),Error);\n  assert.throws(()=>bad.push(new Uint8Array()),Error);\n  const invalidUtf8=createDecoder();\n  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n  const split=createDecoder();\n  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n  assert.deepEqual(split.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[]);\n  assert.deepEqual(split.finish(),[]);\n  const incomplete=createDecoder();\n  incomplete.push(Buffer.from('data: x'));\n  assert.throws(()=>incomplete.finish(),Error);\n  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n  const okay=createDecoder();\n  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n  assert.deepEqual(okay.finish(),[]);\n  assert.throws(()=>createDecoder().push('not bytes'),Error);\n});\n\ntest('CLI validates envelope, canonical base64, protocol, and output',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const run=(input)=>{\n      const file=path.join(dir,'input.json');\n      fs.writeFileSync(file,JSON.stringify(input));\n      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n    };\n    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n    assert.equal(good.status,0);assert.equal(good.stderr,'');\n    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n    for(const input of invalid){\n      const result=run(input);\n      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n    }\n    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n",
+      "displaySha256": "f1e3dbf71421e47de7a110fb2bdeaed7496a55de8890b82f2f1e3689024d4b98",
+      "diff": "--- starter/test/stream-framer.test.js\n+++ delivered/test/stream-framer.test.js\n@@ -0,0 +1,81 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import {spawnSync} from 'node:child_process';\n+import {createDecoder} from '../stream-framer.js';\n+\n+function decode(parts){\n+  const d=createDecoder(),out=[];\n+  for(const part of parts)out.push(...d.push(part));\n+  assert.deepEqual(d.finish(),[]);\n+  return out;\n+}\n+\n+test('all transport partitions, including bytes, give identical frames',()=>{\n+  const wire=Buffer.from('\\ufeffevent: snow\\r\\ndata: 雪😀\\ndata: second\\n\\ndata: [DONE]\\n\\n');\n+  const expected=[{event:'snow',data:'雪😀\\nsecond'}];\n+  assert.deepEqual(decode([wire]),expected);\n+  for(let i=0;i<=wire.length;i++)assert.deepEqual(decode([wire.subarray(0,i),wire.subarray(i)]),expected);\n+  assert.deepEqual(decode([...wire].map(byte=>Uint8Array.of(byte))),expected);\n+});\n+\n+test('parsing preserves protocol details and resets empty frames',()=>{\n+  const d=createDecoder();\n+  assert.deepEqual(d.push(Buffer.from('event: old\\n: note\\nx: ignored\\n\\ndata: a\\rb\\ndata\\nevent:\\n\\n')),[\n+    {event:'message',data:'a\\rb\\n'}]);\n+  assert.deepEqual(d.push(Buffer.from('data: \\ufeffx\\n\\ndata: [DONE]\\n\\n')), [{event:'message',data:'\\ufeffx'}]);\n+  assert.deepEqual(d.finish(),[]);\n+});\n+\n+test('strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder',()=>{\n+  const bad=createDecoder();\n+  assert.deepEqual(bad.push(Uint8Array.of(0xc3)),[]);\n+  assert.throws(()=>bad.finish(),Error);\n+  assert.throws(()=>bad.push(new Uint8Array()),Error);\n+  const invalidUtf8=createDecoder();\n+  assert.throws(()=>invalidUtf8.push(Uint8Array.of(0xc3,0x28)),Error);\n+  const split=createDecoder();\n+  assert.deepEqual(split.push(Uint8Array.of(0xc3)),[]);\n+  assert.deepEqual(split.push(Uint8Array.of(0xa9)),[]);\n+  assert.deepEqual(split.push(Buffer.from('\\ndata: [DONE]\\n\\n')),[]);\n+  assert.deepEqual(split.finish(),[]);\n+  const incomplete=createDecoder();\n+  incomplete.push(Buffer.from('data: x'));\n+  assert.throws(()=>incomplete.finish(),Error);\n+  assert.throws(()=>incomplete.push(new Uint8Array()),Error);\n+  const d=createDecoder();\n+  assert.deepEqual(d.push(Buffer.from('data: good\\n\\ndata: [DONE]\\n\\n')),[{event:'message',data:'good'}]);\n+  assert.throws(()=>d.push(Buffer.from(': forbidden\\n')),Error);\n+  const okay=createDecoder();\n+  okay.push(Buffer.from('data: [DONE]\\n\\n\\n'));\n+  assert.deepEqual(okay.finish(),[]);\n+  assert.throws(()=>createDecoder().push('not bytes'),Error);\n+});\n+\n+test('CLI validates envelope, canonical base64, protocol, and output',()=>{\n+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n+  try{\n+    const run=(input)=>{\n+      const file=path.join(dir,'input.json');\n+      fs.writeFileSync(file,JSON.stringify(input));\n+      return spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8'});\n+    };\n+    const good=run({chunks:[Buffer.from('data: hi\\n\\ndata: [DONE]\\n\\n').toString('base64')],extra:true});\n+    assert.equal(good.status,0);assert.equal(good.stderr,'');\n+    assert.equal(good.stdout,'{\"frames\":[{\"event\":\"message\",\"data\":\"hi\"}]}\\n');\n+    const invalid=[null,[],{}, {chunks:'x'}, {chunks:['Zg']}, {chunks:['Zh==']}, {chunks:['Zm8= ']}, {chunks:['____']}, {chunks:[Buffer.from('data: x\\n\\n').toString('base64')]}];\n+    for(const input of invalid){\n+      const result=run(input);\n+      assert.equal(result.status,2);assert.equal(result.stdout,'');assert.notEqual(result.stderr,'');\n+    }\n+    fs.writeFileSync(path.join(dir,'bad.json'),'{');\n+    const malformed=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'bad.json')],{encoding:'utf8'});\n+    assert.equal(malformed.status,2);assert.equal(malformed.stdout,'');assert.notEqual(malformed.stderr,'');\n+    const missing=spawnSync(process.execPath,['stream-framer.js'],{encoding:'utf8'});\n+    assert.equal(missing.status,2);assert.equal(missing.stdout,'');assert.notEqual(missing.stderr,'');\n+    const extra=spawnSync(process.execPath,['stream-framer.js',path.join(dir,'input.json'),'extra'],{encoding:'utf8'});\n+    assert.equal(extra.status,2);assert.equal(extra.stdout,'');assert.notEqual(extra.stderr,'');\n+  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n+});\n"
+    },
+    {
+      "path": "test/transport-regressions.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "5f801f193f594213fac37a59b6d068c2c270403048134e685b3283e5c5ff5733",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport {spawnSync} from 'node:child_process';\nimport {createDecoder} from '../stream-framer.js';\n\ntest('decoder retains completion and failure edge cases',()=>{\n  for(const suffix of ['data: [DONE]\\n\\n',': comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n    const d=createDecoder();\n    assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n    assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n  }\n  const d=createDecoder();\n  assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:' one\\na\\r'}]);\n  assert.throws(()=>d.finish(),Error);\n  const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n  assert.throws(()=>pending.finish(),Error);\n  const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n  utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n  const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n  const partial=createDecoder();\n  const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n  assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n});\n\ntest('CLI handles large frame batches and rejects malformed UTF-8 files',()=>{\n  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n  try{\n    const file=path.join(dir,'large.json');\n    const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n    fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n    const large=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16*1024*1024});\n    assert.equal(large.status,0);assert.equal(large.stderr,'');\n    const frames=JSON.parse(large.stdout).frames;\n    assert.equal(frames.length,150000);\n    assert.deepEqual(frames[0],{event:'message',data:'x'});\n    assert.deepEqual(frames.at(-1),{event:'message',data:'x'});\n    const malformed=path.join(dir,'malformed.json');\n    fs.writeFileSync(malformed,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n    const bad=spawnSync(process.execPath,['stream-framer.js',malformed],{encoding:'utf8'});\n    assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.notEqual(bad.stderr,'');\n  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n});\n",
+      "displaySha256": "5f801f193f594213fac37a59b6d068c2c270403048134e685b3283e5c5ff5733",
+      "diff": "--- starter/test/transport-regressions.test.js\n+++ delivered/test/transport-regressions.test.js\n@@ -0,0 +1,47 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import {spawnSync} from 'node:child_process';\n+import {createDecoder} from '../stream-framer.js';\n+\n+test('decoder retains completion and failure edge cases',()=>{\n+  for(const suffix of ['data: [DONE]\\n\\n',': comment\\n','x: ignored\\n','event: late\\n','data: late\\n']){\n+    const d=createDecoder();\n+    assert.deepEqual(d.push(Buffer.from('data: [DONE]\\n\\n')),[]);\n+    assert.throws(()=>d.push(Buffer.from(suffix)),Error);\n+  }\n+  const d=createDecoder();\n+  assert.deepEqual(d.push(Buffer.from('event: first\\nevent: last\\ndata:  one\\ndata: a\\r\\r\\n\\n')),[{event:'last',data:' one\\na\\r'}]);\n+  assert.throws(()=>d.finish(),Error);\n+  const pending=createDecoder();pending.push(Buffer.from('data: [DONE]\\n'));\n+  assert.throws(()=>pending.finish(),Error);\n+  const utf8=createDecoder();utf8.push(Buffer.from('data: [DONE]\\n\\n'));\n+  utf8.push(Uint8Array.of(0xc3));assert.throws(()=>utf8.finish(),Error);\n+  const once=createDecoder();once.push(Buffer.from('data: [DONE]\\n\\n'));assert.deepEqual(once.finish(),[]);assert.throws(()=>once.finish(),Error);\n+  const partial=createDecoder();\n+  const earlier=partial.push(Buffer.from('data: kept\\n\\n'));\n+  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n+  assert.throws(()=>partial.push(Uint8Array.of(0xc3,0x28)),Error);\n+  assert.deepEqual(earlier,[{event:'message',data:'kept'}]);\n+});\n+\n+test('CLI handles large frame batches and rejects malformed UTF-8 files',()=>{\n+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'framer-'));\n+  try{\n+    const file=path.join(dir,'large.json');\n+    const wire='data: x\\n\\n'.repeat(150000)+'data: [DONE]\\n\\n';\n+    fs.writeFileSync(file,JSON.stringify({chunks:[Buffer.from(wire).toString('base64')]}));\n+    const large=spawnSync(process.execPath,['stream-framer.js',file],{encoding:'utf8',maxBuffer:16*1024*1024});\n+    assert.equal(large.status,0);assert.equal(large.stderr,'');\n+    const frames=JSON.parse(large.stdout).frames;\n+    assert.equal(frames.length,150000);\n+    assert.deepEqual(frames[0],{event:'message',data:'x'});\n+    assert.deepEqual(frames.at(-1),{event:'message',data:'x'});\n+    const malformed=path.join(dir,'malformed.json');\n+    fs.writeFileSync(malformed,Buffer.concat([Buffer.from('{\"chunks\":[\"ZGF0YTogW0RPTkVdCgo=\"],\"extra\":\"'),Buffer.from([0xff]),Buffer.from('\"}') ]));\n+    const bad=spawnSync(process.execPath,['stream-framer.js',malformed],{encoding:'utf8'});\n+    assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.notEqual(bad.stderr,'');\n+  }finally{fs.rmSync(dir,{recursive:true,force:true});}\n+});\n"
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> factory-stream-framer@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: dispatch only at a blank line, then require explicit termination\nok 1 - dispatch only at a blank line, then require explicit termination\n  ---\n  duration_ms: 1.360232\n  ...\n# Subtest: UTF-8 and CRLF survive one-byte transport chunks\nok 2 - UTF-8 and CRLF survive one-byte transport chunks\n  ---\n  duration_ms: 0.32772\n  ...\n# Subtest: event names, multiple data lines, and empty data\nok 3 - event names, multiple data lines, and empty data\n  ---\n  duration_ms: 0.659011\n  ...\n# Subtest: missing termination and post-finish activity are errors\nok 4 - missing termination and post-finish activity are errors\n  ---\n  duration_ms: 0.360161\n  ...\n# Subtest: all transport partitions, including bytes, give identical frames\nok 5 - all transport partitions, including bytes, give identical frames\n  ---\n  duration_ms: 2.698635\n  ...\n# Subtest: parsing preserves protocol details and resets empty frames\nok 6 - parsing preserves protocol details and resets empty frames\n  ---\n  duration_ms: 0.15315\n  ...\n# Subtest: strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\nok 7 - strict UTF-8, unfinished input, DONE rules, and failures poison only one decoder\n  ---\n  duration_ms: 0.554641\n  ...\n# Subtest: CLI validates envelope, canonical base64, protocol, and output\nok 8 - CLI validates envelope, canonical base64, protocol, and output\n  ---\n  duration_ms: 293.33023\n  ...\n# Subtest: decoder retains completion and failure edge cases\nok 9 - decoder retains completion and failure edge cases\n  ---\n  duration_ms: 2.066294\n  ...\n# Subtest: CLI handles large frame batches and rejects malformed UTF-8 files\nok 10 - CLI handles large frame batches and rejects malformed UTF-8 files\n  ---\n  duration_ms: 172.481717\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 338.29336\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"stream-framer\",\"pass\":true,\"groups\":[{\"name\":\"utf8-and-arbitrary-chunk-boundaries\",\"pass\":true},{\"name\":\"field-parsing-and-frame-dispatch\",\"pass\":true},{\"name\":\"termination-and-finish-state\",\"pass\":true},{\"name\":\"invalid-input-and-poisoned-decoder\",\"pass\":true},{\"name\":\"cli-canonical-chunks-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "ca0cab6ca4c04347041261d491ed63c768f1f76ef6d5409c4adae858e67e3e55"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "3211cc063e6a3c90f5de023205b6aa56f0d02cec4feab0430caa71c9b7d7c8f1"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "c7f09eda32e1c8258094db915ce72bcfab16985cf5982f342293623e4843f815"
+    },
+    {
+      "kind": "supervisor-completion-record",
+      "sha256": "040d7d23bc5fc898e5fe089f1d664db86da27409f9e4b7bb32b8eca3a39dd194"
+    },
+    {
+      "kind": "supervisor-action-journal",
+      "sha256": "a4b7a56e6b7c0ac9acd5df490d7af385f2eba1d5b818e9a989a7e38a34e9d6a4"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "96d5d2e32b0464af06f74a62d0130166534e52fb27d94e8732927398c4550e3f"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "1ec59675550ff025d060ac926fafc7473a7c39b3d10d65a78a6b4d01b2d8ce2f"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "94c7d3906a359a3ea6ddbd71c98f1b7aff83710448e7e2ed11bd15028d450a1d"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "6f2f11962999edc211527204be6c6d0807b3c0fce8710563fc6a80bdb8fddcd6"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "39ace6e15a3faafe011f6bc8236348e6f7479ae013568dde18a1519b105d4c48"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 46,
+    "withResults": 46,
+    "normalizedPathOccurrences": 9,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Astra reviews. Terra closes the gaps.",
+    "paragraphs": [
+      {
+        "text": "Terra repaired framing and decoding. Astra’s review reproduced a large-chunk CLI crash and found malformed UTF-8 file bytes being accepted through replacement decoding.",
+        "actions": [
+          "action-2",
+          "action-26",
+          "action-27"
+        ]
+      },
+      {
+        "text": "Terra repaired both issues and retained regressions. Astra inspected the integrated changes and exercised additional protocol boundaries. All five acceptance groups passed; both models’ usage is counted.",
+        "actions": [
+          "action-28",
+          "action-44",
+          "action-45",
+          "action-46"
+        ]
+      }
+    ]
+  }
+}

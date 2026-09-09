@@ -24,6 +24,28 @@ test("recovery reads typed evidence, survives repeated reads, and retires on a m
 });
 
 const reminderOptions = { generation: 6, workspace: "/fixture/workspace", configuredCommand: "npm test" };
+
+test('a clean successful AND chain retires exactly the focused checks it executed', () => {
+  const a = 'node test/player.js', b = 'node test/station.js';
+  const failed = reminderTurn(0, [reminderEntry(a, 1), reminderEntry(b, 1)]);
+  assert.equal(latestUnresolvedFocusedFailure([failed,
+    reminderTurn(1, [reminderEntry(`${a} && ${b}`)])], reminderOptions), null);
+  assert.equal(latestUnresolvedFocusedFailure([failed,
+    reminderTurn(1, [reminderEntry(`${a} && node test/other.js`)])], reminderOptions).command, b);
+  for (const command of [
+    `${a} && ${b}`, `${a}; ${b}`, `${a} || ${b}`, `exit 0 && ${b}`,
+    `cd /elsewhere && ${b}`, `true && ${b}`, `${a} && ${b} --filter=other`,
+    `${a} && ${b} | cat`, `${a} && ${b} # && node test/other.js`,
+    `node test/other.js && node -e 'console.log("${b}")'`,
+  ]) {
+    const entry = reminderEntry(command, command === `${a} && ${b}` ? 1 : 0);
+    assert.ok(latestUnresolvedFocusedFailure([failed, reminderTurn(1, [entry])], reminderOptions), command);
+  }
+  for (const flag of ['invalidated', 'timedOut', 'interrupted']) {
+    const entry = reminderEntry(`${a} && ${b}`); entry.shellExecution[flag] = true;
+    assert.ok(latestUnresolvedFocusedFailure([failed, reminderTurn(1, [entry])], reminderOptions), flag);
+  }
+});
 function reminderEntry(command, exitCode = 0, generation = 6) {
   const shellExecution = { command, executedCommand: command, exitCode, generation,
     cwd: reminderOptions.workspace, workspaceReadOnly: false, sandbox: "host",

@@ -4,6 +4,7 @@ import { canonicalAuditCommand, sameAuditCommand, sameRecordedCommand, isConfigu
 import { verificationExecutionEntries } from './verification-failure-context.js';
 import { turnEditApplied } from './edit-actions.js';
 import crypto from 'node:crypto';
+import { successfulCheckCommands } from './verification-chain.js';
 
 const LIMITS = { evidenceSha256: 64, fixture: 700, priorExpected: 400,
   proposedExpected: 400, requirement: 400, nextCheck: 400 };
@@ -19,7 +20,8 @@ function measured(entry) {
       || typeof value.cwd !== 'string' || !value.cwd.startsWith('/')
       || typeof value.command !== 'string' || value.command.length > 1600
       || typeof value.executedCommand !== 'string' || value.executedCommand.length > 1600
-      || !canonicalAuditCommand(value.command)) return null;
+      || (!canonicalAuditCommand(value.command)
+        && !(value.exitCode === 0 && successfulCheckCommands(value.command, proof?.configuredCommand).length))) return null;
   if (proof) {
     if (proof.schema !== 1 || !['shell','automatic','scoped','landing','completion'].includes(proof.source)
         || !['pass','fail'].includes(proof.status) || proof.statusScope !== 'execution'
@@ -41,6 +43,12 @@ function executions(turn, index) {
   return verificationExecutionEntries(turn, index).map((entry, sequence) => {
     const value = measured(entry); return value ? { ...value, sequence } : null;
   }).filter(Boolean);
+}
+
+function matchesCheck(execution, command) {
+  return sameAuditCommand(execution.executedCommand, command)
+    || (execution.status === 'pass' && successfulCheckCommands(execution.executedCommand, execution.configuredCommand)
+      .some(part => sameAuditCommand(part, command)));
 }
 
 function linkProposal(proposal, turns, { generation, workspace }) {
@@ -113,17 +121,20 @@ export function repairHandoffContext(turns, { generation, workspace, readSource 
     if (!expected || JSON.stringify(expected) !== JSON.stringify(turn.repairHandoff)) continue;
     // Controller checks can execute after the edit in this same sealed turn.
     // Generation binding prevents pre-edit receipts from settling the repair.
+    // Once checked successfully, this particular repair proposal is settled.
+    // Later unrelated edits do not resurrect it; current-tree completion proof
+    // is still enforced independently by the verification gates.
     const later = turns.slice(i).flatMap((t,j) => executions(t,i+j));
     const pending = (expected.repairs ?? [expected]).filter(item => {
-      const last = later.filter(e => e.cwd === workspace && e.generation === generation
-        && sameAuditCommand(e.executedCommand,item.proposal.nextCheck)).at(-1);
+      const last = later.filter(e => e.cwd === workspace && e.generation >= item.generation && e.generation <= generation
+        && matchesCheck(e,item.proposal.nextCheck)).at(-1);
       return last?.status !== 'pass';
     });
     if (!pending.length) return '';
     const text = '[repair handoff; advisory, NOT verification evidence]\n'
       + pending.map(item => {
-        const last = later.filter(e => e.cwd === workspace && e.generation === generation
-          && sameAuditCommand(e.executedCommand,item.proposal.nextCheck)).at(-1);
+        const last = later.filter(e => e.cwd === workspace && e.generation >= item.generation && e.generation <= generation
+          && matchesCheck(e,item.proposal.nextCheck)).at(-1);
         return 'Observed process receipt (execution/exit only): ' + JSON.stringify(item.observation)
         + '\nWorker-proposed fixture, implementation decision or expectation correction (NOT independently established): '
         + JSON.stringify(item.proposal)

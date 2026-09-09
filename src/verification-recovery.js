@@ -3,6 +3,7 @@
 import { canonicalAuditCommand } from "./verification-command.js";
 import { isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { canonicalEncode } from "./factory/fact-fabric.js";
+import { successfulCheckCommands } from "./verification-chain.js";
 
 export function latestVerificationRecovery(turns = []) {
   for (let index = turns.length - 1; index >= 0; index--) {
@@ -58,7 +59,8 @@ function reminderExecution(entry, { generation, workspace, configuredCommand }) 
       || (workspace != null && shell.cwd !== workspace)
       || typeof shell.command !== "string" || !shell.command || shell.command.length > 4096
       || typeof shell.executedCommand !== "string" || !shell.executedCommand || shell.executedCommand.length > 4096
-      || !isFocusedAuditCommand(shell.executedCommand, configuredCommand)) return null;
+      || (!isFocusedAuditCommand(shell.executedCommand, configuredCommand)
+        && !(shell.exitCode === 0 && successfulCheckCommands(shell.executedCommand, configuredCommand).length))) return null;
   if (proof != null) {
     if (!record(proof) || proof.schema !== 1 || proof.source !== "shell" || badExecution(proof)
         || !HASH.test(proof.outputSha256 ?? "") || proof.statusScope !== "execution"
@@ -87,6 +89,10 @@ export function latestUnresolvedFocusedFailure(turns = [], { generation = null, 
       const key = `${shell.cwd}\0${canonicalAuditCommand(shell.executedCommand) ?? shell.executedCommand}`;
       if (shell.exitCode === 0) {
         if (pending.has(key) && shell.generation >= pending.get(key).generation) pending.delete(key);
+        for (const command of successfulCheckCommands(shell.executedCommand, configuredCommand)) {
+          const checkKey = `${shell.cwd}\0${command}`;
+          if (pending.has(checkKey) && shell.generation >= pending.get(checkKey).generation) pending.delete(checkKey);
+        }
       } else {
         pending.delete(key);
         pending.set(key, { command: shell.executedCommand, generation: shell.generation, turn: index, exitCode: shell.exitCode });

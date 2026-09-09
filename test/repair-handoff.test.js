@@ -11,6 +11,22 @@ const proposal = { evidenceSha256: 'a'.repeat(64), fixture: 'abc with insertions
   priorExpected: 'aXYbc', proposedExpected: 'aXbYc', requirement: 'Offsets refer to the original string', nextCheck: 'node check.mjs' };
 const action = { a: 'write_file', p: 'source.mjs', content: 'export const fixed = true;', repair: [proposal] };
 function repaired() { return { action, editApplied: true, repairHandoff: createRepairHandoff(action, [failed], options) }; }
+
+test('an actual successful AND chain settles a matching repair proposal without fabricating per-check receipts', () => {
+  const turns = [failed, repaired()];
+  const command = 'node check-other.mjs && node check.mjs';
+  const pass = { shellExecution: { ...failed.shellExecution, generation: 2, exitCode: 0, command, executedCommand: command } };
+  assert.equal(repairHandoffContext([...turns, pass], options), '');
+  assert.equal(repairHandoffContext([...turns, pass], { ...options, generation: 3 }), '',
+    'later edits require fresh completion checks but do not resurrect a settled repair hypothesis');
+  assert.match(repairHandoffContext([...turns, pass, { shellExecution: { ...failed.shellExecution, generation: 3 } }],
+    { ...options, generation: 3 }), /most recently exited 1/);
+  for (const change of [{ exitCode: 1 }, { generation: 1 }, { invalidated: true }, { cwd: '/different' }]) {
+    assert.match(repairHandoffContext([...turns, { shellExecution: { ...pass.shellExecution, ...change } }], options), /no matching current successful execution/);
+  }
+  assert.equal(pass.verificationEvidence, undefined);
+  assert.equal(pass.shellExecution.executedCommand, command);
+});
 test('optional grammar-shaped handoff survives parsing and becomes explicit proposal context, not proof', () => {
   assert.deepEqual(parseAction(JSON.stringify(action)).action, action);
   assert.ok(parseAction(JSON.stringify({ ...action, repair: undefined })).ok);

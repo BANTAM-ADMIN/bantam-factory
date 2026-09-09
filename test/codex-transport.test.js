@@ -602,6 +602,25 @@ test("Codex activity extends the inactivity deadline without extending the hard 
   assert.equal(result.content, "still alive");
 });
 
+test('only a silent ordinary action generator is eligible for a fresh connection', async t => {
+  for (const [options, completeOptions, eligible] of [
+    [{}, {outputSchema: actionJsonSchema(), constrainOutput: false}, true],
+    [{}, {}, false],
+    [{threadConfig: {'features.image_generation': true}}, {outputSchema: actionJsonSchema()}, false],
+    [{}, {outputSchema: actionJsonSchema(), baseInstructions: 'Custom worker'}, false],
+  ]) {
+    const codex = server({timeoutMs: 1000, idleTimeoutMs: 30, ...options});
+    t.after(() => codex.close());
+    await assert.rejects(codex.complete('silent turn', completeOptions), error => {
+      assert.equal(error.canRegenerate, eligible);
+      assert.equal(error.outputChars, 0);
+      assert.ok(Number.isInteger(error.notificationCount));
+      return error.timeoutKind === 'idle';
+    });
+    assert.equal(codex.child, null, 'old connection is retired before any recovery');
+  }
+});
+
 test("Codex control-plane requests are bounded and recycle ambiguous protocol state", async () => {
   const codex = server({
     model: "hold-thread-start",

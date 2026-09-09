@@ -330,6 +330,7 @@ export class ModelClient {
     // Capacity failures do not consume the ordinary budget: the request never ran,
     // so retrying duplicates no upstream work and giving up throws away the whole run.
     let capacityGrants = 0;
+    let silentActionRecoveries = 0;
     let lastErr;
     for (let i = 0; i < attempts; i++) {
       const attempt = {
@@ -372,10 +373,17 @@ export class ModelClient {
           capacityGrants += 1;
           attempts += 1;
         }
+        // One fresh connection can recover a silent text-only Codex action.
+        // Consume the normal retry budget; preserve both attempts and the
+        // missing receipt. Never replay any completed BANTAM tool action.
+        const recoverSilentAction = this.codex && e.code === 'model_timeout'
+          && e.timeoutKind === 'idle' && e.canRegenerate === true
+          && silentActionRecoveries === 0 && i < attempts - 1;
+        if (recoverSilentAction) silentActionRecoveries++;
         if (
           e.code === "context_overflow"
           || e.code === "aborted"
-          || e.retryable === false
+          || (e.retryable === false && !recoverSilentAction)
           || requestOptions.signal?.aborted
           || i === attempts - 1
         ) {
@@ -1116,6 +1124,10 @@ function normalizeRequestError(error) {
     name: error?.name ?? "Error",
     message: error?.message ?? String(error),
     code: error?.code ?? null,
+    ...(error?.timeoutKind ? {timeoutKind: error.timeoutKind} : {}),
+    ...(Number.isInteger(error?.outputChars) ? {outputChars: error.outputChars} : {}),
+    ...(Number.isInteger(error?.notificationCount) ? {notificationCount: error.notificationCount, lastEvent: error.lastEvent ?? null} : {}),
+    ...(typeof error?.canRegenerate === 'boolean' ? {canRegenerate: error.canRegenerate} : {}),
   };
 }
 

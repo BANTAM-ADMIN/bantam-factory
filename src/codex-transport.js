@@ -381,6 +381,9 @@ export class CodexAppServer {
       resolve: null,
       reject: null,
       touch: null,
+      lastEvent: null,
+      notificationCount: 0,
+      nativeActivity: false,
     };
     const completed = new Promise((resolve, reject) => {
       state.resolve = resolve;
@@ -402,10 +405,23 @@ export class CodexAppServer {
         if (state.turnId) {
           this.request("turn/interrupt", { threadId, turnId: state.turnId }).catch(() => {});
         }
-        failTurn(codexTimeoutError(
+        const error = codexTimeoutError(
           `Codex app-server turn made no progress for ${this.idleTimeoutMs}ms`,
           "idle",
-        ), { recycle: true });
+        );
+        Object.assign(error, {
+          outputChars: state.content.length,
+          lastEvent: state.lastEvent,
+          notificationCount: state.notificationCount,
+          // Only the ordinary, tool-disabled action generator may be retried.
+          // No returned action has reached BANTAM's executor. Image jobs,
+          // custom thread configurations and partial replies are excluded.
+          canRegenerate: baseInstructions === BASE_INSTRUCTIONS
+            && Array.isArray(outputSchema?.properties?.a?.enum)
+            && Object.keys(this.threadConfig ?? {}).length === 0
+            && !state.content && !state.images.length && !state.nativeActivity,
+        });
+        failTurn(error, { recycle: true });
       }, this.idleTimeoutMs);
     };
     state.touch = armIdleTimer;
@@ -609,6 +625,11 @@ export class CodexAppServer {
     const state = this.turns.get(params.threadId);
     if (!state) return;
     if (params.turnId && state.turnId && params.turnId !== state.turnId) return;
+    state.lastEvent = method;
+    state.notificationCount++;
+    if (params.item?.type && !['agentMessage', 'reasoning', 'userMessage'].includes(params.item.type)) {
+      state.nativeActivity = true;
+    }
     // Reasoning, token usage, item lifecycle, and assistant deltas are all
     // evidence that the current turn is alive. Only a truly quiet interval
     // should trip the inactivity watchdog.

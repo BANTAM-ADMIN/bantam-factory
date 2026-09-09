@@ -11,7 +11,7 @@ import {factoryKit,PUBLIC_FACTORY_CARDS} from './factory-card-catalog.mjs';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_ARMS = ['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 const ARMS = [...LEGACY_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
-const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','pi':'Pi','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus','claude-fable':'Claude · Fable'};
+const LABELS = {'bantam-local-27b':'BANTAM · 27B','deepseek-local-27b':'DeepSeek Harness','pi':'Pi','opencode':'OpenCode','hermes':'Hermes','codex-astra':'Codex · Astra','bantam-codex-astra':'BANTAM · Astra','bantam-codex-sol':'BANTAM · Sol','bantam-codex-terra':'BANTAM · Terra','codex-sol':'Codex · Sol','codex-terra':'Codex · Terra','claude-sonnet':'Claude · Sonnet','claude-opus':'Claude · Opus','claude-fable':'Claude · Fable'};
 const TITLES = {'receipt-reducer':'Receipt reducer','snapshot-drift':'Snapshot drift','job-planner':'Job planner'};
 const SHA = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const NUM = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;

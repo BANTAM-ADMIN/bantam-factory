@@ -132,7 +132,7 @@ function renderSameModelScoreboard(data){
 }
 
 // Presentation order only; it never reorders portable evidence or implies rank.
-const ARM_ORDER=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','claude-sonnet','claude-opus','claude-fable'];
+const ARM_ORDER=['bantam-local-27b','deepseek-local-27b','opencode','hermes','pi','codex-astra','codex-sol','codex-terra','bantam-codex-astra','bantam-codex-sol','bantam-codex-terra','claude-sonnet','claude-opus','claude-fable'];
 const armRank=arm=>{const i=ARM_ORDER.indexOf(arm);return i<0?ARM_ORDER.length:i;};
 
 function renderReferences(data){

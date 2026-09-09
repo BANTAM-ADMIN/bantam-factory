@@ -21,7 +21,8 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const DEFAULT_KIT_ID='factory-2026-09-06';
 export const DEFAULT_FIGHT_ARMS=['bantam-local-27b','deepseek-local-27b','opencode','hermes','codex-astra','bantam-codex-astra'];
 export const NATIVE_CODEX_MODELS=Object.freeze({'codex-astra':'gpt-6-astra','codex-sol':'gpt-5.6-sol','codex-terra':'gpt-5.6-terra'});
-export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable'];
+export const WRAPPED_CODEX_MODELS=Object.freeze({'bantam-codex-astra':'gpt-6-astra','bantam-codex-sol':'gpt-5.6-sol','bantam-codex-terra':'gpt-5.6-terra'});
+export const FIGHT_ARMS=[...DEFAULT_FIGHT_ARMS,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable','bantam-codex-sol','bantam-codex-terra'];
 export const FIGHT_CARDS=['receipt-reducer','snapshot-drift','job-planner'];
 const LOCAL=new Set([...FIGHT_ARMS.slice(0,4),'pi']);
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -65,7 +66,9 @@ export function freshCommand({arm,task,workspace,dir,endpoint,model,contextToken
       ...(peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm]?['--executable',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].executable,'--executable-sha256',peerExecutables[arm==='deepseek-local-27b'?'deepseek':arm].sha256]:[])],env:{}};
   }
   const nativeModel=NATIVE_CODEX_MODELS[arm];
-  const command=cardCommand(nativeModel?'codex-astra':arm,task,workspace,dir);
+  const wrappedModel=WRAPPED_CODEX_MODELS[arm];
+  const command=cardCommand(nativeModel?'codex-astra':wrappedModel?'bantam-codex-astra':arm,task,workspace,dir);
+  if(wrappedModel)command.args[command.args.indexOf('--model')+1]=wrappedModel;
   command.env={...command.env,ASTRA_CONTAINER_SESSION_DIR:path.join(dir,'native-sessions'),
     ...(arm.includes('codex')&&peerExecutables.codex?{ASTRA_CONTAINER_CODEX_EXECUTABLE:peerExecutables.codex.executable,ASTRA_CONTAINER_CODEX_SHA256:peerExecutables.codex.sha256}:{})};
   if(nativeModel){
@@ -188,6 +191,8 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
   for(const card of cards){const meta=JSON.parse(fs.readFileSync(path.join(kitRoot,card,'card.json'),'utf8'));if(meta.id!==card||!Array.isArray(meta.groups)||!meta.groups.length)throw Error('invalid card descriptor');}
   fs.mkdirSync(output,{recursive:true,mode:0o700});
   write(path.join(output,'local-model.json'),model);
+  const codexModels=Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??WRAPPED_CODEX_MODELS[a]]));
+  const uniqueCodexModels=[...new Set(Object.values(codexModels))];
   const manifest={schema:'bantam.factory-fights.v1',kitId,startedAt:new Date().toISOString(),
     presentation:{selectedParticipantsOnly:true},
     design:`Exploratory system regression/demo on the frozen ${kitId} kit: fresh contender workspaces on already-seen adaptive development tasks, identical starter/task bytes per contender, rotated order within queues. No teacher or manual repairs. Native sampling/tool/resource differences are recorded, not a pure context ablation or held-out evaluation. One repeat is not a statistical ranking. Historical cards remain unchanged.`,
@@ -197,8 +202,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
       localContextTokens,bantamHistoryCharBudget:localContextTokens===null?null:historyCharBudget({contextTokens:localContextTokens,extensionTrajectory:true}),
       bantamWallDeadlineMs:timeoutMs,bantamWallClosureReserveMs:wallClosureReserveMs(timeoutMs)},
     configuration:{bantamContext:'extension/immutable',probeEnabled,teacher:false,
-      codexModel:!arms.some(a=>a.includes('codex'))||arms.some(a=>a==='codex-sol'||a==='codex-terra')?null:'gpt-6-astra',codexEffort:'medium',
-      codexModels:Object.fromEntries(arms.filter(a=>a.includes('codex')).map(a=>[a,NATIVE_CODEX_MODELS[a]??'gpt-6-astra'])),
+      codexModel:uniqueCodexModels.length===1?uniqueCodexModels[0]:null,codexEffort:'medium',codexModels,
       claudeModels:Object.fromEntries(arms.filter(a=>a.startsWith('claude-')).map(a=>[a,{alias:a.slice('claude-'.length),effort:'medium'}])),
       verificationWorkspaceReadOnly,terminalClosure,peerExecutables,peerReadiness,codexReadiness,deepseekReadiness,
       executionSchedule:parallelQueues?'One serial local queue and one serial frontier queue overlap. No two local inference runs overlap; CPU/IO contention with frontier tools remains possible.':'All contenders run serially.',

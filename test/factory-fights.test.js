@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parse} from 'acorn';
 import {factoryKit} from '../scripts/factory-card-catalog.mjs';
-import {fightPlan,FIGHT_ARMS,DEFAULT_FIGHT_ARMS,NATIVE_CODEX_MODELS,FIGHT_CARDS,freshCommand,parseGrade,cleanFightEnv,gradeFactoryFight,runFactoryFights,optionalServerCounters,inspectLocalModel} from '../scripts/factory-fights.mjs';
+import {fightPlan,FIGHT_ARMS,DEFAULT_FIGHT_ARMS,NATIVE_CODEX_MODELS,WRAPPED_CODEX_MODELS,FIGHT_CARDS,freshCommand,parseGrade,cleanFightEnv,gradeFactoryFight,runFactoryFights,optionalServerCounters,inspectLocalModel} from '../scripts/factory-fights.mjs';
 import {counterDelta} from '../scripts/fight-usage.mjs';
 test('fresh plan covers all18corner/card cells once, with rotated order',()=>{
   const plan=fightPlan();assert.equal(plan.length,18);assert.equal(new Set(plan.map(r=>r.card+':'+r.arm)).size,18);
@@ -16,7 +16,7 @@ test('all arms get exact task or task file and same explicit local endpoint/Astr
   for(const arm of FIGHT_ARMS){
     const command=freshCommand({arm,task:'EXACT_TASK',workspace:'/tmp/fresh/ws',dir:'/tmp/fresh',endpoint:'http://127.0.0.1:9999',model:'exact27b'});
     assert.ok(command.args.includes('EXACT_TASK')||command.args.includes('/tmp/fresh/task.md'));
-    if(arm.includes('codex'))assert.ok(command.args.includes(NATIVE_CODEX_MODELS[arm]??'gpt-6-astra'));
+    if(arm.includes('codex'))assert.ok(command.args.includes(NATIVE_CODEX_MODELS[arm]??WRAPPED_CODEX_MODELS[arm]));
     else if(arm.startsWith('claude-'))assert.ok(command.args.includes(arm.slice('claude-'.length)));
     else assert.ok(command.args.includes('http://127.0.0.1:9999'));
     if(arm.startsWith('bantam')){assert.equal(command.env.BANTAM_TEACHER,'0');assert.equal(command.env.BANTAM_PROBE,'1');assert.ok(command.args.includes('--factory'));}
@@ -51,7 +51,7 @@ test('legacy default retains exact eighteen card/arm identities and ordering',()
   const cards=['receipt-reducer','snapshot-drift','job-planner'];
   const expected=cards.flatMap((card,index)=>[...arms.slice(index*2),...arms.slice(0,index*2)].map(arm=>({card,arm,repeat:1})));
   assert.deepEqual(DEFAULT_FIGHT_ARMS,arms);assert.deepEqual(FIGHT_CARDS,cards);
-  assert.deepEqual(FIGHT_ARMS,[...arms,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable']);
+  assert.deepEqual(FIGHT_ARMS,[...arms,'pi','codex-sol','codex-terra','claude-sonnet','claude-opus','claude-fable','bantam-codex-sol','bantam-codex-terra']);
   assert.deepEqual(fightPlan(),expected);
   assert.deepEqual(fightPlan({kitId:'factory-2026-09-06'}),expected);
 });

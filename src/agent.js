@@ -1671,6 +1671,10 @@ async function runAgentCore({
   let artifactNeedsVerification = false;
   let nonDocumentArtifactNeedsVerification = false;
   const pendingDocumentArtifacts = new Set();
+  // Task-named documents can be immutable inputs (for example DESIGN.md).
+  // Only actual document mutations create a deliverable to reread after green.
+  // Keep this provenance across resumes; an old audit annotation is not an edit.
+  const authoredDocumentArtifacts = new Set();
   let turnsSinceArtifact = 0;
   const repetition = new RepetitionGuard({
     enabled: dedupeActions, dedupeShell, dedupeQuery,
@@ -1834,6 +1838,7 @@ async function runAgentCore({
     }
     const changedDocuments = changedPaths
       .filter((candidate) => knownArtifacts.has(candidate) && isDocumentArtifactPath(candidate));
+    for (const document of changedPaths.filter(isDocumentArtifactPath)) authoredDocumentArtifacts.add(document);
     if (changedDocuments.length) {
       if (documentRevisionRequired) documentRevisionRequired = false;
       for (const document of changedDocuments) pendingDocumentArtifacts.add(document);
@@ -1842,7 +1847,7 @@ async function runAgentCore({
     const observation = String(turn?.observation ?? "");
     if (observation.includes("[completion-audit]")) {
       for (const document of knownArtifacts) {
-        if (isDocumentArtifactPath(document)) pendingDocumentArtifacts.add(document);
+        if (authoredDocumentArtifacts.has(document) && isDocumentArtifactPath(document)) pendingDocumentArtifacts.add(document);
       }
       if (planAuditPolicy.enabled && pendingDocumentArtifacts.size) {
         documentRevisionAfterAudit = true;
@@ -3990,6 +3995,9 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
+    for (const document of [...directEditPaths, ...shellChangedPaths].filter(isDocumentArtifactPath)) {
+      authoredDocumentArtifacts.add(document);
+    }
     for (const p of [...directEditPaths, ...shellChangedPaths]) {
       const rel = normalizeWorkspaceRel(p);
       verificationObservedPaths.add(rel);
@@ -5282,7 +5290,8 @@ async function runAgentCore({
         visualCompletionAuditPaths = [...new Set([...knownArtifacts, ...openList])];
         visualCompletionAuditSnapshot = visualAltSnapshot(workspace, visualCompletionAuditPaths);
       }
-      const documentArtifacts = [...knownArtifacts].filter(isDocumentArtifactPath);
+      const documentArtifacts = [...knownArtifacts]
+        .filter(document => authoredDocumentArtifacts.has(document) && isDocumentArtifactPath(document));
       if (documentArtifacts.length) {
         for (const document of documentArtifacts) pendingDocumentArtifacts.add(document);
         artifactNeedsVerification = true;

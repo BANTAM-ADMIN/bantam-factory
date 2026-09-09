@@ -44,14 +44,31 @@ test("clean container homes are ephemeral mounts, not mutations of host HOME or 
   assert.ok(!args.includes("--env-file"));
 });
 
-test("every invocation gets an exact CID receipt and an inner bounded deadline", () => {
+test("timed invocations retain an exact CID receipt and an inner deadline", () => {
   const args = buildDockerArgs({ ...base, timeoutSeconds: 120 });
   assert.deepEqual(values(args, "--cidfile"), [base.cidfile]);
   assert.deepEqual(values(args, "--name"), [base.name]);
   assert.ok(args.includes("/usr/bin/timeout"));
   assert.ok(args.includes("120s"));
   assert.ok(args.includes("--kill-after=5s"));
-  for (const timeoutSeconds of [0, 1801, NaN, 1.5]) assert.throws(() => buildDockerArgs({ ...base, timeoutSeconds }), /timeout/);
+  assert.ok(buildDockerArgs(base).includes('480s'));
+  for (const timeoutSeconds of [-1, 1801, NaN, 1.5]) assert.throws(() => buildDockerArgs({ ...base, timeoutSeconds }), /timeout/);
+});
+
+test('explicit long-project mode removes only the lifetime deadline and keeps the setup probe bounded', () => {
+  for (const command of [base.args, ['app-server', '--listen', 'stdio://']]) {
+    const bounded = buildDockerArgs({...base,args:command});
+    const open = buildDockerArgs({...base,args:command,timeoutSeconds:0});
+    const deadline = bounded.indexOf('/usr/bin/timeout');
+    assert.deepEqual(open,[...bounded.slice(0,deadline),...bounded.slice(deadline+4)]);
+    assert.deepEqual(open.slice(-command.length),command);
+    assert.ok(!open.includes('/usr/bin/timeout'));
+    assert.deepEqual(values(open,'--cidfile'),[base.cidfile]);
+  }
+  const probe=buildDockerArgs({...base,args:['--probe'],probe:true,timeoutSeconds:0});
+  assert.ok(probe.includes('/usr/bin/timeout'));
+  assert.ok(probe.includes('30s'));
+  assert.deepEqual(values(probe,'--network'),['none']);
 });
 
 test("the local runtime probe has no network and starts no model request", () => {

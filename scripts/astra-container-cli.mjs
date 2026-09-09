@@ -55,7 +55,7 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
   if (!Array.isArray(args) || (!probe && !["exec", "app-server"].includes(args[0]))) {
     throw new Error("only native exec or app-server stdio is supported");
   }
-  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1800) throw new Error("timeout must be 1..1800 seconds");
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 0 || timeoutSeconds > 1800) throw new Error("timeout must be 0 (no lifetime deadline) or 1..1800 seconds");
   if (!/^astra-codex-[a-z0-9-]+$/.test(name)) throw new Error("invalid container name");
   if (args[0] === "app-server" && JSON.stringify(args) !== JSON.stringify(["app-server", "--listen", "stdio://"])) {
     throw new Error("app-server must use only stdio transport");
@@ -124,8 +124,14 @@ export function buildDockerArgs({ args, workspace, runtime, cidfile, name, timeo
       console.log(JSON.stringify({node:process.version,codex:cp.execFileSync('/opt/codex/bin/codex',['--version'],{encoding:'utf8'}).trim(),npm:cp.execFileSync('npm',['--version'],{encoding:'utf8'}).trim(),git:cp.execFileSync('git',['--version'],{encoding:'utf8'}).trim(),uid:process.getuid(),gid:process.getgid(),home,authReadonly:readonly,credentialFixture:true,workspaceWrite:true,hostConfigAbsent:true}));`;
     return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", '/usr/bin/timeout','--signal=TERM','--kill-after=5s','30s',"/usr/bin/node", "-e", check];
   }
-  return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", "/usr/bin/timeout",
-    "--signal=TERM", "--kill-after=5s", `${timeoutSeconds}s`, "/opt/codex/bin/codex", ...args];
+  // A long project can keep one app-server session alive for hours. An explicit
+  // zero opts out of the process lifetime deadline; per-request watchdogs and
+  // exact-container cleanup still belong to the caller. Timed cards retain the
+  // existing default, and the no-inference setup probe remains bounded above.
+  const deadline = timeoutSeconds === 0 ? [] : ["/usr/bin/timeout",
+    "--signal=TERM", "--kill-after=5s", `${timeoutSeconds}s`];
+  return [...containerArgs, "/bin/sh", "-c", setup, "astra-runtime", ...deadline,
+    "/opt/codex/bin/codex", ...args];
 }
 
 export async function main(args = process.argv.slice(2)) {

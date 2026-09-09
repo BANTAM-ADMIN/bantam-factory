@@ -13,6 +13,10 @@ import {RunCheckpoint} from '../src/run-checkpoint.js';
 const before='export function report(xs) { const out = [...xs]; out.sort(); return out; }\n';
 const after='export function report(xs) { const out = [...xs]; return out; }\nfunction cli() { console.log("ready"); }\n';
 const proposal={a:'write_file',p:'source.mjs',content:after};
+const batchProposal={a:'write_batch',files:[
+ {p:'source.mjs',content:after},
+ {p:'new/nested/check.mjs',content:'export const ready = true;\n'},
+]};
 const receipt=text=>JSON.parse(String(text).match(/\{"a":"confirm_edit","id":"[a-f0-9]+"\}/)?.[0]??'null');
 function fixture(t){
  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-confirm-edit-'));
@@ -38,6 +42,77 @@ test('a changed target invalidates a receipt before it can overwrite newer work'
  const updated=before+'// newer operator work\n';fs.writeFileSync(path.join(workspace,'source.mjs'),updated);
  assert.match((await executor.execute(confirm)).observation,/Stale edit confirmation/);
  assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),updated);
+});
+
+test('a batch receipt commits the exact existing and new files without staging during review',async t=>{
+ const {workspace,executor}=fixture(t);
+ const confirm=receipt((await executor.execute(batchProposal)).observation);
+ assert.ok(confirm);
+ assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),before);
+ assert.equal(fs.existsSync(path.join(workspace,'new')),false);
+ const resolved=executor.resolveEditConfirmation(confirm);
+ assert.equal(fs.existsSync(path.join(workspace,'new')),false,'resolution must not create directories');
+ const applied=await executor.execute(resolved);
+ assert.equal(applied.editOutcome.applied,true,applied.observation);
+ for(const file of batchProposal.files)assert.equal(fs.readFileSync(path.join(workspace,file.p),'utf8'),file.content);
+ assert.match((await executor.execute(confirm)).observation,/Unknown or consumed/);
+});
+
+test('every batch member is bound, including new destinations and changes after resolution',async t=>{
+ for(const afterResolution of [false,true])for(const change of ['existing','appeared','alias','policy','proposal']){
+  const {workspace,executor}=fixture(t);
+  const action={...batchProposal,files:[...batchProposal.files,{p:'notes.txt',content:'updated\n'}]};
+  fs.writeFileSync(path.join(workspace,'notes.txt'),'original\n');
+  const confirm=receipt((await executor.execute(action)).observation);
+  assert.ok(confirm);
+  const next=afterResolution?executor.resolveEditConfirmation(confirm):confirm;
+  if(change==='existing')fs.writeFileSync(path.join(workspace,'notes.txt'),'operator edit\n');
+  if(change==='appeared'){
+   fs.mkdirSync(path.join(workspace,'new/nested'),{recursive:true});
+   fs.writeFileSync(path.join(workspace,'new/nested/check.mjs'),'// operator file\n');
+  }
+  if(change==='alias'){
+   fs.mkdirSync(path.join(workspace,'other'));
+   fs.symlinkSync('other',path.join(workspace,'new'));
+  }
+  if(change==='policy')executor.readOnlyWorkspacePaths=['new'];
+  if(change==='proposal'){
+   if(!afterResolution)continue;
+   next.files[1].content='export const unauthorized = true;\n';
+  }
+  const result=await executor.execute(next);
+  assert.match(result.observation,/ERROR:/,`${change}, after resolution=${afterResolution}`);
+  assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),before,'no earlier batch member may land');
+  assert.equal(fs.readFileSync(path.join(workspace,'notes.txt'),'utf8'),change==='existing'?'operator edit\n':'original\n');
+  if(change==='appeared')assert.equal(fs.readFileSync(path.join(workspace,'new/nested/check.mjs'),'utf8'),'// operator file\n');
+  if(change==='alias')assert.deepEqual(fs.readdirSync(path.join(workspace,'other')),[]);
+ }
+});
+
+test('batch confirmation retains syntax checks and can review multiple risky files without regeneration',async t=>{
+ const {workspace,executor}=fixture(t);
+ const invalid={...batchProposal,files:[batchProposal.files[0],{p:'new/broken.mjs',content:'export function broken( {'}]};
+ const confirm=receipt((await executor.execute(invalid)).observation);
+ assert.ok(confirm);
+ const rejected=await executor.execute(confirm);
+ assert.equal(rejected.editOutcome.applied,false,rejected.observation);
+ assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),before);
+ assert.equal(fs.existsSync(path.join(workspace,'new')),false);
+
+ const second=fixture(t);
+ fs.writeFileSync(path.join(second.workspace,'second.mjs'),before);
+ const both={a:'write_batch',files:[{p:'source.mjs',content:after},{p:'second.mjs',content:after}]};
+ let action=both,applied;
+ for(let attempt=0;attempt<3;attempt++){
+  applied=await second.executor.execute(action);
+  if(attempt<2){
+   assert.equal(applied.editOutcome.applied,false);
+   action=receipt(applied.observation);assert.ok(action);
+   for(const f of both.files)assert.equal(fs.readFileSync(path.join(second.workspace,f.p),'utf8'),before);
+  }
+ }
+ assert.equal(applied.editOutcome.applied,true,applied.observation);
+ for(const f of both.files)assert.equal(fs.readFileSync(path.join(second.workspace,f.p),'utf8'),after);
 });
 
 test('target identity, bytes and policy are checked again after receipt resolution',async t=>{
@@ -80,11 +155,11 @@ test('receipt syntax is opt-in and its compact shape is shared by grammar and va
  assert.equal(parseAction('{"a":"confirm_edit"}').ok,false);
 });
 
-for(const blocked of [false,true])test(`agent keeps ordinary edit guards and compact durable history (blocked=${blocked})`,async t=>{
+for(const proposed of [proposal,batchProposal])for(const blocked of [false,true])test(`agent keeps ordinary edit guards and compact durable history (${proposed.a}, blocked=${blocked})`,async t=>{
  const {workspace}=fixture(t),prompts=[],checkpoint=new RunCheckpoint({autosaveEvery:0});let calls=0,deny=false;
  const model={codex:true,assistantPrefill:'',stop:[],async complete(prompt){
   prompts.push(String(prompt));calls++;
-  const action=calls===1?proposal:calls===2?receipt(prompt):{a:'respond',text:'Reviewed.'};
+  const action=calls===1?proposed:calls===2?receipt(prompt):{a:'respond',text:'Reviewed.'};
   if(calls===2){assert.ok(action);deny=blocked;}
   return {content:JSON.stringify(action),tokens:1,stoppedEos:true,timings:{}};
  }};
@@ -96,7 +171,7 @@ for(const blocked of [false,true])test(`agent keeps ordinary edit guards and com
  const result=await runAgent(options);
  assert.equal(calls,3);
  const confirmed=result.turns[1];
- assert.deepEqual(confirmed.action,proposal);
+ assert.deepEqual(confirmed.action,proposed);
  assert.equal(confirmed.editApplied,!blocked);
  assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),blocked?before:after);
  assert.deepEqual(checkpoint.turns()[1].editConfirmation,confirmed.editConfirmation);
@@ -105,7 +180,7 @@ for(const blocked of [false,true])test(`agent keeps ordinary edit guards and com
  assert.ok(prompts[2].startsWith(prompts[1]),'the provider prefix remains unchanged');
  const delta=prompts[2].slice(prompts[1].length);
  assert.match(delta,/"a":"confirm_edit"/);
- assert.ok(!delta.includes(JSON.stringify(proposal)),'the confirmed body is not retransmitted');
+ assert.ok(!delta.includes(JSON.stringify(proposed)),'the confirmed body is not retransmitted');
  await runAgent({...options,maxTurns:1,resumeTurns:film.turns.slice(0,2)});
  assert.match(prompts.at(-1),/"a":"confirm_edit"/);
 });

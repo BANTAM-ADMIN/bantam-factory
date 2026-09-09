@@ -209,7 +209,7 @@ export const ACTION_DEFINITIONS = deepFreeze([
   }),
   define("confirm_edit", [string("id")], {
     example: { a: "confirm_edit", id: "receipt from edit review" },
-    help: " apply an exact reviewed write_file without regenerating it",
+    help: " apply a reviewed write_file or write_batch without regenerating it",
   }, { feature: EDIT_CONFIRMATION_FEATURE }),
   define("write_batch", [
     recordArray("files", {

@@ -299,18 +299,17 @@ export class Executor {
     });
     try {
       let observation = operation();
-      if (this.editConfirmations && action.a === "write_file"
+      if (this.editConfirmations && ["write_file", "write_batch"].includes(action.a)
           && pending.outcome?.reason === "confirmation_required") {
         const encoded = JSON.stringify(action);
         // Keep only bounded, in-memory proposals. The ordinary identical-edit
         // route remains available for larger writes and other edit verbs.
         if (Buffer.byteLength(encoded) <= 256 * 1024) {
-          const full = this.resolveExisting(action.p);
-          const beforeSha256 = crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
-          const id = crypto.createHash("sha256").update(JSON.stringify([full, beforeSha256, encoded])).digest("hex");
+          const targets = this.reviewedWriteTargets(action);
+          const id = crypto.createHash("sha256").update(JSON.stringify([targets, encoded])).digest("hex");
           if (this._reviewedWrites.size >= 8) this._reviewedWrites.delete(this._reviewedWrites.keys().next().value);
-          this._reviewedWrites.set(id, { full, beforeSha256, action: JSON.parse(encoded) });
-          observation += `\n[edit-confirmation] To accept this reviewed replacement, use ${JSON.stringify({a:"confirm_edit",id})}. The factory retains the exact proposed bytes; do not regenerate the file. A changed target invalidates this receipt.`;
+          this._reviewedWrites.set(id, { targets, action: JSON.parse(encoded) });
+          observation += `\n[edit-confirmation] To accept this reviewed write, use ${JSON.stringify({a:"confirm_edit",id})}. The factory retains the exact proposed bytes; do not regenerate them. A changed target invalidates this receipt.`;
         }
       }
       return { observation, editOutcome: outcome() };
@@ -327,6 +326,28 @@ export class Executor {
       }
       this._activeEditResult = previous;
     }
+  }
+
+  // Capture existing bytes and absent destinations without creating parents.
+  // Bind every batch member, including files after the first review refusal.
+  reviewedWriteTargets(action) {
+    const paths = action.a === "write_batch" ? action.files.map(file => file.p) : [action.p];
+    return paths.map(p => {
+      const lexical = this.resolve(p);
+      this.assertWritablePolicy(lexical, p);
+      let stat = null;
+      try { stat = fs.lstatSync(lexical); } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+      if (stat && !stat.isFile()) throw new Error(`Edit confirmation requires a regular file or absent target: ${p}`);
+      const ancestor = nearestExisting(path.dirname(lexical));
+      const full = stat ? fs.realpathSync(lexical)
+        : path.resolve(fs.realpathSync(ancestor), path.relative(ancestor, lexical));
+      this.assertInsideReal(full, p);
+      this.assertWritablePolicy(full, p);
+      return { p, full, beforeSha256: stat
+        ? crypto.createHash("sha256").update(fs.readFileSync(lexical)).digest("hex") : null };
+    });
   }
 
   resolveEditConfirmation(action) {
@@ -346,11 +367,8 @@ export class Executor {
     if (JSON.stringify(action) !== JSON.stringify(pending.action)) {
       throw new Error("Edit confirmation no longer matches the exact reviewed action");
     }
-    const full = this.resolveExisting(action.p);
-    this.assertWritablePolicy(full, action.p);
-    const hash = crypto.createHash("sha256").update(fs.readFileSync(full)).digest("hex");
-    if (full !== pending.full || hash !== pending.beforeSha256) {
-      throw new Error("Stale edit confirmation: the target changed; read current source and submit a fresh edit");
+    if (JSON.stringify(this.reviewedWriteTargets(action)) !== JSON.stringify(pending.targets)) {
+      throw new Error("Stale edit confirmation: a target changed; read current source and submit a fresh edit");
     }
   }
 

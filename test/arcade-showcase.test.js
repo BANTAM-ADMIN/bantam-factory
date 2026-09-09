@@ -18,7 +18,13 @@ test('playable comparison files match recorded deliveries, prompts and measured 
     const record=json(row.record),bytes=read(row.file);
     assert.equal(record.artifact.sha256,sha(bytes));assert.equal(record.artifact.bytes,bytes.length);
     assert.equal(record.prompt,data.sharedBrief);assert.equal(record.wallMs,row.wallMs);
-    assert.ok(record.actions.length>0);assert.ok(record.finalResponse.length>0);
+    assert.ok(record.actions.length>0);assert.equal(typeof record.finalResponse,'string');
+    if(record.processCompleted)assert.ok(record.finalResponse.length>0);
+    else {
+      assert.equal(row.processCompleted,false);
+      assert.equal(record.usage.complete,false,'an interrupted request may have unreported tokens');
+      assert.match(row.result,/timed out|incomplete/i);
+    }
     assert.equal(record.usage.outputTokens,row.usage.outputTokens);
     assert.ok(record.usage.maxRequestInputTokens>0&&record.usage.maxRequestInputTokens<=272000);
     assert.equal(record.usage.calls.reduce((sum,c)=>sum+c.usage.outputTokens,0),record.usage.outputTokens);
@@ -45,7 +51,7 @@ test('the two Astra games independently passed desktop and phone playtests',()=>
 });
 
 test('the current factory build and prefix-cache reuse match the retained records',()=>{
-  const current=json('astra-factory-context.json'),previous=json('astra-factory.json');
+  const current=json(data.versions.at(-1).record),previous=json('astra-factory.json');
   assert.equal(current.playtest.pass,true);assert.deepEqual(current.playtest.errors,[]);
   assert.deepEqual(current.playtest.externalRequests,[]);
   assert.ok(Object.values(current.playtest.checks).every(v=>v===true));

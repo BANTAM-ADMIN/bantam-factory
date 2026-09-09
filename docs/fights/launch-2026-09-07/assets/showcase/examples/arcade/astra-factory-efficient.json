@@ -1,0 +1,424 @@
+{
+  "schema": "bantam.showcase-build.v2",
+  "arm": "bantam-codex-astra-efficient-v2",
+  "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
+  "startedAt": "2026-09-09T02:49:58.699Z",
+  "wallMs": 471678,
+  "processCompleted": true,
+  "projectChecksPassed": true,
+  "recordingWindowMs": 600000,
+  "artifact": {
+    "file": "astra-factory-efficient.html",
+    "bytes": 24925,
+    "sha256": "9ec446ec64890e256bfb80d0814d68c80df310443a30b6ab9d1a6fd84eb81b9a"
+  },
+  "actions": [
+    {
+      "title": "inspect",
+      "action": {
+        "a": "inspect",
+        "ops": [
+          {
+            "a": "read_file",
+            "p": "package.json"
+          },
+          {
+            "a": "read_file",
+            "p": "test/delivery.test.js"
+          }
+        ]
+      },
+      "observation": "# 1 {\"a\":\"read_file\",\"p\":\"package.json\"}\npackage.json (10 lines, showing 1-10):\n1\t{\n2\t  \"name\": \"creative-arcade\",\n3\t  \"version\": \"1.0.0\",\n4\t  \"private\": true,\n5\t  \"type\": \"module\",\n6\t  \"scripts\": {\n7\t    \"test\": \"node --test\"\n8\t  }\n9\t}\n10\t\n\u2014 end of file (10 lines); nothing beyond line 10, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/delivery.test.js\"}\ntest/delivery.test.js (14 lines, showing 1-14):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport vm from 'node:vm';\n5\tconst file=new URL('../arcade.html',import.meta.url);\n6\ttest('deliver one regular, bounded HTML file',()=>{\n7\t const s=fs.lstatSync(file);assert.ok(s.isFile()&&!s.isSymbolicLink());assert.ok(s.size>0&&s.size<=1024*1024);\n8\t const text=fs.readFileSync(file,'utf8');assert.match(text,/<!doctype html>/i);assert.match(text,/<html\\b/i);assert.match(text,/<title>[^<]+<\\/title>/i);assert.match(text,/name=[\"']viewport[\"']/i);\n9\t});\n10\ttest('include classic JavaScript that parses',()=>{\n11\t const text=fs.readFileSync(file,'utf8');const blocks=[...text.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)];\n12\t assert.ok(blocks.length>0);for(const [,attrs,code] of blocks){assert.doesNotMatch(attrs,/\\bsrc\\s*=/i);assert.doesNotMatch(attrs,/type\\s*=\\s*[\"']module[\"']/i);new vm.Script(code);}\n13\t});\n14\t\n\u2014 end of file (14 lines); nothing beyond line 14, do not re-read this range.",
+      "atMs": 7483.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "write file",
+      "action": {
+        "a": "write_file",
+        "p": "arcade.html",
+        "content": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<meta name=\"theme-color\" content=\"#111923\">\n<title>Afterglow \u2014 a little midnight arcade</title>\n<style>\n:root{color-scheme:dark;--bg:#101720;--panel:#18222e;--ink:#f4eee3;--muted:#9aa9b5;--mint:#b8edcf;--peach:#ffbc97;--line:#ffffff16}\n*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(ellipse at 15% 15%,#25403966,transparent 48%),radial-gradient(ellipse at 90% 75%,#52304744,transparent 48%),var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);border-radius:12px;background:#ffffff07;padding:10px 15px;transition:background .15s,transform .15s}button:hover{background:#ffffff13}button:active{transform:translateY(1px)}button:focus-visible{outline:3px solid var(--mint);outline-offset:3px}button:disabled{opacity:.35;cursor:default}.shell{max-width:1050px;margin:auto;padding:30px 32px 20px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:20px}.brand{display:flex;align-items:center;gap:12px}.mark{display:grid;grid-template-columns:repeat(2,9px);gap:3px;transform:rotate(-12deg)}.mark i{height:9px;background:var(--mint);border-radius:2px}.mark i:nth-child(2){background:var(--peach)}.brand strong{font-size:13px;letter-spacing:3px}.edition{font:11px ui-monospace,monospace;letter-spacing:1px;color:var(--muted)}.intro{display:flex;justify-content:space-between;align-items:end;margin:26px 0 24px}.eyebrow{text-transform:uppercase;letter-spacing:2.6px;font-size:10px;color:var(--mint);margin:0 0 8px}h1{font-size:clamp(36px,6vw,62px);font-weight:650;letter-spacing:-3px;line-height:1;margin:0}h1 span{color:var(--peach)}.intro p:last-child{font-size:13px;color:var(--muted);line-height:1.6;margin:10px 0 0}.status-pill{font:10px ui-monospace,monospace;letter-spacing:1px;border:1px solid var(--line);padding:9px 12px;border-radius:30px;color:var(--mint)}.status-pill:before{content:'\u25cf';margin-right:8px;font-size:8px}.arcade{display:grid;grid-template-columns:180px minmax(240px,330px) 180px;gap:22px;justify-content:center;align-items:start}.rail{display:flex;flex-direction:column;gap:16px}.card{background:linear-gradient(135deg,#ffffff06,#ffffff02);border:1px solid var(--line);border-radius:18px;padding:19px}.label{font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted);text-transform:uppercase}.score{font-size:34px;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;margin-top:9px;font-weight:650;overflow-wrap:anywhere}.best{font:11px ui-monospace,monospace;color:var(--peach);margin-top:12px}.stats{display:flex;justify-content:space-between;margin-top:21px;padding-top:16px;border-top:1px solid var(--line)}.stats strong{display:block;margin-top:5px;font-size:22px;font-variant-numeric:tabular-nums}.mini{display:block;width:112px;height:64px;margin:9px auto 0}.next-list .mini{height:58px;margin-top:5px}.hint{font-size:11px;color:var(--muted);line-height:1.6;margin:10px 0 0}.key{font:10px ui-monospace,monospace;border:1px solid #ffffff25;border-bottom-width:2px;border-radius:4px;padding:2px 5px;color:var(--ink)}.board-wrap{position:relative;padding:10px;background:#263440;border:1px solid #52616b;border-radius:19px;box-shadow:0 24px 65px #0005,0 0 60px #b8edcf07}.board-wrap:before{content:'';position:absolute;inset:-1px 35% auto;height:2px;background:var(--mint);box-shadow:0 0 15px #b8edcf70}#board{display:block;width:100%;height:auto;aspect-ratio:1/2;border-radius:9px;background:#0c141e;touch-action:none}.board-bottom{display:flex;justify-content:space-between;margin:12px 3px 0;font:9px ui-monospace,monospace;color:var(--muted);letter-spacing:1px}.overlay{position:absolute;inset:10px;bottom:32px;background:#0c141eea;border-radius:9px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:23px;backdrop-filter:blur(5px)}.overlay[hidden]{display:none}.orb{width:64px;height:64px;position:relative;margin-bottom:25px;border-radius:20px;background:linear-gradient(135deg,var(--mint),#5ca291);transform:rotate(-12deg);box-shadow:8px 8px 0 #b8edcf10}.orb:after{content:'\u2726';font-size:40px;position:absolute;inset:3px;color:#163f38}.overlay h2{font-size:28px;letter-spacing:-1px;margin:0 0 10px}.overlay p{font-size:13px;line-height:1.7;color:var(--muted);margin:0 0 23px;max-width:220px}.primary{background:var(--mint);color:#142e27;border:0;font-weight:700;padding:13px 22px;box-shadow:0 4px 18px #b8edcf12}.primary:hover{background:#d0f5df}.overlay .secondary{margin-top:12px}.controls-list{display:grid;grid-template-columns:1fr auto;gap:12px 6px;margin-top:18px;font-size:11px;color:var(--muted)}.actions{display:flex;gap:8px}.actions button{flex:1;font-size:11px;padding:11px 7px}.note{font-size:12px;line-height:1.8;color:var(--muted);padding:0 8px}.note span{color:var(--peach)}.progress{height:3px;border-radius:3px;background:#ffffff0d;margin-top:16px;overflow:hidden}#progress{height:100%;background:var(--mint);width:0%;transition:width .25s}.touch{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:14px}.touch button{min-height:48px;padding:7px 2px;touch-action:none;user-select:none;-webkit-user-select:none;font-size:21px;background:#1b2833}.touch small{display:block;font-size:8px;letter-spacing:1px;margin-top:3px;color:var(--muted)}.touch .drop{grid-column:span 3;font-size:12px;background:#b8edcf14;color:var(--mint)}.touch .hold{grid-column:span 2;font-size:12px}.toast{min-height:23px;text-align:center;margin-top:12px;font:11px ui-monospace,monospace;color:var(--peach)}footer{display:flex;justify-content:space-between;margin-top:24px;padding-top:15px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);letter-spacing:.5px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}\n@media(min-width:800px){.touch{margin-top:16px}.shell{padding-top:25px}.board-wrap{max-width:330px}}\n@media(max-width:760px){.shell{padding:17px 16px}.edition{font-size:9px}.intro{margin:20px 0}.intro p:last-child{font-size:12px}.status-pill{display:none}.arcade{grid-template-columns:minmax(0,1fr) 108px;gap:12px;max-width:470px;margin:auto}.left{grid-column:2;grid-row:1}.center{grid-column:1;grid-row:1 / span 2;min-width:0}.right{grid-column:2;grid-row:2}.card{padding:12px;border-radius:13px}.rail{gap:12px}.score{font-size:25px;letter-spacing:-1px}.label{font-size:9px;letter-spacing:1px}.stats{gap:6px;margin-top:13px;padding-top:11px}.stats strong{font-size:19px}.best{font-size:9px;line-height:1.5}.mini{width:80px;height:48px}.next-list .mini{height:44px}.desktop-help,.note{display:none}.right{align-self:start}.actions{flex-direction:column}.board-wrap{padding:6px;border-radius:13px}.overlay{inset:6px;bottom:29px;padding:12px}.overlay h2{font-size:23px}.overlay p{font-size:11px}.orb{width:48px;height:48px;margin-bottom:20px}.orb:after{font-size:32px}.board-bottom{font-size:7px;letter-spacing:.4px}.touch{gap:5px;margin-top:10px}.touch button{min-height:44px;font-size:18px}.touch small{font-size:7px}.toast{font-size:9px;line-height:1.5}.intro h1{font-size:43px}footer{font-size:9px}.hint{font-size:10px}.primary{font-size:12px;padding:12px 18px}}\n@media(prefers-reduced-motion:reduce){*{transition:none!important}}\n</style>\n</head>\n<body>\n<div class=\"shell\">\n<header><div class=\"brand\"><span class=\"mark\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i></span><strong>SMALL HOURS</strong></div><span class=\"edition\">POCKET ARCADE / No. 01</span></header>\n<section class=\"intro\"><div><p class=\"eyebrow\">One more piece. One more possibility.</p><h1>Afterglow<span>.</span></h1><p>A little order in the middle of the night.</p></div><span class=\"status-pill\" id=\"status\">READY WHEN YOU ARE</span></section>\n<main class=\"arcade\" aria-label=\"Afterglow falling-block game\">\n<aside class=\"rail left\"><section class=\"card\"><div class=\"label\">Your score</div><div class=\"score\" id=\"score\">0</div><div class=\"best\">BEST <span id=\"best\">0</span></div><div class=\"stats\"><div><span class=\"label\">Level</span><strong id=\"level\">01</strong></div><div><span class=\"label\">Lines</span><strong id=\"lines\">0</strong></div></div><div class=\"progress\" title=\"Progress to next level\"><div id=\"progress\"></div></div></section><section class=\"card\"><div class=\"label\">On hold <span class=\"key\">C</span></div><canvas class=\"mini\" id=\"hold\" width=\"112\" height=\"64\" aria-label=\"Held piece, empty\"></canvas><p class=\"hint\" id=\"holdHint\">Save a little<br>for later.</p></section><p class=\"note\">Find your rhythm.<br>Leave room to <span>surprise yourself.</span></p></aside>\n<div class=\"center\"><div class=\"board-wrap\"><canvas id=\"board\" width=\"300\" height=\"600\" role=\"img\" aria-label=\"Playfield, 10 columns by 20 rows. Use the keyboard or touch controls below.\"></canvas><div class=\"board-bottom\"><span>10 \u00d7 20 POSSIBILITIES</span><span id=\"boardState\">STANDBY</span></div><div class=\"overlay\" id=\"overlay\"><div class=\"orb\" aria-hidden=\"true\"></div><h2 id=\"overlayTitle\">Make room for magic.</h2><p id=\"overlayText\">Move, turn, and settle in.<br>Fill a row to watch it disappear.<br>No rush. Until there is.</p><button class=\"primary\" id=\"play\">Let's play \u2192</button><button class=\"secondary\" id=\"cancel\" hidden>Keep playing</button></div></div><div class=\"touch\" aria-label=\"Touch game controls\"><button data-command=\"left\" aria-label=\"Move left\">\u2190<small>LEFT</small></button><button data-command=\"right\" aria-label=\"Move right\">\u2192<small>RIGHT</small></button><button data-command=\"ccw\" aria-label=\"Rotate counterclockwise\">\u21b6<small>TURN</small></button><button data-command=\"cw\" aria-label=\"Rotate clockwise\">\u21b7<small>TURN</small></button><button data-command=\"down\" aria-label=\"Soft drop\">\u2193<small>DOWN</small></button><button data-command=\"hold\" class=\"hold\">HOLD <small>SAVE / SWAP</small></button><button data-command=\"drop\" class=\"drop\">\u2193 DROP <small>STRAIGHT TO THE GLOW</small></button></div><div class=\"toast\" id=\"toast\" role=\"status\" aria-live=\"polite\">A fresh start looks good on you.</div></div>\n<aside class=\"rail right\"><section class=\"card next-list\"><div class=\"label\">Up next</div><canvas class=\"mini\" id=\"next0\" width=\"112\" height=\"64\" aria-label=\"Next piece\"></canvas><canvas class=\"mini\" id=\"next1\" width=\"112\" height=\"64\" aria-label=\"Second upcoming piece\"></canvas><canvas class=\"mini\" id=\"next2\" width=\"112\" height=\"64\" aria-label=\"Third upcoming piece\"></canvas></section><div class=\"actions\"><button id=\"pause\" disabled>\u2161 Pause</button><button id=\"restart\" disabled>\u21bb Restart</button></div><section class=\"card desktop-help\"><div class=\"label\">The little manual</div><div class=\"controls-list\"><span>Move</span><span><b class=\"key\">\u2190</b> <b class=\"key\">\u2192</b></span><span>Turn</span><span><b class=\"key\">\u2191</b> / <b class=\"key\">Z</b></span><span>Soft drop</span><b class=\"key\">\u2193</b><span>Hard drop</span><b class=\"key\">SPACE</b><span>Hold / swap</span><b class=\"key\">C</b><span>Pause</span><b class=\"key\">P / ESC</b></div></section></aside>\n</main>\n<details class=\"hint\"><summary>How to play & keyboard controls</summary><p>Complete horizontal rows to clear them. Clear 1 / 2 / 3 / 4 rows for 100 / 300 / 500 / 800 \u00d7 level points; consecutive clears earn a combo bonus. Every 10 lines raises the level and the pace. The outline shows where your piece will land. Hold once per piece. Stack to the top and the round ends.</p><p>\u2190 \u2192 move \u00b7 \u2191 / X rotate clockwise \u00b7 Z rotate counterclockwise \u00b7 \u2193 soft drop \u00b7 Space hard drop \u00b7 C / Shift hold \u00b7 P / Esc pause. On a phone, use the buttons; hold left, right, or down to repeat. Switching away automatically pauses. Best score stays on this device when storage is available.</p></details>\n<footer><span>MADE FOR YOUR JUST-ONE-MORE MOMENTS</span><span>OFFLINE. ALWAYS.</span></footer>\n</div>\n<script>\n'use strict';\nconst SHAPES={I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1],[0,0,0]],S:[[0,1,1],[1,1,0],[0,0,0]],Z:[[1,1,0],[0,1,1],[0,0,0]],J:[[1,0,0],[1,1,1],[0,0,0]],L:[[0,0,1],[1,1,1],[0,0,0]]};\nconst COLORS={I:'#8ad7e8',O:'#f6d787',T:'#c1a2e8',S:'#a8dcb7',Z:'#ee939f',J:'#92afe8',L:'#ffbc97'};\nclass Afterglow {\n constructor(random=Math.random){this.random=random;this.state='ready';this.board=this.empty();this.queue=[];this.piece=null;this.held=null;this.score=0;this.lines=0;this.level=1;this.onEvent=()=>{};}\n empty(){return Array.from({length:20},()=>Array(10).fill(null));}\n fillQueue(){while(this.queue.length<7){const bag=Object.keys(SHAPES);for(let i=bag.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}this.queue.push(...bag);}}\n start(){this.board=this.empty();this.queue=[];this.held=null;this.score=0;this.lines=0;this.level=1;this.combo=-1;this.state='playing';this.canHold=true;this.spawn();}\n spawn(type){this.fillQueue();const kind=type||this.queue.shift();this.fillQueue();const m=SHAPES[kind].map(r=>r.slice());this.piece={kind,m,x:Math.floor((10-m.length)/2),y:0};this.fall=0;this.lockTime=0;this.resets=0;if(!this.fits(this.piece)){this.over();}}\n fits(p,dx=0,dy=0,m=p.m){return m.every((row,y)=>row.every((v,x)=>!v||(p.x+x+dx>=0&&p.x+x+dx<10&&p.y+y+dy<20&&(p.y+y+dy<0||!this.board[p.y+y+dy][p.x+x+dx]))));}\n grounded(){return !this.fits(this.piece,0,1);}\n resetLock(wasGrounded){if(wasGrounded&&this.resets<15){this.lockTime=0;this.resets++;}}\n move(dx,dy=0){if(this.state!=='playing')return false;const ground=this.grounded();if(!this.fits(this.piece,dx,dy))return false;this.piece.x+=dx;this.piece.y+=dy;if(dy){this.score+=dy;this.fall=0;}else this.resetLock(ground);return true;}\n rotate(dir=1){if(this.state!=='playing')return false;const p=this.piece;if(p.kind==='O')return false;const n=p.m.length;const m=Array.from({length:n},(_,y)=>Array.from({length:n},(_,x)=>dir===1?p.m[n-1-x][y]:p.m[x][n-1-y]));const ground=this.grounded();for(const [dx,dy] of [[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[-1,-1],[1,-1],[0,-2]]){if(this.fits(p,dx,dy,m)){p.x+=dx;p.y+=dy;p.m=m;this.resetLock(ground);return true;}}return false;}\n ghostY(){let y=this.piece.y;while(this.fits(this.piece,0,y-this.piece.y+1))y++;return y;}\n hardDrop(){if(this.state!=='playing')return;const y=this.ghostY();this.score+=(y-this.piece.y)*2;this.piece.y=y;this.lock();}\n hold(){if(this.state!=='playing'||!this.canHold)return false;const old=this.held;this.held=this.piece.kind;this.canHold=false;this.spawn(old);this.onEvent({type:'hold'});return true;}\n lock(){const p=this.piece;let above=false;p.m.forEach((r,y)=>r.forEach((v,x)=>{if(v){if(p.y+y<0)above=true;else this.board[p.y+y][p.x+x]=p.kind;}}));if(above){this.over();return;}const rows=[];this.board.forEach((r,y)=>{if(r.every(Boolean))rows.push(y);});if(rows.length){this.board=this.board.filter((_,y)=>!rows.includes(y));while(this.board.length<20)this.board.unshift(Array(10).fill(null));this.combo++;const gain=([0,100,300,500,800][rows.length]+Math.max(0,this.combo)*50)*this.level;this.score+=gain;this.lines+=rows.length;this.level=1+Math.floor(this.lines/10);this.onEvent({type:'clear',rows,gain,combo:this.combo});}else{this.combo=-1;this.onEvent({type:'lock'});}this.canHold=true;this.spawn();}\n tick(dt){if(this.state!=='playing')return;this.fall+=dt;const interval=Math.max(75,800*Math.pow(.8,this.level-1));if(this.fall>=interval){this.fall%=interval;if(this.fits(this.piece,0,1))this.piece.y++;}if(this.grounded()){this.lockTime+=dt;if(this.lockTime>=450)this.lock();}else this.lockTime=0;}\n pause(){if(this.state==='playing')this.state='paused';else if(this.state==='paused')this.state='playing';}\n over(){this.state='over';this.onEvent({type:'over'});}\n}\n</script>\n<!-- INTERFACE -->\n</body>\n</html>\n"
+      },
+      "observation": "wrote 15854 bytes to arcade.html",
+      "atMs": 172792.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "replace",
+      "action": {
+        "a": "replace",
+        "p": "arcade.html",
+        "old": "<!-- INTERFACE -->",
+        "new": "<script>\n'use strict';\nconst $=id=>document.getElementById(id);\nconst game=new Afterglow();\nconst boardCanvas=$('board'),ctx=boardCanvas.getContext('2d');\nboardCanvas.tabIndex=0;\nlet best=0,confirmRestart=false,lastState='',lastTime=0,toastUntil=0,particles=[],flash=0;\ntry{best=Number(localStorage.getItem('afterglow.best'))||0;}catch{}\nconst reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;\nfunction saveBest(){if(game.score>best){best=game.score;try{localStorage.setItem('afterglow.best',String(best));}catch{}}}\nfunction toast(message){$('toast').textContent=message;toastUntil=performance.now()+3200;}\nfunction tile(c,x,y,size,kind,ghost=false){const color=COLORS[kind];if(ghost){c.strokeStyle=color;c.globalAlpha=.4;c.lineWidth=1.5;c.strokeRect(x+3,y+3,size-6,size-6);c.globalAlpha=1;return;}c.fillStyle=color;c.fillRect(x+1.5,y+1.5,size-3,size-3);c.fillStyle='#ffffff35';c.fillRect(x+3,y+3,size-6,2);c.fillStyle='#0000001c';c.fillRect(x+3,y+size-6,size-6,3);c.fillStyle='#ffffff18';c.fillRect(x+6,y+6,3,3);}\nfunction preview(id,kind,dim=false){const c=$(id).getContext('2d');c.clearRect(0,0,112,64);$(id).setAttribute('aria-label',(id==='hold'?'Held piece: ':'Upcoming piece: ')+(kind||'empty'));if(!kind){c.fillStyle='#748594';c.font='20px monospace';c.textAlign='center';c.fillText('\u2014',56,37);return;}const m=SHAPES[kind],cells=[];m.forEach((r,y)=>r.forEach((v,x)=>{if(v)cells.push([x,y]);}));const minX=Math.min(...cells.map(p=>p[0])),maxX=Math.max(...cells.map(p=>p[0])),minY=Math.min(...cells.map(p=>p[1])),maxY=Math.max(...cells.map(p=>p[1]));const size=21,ox=(112-(maxX-minX+1)*size)/2,oy=(64-(maxY-minY+1)*size)/2;c.globalAlpha=dim?.35:1;cells.forEach(([x,y])=>tile(c,ox+(x-minX)*size,oy+(y-minY)*size,size,kind));c.globalAlpha=1;}\nfunction sync(){saveBest();$('score').textContent=game.score.toLocaleString();$('best').textContent=best.toLocaleString();$('level').textContent=String(game.level).padStart(2,'0');$('lines').textContent=game.lines;$('progress').style.width=(game.lines%10)*10+'%';preview('hold',game.held,!game.canHold);for(let i=0;i<3;i++)preview('next'+i,game.queue[i]);$('holdHint').innerHTML=game.held?(game.canHold?'Ready to swap.':'Next piece,<br>next chance.'):'Save a little<br>for later.';const state=confirmRestart?'confirm':game.state;$('pause').disabled=!['playing','paused'].includes(game.state)||confirmRestart;$('restart').disabled=game.state==='ready'||confirmRestart;document.querySelectorAll('[data-command]').forEach(b=>b.disabled=game.state!=='playing'||confirmRestart);$('pause').textContent=game.state==='paused'?'\u25b6 Resume':'\u2161 Pause';$('status').textContent={ready:'READY WHEN YOU ARE',playing:'FIND YOUR FLOW',paused:'TAKE YOUR TIME',over:'ANOTHER POSSIBILITY'}[game.state];$('boardState').textContent={ready:'STANDBY',playing:'IN THE FLOW',paused:'PAUSED',over:'ROUND OVER'}[game.state];\nif(state===lastState)return;lastState=state;$('overlay').hidden=state==='playing';$('cancel').hidden=state!=='confirm';if(state==='ready')return;\nconst messages={paused:['A little breathing room.','Your pieces will be right here.<br>Press P or Esc to resume.','Back to the glow \u2192'],over:['Every end, a beginning.',game.score.toLocaleString()+' points \u00b7 '+game.lines+' lines<br>There\u2019s always another possibility.','One more round \u2192'],confirm:['A fresh canvas?','This round will end.<br>Your best score is already saved.','Start fresh \u2192']};if(messages[state]){const [title,body,label]=messages[state];$('overlayTitle').textContent=title;$('overlayText').innerHTML=body;$('play').textContent=label;$('play').focus({preventScroll:true});}}\nfunction draw(dt){ctx.clearRect(0,0,300,600);ctx.fillStyle='#0c141e';ctx.fillRect(0,0,300,600);ctx.strokeStyle='#ffffff05';ctx.lineWidth=1;for(let x=0;x<=300;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,600);ctx.stroke();}for(let y=0;y<=600;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(300,y);ctx.stroke();}\ngame.board.forEach((row,y)=>row.forEach((kind,x)=>{if(kind)tile(ctx,x*30,y*30,30,kind);}));if(game.piece&&game.state!=='over'){const p=game.piece,gy=game.ghostY();p.m.forEach((r,y)=>r.forEach((v,x)=>{if(v){tile(ctx,(p.x+x)*30,(gy+y)*30,30,p.kind,true);tile(ctx,(p.x+x)*30,(p.y+y)*30,30,p.kind);}}));}if(game.state==='playing'){particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt/1000;p.y+=p.vy*dt/1000;p.vy+=dt*.1;ctx.globalAlpha=Math.max(0,p.life/600);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4);}ctx.globalAlpha=1;if(flash>0){ctx.fillStyle='rgba(184,237,207,'+(flash/1600)+')';ctx.fillRect(0,0,300,600);flash=Math.max(0,flash-dt);}}}\ngame.onEvent=e=>{if(e.type==='clear'){const names=['','A little more space.','Double delight.','Three\u2019s a charm.','AFTERGLOW! Four lines.'];toast(names[e.rows.length]+' +'+e.gain+(e.combo>0?' \u00b7 COMBO '+(e.combo+1):''));if(!reduced){flash=130;for(const row of e.rows)for(let i=0;i<24;i++)particles.push({x:Math.random()*300,y:row*30+15,vx:(Math.random()-.5)*140,vy:-Math.random()*140,life:600,color:Object.values(COLORS)[i%7]});}}else if(e.type==='over'){clearHeld();toast('Well played. Make a little room for another round.');saveBest();}else if(e.type==='hold')toast('A possibility, saved for later.');};\nfunction fresh(){clearHeld();confirmRestart=false;particles=[];flash=0;game.start();toast('Find your rhythm. You\u2019ve got this.');sync();boardCanvas.focus({preventScroll:true});}\nfunction togglePause(){if(confirmRestart)return;clearHeld();game.pause();sync();if(game.state==='playing')boardCanvas.focus({preventScroll:true});}\n$('play').addEventListener('click',()=>{if(game.state==='paused'&&!confirmRestart)togglePause();else fresh();});\n$('pause').addEventListener('click',togglePause);\n$('restart').addEventListener('click',()=>{clearHeld();if(game.state==='over'){fresh();return;}if(game.state==='playing')game.pause();confirmRestart=true;sync();});\n$('cancel').addEventListener('click',()=>{confirmRestart=false;if(game.state==='paused')game.pause();sync();boardCanvas.focus({preventScroll:true});});\nfunction command(name){if(confirmRestart||game.state!=='playing')return;switch(name){case 'left':game.move(-1);break;case 'right':game.move(1);break;case 'down':game.move(0,1);break;case 'cw':game.rotate(1);break;case 'ccw':game.rotate(-1);break;case 'hold':game.hold();break;case 'drop':game.hardDrop();break;}sync();}\nconst keys={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'cw',x:'cw',z:'ccw',c:'hold',Shift:'hold',' ':'drop'};\nconst held=new Map();\nfunction clearHeld(){held.clear();}\nfunction press(id,name){if(held.has(id)||game.state!=='playing'||confirmRestart)return;command(name);if(['left','right','down'].includes(name))held.set(id,{name,next:performance.now()+160});}\nwindow.addEventListener('keydown',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(k==='p'||k==='Escape'){e.preventDefault();if(!e.repeat){if(confirmRestart&&k==='Escape')$('cancel').click();else togglePause();}return;}if(!keys[k]||game.state!=='playing'||confirmRestart)return;e.preventDefault();if(!e.repeat)press('key:'+k,keys[k]);});\nwindow.addEventListener('keyup',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;held.delete('key:'+k);});\ndocument.querySelectorAll('[data-command]').forEach(button=>{button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);press('pointer:'+e.pointerId,button.dataset.command);});button.addEventListener('pointerup',e=>held.delete('pointer:'+e.pointerId));button.addEventListener('pointercancel',e=>held.delete('pointer:'+e.pointerId));button.addEventListener('lostpointercapture',e=>held.delete('pointer:'+e.pointerId));button.addEventListener('contextmenu',e=>e.preventDefault());button.addEventListener('click',e=>{if(e.detail===0)command(button.dataset.command);});});\nfunction autoPause(){clearHeld();if(game.state==='playing'){game.pause();sync();}}\nwindow.addEventListener('blur',autoPause);document.addEventListener('visibilitychange',()=>{if(document.hidden)autoPause();});\nfunction frame(now){const dt=Math.min(50,now-(lastTime||now));lastTime=now;if(game.state==='playing'&&!confirmRestart){for(const h of held.values())if(now>=h.next){command(h.name);h.next=now+(h.name==='down'?40:65);}game.tick(dt);}draw(dt);sync();if(toastUntil&&now>toastUntil){$('toast').textContent=game.state==='playing'?'Leave a little space for what comes next.':'A fresh start looks good on you.';toastUntil=0;}requestAnimationFrame(frame);}\ngame.fillQueue();sync();draw(0);requestAnimationFrame(frame);\n</script>"
+      },
+      "observation": "replaced 1 occurrence in arcade.html",
+      "atMs": 255481.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "write file",
+      "action": {
+        "a": "write_file",
+        "p": "test/game.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nconst source=[...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)][0][1];\nfunction fixture(){const context=vm.createContext({});vm.runInContext(source+'\\nglobalThis.Engine=Afterglow;',context);const g=new context.Engine(()=>.42);g.start();return g;}\nconst piece=(kind,m,x,y)=>({kind,m,x,y});\ntest('seven-bag distribution and independent board rows',()=>{const g=fixture();const first=[g.piece.kind,...g.queue.slice(0,6)];assert.equal(new Set(first).size,7);g.board[0][0]='T';assert.equal(g.board[1][0],null);assert.equal(g.board.length,20);assert.ok(g.queue.length>=7);});\ntest('movement respects both walls and occupied cells',()=>{const g=fixture();g.piece=piece('O',[[1,1],[1,1]],0,5);assert.equal(g.move(-1),false);assert.equal(g.piece.x,0);g.board[5][2]='T';assert.equal(g.move(1),false);g.board[5][2]=null;assert.equal(g.move(1),true);g.piece.x=8;assert.equal(g.move(1),false);});\ntest('rotation cycles, inverse rotation and a wall kick',()=>{const g=fixture();g.spawn('T');const original=JSON.stringify(g.piece.m);for(let i=0;i<4;i++)assert.equal(g.rotate(),true);assert.equal(JSON.stringify(g.piece.m),original);g.rotate();g.rotate(-1);assert.equal(JSON.stringify(g.piece.m),original);g.spawn('I');g.rotate();g.piece.x=-2;assert.equal(g.fits(g.piece),true);assert.equal(g.rotate(),true);assert.equal(g.fits(g.piece),true);assert.ok(g.piece.x>=0);});\ntest('gravity, soft drop and hard drop scoring',()=>{const g=fixture();g.spawn('O');g.tick(800);assert.equal(g.piece.y,1);assert.equal(g.score,0);g.move(0,1);assert.equal(g.piece.y,2);assert.equal(g.score,1);assert.equal(g.ghostY(),18);g.hardDrop();assert.equal(g.score,33);assert.equal(g.board[19].filter(Boolean).length,2);assert.equal(g.board[18].filter(Boolean).length,2);});\ntest('hold is limited to once per piece and restores spawn orientation',()=>{const g=fixture();g.spawn('T');g.rotate();assert.equal(g.hold(),true);assert.equal(g.held,'T');const next=g.piece.kind;assert.equal(g.hold(),false);g.hardDrop();assert.equal(g.hold(),true);assert.equal(g.piece.kind,'T');assert.equal(JSON.stringify(g.piece.m),'[[0,1,0],[1,1,1],[0,0,0]]');assert.notEqual(next,undefined);assert.equal(g.canHold,false);});\nfunction fourRows(g){g.board=g.empty();for(let y=16;y<20;y++)g.board[y]=Array.from({length:10},(_,x)=>x===4?null:'J');g.piece=piece('I',[[1],[1],[1],[1]],4,16);g.lock();}\ntest('four-row clear, compaction, combo, level and event data',()=>{const g=fixture();const events=[];g.onEvent=e=>events.push(e);fourRows(g);assert.equal(g.score,800);assert.equal(g.lines,4);assert.equal(g.board.flat().filter(Boolean).length,0);assert.equal(events[0].rows.length,4);fourRows(g);assert.equal(g.score,1650);assert.equal(g.combo,1);fourRows(g);assert.equal(g.lines,12);assert.equal(g.level,2);assert.equal(g.score,2550);g.hardDrop();assert.equal(g.combo,-1);});\ntest('cleared rows shift surviving cells downward',()=>{const g=fixture();g.board[18][0]='Z';g.board[19]=Array.from({length:10},(_,x)=>x>=8?null:'J');g.piece=piece('O',[[1,1],[1,1]],8,18);g.lock();assert.equal(g.lines,1);assert.equal(g.score,100);assert.equal(g.board[19][0],'Z');assert.equal(g.board[19][8],'O');assert.ok(g.board[0].every(v=>v===null));});\ntest('lock delay and bounded reset prevent instant lock and infinite stalling',()=>{const g=fixture();g.spawn('O');g.piece.y=18;g.tick(400);assert.equal(g.board.flat().filter(Boolean).length,0);g.move(-1);assert.equal(g.lockTime,0);for(let i=0;i<14;i++)g.move(i%2? -1:1);assert.equal(g.resets,15);g.tick(400);g.move(1);assert.equal(g.lockTime,400);g.tick(50);assert.equal(g.board.flat().filter(Boolean).length,4);});\ntest('pause freezes board, scores, movement, rotation, hold and drop',()=>{const g=fixture();g.pause();const before=JSON.stringify(g);g.tick(5000);g.move(1);g.rotate();g.hold();g.hardDrop();assert.equal(JSON.stringify(g),before);g.pause();assert.equal(g.state,'playing');g.tick(800);assert.equal(g.piece.y,1);});\ntest('blocked spawn and above-board lock end the game',()=>{const g=fixture();g.board[0].fill('J');g.spawn('O');assert.equal(g.state,'over');g.start();g.piece=piece('O',[[1,1],[1,1]],4,-1);g.lock();assert.equal(g.state,'over');});\ntest('restart resets a completed or paused round',()=>{const g=fixture();fourRows(g);g.hold();g.pause();g.start();assert.equal(g.state,'playing');assert.equal(g.score,0);assert.equal(g.lines,0);assert.equal(g.level,1);assert.equal(g.held,null);assert.equal(g.canHold,true);assert.ok(g.board.flat().every(v=>v===null));assert.ok(g.piece);});\ntest('long deterministic play remains within legal board bounds',()=>{const g=fixture();for(let i=0;i<500;i++){if(g.state==='over')g.start();for(let j=0;j<i%6;j++)g.rotate(i%2?1:-1);for(let j=0;j<i%5;j++)g.move(i%2?1:-1);if(i%4===0)g.hold();assert.ok(g.fits(g.piece)||g.state==='over');g.hardDrop();assert.equal(g.board.length,20);assert.ok(g.board.every(r=>r.length===10));assert.ok(Number.isFinite(g.score));}});\ntest('delivery contains no external resources or network APIs',()=>{assert.doesNotMatch(html,/<(?:script|link|img|iframe|audio|video)\\b[^>]*(?:src|href)\\s*=/i);assert.doesNotMatch(html,/\\b(?:fetch|XMLHttpRequest|WebSocket|importScripts)\\s*\\(/);assert.doesNotMatch(html,/url\\(\\s*['\"]?https?:/i);});\n"
+      },
+      "observation": "wrote 5397 bytes to test/game.test.js",
+      "atMs": 313977.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "shell",
+      "action": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "observation": "VERDICT: all 15 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 2.051777\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 1.969066\n  ...\n# Subtest: seven-bag distribution and independent board rows\nok 3 - seven-bag distribution and independent board rows\n  ---\n  duration_ms: 1.778504\n  ...\n# Subtest: movement respects both walls and occupied cells\nok 4 - movement respects both walls and occupied cells\n  ---\n  duration_ms: 0.644866\n  ...\n# Subtest: rotation cycles, inverse rotation and a wall kick\nok 5 - rotation cycles, inverse rotation and a wall kick\n  ---\n  duration_ms: 0.731926\n  ...\n# Subtest: gravity, soft drop and hard drop scoring\nok 6 - gravity, soft drop and hard drop scoring\n  ---\n  duration_ms: 0.795507\n  ...\n# Subtest: hold is limited to once per piece and restores spawn orientation\nok 7 - hold is limited to once per piece and restores spawn orientation\n  ---\n  duration_ms: 1.121219\n  ...\n# Subtest: four-row clear, compaction, combo, level and event data\nok 8 - four-row clear, compaction, combo, level and event data\n  ---\n  duration_ms: 0.782897\n  ...\n# Subtest: cleared rows shift surviving cells downward\nok 9 - cleared rows shift surviving cells downward\n  ---\n  duration_ms: 0.602146\n  ...\n# Subtest: lock delay and bounded reset prevent instant lock and infinite stalling\nok 10 - lock delay and bounded reset prevent instant lock and infinite stalling\n  ---\n  duration_ms: 0.636405\n  ...\n# Subtest: pause freezes board, scores, movement, rotation, hold and drop\nok 11 - pause freezes board, scores, movement, rotation, hold and drop\n  ---\n  duration_ms: 0.630156\n  ...\n# Subtest: blocked spawn and above-board lock end the game\nok 12 - blocked spawn and above-board lock end the game\n  ---\n  duration_ms: 0.661846\n  ...\n# Subtest: restart resets a completed or paused round\nok 13 - restart resets a completed or paused round\n  ---\n  duration_ms: 0.616195\n  ...\n# Subtest: long deterministic play remains within legal board bounds\nok 14 - long deterministic play remains within legal board bounds\n  ---\n  duration_ms: 9.856112\n  ...\n# Subtest: delivery contains no external resources or network APIs\nok 15 - delivery contains no external resources or network APIs\n  ---\n  duration_ms: 0.335773\n  ...\n1..15\n# tests 15\n# suites 0\n# pass 15\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 71.474903",
+      "atMs": 317012.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": 0
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html interact --width=390 --height=844"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (50 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play \u2192\"\n  focus after primary: canvas#board \"Playfield, 10 columns by 20 rows. Use the keyboard or touch \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"33\"; strong#level \"01\"; strong#lines \"0\"; span#boardState \"IN THE FLOW\"\n  overlays after first P: div#overlay.overlay \"A little breathing room. Your pieces will be right here. Pre\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"SMALL HOURS POCKET ARCADE / No. 01 ONE MORE PIECE. ONE MORE POSSIBILITY. Afterglow. A little order in the middle of the night. YOUR SCORE 33 BEST 33 LEVEL 01 LI\"\nMEASURED LAYOUT (px, viewport 390x844, page 390x934, body bg rgb(16, 23, 32), text rgb(244, 238, 227)):\n  div.shell @ x=0 y=0 w=390 h=934 \"SMALL HOURS\"\n  header @ x=16 y=17 w=358 h=42 \"SMALL HOURS\"\n  section.intro @ x=16 y=79 w=358 h=94 \"ONE MORE PIECE. ONE MORE POSSIBILITY\"\n  main.arcade @ x=16 y=193 w=358 h=645 \"YOUR SCORE\"\n  details.hint @ x=16 y=848 w=358 h=16 \"How to play & keyboard controls\"\n  footer @ x=16 y=888 w=358 h=29 \"MADE FOR YOUR JUST-ONE-MORE MOMENTS\"",
+      "atMs": 321991.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html interact --width=1440 --height=1000"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (48.3 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pointer-obstruction\nNo page errors, console errors, or failed loads detected.\nPOINTER HIT-TEST PROBLEMS (2):\n  - button.hold \"HOLD SAVE / SWAP\" center at (619,1000) is covered by (none).\n  - button.drop \"\u2193 DROP STRAIGHT TO THE GLOW\" center at (787,1000) is covered by (none).\nThese are Chromium hit-test results, not inferred from source or screenshot appearance.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play \u2192\"\n  focus after primary: canvas#board \"Playfield, 10 columns by 20 rows. Use the keyboard or touch \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: span#status.status-pill \"FIND YOUR FLOW\"; div#score.score \"35\"; strong#level \"01\"; strong#lines \"0\"; span#boardState \"IN THE FLOW\"\n  overlays after first P: div#overlay.overlay \"A little breathing room. Your pieces will be right here. Pre\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"SMALL HOURS POCKET ARCADE / No. 01 ONE MORE PIECE. ONE MORE POSSIBILITY. Afterglow. A little order in the middle of the night. FIND YOUR FLOW YOUR SCORE 35 BEST\"\nMEASURED LAYOUT (px, viewport 1440x1000, page 1440x1160, body bg rgb(16, 23, 32), text rgb(244, 238, 227)):\n  div.shell @ x=195 y=0 w=1050 h=1160 \"SMALL HOURS\"\n  header @ x=227 y=25 w=986 h=42 \"SMALL HOURS\"\n  section.intro @ x=227 y=93 w=986 h=115 \"ONE MORE PIECE. ONE MORE POSSIBILITY\"\n  main.arcade @ x=227 y=232 w=986 h=827 \"YOUR SCORE\"\n  details.hint @ x=227 y=1069 w=986 h=18 \"How to play & keyboard controls\"\n  footer @ x=227 y=1110 w=986 h=30 \"MADE FOR YOUR JUST-ONE-MORE MOMENTS\"",
+      "atMs": 348051.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "replace",
+      "action": {
+        "a": "replace",
+        "p": "arcade.html",
+        "old": "@media(prefers-reduced-motion:reduce){*{transition:none!important}}",
+        "new": "@media(min-width:761px){.arcade{grid-template-columns:180px clamp(220px,calc((100svh - 320px)/2),330px) 180px}.touch{display:none}.board-wrap{width:100%}.center{min-width:0}}\n@media(max-width:760px){.arcade{max-width:min(470px,calc((100svh - 305px)/2 + 120px))}.shell{padding-top:12px}header{padding-bottom:12px}.intro{margin:14px 0}.intro h1{font-size:38px}.intro .eyebrow{font-size:9px;letter-spacing:2px}.intro p:last-child{margin-top:7px}}\n@media(prefers-reduced-motion:reduce){*{transition:none!important}}"
+      },
+      "observation": "replaced 1 occurrence in arcade.html",
+      "atMs": 373834.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html interact --width=1440 --height=900"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (49.2 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play \u2192\"\n  focus after primary: canvas#board \"Playfield, 10 columns by 20 rows. Use the keyboard or touch \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: span#status.status-pill \"FIND YOUR FLOW\"; div#score.score \"35\"; strong#level \"01\"; strong#lines \"0\"; span#boardState \"IN THE FLOW\"\n  overlays after first P: div#overlay.overlay \"A little breathing room. Your pieces will be right here. Pre\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"SMALL HOURS POCKET ARCADE / No. 01 ONE MORE PIECE. ONE MORE POSSIBILITY. Afterglow. A little order in the middle of the night. FIND YOUR FLOW YOUR SCORE 35 BEST\"\nMEASURED LAYOUT (px, viewport 1440x900, page 1440x948, body bg rgb(16, 23, 32), text rgb(244, 238, 227)):\n  div.shell @ x=195 y=0 w=1050 h=948 \"SMALL HOURS\"\n  header @ x=227 y=25 w=986 h=42 \"SMALL HOURS\"\n  section.intro @ x=227 y=93 w=986 h=115 \"ONE MORE PIECE. ONE MORE POSSIBILITY\"\n  main.arcade @ x=227 y=232 w=986 h=615 \"YOUR SCORE\"\n  details.hint @ x=227 y=857 w=986 h=18 \"How to play & keyboard controls\"\n  footer @ x=227 y=898 w=986 h=30 \"MADE FOR YOUR JUST-ONE-MORE MOMENTS\"",
+      "atMs": 379321.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "write file",
+      "action": {
+        "a": "write_file",
+        "p": "test/interface.test.js",
+        "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nfunction setup(){\n const elements=new Map(),listeners={};let now=0;\n const context2d=new Proxy({}, {get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>(o[k]=v,true)});\n function element(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},hidden:false,disabled:false,textContent:'',innerHTML:'',events:{},getContext:()=>context2d,setAttribute(){},focus(){},setPointerCapture(){},addEventListener(k,f){this.events[k]=f;},click(){this.events.click?.({detail:0});}});return elements.get(id);}\n const buttons=['left','right','ccw','cw','down','hold','drop'].map(name=>{const b=element('touch-'+name);b.dataset.command=name;return b;});\n const document={getElementById:element,querySelectorAll:()=>buttons,addEventListener:(k,f)=>listeners['document:'+k]=f,hidden:false};\n const window={matchMedia:()=>({matches:false}),addEventListener:(k,f)=>listeners[k]=f};\n const context=vm.createContext({document,window,performance:{now:()=>now},requestAnimationFrame:()=>{},localStorage:{getItem(){throw Error('Storage blocked');},setItem(){throw Error('Storage blocked');}}});\n for(const match of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi))vm.runInContext(match[1],context);\n return {element,document,run:code=>vm.runInContext(code,context),event:(name,props={})=>listeners[name]?.({preventDefault(){},...props}),advance:ms=>{now+=ms;vm.runInContext('frame('+now+')',context);}};\n}\ntest('interface starts, pauses, resumes and safely confirms or cancels restart',()=>{const s=setup();assert.equal(s.run('game.state'),'ready');s.element('play').click();assert.equal(s.run('game.state'),'playing');assert.equal(s.element('overlay').hidden,true);s.element('pause').click();assert.equal(s.run('game.state'),'paused');assert.equal(s.element('overlay').hidden,false);s.element('play').click();assert.equal(s.run('game.state'),'playing');s.run('game.score=123');s.element('restart').click();assert.equal(s.run('confirmRestart'),true);s.element('cancel').click();assert.equal(s.run('game.score'),123);assert.equal(s.run('game.state'),'playing');s.element('restart').click();s.element('play').click();assert.equal(s.run('game.score'),0);assert.equal(s.run('game.state'),'playing');});\ntest('keyboard hold, rotate, hard drop and pause are connected',()=>{const s=setup();s.element('play').click();s.event('keydown',{key:'c',repeat:false});assert.ok(s.run('game.held'));s.event('keydown',{key:'ArrowUp',repeat:false});s.event('keydown',{key:' ',repeat:false});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);s.event('keydown',{key:' ',repeat:true});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);s.event('keydown',{key:'p',repeat:false});assert.equal(s.run('game.state'),'paused');s.event('keydown',{key:'Escape',repeat:false});assert.equal(s.run('game.state'),'playing');});\ntest('touch movement repeats while held and stops on pointer cancellation',()=>{const s=setup();s.element('play').click();s.run(\"game.spawn('O')\");const b=s.element('touch-left');b.events.pointerdown({pointerId:1,preventDefault(){}});assert.equal(s.run('game.piece.x'),3);s.advance(200);assert.equal(s.run('game.piece.x'),2);b.events.pointercancel({pointerId:1});s.advance(200);assert.equal(s.run('game.piece.x'),2);s.element('touch-hold').events.pointerdown({pointerId:2,preventDefault(){}});assert.equal(s.run('game.held'),'O');s.element('touch-drop').events.pointerdown({pointerId:3,preventDefault(){}});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);});\ntest('switching away pauses and clears repeating inputs',()=>{const s=setup();s.element('play').click();s.event('keydown',{key:'ArrowLeft',repeat:false});assert.equal(s.run('held.size'),1);s.event('blur');assert.equal(s.run('game.state'),'paused');assert.equal(s.run('held.size'),0);s.element('play').click();s.document.hidden=true;s.event('document:visibilitychange');assert.equal(s.run('game.state'),'paused');});\ntest('game-over overlay offers a working new round even without local storage',()=>{const s=setup();s.element('play').click();s.run(\"game.score=800;game.over();sync()\");assert.equal(s.element('overlay').hidden,false);assert.match(s.element('overlayText').innerHTML,/800 points/);assert.equal(s.element('best').textContent,'800');s.element('play').click();assert.equal(s.run('game.state'),'playing');assert.equal(s.run('game.score'),0);assert.equal(s.run('best'),800);});\n"
+      },
+      "observation": "wrote 4565 bytes to test/interface.test.js\n[impact] Cross-file references for symbols in this edit \u2014 if the change alters their contract, these sites are affected:\n  `piece` is also referenced in: test/game.test.js\n[regression-guard] Test inputs changed (test/interface.test.js). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.",
+      "atMs": 424660.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "replace",
+      "action": {
+        "a": "replace",
+        "p": "arcade.html",
+        "old": "@media(prefers-reduced-motion:reduce){*{transition:none!important}}",
+        "new": "@media(min-width:761px) and (any-pointer:coarse){.touch{display:grid}}\n@media(prefers-reduced-motion:reduce){*{transition:none!important}}"
+      },
+      "observation": "replaced 1 occurrence in arcade.html",
+      "atMs": 430512.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "shell",
+      "action": {
+        "a": "shell",
+        "c": "npm test"
+      },
+      "observation": "VERDICT: all 20 tests passed.\n$ npm test\ncwd: /workspace\nsandbox: docker:alpine:3\nexit 0\n\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.337501\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 1.396742\n  ...\n# Subtest: seven-bag distribution and independent board rows\nok 3 - seven-bag distribution and independent board rows\n  ---\n  duration_ms: 2.122887\n  ...\n# Subtest: movement respects both walls and occupied cells\nok 4 - movement respects both walls and occupied cells\n  ---\n  duration_ms: 0.630655\n  ...\n# Subtest: rotation cycles, inverse rotation and a wall kick\nok 5 - rotation cycles, inverse rotation and a wall kick\n  ---\n  duration_ms: 0.842197\n  ...\n# Subtest: gravity, soft drop and hard drop scoring\nok 6 - gravity, soft drop and hard drop scoring\n  ---\n  duration_ms: 0.830407\n  ...\n# Subtest: hold is limited to once per piece and restores spawn orientation\nok 7 - hold is limited to once per piece and restores spawn orientation\n  ---\n  duration_ms: 1.27206\n  ...\n# Subtest: four-row clear, compaction, combo, level and event data\nok 8 - four-row clear, compaction, combo, level and event data\n  ---\n  duration_ms: 0.804277\n  ...\n# Subtest: cleared rows shift surviving cells downward\nok 9 - cleared rows shift surviving cells downward\n  ---\n  duration_ms: 0.571535\n  ...\n# Subtest: lock delay and bounded reset prevent instant lock and infinite stalling\nok 10 - lock delay and bounded reset prevent instant lock and infinite stalling\n  ---\n  duration_ms: 0.640295\n  ...\n# Subtest: pause freezes board, scores, movement, rotation, hold and drop\nok 11 - pause freezes board, scores, movement, rotation, hold and drop\n  ---\n  duration_ms: 0.655626\n  ...\n# Subtest: blocked spawn and above-board lock end the game\nok 12 - blocked spawn and above-board lock end the game\n  ---\n  duration_ms: 0.672516\n  ...\n# Subtest: restart resets a completed or paused round\nok 13 - restart resets a completed or paused round\n  ---\n  duration_ms: 0.619015\n  ...\n# Subtest: long deterministic play remains within legal board bounds\nok 14 - long deterministic play remains within legal board bounds\n  ---\n  duration_ms: 10.228112\n  ...\n# Subtest: delivery contains no external resources or network APIs\nok 15 - delivery contains no external resources or network APIs\n  ---\n  duration_ms: 0.346393\n  ...\n# Subtest: interface starts, pauses, resumes and safely confirms or cancels restart\nok 16 - interface starts, pauses, resumes and safely confirms or cancels restart\n  ---\n  duration_ms: 13.768142\n  ...\n# Subtest: keyboard hold, rotate, hard drop and pause are connected\nok 17 - keyboard hold, rotate, hard drop and pause are connected\n  ---\n  duration_ms: 1.541743\n  ...\n# Subtest: touch movement repeats while held and stops on pointer cancellation\nok 18 - touch movement repeats while held and stops on pointer cancellation\n  ---\n  duration_ms: 2.059076\n  ...\n# Subtest: switching away pauses and clears repeating inputs\nok 19 - switching away pauses and clears repeating inputs\n  ---\n  duration_ms: 1.004898\n  ...\n# Subtest: game-over overlay offers a working new round even without local storage\nok 20 - game-over overlay offers a working new round even without local storage\n  ---\n  duration_ms: 0.943378\n  ...\n1..20\n# tests 20\n# suites 0\n# pass 20\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 71.969834",
+      "atMs": 435925.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": 0
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html interact --width=390 --height=844"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (50.8 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play \u2192\"\n  focus after primary: canvas#board \"Playfield, 10 columns by 20 rows. Use the keyboard or touch \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"35\"; strong#level \"01\"; strong#lines \"0\"; span#boardState \"IN THE FLOW\"\n  overlays after first P: div#overlay.overlay \"A little breathing room. Your pieces will be right here. Pre\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"SMALL HOURS POCKET ARCADE / No. 01 ONE MORE PIECE. ONE MORE POSSIBILITY. Afterglow. A little order in the middle of the night. YOUR SCORE 35 BEST 35 LEVEL 01 LI\"\nMEASURED LAYOUT (px, viewport 390x844, page 390x900, body bg rgb(16, 23, 32), text rgb(244, 238, 227)):\n  div.shell @ x=0 y=0 w=390 h=900 \"SMALL HOURS\"\n  header @ x=16 y=12 w=358 h=34 \"SMALL HOURS\"\n  section.intro @ x=16 y=60 w=358 h=85 \"ONE MORE PIECE. ONE MORE POSSIBILITY\"\n  main.arcade @ x=16 y=159 w=358 h=645 \"YOUR SCORE\"\n  details.hint @ x=16 y=814 w=358 h=16 \"How to play & keyboard controls\"\n  footer @ x=16 y=854 w=358 h=29 \"MADE FOR YOUR JUST-ONE-MORE MOMENTS\"",
+      "atMs": 439499.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "query",
+      "action": {
+        "a": "query",
+        "q": "preview arcade.html interact --width=320 --height=740"
+      },
+      "observation": "[preview] loaded arcade.html in headless chromium (exit 0).\nPREVIEW REALTIME: 60 fps sustained (50.8 fps at load) \u2014 healthy under the real clock.\nPREVIEW MODE: INTERACTIVE SMOKE (bounded primary-control + keyboard probe).\nPREVIEW NETWORK: DISABLED BY POLICY.\nPREVIEW STATUS: pass\nNo page errors, console errors, or failed loads detected.\nINTERACTION SMOKE:\n  primary: button#play.primary \"Let's play \u2192\"\n  focus after primary: canvas#board \"Playfield, 10 columns by 20 rows. Use the keyboard or touch \"\n  dispatched: click-primary, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Space, KeyP, KeyP\n  HUD after keys: div#score.score \"33\"; strong#level \"01\"; strong#lines \"0\"; span#boardState \"IN THE FLOW\"\n  overlays after first P: div#overlay.overlay \"A little breathing room. Your pieces will be right here. Pre\"\n  overlays after second P: (none)\n  No interaction conflicts detected by this bounded smoke.\nVisible text starts: \"SMALL HOURS POCKET ARCADE / No. 01 ONE MORE PIECE. ONE MORE POSSIBILITY. Afterglow. A little order in the middle of the night. YOUR SCORE 33 BEST 33 LEVEL 01 LI\"\nMEASURED LAYOUT (px, viewport 320x740, page 320x928, body bg rgb(16, 23, 32), text rgb(244, 238, 227)):\n  div.shell @ x=0 y=0 w=320 h=928 \"SMALL HOURS\"\n  header @ x=16 y=12 w=288 h=49 \"SMALL HOURS\"\n  section.intro @ x=16 y=75 w=288 h=85 \"ONE MORE PIECE. ONE MORE POSSIBILITY\"\n  main.arcade @ x=16 y=174 w=288 h=645 \"YOUR SCORE\"\n  details.hint @ x=16 y=829 w=288 h=16 \"How to play & keyboard controls\"\n  footer @ x=16 y=869 w=288 h=42 \"MADE FOR YOUR JUST-ONE-MORE MOMENTS\"",
+      "atMs": 447914.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    },
+    {
+      "title": "done",
+      "action": {
+        "a": "done",
+        "summary": "Created arcade.html: Afterglow, a self-contained offline arcade game with pastel styling, full falling-block gameplay, hold, three-piece preview, ghost landing guide, combos, levels, pause/resume, restart confirmation, game over, saved best score, and phone touch controls. Added gameplay and interface tests without changing the starter files. All 20 tests pass via npm test; desktop and phone browser smoke checks pass with no runtime errors or failed loads. Open arcade.html to play."
+      },
+      "observation": "",
+      "atMs": 470520.0,
+      "endedMs": null,
+      "state": "recorded",
+      "exitCode": null
+    }
+  ],
+  "finalResponse": "Created arcade.html: Afterglow, a self-contained offline arcade game with pastel styling, full falling-block gameplay, hold, three-piece preview, ghost landing guide, combos, levels, pause/resume, restart confirmation, game over, saved best score, and phone touch controls. Added gameplay and interface tests without changing the starter files. All 20 tests pass via npm test; desktop and phone browser smoke checks pass with no runtime errors or failed loads. Open arcade.html to play.",
+  "verification": "Recorded project check: 20/20 tests passed. Two supplied tests check packaging; the other tests were written by the agent.",
+  "verificationOutput": "\n> creative-arcade@1.0.0 test\n> node --test\n\nTAP version 13\n# Subtest: deliver one regular, bounded HTML file\nok 1 - deliver one regular, bounded HTML file\n  ---\n  duration_ms: 1.391902\n  ...\n# Subtest: include classic JavaScript that parses\nok 2 - include classic JavaScript that parses\n  ---\n  duration_ms: 1.447312\n  ...\n# Subtest: seven-bag distribution and independent board rows\nok 3 - seven-bag distribution and independent board rows\n  ---\n  duration_ms: 1.836565\n  ...\n# Subtest: movement respects both walls and occupied cells\nok 4 - movement respects both walls and occupied cells\n  ---\n  duration_ms: 0.651145\n  ...\n# Subtest: rotation cycles, inverse rotation and a wall kick\nok 5 - rotation cycles, inverse rotation and a wall kick\n  ---\n  duration_ms: 0.790896\n  ...\n# Subtest: gravity, soft drop and hard drop scoring\nok 6 - gravity, soft drop and hard drop scoring\n  ---\n  duration_ms: 0.785317\n  ...\n# Subtest: hold is limited to once per piece and restores spawn orientation\nok 7 - hold is limited to once per piece and restores spawn orientation\n  ---\n  duration_ms: 0.660365\n  ...\n# Subtest: four-row clear, compaction, combo, level and event data\nok 8 - four-row clear, compaction, combo, level and event data\n  ---\n  duration_ms: 1.356931\n  ...\n# Subtest: cleared rows shift surviving cells downward\nok 9 - cleared rows shift surviving cells downward\n  ---\n  duration_ms: 0.593075\n  ...\n# Subtest: lock delay and bounded reset prevent instant lock and infinite stalling\nok 10 - lock delay and bounded reset prevent instant lock and infinite stalling\n  ---\n  duration_ms: 0.631825\n  ...\n# Subtest: pause freezes board, scores, movement, rotation, hold and drop\nok 11 - pause freezes board, scores, movement, rotation, hold and drop\n  ---\n  duration_ms: 0.630964\n  ...\n# Subtest: blocked spawn and above-board lock end the game\nok 12 - blocked spawn and above-board lock end the game\n  ---\n  duration_ms: 0.663505\n  ...\n# Subtest: restart resets a completed or paused round\nok 13 - restart resets a completed or paused round\n  ---\n  duration_ms: 0.628935\n  ...\n# Subtest: long deterministic play remains within legal board bounds\nok 14 - long deterministic play remains within legal board bounds\n  ---\n  duration_ms: 10.279303\n  ...\n# Subtest: delivery contains no external resources or network APIs\nok 15 - delivery contains no external resources or network APIs\n  ---\n  duration_ms: 0.350333\n  ...\n# Subtest: interface starts, pauses, resumes and safely confirms or cancels restart\nok 16 - interface starts, pauses, resumes and safely confirms or cancels restart\n  ---\n  duration_ms: 14.050653\n  ...\n# Subtest: keyboard hold, rotate, hard drop and pause are connected\nok 17 - keyboard hold, rotate, hard drop and pause are connected\n  ---\n  duration_ms: 1.678903\n  ...\n# Subtest: touch movement repeats while held and stops on pointer cancellation\nok 18 - touch movement repeats while held and stops on pointer cancellation\n  ---\n  duration_ms: 2.061667\n  ...\n# Subtest: switching away pauses and clears repeating inputs\nok 19 - switching away pauses and clears repeating inputs\n  ---\n  duration_ms: 1.003518\n  ...\n# Subtest: game-over overlay offers a working new round even without local storage\nok 20 - game-over overlay offers a working new round even without local storage\n  ---\n  duration_ms: 1.120509\n  ...\n1..20\n# tests 20\n# suites 0\n# pass 20\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 69.105319\n\n",
+  "source": "factory-turns-and-verification",
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "476d40290412e2e056592dfa78b212aed8825d947ba5262daebeee7b3db7c9ba"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "d841be5a4f624890e49fdcef78bc30d679a758adc8ab858b6a886c952324d0d4"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "92748bc932d600501afb157870422030ede150f3255565089fa689aea8d60cc8"
+    }
+  ],
+  "usage": {
+    "source": "run.json",
+    "complete": true,
+    "requests": 15,
+    "inputTokens": 359278,
+    "outputTokens": 13051,
+    "cacheHitTokens": 324736,
+    "reasoningTokens": 1718,
+    "prefixReuse": 0.9,
+    "freshInputTokens": 34542,
+    "calls": [
+      {
+        "usage": {
+          "inputTokens": 10012,
+          "outputTokens": 36,
+          "cacheHitTokens": 0,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 11357,
+          "outputTokens": 5452,
+          "cacheHitTokens": 9856,
+          "reasoningTokens": 292
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 16939,
+          "outputTokens": 2684,
+          "cacheHitTokens": 11136,
+          "reasoningTokens": 98
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 19979,
+          "outputTokens": 1863,
+          "cacheHitTokens": 16768,
+          "reasoningTokens": 131
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 22201,
+          "outputTokens": 14,
+          "cacheHitTokens": 19840,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 23172,
+          "outputTokens": 24,
+          "cacheHitTokens": 22016,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 24006,
+          "outputTokens": 544,
+          "cacheHitTokens": 23040,
+          "reasoningTokens": 516
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 25462,
+          "outputTokens": 495,
+          "cacheHitTokens": 23808,
+          "reasoningTokens": 276
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 26327,
+          "outputTokens": 92,
+          "cacheHitTokens": 25344,
+          "reasoningTokens": 65
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 27256,
+          "outputTokens": 1268,
+          "cacheHitTokens": 26112,
+          "reasoningTokens": 14
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 28976,
+          "outputTokens": 91,
+          "cacheHitTokens": 27136,
+          "reasoningTokens": 13
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 29437,
+          "outputTokens": 14,
+          "cacheHitTokens": 28800,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 30529,
+          "outputTokens": 24,
+          "cacheHitTokens": 29312,
+          "reasoningTokens": 0
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 31379,
+          "outputTokens": 41,
+          "cacheHitTokens": 30336,
+          "reasoningTokens": 15
+        }
+      },
+      {
+        "usage": {
+          "inputTokens": 32246,
+          "outputTokens": 409,
+          "cacheHitTokens": 31232,
+          "reasoningTokens": 298
+        }
+      }
+    ],
+    "maxRequestInputTokens": 32246
+  },
+  "playtest": {
+    "arm": "bantam-codex-astra-efficient-v2",
+    "method": "Untouched delivered HTML in Chromium. Real keyboard and touch events; deterministic line-clear fixture in browser memory only. No product edits. ",
+    "checks": {
+      "gravity": true,
+      "left": true,
+      "right": true,
+      "rotation": true,
+      "hard_drop_and_next": true,
+      "hold": true,
+      "pause": true,
+      "resume": true,
+      "restart_confirmation": true,
+      "restart": true,
+      "line_clear": true,
+      "game_over": true,
+      "restart_after_game_over": true
+    },
+    "viewports": [
+      {
+        "width": 390,
+        "horizontalOverflow": false,
+        "touchMovesPiece": true,
+        "touchControlsWithinWidth": true,
+        "controlsBottom": 756.1875,
+        "screenHeight": 844
+      },
+      {
+        "width": 320,
+        "horizontalOverflow": false,
+        "touchMovesPiece": true,
+        "touchControlsWithinWidth": true,
+        "controlsBottom": 640.1875,
+        "screenHeight": 844
+      }
+    ],
+    "errors": [],
+    "externalRequests": [],
+    "pass": true
+  },
+  "files": [
+    {
+      "path": "test/delivery.test.js",
+      "sha256": "756944dc3596dc7ace4a2069253751e2e1344d9cfbfcd6d97fe9057a09672ae1",
+      "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst file=new URL('../arcade.html',import.meta.url);\ntest('deliver one regular, bounded HTML file',()=>{\n const s=fs.lstatSync(file);assert.ok(s.isFile()&&!s.isSymbolicLink());assert.ok(s.size>0&&s.size<=1024*1024);\n const text=fs.readFileSync(file,'utf8');assert.match(text,/<!doctype html>/i);assert.match(text,/<html\\b/i);assert.match(text,/<title>[^<]+<\\/title>/i);assert.match(text,/name=[\"']viewport[\"']/i);\n});\ntest('include classic JavaScript that parses',()=>{\n const text=fs.readFileSync(file,'utf8');const blocks=[...text.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)];\n assert.ok(blocks.length>0);for(const [,attrs,code] of blocks){assert.doesNotMatch(attrs,/\\bsrc\\s*=/i);assert.doesNotMatch(attrs,/type\\s*=\\s*[\"']module[\"']/i);new vm.Script(code);}\n});\n"
+    },
+    {
+      "path": "test/game.test.js",
+      "sha256": "d76ec4cc3c0e8493e78fbf9ede259c27e8af2fededad3c5b33ed3f73b301e988",
+      "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nconst source=[...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)][0][1];\nfunction fixture(){const context=vm.createContext({});vm.runInContext(source+'\\nglobalThis.Engine=Afterglow;',context);const g=new context.Engine(()=>.42);g.start();return g;}\nconst piece=(kind,m,x,y)=>({kind,m,x,y});\ntest('seven-bag distribution and independent board rows',()=>{const g=fixture();const first=[g.piece.kind,...g.queue.slice(0,6)];assert.equal(new Set(first).size,7);g.board[0][0]='T';assert.equal(g.board[1][0],null);assert.equal(g.board.length,20);assert.ok(g.queue.length>=7);});\ntest('movement respects both walls and occupied cells',()=>{const g=fixture();g.piece=piece('O',[[1,1],[1,1]],0,5);assert.equal(g.move(-1),false);assert.equal(g.piece.x,0);g.board[5][2]='T';assert.equal(g.move(1),false);g.board[5][2]=null;assert.equal(g.move(1),true);g.piece.x=8;assert.equal(g.move(1),false);});\ntest('rotation cycles, inverse rotation and a wall kick',()=>{const g=fixture();g.spawn('T');const original=JSON.stringify(g.piece.m);for(let i=0;i<4;i++)assert.equal(g.rotate(),true);assert.equal(JSON.stringify(g.piece.m),original);g.rotate();g.rotate(-1);assert.equal(JSON.stringify(g.piece.m),original);g.spawn('I');g.rotate();g.piece.x=-2;assert.equal(g.fits(g.piece),true);assert.equal(g.rotate(),true);assert.equal(g.fits(g.piece),true);assert.ok(g.piece.x>=0);});\ntest('gravity, soft drop and hard drop scoring',()=>{const g=fixture();g.spawn('O');g.tick(800);assert.equal(g.piece.y,1);assert.equal(g.score,0);g.move(0,1);assert.equal(g.piece.y,2);assert.equal(g.score,1);assert.equal(g.ghostY(),18);g.hardDrop();assert.equal(g.score,33);assert.equal(g.board[19].filter(Boolean).length,2);assert.equal(g.board[18].filter(Boolean).length,2);});\ntest('hold is limited to once per piece and restores spawn orientation',()=>{const g=fixture();g.spawn('T');g.rotate();assert.equal(g.hold(),true);assert.equal(g.held,'T');const next=g.piece.kind;assert.equal(g.hold(),false);g.hardDrop();assert.equal(g.hold(),true);assert.equal(g.piece.kind,'T');assert.equal(JSON.stringify(g.piece.m),'[[0,1,0],[1,1,1],[0,0,0]]');assert.notEqual(next,undefined);assert.equal(g.canHold,false);});\nfunction fourRows(g){g.board=g.empty();for(let y=16;y<20;y++)g.board[y]=Array.from({length:10},(_,x)=>x===4?null:'J');g.piece=piece('I',[[1],[1],[1],[1]],4,16);g.lock();}\ntest('four-row clear, compaction, combo, level and event data',()=>{const g=fixture();const events=[];g.onEvent=e=>events.push(e);fourRows(g);assert.equal(g.score,800);assert.equal(g.lines,4);assert.equal(g.board.flat().filter(Boolean).length,0);assert.equal(events[0].rows.length,4);fourRows(g);assert.equal(g.score,1650);assert.equal(g.combo,1);fourRows(g);assert.equal(g.lines,12);assert.equal(g.level,2);assert.equal(g.score,2550);g.hardDrop();assert.equal(g.combo,-1);});\ntest('cleared rows shift surviving cells downward',()=>{const g=fixture();g.board[18][0]='Z';g.board[19]=Array.from({length:10},(_,x)=>x>=8?null:'J');g.piece=piece('O',[[1,1],[1,1]],8,18);g.lock();assert.equal(g.lines,1);assert.equal(g.score,100);assert.equal(g.board[19][0],'Z');assert.equal(g.board[19][8],'O');assert.ok(g.board[0].every(v=>v===null));});\ntest('lock delay and bounded reset prevent instant lock and infinite stalling',()=>{const g=fixture();g.spawn('O');g.piece.y=18;g.tick(400);assert.equal(g.board.flat().filter(Boolean).length,0);g.move(-1);assert.equal(g.lockTime,0);for(let i=0;i<14;i++)g.move(i%2? -1:1);assert.equal(g.resets,15);g.tick(400);g.move(1);assert.equal(g.lockTime,400);g.tick(50);assert.equal(g.board.flat().filter(Boolean).length,4);});\ntest('pause freezes board, scores, movement, rotation, hold and drop',()=>{const g=fixture();g.pause();const before=JSON.stringify(g);g.tick(5000);g.move(1);g.rotate();g.hold();g.hardDrop();assert.equal(JSON.stringify(g),before);g.pause();assert.equal(g.state,'playing');g.tick(800);assert.equal(g.piece.y,1);});\ntest('blocked spawn and above-board lock end the game',()=>{const g=fixture();g.board[0].fill('J');g.spawn('O');assert.equal(g.state,'over');g.start();g.piece=piece('O',[[1,1],[1,1]],4,-1);g.lock();assert.equal(g.state,'over');});\ntest('restart resets a completed or paused round',()=>{const g=fixture();fourRows(g);g.hold();g.pause();g.start();assert.equal(g.state,'playing');assert.equal(g.score,0);assert.equal(g.lines,0);assert.equal(g.level,1);assert.equal(g.held,null);assert.equal(g.canHold,true);assert.ok(g.board.flat().every(v=>v===null));assert.ok(g.piece);});\ntest('long deterministic play remains within legal board bounds',()=>{const g=fixture();for(let i=0;i<500;i++){if(g.state==='over')g.start();for(let j=0;j<i%6;j++)g.rotate(i%2?1:-1);for(let j=0;j<i%5;j++)g.move(i%2?1:-1);if(i%4===0)g.hold();assert.ok(g.fits(g.piece)||g.state==='over');g.hardDrop();assert.equal(g.board.length,20);assert.ok(g.board.every(r=>r.length===10));assert.ok(Number.isFinite(g.score));}});\ntest('delivery contains no external resources or network APIs',()=>{assert.doesNotMatch(html,/<(?:script|link|img|iframe|audio|video)\\b[^>]*(?:src|href)\\s*=/i);assert.doesNotMatch(html,/\\b(?:fetch|XMLHttpRequest|WebSocket|importScripts)\\s*\\(/);assert.doesNotMatch(html,/url\\(\\s*['\"]?https?:/i);});\n"
+    },
+    {
+      "path": "test/interface.test.js",
+      "sha256": "87568df67eeac181f0c4099ed8125e745b519e7f4b18831f1d580d9fe95f3d64",
+      "text": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport vm from 'node:vm';\nconst html=fs.readFileSync(new URL('../arcade.html',import.meta.url),'utf8');\nfunction setup(){\n const elements=new Map(),listeners={};let now=0;\n const context2d=new Proxy({}, {get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>(o[k]=v,true)});\n function element(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},hidden:false,disabled:false,textContent:'',innerHTML:'',events:{},getContext:()=>context2d,setAttribute(){},focus(){},setPointerCapture(){},addEventListener(k,f){this.events[k]=f;},click(){this.events.click?.({detail:0});}});return elements.get(id);}\n const buttons=['left','right','ccw','cw','down','hold','drop'].map(name=>{const b=element('touch-'+name);b.dataset.command=name;return b;});\n const document={getElementById:element,querySelectorAll:()=>buttons,addEventListener:(k,f)=>listeners['document:'+k]=f,hidden:false};\n const window={matchMedia:()=>({matches:false}),addEventListener:(k,f)=>listeners[k]=f};\n const context=vm.createContext({document,window,performance:{now:()=>now},requestAnimationFrame:()=>{},localStorage:{getItem(){throw Error('Storage blocked');},setItem(){throw Error('Storage blocked');}}});\n for(const match of html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi))vm.runInContext(match[1],context);\n return {element,document,run:code=>vm.runInContext(code,context),event:(name,props={})=>listeners[name]?.({preventDefault(){},...props}),advance:ms=>{now+=ms;vm.runInContext('frame('+now+')',context);}};\n}\ntest('interface starts, pauses, resumes and safely confirms or cancels restart',()=>{const s=setup();assert.equal(s.run('game.state'),'ready');s.element('play').click();assert.equal(s.run('game.state'),'playing');assert.equal(s.element('overlay').hidden,true);s.element('pause').click();assert.equal(s.run('game.state'),'paused');assert.equal(s.element('overlay').hidden,false);s.element('play').click();assert.equal(s.run('game.state'),'playing');s.run('game.score=123');s.element('restart').click();assert.equal(s.run('confirmRestart'),true);s.element('cancel').click();assert.equal(s.run('game.score'),123);assert.equal(s.run('game.state'),'playing');s.element('restart').click();s.element('play').click();assert.equal(s.run('game.score'),0);assert.equal(s.run('game.state'),'playing');});\ntest('keyboard hold, rotate, hard drop and pause are connected',()=>{const s=setup();s.element('play').click();s.event('keydown',{key:'c',repeat:false});assert.ok(s.run('game.held'));s.event('keydown',{key:'ArrowUp',repeat:false});s.event('keydown',{key:' ',repeat:false});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);s.event('keydown',{key:' ',repeat:true});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);s.event('keydown',{key:'p',repeat:false});assert.equal(s.run('game.state'),'paused');s.event('keydown',{key:'Escape',repeat:false});assert.equal(s.run('game.state'),'playing');});\ntest('touch movement repeats while held and stops on pointer cancellation',()=>{const s=setup();s.element('play').click();s.run(\"game.spawn('O')\");const b=s.element('touch-left');b.events.pointerdown({pointerId:1,preventDefault(){}});assert.equal(s.run('game.piece.x'),3);s.advance(200);assert.equal(s.run('game.piece.x'),2);b.events.pointercancel({pointerId:1});s.advance(200);assert.equal(s.run('game.piece.x'),2);s.element('touch-hold').events.pointerdown({pointerId:2,preventDefault(){}});assert.equal(s.run('game.held'),'O');s.element('touch-drop').events.pointerdown({pointerId:3,preventDefault(){}});assert.equal(s.run('game.board.flat().filter(Boolean).length'),4);});\ntest('switching away pauses and clears repeating inputs',()=>{const s=setup();s.element('play').click();s.event('keydown',{key:'ArrowLeft',repeat:false});assert.equal(s.run('held.size'),1);s.event('blur');assert.equal(s.run('game.state'),'paused');assert.equal(s.run('held.size'),0);s.element('play').click();s.document.hidden=true;s.event('document:visibilitychange');assert.equal(s.run('game.state'),'paused');});\ntest('game-over overlay offers a working new round even without local storage',()=>{const s=setup();s.element('play').click();s.run(\"game.score=800;game.over();sync()\");assert.equal(s.element('overlay').hidden,false);assert.match(s.element('overlayText').innerHTML,/800 points/);assert.equal(s.element('best').textContent,'800');s.element('play').click();assert.equal(s.run('game.state'),'playing');assert.equal(s.run('game.score'),0);assert.equal(s.run('best'),800);});\n"
+    }
+  ]
+}

@@ -15,7 +15,7 @@
     },
     {
       "id": "astra-factory-context",
-      "label": "Current factory build",
+      "label": "Previous factory build",
       "title": "Afterglow",
       "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
       "file": "astra-factory-context.html",
@@ -24,62 +24,76 @@
       "actionCount": 16,
       "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
       "features": "An offline pocket arcade with a ghost piece, hold, a three-piece queue, combos, a personal best and touch controls. All 17 retained tests pass. The board and controls fit on 390 px and 320 px phones."
+    },
+    {
+      "id": "astra-factory-efficient",
+      "label": "Current factory build",
+      "title": "Afterglow",
+      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
+      "file": "astra-factory-efficient.html",
+      "record": "astra-factory-efficient.json",
+      "wallMs": 471678,
+      "actionCount": 15,
+      "prompt": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.",
+      "features": "A midnight arcade with hold, a ghost landing guide, three-piece preview, combos, levels, saved best score and touch controls. Twenty retained tests pass. The factory previewed desktop and phone layouts, fixed interaction details, and finished the job."
     }
   ],
   "comparisons": [
     {
-      "id": "astra-factory-context",
+      "id": "astra-factory-efficient",
       "label": "Astra \u00b7 BANTAM FACTORY",
       "title": "Afterglow",
       "model": "GPT-6 Astra \u00b7 medium",
-      "file": "astra-factory-context.html",
-      "record": "astra-factory-context.json",
-      "wallMs": 485277,
-      "result": "Complete \u00b7 browser playtested",
-      "review": "Mint, navy and peach with a compact arcade layout. Touch controls fit below the board on both phone widths. Its 17 tests cover the engine and real browser interactions, including pause, restart confirmation, touch release and storage failures.",
+      "file": "astra-factory-efficient.html",
+      "record": "astra-factory-efficient.json",
+      "wallMs": 471678,
+      "result": "Complete \u00b7 20 tests \u00b7 browser playtested",
+      "processCompleted": true,
+      "review": "Mint and peach on a calm midnight background. Compact phone controls, restart confirmation and a clean three-piece queue. The factory used its built-in browser preview to check and refine the interface. All 20 retained tests and the independent desktop/phone playtest pass.",
       "usage": {
-        "astraCalls": 16,
-        "freshInputTokens": 41344,
-        "cacheHitTokens": 421248,
-        "outputTokens": 13420,
-        "localOutputTokens": null,
-        "inputTokens": 462592
+        "inputTokens": 359278,
+        "outputTokens": 13051,
+        "cacheHitTokens": 324736,
+        "freshInputTokens": 34542,
+        "complete": true,
+        "astraCalls": 15
       }
     },
     {
-      "id": "astra-cli",
+      "id": "astra-cli-efficient",
       "label": "Astra \u00b7 Codex CLI",
-      "title": "Afterglow",
+      "title": "Orbital",
       "model": "GPT-6 Astra \u00b7 medium",
-      "file": "astra-cli.html",
-      "record": "astra-cli.json",
-      "wallMs": 404937,
-      "result": "Complete \u00b7 browser playtested",
-      "review": "Cream, teal and lime with a distinctive editorial layout. Sound, personal bests and a three-piece queue add character. Its checks exercise movement, hold, line clearing, level changes and game over. Touch controls sit further down the page.",
+      "file": "astra-cli-efficient.html",
+      "record": "astra-cli-efficient.json",
+      "wallMs": 600485,
+      "result": "Game playable \u00b7 run timed out",
+      "processCompleted": false,
+      "review": "A distinctive orbital theme with lilac, lime, soft blocks, a seven-bag queue, wall kicks and optional sound. The game passes our browser playtest. The run timed out while setting up a browser; its downloaded dependency tree broke npm test. Its 12 retained tests pass when run directly.",
       "usage": {
-        "astraCalls": 19,
-        "freshInputTokens": 26176,
-        "cacheHitTokens": 430208,
-        "outputTokens": 10848,
-        "localOutputTokens": null,
-        "inputTokens": 456384
+        "inputTokens": 1052390,
+        "outputTokens": 16945,
+        "cacheHitTokens": 1008896,
+        "freshInputTokens": 43494,
+        "complete": false,
+        "astraCalls": null
       }
     }
   ],
   "defaults": {
-    "left": "astra-factory-context",
-    "right": "astra-cli"
+    "left": "astra-factory-efficient",
+    "right": "astra-cli-efficient"
   },
   "comparisonNote": "One shared brief. Identical starting files. Astra at medium effort in both harnesses. These are the files each delivered.",
   "sharedBrief": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
-  "conditions": "Each fresh build received ten minutes and the same prompt and starting files. Two supplied tests cover packaging; the agents added their own checks. We played the untouched files in Chromium at desktop, 390 px and 320 px widths. Native Codex delivered in 404.9 s; the latest factory build took 485.3 s. This repeat uses the stable-schema and observation-only context fixes. All earlier attempts remain in the record. Native Codex overlapped local work; the factory repeat followed the supervisor run. CPU and provider conditions differ between recording windows.",
-  "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. Figures include the factory\u2019s recorded checks.",
+  "conditions": "Fresh attempts, native then factory, run serially. Identical brief and starting files; Astra at medium effort in both; ten-minute recording window. BANTAM finished in 471.7 seconds with 20 passing tests. Native Codex reached 600.5 seconds without a final completion; npm test failed on a downloaded browser dependency path. Both untouched HTML files passed our independent desktop and phone playtest. Earlier builds and measurements remain in the attempt index.",
+  "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. The \u2265 marker identifies the native run\u2019s recorded subset: its unfinished request may have additional unreported usage. Factory figures include all 15 measured requests and its recorded checks.",
   "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
   "contextReuse": {
-    "percentCached": 91,
-    "inputTokens": 462592,
-    "cacheHitTokens": 421248,
-    "description": "421,248 of 462,592 input tokens came from prefix cache. The game retained 17 passing tests and passed the browser playtest.",
-    "record": "astra-factory-context.json"
+    "percentCached": 90,
+    "inputTokens": 359278,
+    "cacheHitTokens": 324736,
+    "description": "324,736 of 359,278 input tokens came from prefix cache. The factory delivered a working game, 20 passing tests and desktop/phone browser checks in 7m 52s.",
+    "record": "astra-factory-efficient.json"
   }
 }

@@ -10,6 +10,35 @@ import crypto from "node:crypto";
 
 export const MAX_TRUSTED_REVIEW_BYTES = 64 * 1024;
 
+// Review observations are operator input, not tool-output tails. Their accepted
+// 64 KiB payload must not silently become a 4,000-character head/tail excerpt.
+// Validate the synthetic turn and recorded digest before granting a separate
+// prompt allowance. This also recovers existing saved continuations without
+// inventing provenance for an ordinary action that prints the same marker.
+export function trustedReviewEvidenceEnd(turn, observation = turn?.observation) {
+  if (!turn || turn.action != null || turn.parsedAction != null) return null;
+  const text = String(observation ?? '');
+  if (!text.startsWith('[trusted-review-evidence]\n')) return null;
+  const open = '\n<review_evidence>\n', close = '\n</review_evidence>';
+  const start = text.indexOf(open);
+  if (start < 0 || Buffer.byteLength(text.slice(0, start)) > 8192) return null;
+  const header = text.slice(0, start);
+  if (!header.includes('\nauthority: operator-supplied reviewer/runtime evidence\n')) return null;
+  const digest = header.match(/\nevidence_sha256: ([a-f0-9]{64})\n?$/)?.[1];
+  if (!digest) return null;
+  const bodyStart = start + open.length;
+  let end = text.indexOf(close, bodyStart);
+  // Delimiter-looking prose is allowed inside the review. Only the original
+  // exact payload hash identifies its boundary; cap scanning and hashing too.
+  while (end >= 0 && end - bodyStart <= MAX_TRUSTED_REVIEW_BYTES) {
+    const body = text.slice(bodyStart, end);
+    if (Buffer.byteLength(body) > MAX_TRUSTED_REVIEW_BYTES) return null;
+    if (sha256(body) === digest) return end + close.length;
+    end = text.indexOf(close, end + close.length);
+  }
+  return null;
+}
+
 export function prepareRunContinuation(artifact, {
   task,
   throughTurn = undefined,

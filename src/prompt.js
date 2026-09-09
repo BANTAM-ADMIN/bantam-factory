@@ -14,6 +14,7 @@
 import { QWEN_ASSISTANT_PREFILL, CHATML_TEMPLATE } from "./profiles.js";
 import { clipText as clipObservation, OBS_MAX } from "./clip.js";
 import { clipReadObservation } from "./read-observation.js";
+import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 import { actionContractUpdateValid } from "./context-updates.js";
 import { editPaths, turnEditApplied } from "./edit-actions.js";
 import { START_WINDOW } from "./executor.js";
@@ -695,7 +696,9 @@ export function buildPrompt({
     const shellReplay = slimSuccessfulShellReplay(turn.action, rawObservation, {
       enabled: slimSuccessfulShellActions,
     });
-    const sourceObservation = compactSourceRanges(shellReplay.observation, deliveredSourceLines, recordedTurn);
+    const reviewEnd = trustedReviewEvidenceEnd(turn, shellReplay.observation);
+    const sourceObservation = reviewEnd !== null ? shellReplay.observation
+      : compactSourceRanges(shellReplay.observation, deliveredSourceLines, recordedTurn);
     if (turn.action) {
       // Scrub the replayed action too: a prior write_file/replace whose content contains
       // `<|im_start|>` or a `<think>` block would otherwise inject a fake turn on replay
@@ -763,7 +766,10 @@ export function buildPrompt({
     const controllerSuffix = preserveSlimmedControlAnnotations
       ? controllerAnnotationSuffix(sourceObservation)
       : "";
-    const observation = rewriteSuperseded
+    const observation = reviewEnd !== null
+      ? sourceObservation.slice(0, reviewEnd)
+        + clipKeepingControllerAnnotation(sourceObservation.slice(reviewEnd), preserveSlimmedControlAnnotations)
+      : rewriteSuperseded
       ? `${staleRead
         ? `[turn ${recordedTurn}: ${turn.action.p} — earlier snapshot omitted; read_file for current contents]`
         : `[turn ${recordedTurn}: ${turn.action.p} — earlier snapshot omitted; read_file for current contents]`}${controllerSuffix ? `\n${controllerSuffix}` : ""}`

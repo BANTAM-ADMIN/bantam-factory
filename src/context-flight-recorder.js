@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 
 import { parsePromptSections } from "./prompt-audit.js";
 import { controllerAnnotationSuffix } from "./prompt.js";
+import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 
 const OPEN_FILE_HEADER = /^# (.+?) \(current, (\d+) lines\)(?:\n|$)/gm;
 const PARTIAL_MARKERS = Object.freeze([
@@ -304,7 +305,7 @@ function outcomeResidency(turn, prompt) {
 // deleted body reports clean. Measured 2026-09-08 on ansi-wrap turn 7, where a
 // 6,969-character deletion registered as delivered.chars === raw.chars and
 // controllerEvidence.missing === 0. Check them whole.
-const WHOLE_BLOCK_HEAD = /^\[(?:requirement-checklist|fixture-defaults|required-read-history|work-checkpoint|working-checkpoint)\b/i;
+const WHOLE_BLOCK_HEAD = /^\[(?:requirement-checklist|fixture-defaults|required-read-history|work-checkpoint|working-checkpoint|trusted-review-evidence)\b/i;
 
 /** Guidance blocks that must reach the prompt intact, and whether they did. */
 function wholeBlockResidency(observation, prompt) {
@@ -315,7 +316,21 @@ function wholeBlockResidency(observation, prompt) {
   for (let i = 0; i < lines.length; i++) {
     if (!WHOLE_BLOCK_HEAD.test(lines[i])) continue;
     let end = i + 1;
-    while (end < lines.length && !CONTROLLER_BLOCK_HEAD.test(lines[end])) end++;
+    if (lines[i] === '[trusted-review-evidence]') {
+      const candidate = lines.slice(i).join('\n');
+      const boundary = trustedReviewEvidenceEnd({ action: null }, candidate);
+      if (boundary !== null) {
+        const block = candidate.slice(0, boundary);
+        blocks.push(block);
+        i += block.split('\n').length - 1;
+        continue;
+      }
+      // Invalid/legacy damaged records still expose a bounded diagnostic block.
+      while (end < lines.length && lines[end] !== '</review_evidence>') end++;
+      if (end < lines.length) end++;
+    } else {
+      while (end < lines.length && !CONTROLLER_BLOCK_HEAD.test(lines[end])) end++;
+    }
     blocks.push(lines.slice(i, end).join("\n").trim());
     i = end - 1;
   }

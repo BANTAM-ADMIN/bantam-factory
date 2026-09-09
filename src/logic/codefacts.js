@@ -16,6 +16,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isTestPath } from "../scope-guard.js";
+import { parse } from "acorn";
+import { simple } from "acorn-walk";
+import { codePositions } from "../collateral.js";
 
 // Deduplicate import check: ensure no duplicate imports in this file
 const _importDedupeGuard = [fs, path, isTestPath];
@@ -44,6 +47,43 @@ const DEF_PATTERNS = [
 // for its registration side effects would look unaffected by an edit to that module).
 const IMPORT_RE = /(?:(?:import|export)[^"'`]*from\s*["'`]([^"'`]+)["'`]|(?:require|import)\(\s*["'`]([^"'`]+)["'`]\s*\)|import\s+["'`]([^"'`]+)["'`])/g;
 const CALL_RE = /\b([A-Za-z_$][\w$]*)\s*\(/g;
+
+function extractJsImports(source) {
+  try {
+    const tree = parse(source, { ecmaVersion: "latest", sourceType: "module",
+      allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true });
+    const imports = [];
+    const literal = node => {
+      if (node?.type === "Literal" && typeof node.value === "string") imports.push(node.value);
+      else if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+        imports.push(node.quasis[0].value.cooked);
+      }
+    };
+    simple(tree, {
+      ImportDeclaration: node => literal(node.source),
+      ExportNamedDeclaration: node => literal(node.source),
+      ExportAllDeclaration: node => literal(node.source),
+      ImportExpression: node => literal(node.source),
+      CallExpression: node => {
+        if (node.callee.type === "Identifier" && node.callee.name === "require") literal(node.arguments[0]);
+      },
+    });
+    return imports;
+  } catch {
+    // Keep dependency hints for TypeScript and temporarily incomplete edits.
+    // Quoted subprocess programs, comments and example strings belong to
+    // another context; they must never fabricate unresolved module edges.
+    const positions = codePositions(source), imports = [];
+    IMPORT_RE.lastIndex = 0;
+    let match;
+    while ((match = IMPORT_RE.exec(source))) {
+      if (positions[match.index] && !/[\w$.]/.test(source[match.index - 1] ?? "")) {
+        imports.push(match[1] || match[2] || match[3]);
+      } else IMPORT_RE.lastIndex = match.index + 1;
+    }
+    return imports;
+  }
+}
 
 // Python import specifiers, line-scanned (Python imports are statement-per-line). Produces the same
 // flat spec list JS extraction does — module references, relative ones keeping their leading dots
@@ -525,8 +565,7 @@ function extractFileRecord(relative, source) {
   if (relative.endsWith(".py") && process.env.BANTAM_PY_IMPORTS !== "0") {
     ({ specs: imports, soft: softImports } = extractPyImports(source));
   } else {
-    IMPORT_RE.lastIndex = 0;
-    imports = [...source.matchAll(IMPORT_RE)].map((match) => match[1] || match[2] || match[3]);
+    imports = extractJsImports(source);
   }
   return {
     path: relative, source, defines: [...defines], definedAt: [...definedAt],

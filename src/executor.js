@@ -77,6 +77,8 @@ export class Executor {
   constructor(workspace, opts = {}) {
     this.workspace = path.resolve(workspace);
     this.realWorkspace = fs.realpathSync(this.workspace);
+    this.inspectMaxChars = Number.isSafeInteger(opts.inspectMaxChars) && opts.inspectMaxChars >= OBS_MAX
+      ? Math.min(opts.inspectMaxChars, 24000) : OBS_MAX;
     // 10-minute default. The old 30s was fine for fixture test-runs but strangled
     // real work — an `apt install`, `pip install`, `make`, `cargo build`, or a slow
     // test suite routinely needs minutes, and getting killed mid-install corrupts
@@ -536,14 +538,15 @@ export class Executor {
       parts.push(`# ${i + 1} ${JSON.stringify(op)}\n${observation}`);
     }
     const joined = parts.join("\n\n");
-    if (joined.length <= OBS_MAX) return joined;
+    const max = this.inspectMaxChars;
+    if (joined.length <= max) return joined;
     // The bundle is clipped head+tail, so middle ops vanish and edge ops arrive
     // in part, with nothing saying which (2026-08-24 tour run: four listings,
     // `bin` never shown). Name every op that did not arrive whole so the next
     // request is a fact, not an inference. The note is reserved out of the
-    // budget so the observation still fits OBS_MAX.
+    // budget so the observation still fits the configured inspection limit.
     const NOTE_RESERVE = 240;
-    const clipped = clipText(joined, OBS_MAX - NOTE_RESERVE);
+    const clipped = clipText(joined, max - NOTE_RESERVE);
     const cut = parts
       .map((part, i) => (clipped.includes(part) ? null : `#${i + 1} ${ops[i].a} ${ops[i].p ?? ops[i].q ?? ""}`.trim()))
       .filter(Boolean);

@@ -435,6 +435,7 @@ export const FROZEN_STABLE_END = Symbol.for("bantam.frozenStableEnd");
 
 export function buildPrompt({
   compactRules,
+  readObservationMaxChars = OBS_MAX,
   maxTurns = null,
   profileText = null,
   // Whether shell actions run in the per-action docker sandbox (the executor's
@@ -749,7 +750,9 @@ export function buildPrompt({
           immutableHistory ? EMPTY_SET : staleReadPaths,
           recordedTurn,
           preserveSlimmedControlAnnotations,
-        ), preserveSlimmedControlAnnotations));
+        ), preserveSlimmedControlAnnotations,
+        turn.action?.a === "read_file" || turn.action?.a === "inspect"
+          ? Math.max(OBS_MAX, Math.min(24000, Number(readObservationMaxChars) || OBS_MAX)) : OBS_MAX));
     if (rewriteSuperseded) stubbedTurns.add(recordedTurn);
     const deliveredObservation = scrub(resolvePointer(observation, stubbedTurns));
     recordDeliveredSourceLines(deliveredObservation, deliveredSourceLines, recordedTurn);

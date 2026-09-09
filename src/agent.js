@@ -651,6 +651,11 @@ async function runAgentCore({
     ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WRITE_BATCH),
   fixtureDefaultHints = process.env.BANTAM_FIXTURE_DEFAULT_HINTS === undefined
     ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_FIXTURE_DEFAULT_HINTS),
+  // A recorded supervised Terra repair spent four reads recovering a 10 KB
+  // source bundle clipped to 4 KB. Retain bounded source views through BOTH
+  // executor and prompt assembly; ordinary command output keeps its own cap.
+  readObservationMaxChars = positiveInt(process.env.BANTAM_READ_CONTEXT_CHARS,
+    model?.codex === true || model?.codexBacked === true ? 24000 : 4000),
   // Candidate fixture experiments remain opt-in until downstream qualification.
   probeEnabled = envTruthy(process.env.BANTAM_PROBE),
   // Direct delete/move actions only for tasks that explicitly name those file
@@ -857,6 +862,7 @@ async function runAgentCore({
   }
   const exec = new Executor(workspace, {
     fixtureDefaultHints,
+    inspectMaxChars: readObservationMaxChars,
     probeEnabled,
     noopEditGuard,
     shellSandbox,
@@ -2884,7 +2890,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ compactRules, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ compactRules, readObservationMaxChars, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -2966,7 +2972,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
           return built;
         },

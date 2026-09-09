@@ -66,6 +66,51 @@ test('createCodeFactIndex extracts imports', () => {
   cleanup(dir);
 });
 
+test('quoted subprocess code does not create an unresolved import in its containing test file', () => {
+  const dir = makeTmpDir('subprocess-import');
+  writeFile(dir, 'context-packet.js', 'export const value = 1;');
+  writeFile(dir, 'test/behavior.test.js', `
+    import { value } from '../context-packet.js';
+    import { spawnSync } from 'node:child_process';
+    spawnSync(process.execPath, ['--input-type=module', '-e', "import './context-packet.js'"]);
+    // import './comment-missing.js';
+    const example = "require('./string-missing.js')";
+    const pattern = /import ['"]regex-missing/;
+  `);
+  const db = new Datalog();
+  extractCodeFacts(db, dir);
+  assert.deepEqual(db.query('unresolved', 'test/behavior.test.js', '?'), []);
+  assert.ok(db.has('imports', 'test/behavior.test.js', '../context-packet.js'));
+});
+
+test('real static, dynamic and template-expression imports remain dependency edges', () => {
+  const dir = makeTmpDir('real-imports');
+  writeFile(dir, 'x.js', [
+    "import './side.js';",
+    "export * from './barrel.js';",
+    "export { value } from './named.js';",
+    "const a = import('./dynamic.js');",
+    "const b = require('./common.cjs');",
+    "const c = `example import './not-real.js' ${import('./interpolated.js')}`;",
+    "const d = import(`./literal.js`);",
+    "const e = import('./' + name);",
+  ].join('\n'));
+  const imports = createCodeFactIndex(dir).records.get('x.js').imports;
+  assert.deepEqual(imports, ['./side.js', './barrel.js', './named.js', './dynamic.js',
+    './common.cjs', './interpolated.js', './literal.js']);
+});
+
+test('TypeScript fallback ignores quoted and commented imports while retaining real edges', () => {
+  const dir = makeTmpDir('ts-imports');
+  writeFile(dir, 'x.ts', [
+    "const example: string = `import './not-real.js'`;",
+    "// import { fake } from './comment.js';",
+    "import type { Foo } from './types';",
+    "const y: Foo = require('./real.cjs');",
+  ].join('\n'));
+  assert.deepEqual(createCodeFactIndex(dir).records.get('x.ts').imports, ['./types', './real.cjs']);
+});
+
 test('createCodeFactIndex handles custom exts', () => {
   const dir = makeTmpDir('exts');
   writeFile(dir, 'x.mjs', 'export const x = 1;');

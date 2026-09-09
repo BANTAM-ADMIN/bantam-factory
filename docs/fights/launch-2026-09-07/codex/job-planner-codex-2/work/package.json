@@ -1,0 +1,79 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 56931,
+      "sha256": "b5273bd1a633ba366cc9367d02e2ab9088a6a1ac7e598e859fa303c1840bcc30",
+      "arm": "bantam-codex-astra",
+      "wallMs": 107073,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Read together. Review once. Keep the exact edit.",
+        "paragraphs": [
+          {
+            "text": "Astra read the implementation, configuration and tests together. The factory flagged a large rewrite for review; Astra approved a 92-character receipt and the factory applied the original proposed bytes. It did not generate the program a second time.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra added behavioral and CLI tests, ran them, and finished. The delivered program passed all five acceptance groups and all three additional graph and scale checks.",
+            "actions": [
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 55147,
+      "sha256": "71e5b4eeb196f53e3814c0d53ededf8f0cea812176bd03e84e1c5eb0d3cd897d",
+      "arm": "codex-astra",
+      "wallMs": 149434,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Native Astra recovered from two tool failures: Python was unavailable, and its patch tried to delete and add the same path. It then regenerated the implementation through the shell, added tests and completed in 149.4 seconds; the factory took 107.1 seconds.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          },
+          {
+            "text": "The delivered program passed all five acceptance groups and all three additional graph and scale checks. Open Files to inspect the implementation and Tests for the exact results.",
+            "actions": []
+          }
+        ]
+      }
+    }
+  ]
+}

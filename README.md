@@ -32,26 +32,37 @@ the checks, feeds back the result, and directs the next repair or delivery.
 
 ## Get more from Codex.
 
-**Your Codex account. Same models. A better way to work.**
-Connect your signed-in Codex CLI during setup. The factory gives Astra, Sol,
-or Terra focused context, reusable tools, and checks that guide the next step.
+**Your Codex account. Same Astra. More work from your tokens.**
+Connect your signed-in Codex CLI during setup. The factory gives Astra focused
+context, reusable tools, and checks that guide the next step.
 
-Recorded Context Packet fights against each model's native Codex CLI:
+Astra inside BANTAM FACTORY vs. Astra in native Codex:
 
-| Same model | Faster completion | Fewer input tokens | See the work |
-| --- | --- | --- | --- |
-| **Astra** | **1.2×** | **46%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
-| **Sol** | **1.8×** | **44%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html) |
-| **Terra** | **2.3×** | **73%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra) |
+| Job | Less input | Less output | Less time | See the work |
+| --- | --- | --- | --- | --- |
+| **Context packer** | **46%** | **18%** | **18%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
+| **Snapshot checker** | **35%** | **14%** | **12%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html#card=snapshot-drift&view=results&layout=compare&left=bantam-codex-astra&right=codex-astra) |
+| **Job planner** | **26%** | **19%** | **14%** | [Round 1 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-1/share/index.html) · [Round 2 ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-2/share/index.html) |
 
-Same task, starting files, and medium reasoning effort. Every run passed all
-five independent check groups. Astra and Sol combine two paired repeats;
-Terra is one pair. Each replay includes the code, tests, wall clock, input,
-output, and prefix-cache tokens. Cache hits are included in input.
+Same task, starting files, and medium reasoning effort within each comparison.
+Every run passed all five independent acceptance groups. Context packer and
+job planner combine two paired repeats; snapshot checker is one pair.
+Open a replay for every action, delivered file, check, and token counter.
+Prefix-cache tokens are included in input. Job planner reused **89,344**
+prefix-cache tokens across the two factory runs; uncached input was
+**35,487 vs. 33,701** in native Codex.
 
-**Another Astra fight: 35% less input, 14% less output, 12% less time.**
-Both snapshot checkers passed all five acceptance groups.
-[Watch Astra inside the factory vs. native Codex →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html#card=snapshot-drift&view=results&layout=compare&left=bantam-codex-astra&right=codex-astra)
+<details>
+<summary>Sol and Terra work here, too.</summary>
+
+On the Context Packet task, factory Sol finished **1.8× faster with 44% less
+input** across two pairs ([round 1](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-1/share/index.html),
+[round 2](https://bantam-admin.github.io/bantam-factory/codex/context-packet-sol-2/share/index.html)).
+Factory Terra finished **2.3× faster with 73% less input** in
+[one recorded pair](https://bantam-admin.github.io/bantam-factory/codex/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-codex-terra&right=codex-terra).
+All passed the same five acceptance groups at medium effort.
+
+</details>
 
 **[Play what Astra built →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two playable games. Compare the factory and native CLI builds.

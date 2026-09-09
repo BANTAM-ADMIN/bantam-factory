@@ -1,0 +1,78 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "job-planner",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 47993,
+      "sha256": "e8dff3bea5bebcb334774fc31ec4c682c2d437869f60feb358f41fc45bc82384",
+      "arm": "codex-astra",
+      "wallMs": 97070,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 3,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "The native CLI’s recorded workflow.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the starter, then wrote its implementation and tests and ran the suite in one shell call. It completed this round in 97.1 seconds, ahead of the factory’s 105.4 seconds.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "The delivered program passed all five acceptance groups and all three additional graph and scale checks. Open Files to inspect the implementation and Tests for the exact results.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 55881,
+      "sha256": "68edde8cb6b8a93dfa76778da430c683f6f9499de5c81f690b52966f55711880",
+      "arm": "bantam-codex-astra",
+      "wallMs": 105407,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "4b1de84bafbf30dc72be646dbef0d367d13d81c9fa7f228959d161ce66c360fa",
+      "explanation": {
+        "title": "Read together. Review once. Keep the exact edit.",
+        "paragraphs": [
+          {
+            "text": "Astra read the implementation, configuration and tests together. The factory flagged a large rewrite for review; Astra approved a 92-character receipt and the factory applied the original proposed bytes. It did not generate the program a second time.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra added behavioral and CLI tests, ran them, and finished. The delivered program passed all five acceptance groups and all three additional graph and scale checks.",
+            "actions": [
+              "action-4",
+              "action-5",
+              "action-6"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

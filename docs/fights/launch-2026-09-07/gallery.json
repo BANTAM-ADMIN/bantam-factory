@@ -2334,6 +2334,96 @@
   "codex": {
     "cards": [
       {
+        "title": "Astra · job planner · round 1",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "The same Astra repairs a dependency planner in native Codex and BANTAM FACTORY. Both paired repeats are published, with every action, delivered file, token counter and independent check.",
+        "id": "job-planner-codex-1",
+        "workOrder": "job-planner",
+        "recorded": true,
+        "sourceSha256": "8172becda0c6ec18c8bbc4cdafc8fdd25eaaac6d73c4458889fc5589e1d6078b",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 97070,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 59307,
+              "outputTokens": 2766,
+              "cacheHitTokens": 36480
+            }
+          },
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 105407,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 62310,
+              "outputTokens": 2798,
+              "cacheHitTokens": 48256
+            }
+          }
+        ]
+      },
+      {
+        "title": "Astra · job planner · round 2",
+        "kind": "REPAIR",
+        "number": "03",
+        "description": "The same Astra repairs a dependency planner in native Codex and BANTAM FACTORY. Both paired repeats are published, with every action, delivered file, token counter and independent check.",
+        "id": "job-planner-codex-2",
+        "workOrder": "job-planner",
+        "recorded": true,
+        "sourceSha256": "c7a5aedc6fc34ea3f8222e0cdd86825befc7116b7983bb9d6d5fb93e0583df4f",
+        "reviewedWork": true,
+        "rows": [
+          {
+            "label": "BANTAM · Astra",
+            "model": "GPT-6 Astra · wrapped CLI",
+            "arm": "bantam-codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 107073,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 62521,
+              "outputTokens": 2858,
+              "cacheHitTokens": 41088
+            }
+          },
+          {
+            "label": "Codex · Astra",
+            "model": "GPT-6 Astra · native CLI",
+            "arm": "codex-astra",
+            "outcome": "PASS",
+            "passed": true,
+            "wallMs": 149434,
+            "groupsPassed": 5,
+            "groupsTotal": 5,
+            "accountingComplete": true,
+            "tokens": {
+              "inputTokens": 109690,
+              "outputTokens": 4253,
+              "cacheHitTokens": 98816
+            }
+          }
+        ]
+      },
+      {
         "title": "Snapshot checker · latest round",
         "kind": "EXTEND",
         "number": "02",

@@ -47,6 +47,9 @@ export const LAUNCH_CARDS=Object.freeze(LAUNCH_SECTIONS.flatMap(section=>section
 // Reviewed follow-up windows keep their own URLs and complete rosters. Earlier
 // recordings stay inspectable; a later harness revision never replaces them.
 const CODEX_RECORDINGS=Object.freeze([
+  ...[1,2].map(round=>({id:`job-planner-codex-${round}`,workOrder:'job-planner',
+    title:`Astra · job planner · round ${round}`,
+    description:'The same Astra repairs a dependency planner in native Codex and BANTAM FACTORY. Both paired repeats are published, with every action, delivered file, token counter and independent check.'})),
   {id:'snapshot-drift-qualified-4',workOrder:'snapshot-drift',title:'Snapshot checker · latest round',
     description:'The updated factory extends a real file checker. Compare native Astra, factory Astra, and Astra supervising Terra or Sol, with every result and both roles counted.'},
   ...['context-packet','stream-framer'].map(workOrder=>({
@@ -230,7 +233,7 @@ export function renderFightGallery(data){
     return list.length?`<section class="fight-section" id="${section.id}"><div class="kit"><h2>${escape(section.title)}</h2><span>${list.length} work orders</span></div><p class="kit-blurb">${escape(section.blurb)}</p><section class="grid" aria-label="${escape(section.title)} fight cards">${list.map((card,i)=>panel(card,i,list.length)).join('')}</section></section>`:'';
   }).join('');
   const codexCards=data.codex?.cards??[];
-  const latestIds=new Set(['snapshot-drift-qualified-4','context-packet-qualified-1','stream-framer-qualified-1']);
+  const latestIds=new Set(['job-planner-codex-1','job-planner-codex-2','snapshot-drift-qualified-4','context-packet-qualified-1','stream-framer-qualified-1']);
   const latest=codexCards.filter(card=>latestIds.has(card.id)),earlier=codexCards.filter(card=>!latestIds.has(card.id));
   const codexGrid=(list,label)=>`<section class="grid" aria-label="${label}">${list.map(card=>panel(card,codexCards.indexOf(card),codexCards.length,'codex/')).join('')}</section>`;
   const codexContents=latest.length?`${codexGrid(latest,'Latest Codex fight cards')}${earlier.length?`<details class="earlier-fights"><summary>Earlier recordings <span>${earlier.length} cards · complete records</span></summary>${codexGrid(earlier,'Earlier Codex fight cards')}</details>`:''}`:codexGrid(codexCards,'Codex fight cards');

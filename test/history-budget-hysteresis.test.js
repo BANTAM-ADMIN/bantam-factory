@@ -7,6 +7,21 @@ const turns = count => Array.from({ length: count }, (_, i) => ({ i,
   observation: `distinct turn ${i}: ` + String.fromCharCode(65 + i % 26).repeat(1000) }));
 const ids = window => window.map(turn => turn.i);
 
+test('capacity updates preserve the retained prefix and never resurrect evicted history', () => {
+  const history=turns(15),events=[];
+  const window=createHistoryWindow({charBudget:6000,onRebase:e=>events.push(e)});
+  const initial=ids(window(history.slice(0,12)));
+  assert.ok(initial[1]>1);
+  window.setBudget(20000);
+  assert.deepEqual(ids(window(history.slice(0,12))),initial);
+  assert.deepEqual(ids(window(history)),[...initial,12,13,14]);
+  window.setBudget(4000);
+  const reduced=ids(window(history));
+  assert.ok(reduced.every(id=>[...initial,12,13,14].includes(id)));
+  assert.equal(events.at(-1).hardCharBudget,4000);
+  for(const invalid of [0,-1,NaN,Infinity,1.5])assert.throws(()=>window.setBudget(invalid),/positive integer/);
+});
+
 test("extension keeps its cutoff across repeated builds and rebases in chunks without raising the hard cap", () => {
   const history = turns(24), events = [];
   const window = createHistoryWindow({ charBudget: 6500, onRebase: event => events.push(event) });

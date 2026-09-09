@@ -23,6 +23,25 @@ function server(options = {}) {
   });
 }
 
+test('usable context capacity comes from native receipts and stays scoped to the selected model', async t => {
+  const codex = server({model:'capacity-large'});
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  assert.equal(codex.contextWindowFor('capacity-large'),null);
+  const result = await codex.complete('context window 258400',{model:'capacity-large',constrainOutput:false});
+  assert.equal(result.modelContextWindow,258400);
+  assert.equal(codex.contextWindowFor('capacity-large'),258400);
+  assert.equal(codex.contextWindowFor('capacity-small'),null);
+  codex.endRun(token);
+  const smallToken = codex.beginRun();
+  await codex.complete('context window 8192',{model:'capacity-small',constrainOutput:false});
+  assert.equal(codex.contextWindowFor('capacity-small'),8192);
+  assert.equal(codex.contextWindowFor('capacity-large'),258400);
+  await codex.complete('context window -1',{model:'capacity-small',constrainOutput:false});
+  assert.equal(codex.contextWindowFor('capacity-small'),8192);
+  codex.endRun(smallToken);
+});
+
 test('the worker policy is supplied once and explicit additional developer instructions remain available', async t => {
   for (const additional of [undefined, 'Caller-specific operating instruction.']) {
     const codex = server({ threadConfig: additional ? { developer_instructions: additional } : {} });

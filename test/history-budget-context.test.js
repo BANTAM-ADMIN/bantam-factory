@@ -26,6 +26,15 @@ test('a very large window is capped where small-model action discipline degrades
   assert.equal(huge, HISTORY_MAX_HISTORY_TOKENS * HISTORY_CHARS_PER_TOKEN);
 });
 
+test('Codex uses advertised capacity without inheriting the local worker ceiling', () => {
+  const capacity=258400;
+  const budget=historyCharBudget({contextTokens:capacity,extensionTrajectory:true,codexBacked:true});
+  assert.ok(budget>HISTORY_MAX_HISTORY_TOKENS*HISTORY_CHARS_PER_TOKEN);
+  assert.ok(budget/HISTORY_CHARS_PER_TOKEN<=capacity*0.6);
+  assert.equal(historyCharBudget({extensionTrajectory:true,codexBacked:true}),120000);
+  assert.equal(historyCharBudget({contextTokens:capacity,extensionTrajectory:true,codexBacked:true,override:4242}),4242);
+});
+
 test('an explicit operator override always wins and an unknown window keeps the documented defaults', () => {
   assert.equal(historyCharBudget({contextTokens: 72192, extensionTrajectory: true, override: 4242}), 4242);
   assert.equal(historyCharBudget({extensionTrajectory: true}), 120000);

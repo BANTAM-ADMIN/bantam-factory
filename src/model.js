@@ -271,6 +271,12 @@ export class ModelClient {
   // the direct app-server transport. Keep capability and transport separate.
   get codexBacked() { return this.codex || this.chatSessions !== null; }
 
+  // Learn the usable window from the actual selected runtime's receipt rather
+  // than guessing from a model name or applying the local-model history cap.
+  get contextWindowTokens() {
+    return this.codex ? this.codexRuntime?.contextWindowFor?.(this.modelName) ?? null : null;
+  }
+
   get codexToolIdentity() {
     // codexapi accepts model:effort; native vision tools accept them separately.
     const match = this.codexBacked && this.modelName?.match(/^(.*):(low|medium|high|xhigh|max|ultra)$/);
@@ -1126,6 +1132,8 @@ function normalizedResponseRecord(value) {
     codexThread: value?.codexThread ?? null,
     codexPromptDelivery: value?.codexPromptDelivery ?? null,
     codexUsageEvidence: value?.codexUsageEvidence ?? null,
+    ...(Number.isSafeInteger(value?.modelContextWindow) && value.modelContextWindow > 0
+      ? { modelContextWindow: value.modelContextWindow } : {}),
   };
 }
 

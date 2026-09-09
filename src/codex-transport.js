@@ -151,6 +151,7 @@ export class CodexAppServer {
     this.pending = new Map();
     this.turns = new Map();
     this.usageCursors = new Map();
+    this.contextWindows = new Map();
     this.ready = null;
     this.stderr = "";
   }
@@ -189,6 +190,10 @@ export class CodexAppServer {
     } catch {
       return false;
     }
+  }
+
+  contextWindowFor(model = this.model) {
+    return this.contextWindows.get(model) ?? null;
   }
 
   async models() {
@@ -711,6 +716,10 @@ export class CodexAppServer {
       return;
     }
     if (method === "thread/tokenUsage/updated") {
+      const contextWindow = params.tokenUsage?.modelContextWindow;
+      if (Number.isSafeInteger(contextWindow) && contextWindow > 0) {
+        this.contextWindows.set(state.model, contextWindow);
+      }
       state.usageAccumulator.add(params.tokenUsage);
       const accumulated = state.usageAccumulator.snapshot();
       state.usage = accumulated.raw;
@@ -740,6 +749,7 @@ export class CodexAppServer {
       timings: {},
       usage: codexUsage(state.usage, state.model, accumulated),
       rawUsage: state.usage,
+      modelContextWindow: this.contextWindowFor(state.model),
       codexUsageEvidence: accumulated.evidence,
       images: state.images,
     });

@@ -59,6 +59,45 @@ test("write_batch rejects duplicate paths before changing any file", async () =>
   assert.equal(fs.readFileSync(target, "utf8"), "export const original = true;\n");
 });
 
+test('write_batch validates modules against their staged package boundary in either file order', async () => {
+  for (const reverse of [false, true]) {
+    const root = workspace();
+    fs.writeFileSync(path.join(root,'package.json'),'{"type":"commonjs"}');
+    const executor = new Executor(root);
+    const files = [{p:'src/package.json',content:'{"type":"module"}'},
+      {p:'src/bus.js',content:'export class Bus { emit() { return 42; } }\n'}];
+    const result = await executor.execute({a:'write_batch',files:reverse ? [...files].reverse() : files});
+    assert.match(result.observation,/wrote batch of 2 files/);
+    const {Bus} = await import(path.join(root,'src/bus.js'));
+    assert.equal(new Bus().emit(),42);
+  }
+});
+
+test('a staged CommonJS boundary cannot disguise an invalid new module or commit the manifest alone', async () => {
+  const root = workspace();
+  fs.writeFileSync(path.join(root,'package.json'),'{"type":"module"}');
+  const executor = new Executor(root);
+  const result = await executor.execute({a:'write_batch',files:[
+    {p:'src/bus.js',content:'export const value = 42;'},
+    {p:'src/package.json',content:'{"type":"commonjs"}'},
+  ]});
+  assert.match(result.observation,/failed to parse/);
+  assert.equal(fs.existsSync(path.join(root,'src')),false);
+});
+
+test('atomic patch validates a package type migration against the proposed manifest', async () => {
+  const root = workspace();
+  fs.writeFileSync(path.join(root,'package.json'),'{"type":"commonjs"}');
+  fs.writeFileSync(path.join(root,'value.js'),'module.exports = 7;\n');
+  const executor = new Executor(root);
+  const result = await executor.execute({a:'patch',edits:[
+    {p:'value.js',old:'module.exports = 7;',new:'export const value = 7;'},
+    {p:'package.json',old:'"commonjs"',new:'"module"'},
+  ]});
+  assert.doesNotMatch(result.observation,/ERROR/);
+  assert.equal((await import(path.join(root,'value.js'))).value,7);
+});
+
 test("write_batch validates every source before creating earlier targets", async () => {
   const root = workspace();
   const executor = new Executor(root);

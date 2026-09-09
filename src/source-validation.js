@@ -27,14 +27,14 @@ export function isJavaScriptPath(filePath) {
  * boundary it may be either a classic browser script or a browser module, so
  * the syntax gate accepts either source mode.
  */
-export function parseJavaScript(source, filePath = "file.js", { runtimePath = null } = {}) {
+export function parseJavaScript(source, filePath = "file.js", { runtimePath = null, stagedFiles = null } = {}) {
   const text = String(source ?? "");
   const ext = String(filePath).toLowerCase().match(/\.(mjs|cjs|js)$/)?.[1];
   const modes = ext === "mjs"
     ? ["module"]
     : ext === "cjs"
       ? ["script"]
-      : sourceModesForJs(runtimePath);
+      : sourceModesForJs(runtimePath, stagedFiles);
   const errors = [];
 
   for (const sourceType of modes) {
@@ -72,6 +72,7 @@ export function validateSourceTransition({
   before,
   after,
   runtimePath = null,
+  stagedFiles = null,
 } = {}) {
   // Existing edits may arrive through an in-workspace symlink. Classify the
   // resolved target when the executor has one, so `alias.md -> module.js`
@@ -80,7 +81,7 @@ export function validateSourceTransition({
   const classificationPath = runtimePath ?? filePath;
   if (!isJavaScriptPath(classificationPath)) return { ok: true, applicable: false };
 
-  const staged = parseJavaScript(after, classificationPath, { runtimePath });
+  const staged = parseJavaScript(after, classificationPath, { runtimePath, stagedFiles });
   if (staged.ok) return { ok: true, applicable: true };
 
   const isNew = before === null || before === undefined;
@@ -96,7 +97,7 @@ export function validateSourceTransition({
   };
 }
 
-function sourceModesForJs(runtimePath) {
+function sourceModesForJs(runtimePath, stagedFiles = null) {
   // Library callers which only have a content/path specimen use the neutral
   // dual-mode parser. A real target path follows an explicit Node package
   // boundary, but a package-less web workspace remains genuinely ambiguous:
@@ -106,7 +107,11 @@ function sourceModesForJs(runtimePath) {
   while (true) {
     const manifest = path.join(directory, "package.json");
     try {
-      const parsed = JSON.parse(fs.readFileSync(manifest, "utf8"));
+      // A transaction's package boundary is part of its proposed result.
+      // Reading only disk rejects a new module and its package.json when they
+      // are submitted together, even though the committed pair is valid.
+      const parsed = JSON.parse(stagedFiles?.has(manifest)
+        ? stagedFiles.get(manifest) : fs.readFileSync(manifest, "utf8"));
       return parsed?.type === "module" ? ["module"] : ["script"];
     } catch (error) {
       if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) return ["script"];

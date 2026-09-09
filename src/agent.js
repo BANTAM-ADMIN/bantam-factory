@@ -1911,11 +1911,15 @@ async function runAgentCore({
   // driven by the real context limit rather than a constant that ignores it.
   // BANTAM_CONTEXT_TOKENS carries the inspected n_ctx; when it is absent the
   // previously documented constants still apply.
-  const historyCharBudget = deriveHistoryCharBudget({
-    contextTokens: positiveInt(process.env.BANTAM_CONTEXT_TOKENS, null),
+  const configuredContextTokens = positiveInt(process.env.BANTAM_CONTEXT_TOKENS, null);
+  const configuredHistoryBudget = positiveInt(process.env.BANTAM_HISTORY_CHAR_BUDGET, null);
+  const currentHistoryBudget = () => deriveHistoryCharBudget({
+    contextTokens: configuredContextTokens ?? model.contextWindowTokens,
     extensionTrajectory,
-    override: positiveInt(process.env.BANTAM_HISTORY_CHAR_BUDGET, null),
+    codexBacked: model.codexBacked === true,
+    override: configuredHistoryBudget,
   });
+  let historyCharBudget = currentHistoryBudget();
   // Turn-level replay capture: with BANTAM_SAVE_PROMPTS=1 every turn records
   // its exact assembled prompt, so `bantam replay <artifact> --turn N` can
   // rewind to the precise moment of a failure and test context adjustments.
@@ -1932,7 +1936,17 @@ async function runAgentCore({
       onEvent({ type: "extension_history_rebase", ...receipt });
     },
   }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars });
-  const capTurns = h => historyWindow(Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h);
+  const capTurns = h => {
+    const nextBudget = currentHistoryBudget();
+    if (nextBudget !== historyCharBudget) {
+      historyWindow.setBudget?.(nextBudget);
+      onEvent({type:'history_budget_updated',previousChars:historyCharBudget,chars:nextBudget,
+        contextTokens:configuredContextTokens ?? model.contextWindowTokens,
+        source:configuredHistoryBudget ? 'operator-history' : configuredContextTokens ? 'operator-context' : 'runtime'});
+      historyCharBudget = nextBudget;
+    }
+    return historyWindow(Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h);
+  };
   // Count the rendered bytes, not an annotation that might have been clipped.
   // This boundary is the exact prompt passed to ModelClient, NOT evidence that
   // a remote server accepted or attended to it. Raw request films independently

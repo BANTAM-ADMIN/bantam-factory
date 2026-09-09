@@ -48,13 +48,17 @@ export const HISTORY_MAX_HISTORY_TOKENS = 44000;
 export const HISTORY_MIN_CHAR_BUDGET = 4000;
 const HISTORY_WINDOW_SHARE = { extension: 0.6, panel: 0.125 };
 
-export function historyCharBudget({ contextTokens, extensionTrajectory = false, override } = {}) {
+export function historyCharBudget({ contextTokens, extensionTrajectory = false, codexBacked = false, override } = {}) {
   const explicit = Number(override);
   if (Number.isInteger(explicit) && explicit > 0) return explicit;
   const context = Number(contextTokens);
   if (!Number.isInteger(context) || context <= 0) return extensionTrajectory ? 120000 : 36000;
   const share = HISTORY_WINDOW_SHARE[extensionTrajectory ? "extension" : "panel"];
-  const tokens = Math.min(Math.floor(context * share), HISTORY_MAX_HISTORY_TOKENS);
+  // The 44K ceiling is a local-worker discipline limit, not a frontier model's
+  // context limit. A Codex worker uses its advertised window with the same
+  // prompt/response headroom; unknown windows keep the conservative fallback.
+  const tokens = codexBacked ? Math.floor(context * share)
+    : Math.min(Math.floor(context * share), HISTORY_MAX_HISTORY_TOKENS);
   return Math.max(HISTORY_MIN_CHAR_BUDGET, tokens * HISTORY_CHARS_PER_TOKEN);
 }
 
@@ -90,11 +94,11 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
   if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
     throw new Error("history retainRatio must be between zero and one");
   }
-  const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 120000);
-  const target = Math.floor(limit * retainRatio);
+  let limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 120000);
+  let target = Math.floor(limit * retainRatio);
   let origin = null, cutoff = null, previousNewest = null, previousLength = 0;
   let previousChars = 0, previousKeyKind = null, lastOverflow = null;
-  return function historyWindow(turns) {
+  function historyWindow(turns) {
     const list = Array.isArray(turns) ? turns : [];
     if (!list.length) {
       origin = cutoff = previousNewest = previousKeyKind = lastOverflow = null;
@@ -159,7 +163,15 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
     previousKeyKind = keyKind; previousChars = afterChars;
     lastOverflow = signature;
     return window;
+  }
+  historyWindow.setBudget = next => {
+    if (!Number.isSafeInteger(next) || next <= 0) throw new Error('history budget must be a positive integer');
+    limit = next;
+    target = Math.floor(limit * retainRatio);
+    // Keep the retained boundary. Learning more capacity must not resurrect
+    // previously evicted turns and rewrite an otherwise unchanged prefix.
   };
+  return historyWindow;
 }
 
 function firstKeptIndex(compacted, limit, { pinHead = false, readObservationMaxChars = 4000 } = {}) {

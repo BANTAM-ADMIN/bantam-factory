@@ -797,9 +797,10 @@ export class Executor {
     // Validate the complete result for every file before any legacy
     // structural/collateral guard or staging write runs.  Individual hunks may
     // temporarily unbalance a construct; only the final atomic patch matters.
+    const stagedFiles = new Map([...files.values()].map(file => [file.full, file.output]));
     for (const file of files.values()) {
       const rel = [...file.paths][0];
-      const syntax = this.validateEditTransition({ path: rel, before: file.text, after: file.output, runtimePath: file.full });
+      const syntax = this.validateEditTransition({ path: rel, before: file.text, after: file.output, runtimePath: file.full, stagedFiles });
       if (!syntax.ok) return this.editObservation(syntax.message, syntax.reason ?? "syntax_invalid", [rel]);
     }
 
@@ -996,14 +997,6 @@ export class Executor {
       const existingParent = nearestExisting(parent);
       this.assertInsideReal(fs.realpathSync(existingParent), item.p);
       const before = stat ? fs.readFileSync(full, "utf8") : null;
-      const syntax = this.validateEditTransition({
-        path: item.p,
-        before,
-        after: item.content,
-        runtimePath: full,
-      });
-      if (!syntax.ok) return this.editObservation(`${syntax.message}\n[write_batch] No files changed.`, syntax.reason ?? "syntax_invalid", [item.p]);
-
       records.push({
         path: item.p,
         full,
@@ -1013,6 +1006,15 @@ export class Executor {
         output: item.content,
         mode: stat?.mode ?? 0o644,
       });
+    }
+
+    const stagedFiles = new Map(records.map(record => [record.full, record.output]));
+    for (const record of records) {
+      const syntax = this.validateEditTransition({
+        path: record.path, before: record.text, after: record.output,
+        runtimePath: record.full, stagedFiles,
+      });
+      if (!syntax.ok) return this.editObservation(`${syntax.message}\n[write_batch] No files changed.`, syntax.reason ?? "syntax_invalid", [record.path]);
     }
 
     const changed = records.filter((record) => record.text !== record.output);

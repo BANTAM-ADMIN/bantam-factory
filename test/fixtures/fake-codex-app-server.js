@@ -183,6 +183,7 @@ lines.on("line", (line) => {
       threadId: params.threadId,
       turnId,
       tokenUsage: {
+        ...(prompt.startsWith('context window ') ? {modelContextWindow:Number(prompt.slice('context window '.length))} : {}),
         last: {
           inputTokens: 120,
           cachedInputTokens: 20,

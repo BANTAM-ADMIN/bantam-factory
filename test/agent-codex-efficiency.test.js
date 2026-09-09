@@ -69,7 +69,12 @@ test('Codex defaults deliver the qualified compact prompt, file discovery and ba
         calls++;
         assert.ok(prompt.includes(composeRulesBlock(process.env, {compact: enabled})), provider);
         if(calls===1)assert.equal(prompt.includes('test/public.test.js'), enabled, provider);
-        if(calls===1)assert.doesNotMatch(prompt, /SOURCE_BODY_MUST_NOT_BE_PRELOADED/);
+        if(calls===1){
+          assert.doesNotMatch(prompt, /SOURCE_BODY_MUST_NOT_BE_PRELOADED/);
+          const example=JSON.parse(prompt.match(/^- (\{"a":"replace",[^\n]+?\})/m)[1]);
+          assert.equal(Object.hasOwn(example,'line'),!enabled,'Codex unique-match example omits an unnecessary line anchor; local and rollback menus retain it');
+          assert.equal(prompt.includes('omit "line" when "old" is unique'),enabled,'line disambiguation guidance');
+        }
         else assert.equal(prompt.includes('Passing undefined or omitting that argument uses the default'), enabled, 'fixture hint delivery');
         if(calls===1)assert.equal(options.jsonSchema.properties.a.enum.includes('write_batch'), enabled, provider);
         return {content: JSON.stringify(calls===1?{a:'read_file',p:'test/public.test.js'}:{a: 'done', summary: 'Hello.'}), tokens: 1};

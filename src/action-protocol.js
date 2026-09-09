@@ -354,7 +354,7 @@ export function actionDefinitionsInGroup(group, options = {}) {
 
 export function actionPromptMenu(options = {}) {
   const lines = enabledActionDefinitions(options)
-    .map(({ prompt }) => `- ${JSON.stringify(prompt.example)}${prompt.help}`);
+    .map(definition => promptMenuLine(definition, options));
   // The per-action output cap, stated UP FRONT. The model used to learn it only
   // by hitting it: a whole program emitted as one write_file/heredoc ran to the
   // 8192-token limit, was rejected as unterminated JSON, and the repair note
@@ -382,7 +382,20 @@ export function actionPromptMenu(options = {}) {
 export function actionPromptMenuLine(verb, options = {}) {
   const definition = enabledActionDefinitions(options).find((entry) => entry.verb === verb);
   if (!definition) throw new Error(`unknown or disabled action verb: ${verb}`);
-  return `- ${JSON.stringify(definition.prompt.example)}${definition.prompt.help}`;
+  return promptMenuLine(definition, options);
+}
+
+function promptMenuLine(definition, { compact = false } = {}) {
+  let example = definition.prompt.example;
+  // Recorded Codex edits repeatedly supplied stale line anchors for unique
+  // matches. Demonstrate the simpler shape: a unique exact match needs no
+  // line. Keep the optional field and all of its validation; the ordinary
+  // local-model menu stays unchanged.
+  if (compact && definition.verb === "replace") {
+    const { line, ...uniqueMatch } = example;
+    example = uniqueMatch;
+  }
+  return `- ${JSON.stringify(example)}${definition.prompt.help}`;
 }
 
 export function actionPromptRules(options = {}) {

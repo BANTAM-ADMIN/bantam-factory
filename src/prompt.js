@@ -66,7 +66,7 @@ export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedSh
 Each turn you emit one action. The harness executes it and returns an observation. You then emit the next action. Repeat until the task is done.${budgetLine}
 
 Actions (emit exactly one, as compact JSON):
-${actionPromptMenu({ features: actionFeatures, outputTokenCap })}${extraRules}
+${actionPromptMenu({ features: actionFeatures, outputTokenCap, compact: compactRules })}${extraRules}
 
 Rules:
 ${composeRulesBlock(process.env, { compact: compactRules })}`;

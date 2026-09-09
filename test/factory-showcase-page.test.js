@@ -42,6 +42,20 @@ test('Codex comparison rejects missing pairs, different models and impossible ca
   assert.equal(renderCodexEfficiency(data),'');card.rows.pop();assert.equal(renderCodexEfficiency(data),'');
 });
 
+test('supervised test-strength highlight requires all four matching reviewed outcomes',()=>{
+  const row=arm=>({arm,model:'GPT-5.6 Terra · native CLI',passed:true,accountingComplete:true,
+    wallMs:1000,tokens:{inputTokens:2000,outputTokens:100,cacheHitTokens:1000}});
+  const review={id:'stream-framer-qualified-1',workOrder:'stream-framer',recorded:true,
+    testReviews:['codex-astra','bantam-codex-astra','bantam-astra-terra','bantam-astra-sol'].map(arm=>({arm,
+      caseId:'base64-roundtrip',sourcePath:'stream-framer.js',caught:arm==='bantam-astra-sol'}))};
+  const data={codex:{cards:[{id:'context-packet',recorded:true,rows:[row('bantam-codex-terra'),row('codex-terra')]},review]}};
+  assert.match(renderCodexEfficiency(data),/caught a planted bug that the other three suites missed/);
+  for(const mutate of [r=>r.testReviews.pop(),r=>r.testReviews[0].caught=true,r=>r.testReviews[0].caseId='different-bug']){
+    const incomplete=structuredClone(data);mutate(incomplete.codex.cards[1]);
+    assert.doesNotMatch(renderCodexEfficiency(incomplete),/caught a planted bug/);
+  }
+});
+
 test('front-page results use recorded times and outcomes, and missing competitors remain absent attempts',()=>{
   const data=gallery(),before=structuredClone(data);
   const html=renderShowcaseResults(data);

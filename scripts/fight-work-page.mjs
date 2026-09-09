@@ -127,11 +127,15 @@ export function fightWorkBrowser(replayEvents) {
       const tests=String(check.stdout??'').match(/^# tests (\d+)$/m)?.[1];
       const passed=String(check.stdout??'').match(/^# pass (\d+)$/m)?.[1];
       const failed=String(check.stdout??'').match(/^# fail (\d+)$/m)?.[1];
-      return `<section class="check-result"><div class="check-heading"><h5>${E(check.title)}</h5><span class="${check.exitCode===0?'good':check.exitCode===null?'':'bad'}">${check.exitCode===0?'PASS':check.exitCode===null?'UNKNOWN':'FAIL'} · exit ${E(check.exitCode??'unknown')}</span></div>
+      const mutation=check.mutationReview?.schema==='bantam.test-mutation-review.v1';
+      const verdict=mutation?(check.exitCode===1?'CAUGHT':check.exitCode===0?'MISSED':'UNKNOWN'):(check.exitCode===0?'PASS':check.exitCode===null?'UNKNOWN':'FAIL');
+      const good=mutation?check.exitCode===1:check.exitCode===0;
+      return `<section class="check-result${mutation?' mutation-review':''}"><div class="check-heading"><h5>${E(check.title)}</h5><span class="${verdict==='UNKNOWN'?'':good?'good':'bad'}">${verdict} · exit ${E(check.exitCode??'unknown')}</span></div>
+        ${mutation?`<p>${E(check.description)}</p><details class="work-extra"><summary>Exact source change and control results</summary>${code(check.mutationReview)}</details>`:''}
         ${groups?`<ul class="grade-groups">${groups.map(g=>`<li class="grade-entry"><span class="${g.pass?'good':'bad'}">${g.pass?'✓':'×'}</span><div><strong>${E(g.name.replaceAll('-',' '))}</strong>${g.error?`<details><summary>See the failure</summary>${code(g.error)}</details>`:''}</div></li>`).join('')}</ul>`:tests?`<p class="test-counts"><strong>${E(passed??'?')}</strong> passed · <strong>${E(failed??'?')}</strong> failed · ${E(tests)} tests</p>`:''}
         <details class="work-extra"><summary>Full recorded output</summary>${code(check.stdout)}${check.stderr?code(check.stderr):''}</details></section>`;
     };
-    return `<p class="work-help">Checks executed against the delivered workspace after the contender stopped.</p>${work.checks.map(checkView).join('')}
+    return `<p class="work-help">Original acceptance checks and any separately labeled post-run reviews.</p>${work.checks.map(checkView).join('')}
       <details class="work-extra"><summary>The supplied work order</summary>${code(work.task)}</details>
       <details class="work-extra"><summary>${work.finalResponseKind==='last-message'?'The last recorded assistant message':'The contender’s final response'}</summary>${code(work.finalResponse || 'No final response was recorded.')}</details>`;
   }

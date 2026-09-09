@@ -80,12 +80,12 @@ Every run above passed all five independent check groups. Astra and Sol figures
 combine two paired repeats; Terra is one pair. Cards show wall clock, input,
 output and prefix-cache tokens, plus the complete work.
 
-Astra also used **39% fewer input tokens** on Patch Transaction across two paired
-runs: [round 1](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-1/share/index.html) · [round 2](https://bantam-admin.github.io/bantam-factory/codex/patch-transaction-astra-context-2/share/index.html).
-
-**[Let Astra run the floor →](https://bantam-admin.github.io/bantam-factory/codex/context-packet-supervised-1/share/index.html)**
-Watch Astra supervise Terra or Sol inside the factory. Eight fresh runs compare
-native Codex, BANTAM workers, and supervised teams—with both roles counted.
+**Latest Astra fights: 50% less input, 10% less output, 8% less wall time.**
+Totals across two fresh matched jobs, both 5/5 in both harnesses.
+Open the [context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
+or [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html)
+to compare solo Astra and Astra supervising Terra or Sol. Every action, delivered
+file, and token counter is there; supervised totals include both models.
 
 **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two playable games. Every recorded action and the delivered files.

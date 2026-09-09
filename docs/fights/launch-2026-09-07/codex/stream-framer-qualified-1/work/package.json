@@ -1,0 +1,201 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "stream-framer",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 60809,
+      "sha256": "de4af37373f49c5f671fbddbf5827daccbe42de799d1e11b98e9190d23239b71",
+      "arm": "codex-astra",
+      "wallMs": 144096,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "A complete native repair.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the project, repaired the decoder and CLI, added regression tests, and ran its checks. The completed result passed all five independent acceptance groups.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          },
+          {
+            "text": "The CLI used six model requests and finished in 144.1 seconds. Its input, output and prefix-cache counters are shown above; open Files to inspect the delivered state machine and tests alongside the factory’s build.",
+            "actions": [
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      },
+      "testReviews": [
+        {
+          "caseId": "base64-roundtrip",
+          "sourcePath": "stream-framer.js",
+          "originalSha256": "9fc5cd07e89addeabbc12052372dfc7eeb7efc0f96ced44689f8be9387390301",
+          "caught": false,
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 71151,
+      "sha256": "a2792f3429df97b24963ae482a1273b4b3c3806d03b27a6022ca13ea46bbe48f",
+      "arm": "bantam-codex-astra",
+      "wallMs": 127382,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Inspect. Build. Check. Done.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter, then wrote the streaming decoder and its regression tests in one batch. It ran the checks and completed in four model requests. The result handles split UTF-8, frame boundaries, strict termination and CLI errors.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "Both Astra builds passed all five independent acceptance groups. This factory attempt finished in 127.4 seconds versus 144.1 in native Codex, using 44,595 input tokens versus 95,266. The token table also records the lower prefix-cache reuse in this factory run.",
+            "actions": [
+              "action-2",
+              "action-3"
+            ]
+          }
+        ]
+      },
+      "testReviews": [
+        {
+          "caseId": "base64-roundtrip",
+          "sourcePath": "stream-framer.js",
+          "originalSha256": "2fbca13f19c361bdc929c2d68300befc269883f813e65a04580f2d08a93e8e05",
+          "caught": false,
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 192912,
+      "sha256": "560bc97016ea3e42e94a7711148634ace7b264288fc890e4e79577cf949f9f09",
+      "arm": "bantam-astra-terra",
+      "wallMs": 353316,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 45,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Correct the fixtures. Test the limit.",
+        "paragraphs": [
+          {
+            "text": "Astra spotted test expectations that contradicted the contract: one leading space is removed from a data field, and an incomplete UTF-8 sequence can remain buffered between chunks. It steered Terra to correct those fixtures while preserving the decoder behavior.",
+            "actions": [
+              "action-18"
+            ]
+          },
+          {
+            "text": "A later review found the CLI could hit JavaScript’s argument limit on a large valid frame batch. Astra assigned a focused repair and retained large-batch regression. The integrated result passed all five independent acceptance groups. This lane includes all nine supervisor calls and 33 worker calls.",
+            "actions": [
+              "action-35",
+              "action-36",
+              "action-44",
+              "action-45"
+            ]
+          }
+        ]
+      },
+      "testReviews": [
+        {
+          "caseId": "base64-roundtrip",
+          "sourcePath": "stream-framer.js",
+          "originalSha256": "9d22704bd6b6170df07a235d69cfa50589f697aefef765c4fe8543135788f8bf",
+          "caught": false,
+          "exitCode": 0
+        }
+      ]
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 190335,
+      "sha256": "21c6a1b42f183e58af7b40885e381e743da5288efb77288b532b39b4b9576eeb",
+      "arm": "bantam-astra-sol",
+      "wallMs": 492648,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 30,
+      "files": 6,
+      "changedFiles": 4,
+      "taskSha256": "6e5819931e495dbe1cb58e3aa34d4e7b0635cd7aeda4d87853ec9a6dc3cd92d2",
+      "explanation": {
+        "title": "Make the tests catch the actual bug.",
+        "paragraphs": [
+          {
+            "text": "Astra corrected a Buffer-versus-Uint8Array fixture and asked for nonempty mutation checks. After Sol’s first delivery, it caught a large-batch CLI limit and a weakness in the base64 tests: invalid encodings could fail for an unrelated protocol error.",
+            "actions": [
+              "action-11",
+              "action-19"
+            ]
+          },
+          {
+            "text": "Sol fixed the CLI and added tests using noncanonical aliases of an otherwise valid complete stream. Those fixtures isolate the encoding rule. Astra reviewed the repair, and the integrated project passed all five independent acceptance groups. Both models’ tokens and their complete action record are included.",
+            "actions": [
+              "action-20",
+              "action-29",
+              "action-30"
+            ]
+          },
+          {
+            "text": "A post-run check planted the same missing base64 guard in copies of all four builds. Only this supervised Sol build’s retained tests caught it. The other three suites stayed green. Open Tests for the exact source change, controls and test output.",
+            "actions": [
+              "action-20",
+              "action-29"
+            ]
+          }
+        ]
+      },
+      "testReviews": [
+        {
+          "caseId": "base64-roundtrip",
+          "sourcePath": "stream-framer.js",
+          "originalSha256": "c902e92ff59f20e352823f1e4c3bfcbe80c10fea45096e1b9515762e32dcdd16",
+          "caught": true,
+          "exitCode": 1
+        }
+      ]
+    }
+  ]
+}

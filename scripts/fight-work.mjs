@@ -61,6 +61,26 @@ export function validateFightWork(value, row, card) {
         || (file.before !== null && !hex(file.beforeSha256))) throw Error('Invalid delivered file');
     names.add(file.path);
   }
+  for (const check of value.checks) {
+    if (!Object.hasOwn(check, 'mutationReview')) continue;
+    const review=check.mutationReview, file=value.files.find(f=>f.path===review?.sourcePath);
+    if (review?.schema!=='bantam.test-mutation-review.v1' || !file?.after
+        || review.caseId!=='base64-roundtrip'
+        || ![0,1].includes(check.exitCode) || !text(check.description,2000)
+        || !hex(review.originalSha256) || review.originalSha256!==file.afterSha256
+        || sha(file.after)!==review.originalSha256 || !hex(review.mutantSha256)
+        || !text(review.change?.before,4000) || !review.change.before
+        || !text(review.change?.after,4000)
+        || file.after.split(review.change.before).length!==2
+        || sha(file.after.replace(review.change.before,review.change.after))!==review.mutantSha256
+        || !Array.isArray(review.retainedTests)
+        || review.retainedTests.length!==value.files.filter(f=>f.after!==null&&/^tests?\//.test(f.path)).length
+        || new Set(review.retainedTests.map(t=>t.path)).size!==review.retainedTests.length
+        || review.retainedTests.some(t=>!value.files.some(f=>f.path===t.path&&/^tests?\//.test(f.path)&&f.after!==null&&f.afterSha256===t.sha256))
+        || review.control?.canonicalExit!==0 || review.control?.aliasExit!==2
+        || review.mutant?.canonicalExit!==0 || review.mutant?.aliasExit!==0)
+      throw Error('Mutation review must bind a tested change to this delivered source');
+  }
   const story = value.explanation;
   if (!story || !text(story.title, 100) || !story.title || !Array.isArray(story.paragraphs)
       || Object.keys(story).some(key => !['title', 'paragraphs'].includes(key))
@@ -72,10 +92,13 @@ export function validateFightWork(value, row, card) {
 }
 
 function entryFor(value, bytes) {
+  const testReviews=value.checks.filter(c=>c.mutationReview).map(c=>({caseId:c.mutationReview.caseId,
+    sourcePath:c.mutationReview.sourcePath,originalSha256:c.mutationReview.originalSha256,
+    caught:c.exitCode===1,exitCode:c.exitCode}));
   return {path: value.arm + '.json', bytes: bytes.length, sha256: sha(bytes), ...binding(value),
     actions: value.actions.length, files: value.files.length,
     changedFiles: value.files.filter(file => file.state !== 'unchanged').length,
-    taskSha256: value.taskSha256, explanation: value.explanation};
+    taskSha256: value.taskSha256, explanation: value.explanation,...(testReviews.length?{testReviews}:{})};
 }
 
 export function writeFightWork({output, card, rows, inputs}) {

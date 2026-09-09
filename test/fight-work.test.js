@@ -53,6 +53,24 @@ test('work review rejects invented explanation links, changed source bytes and r
   assert.ok(html.includes('&lt;img'));assert.ok(!html.includes('<img'));
 });
 
+test('a post-run mutation review binds its source change and controls without altering the original outcome', () => {
+  const value=fixture(), source=value.files[0].after;
+  value.checks.push({title:'Post-run regression check',description:'A planted change in a fresh copy; the delivered tests stayed unchanged.',exitCode:1,stdout:'1 test failed',stderr:'',
+    mutationReview:{schema:'bantam.test-mutation-review.v1',caseId:'base64-roundtrip',sourcePath:'tool.js',originalSha256:sha(source),retainedTests:[],
+      mutantSha256:sha(source.replace('true','false')),change:{before:'true',after:'false'},
+      control:{canonicalExit:0,aliasExit:2},mutant:{canonicalExit:0,aliasExit:0}}});
+  assert.equal(validateFightWork(value,row,'context-packet').outcome,'PASS');
+  for(const mutate of [
+    v=>v.checks[1].mutationReview.originalSha256='f'.repeat(64),
+    v=>v.checks[1].mutationReview.mutantSha256='f'.repeat(64),
+    v=>v.checks[1].mutationReview.change.before='missing source',
+    v=>v.checks[1].mutationReview.control.aliasExit=0,
+    v=>v.checks[1].mutationReview.mutant.aliasExit=2,
+    v=>v.checks[1].mutationReview.retainedTests.push({path:'different.test.js',sha256:'f'.repeat(64)}),
+    v=>v.checks[1].exitCode=137,
+  ]) {const invalid=structuredClone(value);mutate(invalid);assert.throws(()=>validateFightWork(invalid,row,'context-packet'),/Mutation review/);}
+});
+
 test('native work extraction retains original Hermes tool history across compaction and excludes private Claude records', () => {
   const script=String.raw`
 import importlib.util,json,pathlib,sqlite3,tempfile

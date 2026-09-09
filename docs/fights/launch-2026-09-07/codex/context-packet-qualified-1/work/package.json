@@ -1,0 +1,156 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "context-packet",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 49295,
+      "sha256": "e27bc7b1b9b0e197a86a4c50f2721cb4b11fe9425f60fdfd307e79b42e9b065c",
+      "arm": "bantam-codex-astra",
+      "wallMs": 98582,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "One inspection. One build.",
+        "paragraphs": [
+          {
+            "text": "The factory supplied the project listing. Astra read the source and tests together, then wrote the implementation and its regression tests in one batch. One test run and the completion check finished the job.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "Both Astra builds passed all five independent acceptance groups. This factory attempt used 40,728 input tokens versus 75,244 in native Codex, and finished in 98.6 seconds versus 102.4. Open Files for the exact code and retained tests.",
+            "actions": [
+              "action-2",
+              "action-3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 42202,
+      "sha256": "7ddd58b8a408fbbbdb77a2347c5a8af87c4e06e57ac9d582ffd65bd228467276",
+      "arm": "codex-astra",
+      "wallMs": 102410,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 4,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Solid work, more setup.",
+        "paragraphs": [
+          {
+            "text": "Native Astra discovered the project and checked parent directories for instructions before building the packer. It wrote the implementation and regression tests in separate steps, then ran its checks.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4"
+            ]
+          },
+          {
+            "text": "The result passed all five independent acceptance groups. It validates inputs before packing, preserves required sections, measures UTF-8 bytes, and provides an import-safe CLI. Its recorded input, output, prefix cache and wall time appear above.",
+            "actions": [
+              "action-3",
+              "action-4"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 124064,
+      "sha256": "9af8f48672e7643d0d7359398cd0c1338681b6cd0d027fb5a49f99075227fb3f",
+      "arm": "bantam-astra-terra",
+      "wallMs": 228275,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 31,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "The supervisor corrected the test.",
+        "paragraphs": [
+          {
+            "text": "Terra built the packer and its tests. A special-ID fixture expected input order even though its priorities required a different order. Astra spotted the mismatch and steered Terra to fix the fixture while preserving the correct sorting behavior.",
+            "actions": [
+              "action-2",
+              "action-15"
+            ]
+          },
+          {
+            "text": "This lane passed all five independent acceptance groups. It took 22 worker model calls and eight supervisor calls; a later Astra review probe also needed a fixture correction. The complete workflow and combined token totals show where the extra work went.",
+            "actions": [
+              "action-28",
+              "action-29",
+              "action-30",
+              "action-31"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 86462,
+      "sha256": "2f52baa8b8e976159f3bda3dbb1d976ae5d08893564b230e9ab5ca35c613e841",
+      "arm": "bantam-astra-sol",
+      "wallMs": 192563,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 10,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "2d16d34295fea247b65dbe81afa76934bc7508bfa3e713fb7780c7b76f9dc7fc",
+      "explanation": {
+        "title": "Delegate a complete job.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter and assigned the whole packer to Sol with concrete API and CLI checks. Sol delivered the implementation and retained regression tests in one job.",
+            "actions": [
+              "action-1",
+              "action-2"
+            ]
+          },
+          {
+            "text": "Astra reviewed the delivered source and tests, then the integrated project passed all five independent acceptance groups. Five supervisor calls and Sol’s implementation used 99,562 input tokens in total. Both roles are counted in the table above.",
+            "actions": [
+              "action-9",
+              "action-10"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -86,3 +86,19 @@ test('cancel running local job drains it before requeue and leaves the Codex lan
   releases.fresh(); releases.review(); while(q.pending) await q.wait(1000);
   assert.equal(peak,1); assert.equal(q.jobs[1].status,'passed'); assert.equal(q.jobs[2].status,'passed');
 });
+
+
+test('new worker evidence wakes a waiting supervisor before the polling timeout', async t => {
+  let progress, release;
+  const q = new ForemanQueue({execute:async(j,deps,signal,report)=>{
+    progress=report; await new Promise(r=>{release=r;}); return {pass:true};
+  }});
+  t.after(async()=>{release?.();await q.close();});
+  q.submit([job('working')]); await Promise.resolve();
+  let observed = null;
+  const waiting=q.wait(10000).then(rows=>{observed=rows[0].progress;});
+  progress({observation:{text:'The retained fixture failed its installation assertion.'}});
+  await new Promise(r=>setImmediate(r));
+  assert.match(observed?.evidence?.observation?.text ?? '',/installation assertion/);
+  await waiting;
+});

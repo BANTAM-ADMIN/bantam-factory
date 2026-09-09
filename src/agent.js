@@ -4087,6 +4087,18 @@ async function runAgentCore({
       focusByPath.delete(shellPath);
       mutationFocusByPath.delete(shellPath);
     }
+    const changedTestInputs = [...new Set([...directEditPaths, ...shellChangedPaths,
+      ...(directEditSucceeded && action.a === 'delete_file' ? [action.p] : []),
+      ...(directEditSucceeded && action.a === 'move_file' ? [action.from, action.to] : [])])]
+      .filter(p => isTestPath(p) || /(?:^|\/)(?:package\.json|(?:vitest|jest|pytest|playwright)\.config\.[^/]+|pytest\.ini|conftest\.py)$/.test(p));
+    if (regressionGuard && bestCommand !== null && changedTestInputs.length) {
+      // Stronger assertions can lower the pass count without a product
+      // regression. Never restore older tests to recover their easier green.
+      bestSnapshot = null; bestPassed = -1; bestTotal = 0; bestCommand = null;
+      editsSinceBestSnapshot = 0; revertsOfThisSnapshot = 0;
+      result.observation += `\n[regression-guard] Test inputs changed (${changedTestInputs.slice(0, 8).join(', ')}). Earlier pass counts describe different checks; the rollback baseline is cleared. Preserve justified test improvements and repair the implementation against the current assertions.`;
+      onEvent({type: 'regression_baseline_invalidated', paths: changedTestInputs});
+    }
     // A read is useful context, not merely historical prose. Retain the exact
     // current file behind a successful read in the same bounded panel, behind
     // edited files. This is the generic replacement for one-off dispatch and

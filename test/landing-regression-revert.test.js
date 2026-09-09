@@ -133,3 +133,25 @@ describe("landing-window regression revert", () => {
     assert.equal(result.verification.status, "fail");
   });
 });
+
+
+describe('changed assertion baseline', () => {
+  for(const route of ['direct','shell']) it(`retains a strengthened test through ${route} edits and landing verification`, async t => {
+    const workspace=temporaryWorkspace(t);
+    const original=fs.readFileSync(path.join(workspace,'target.test.js'),'utf8')+'\n// retained test\n';
+    const stronger=original.replace('"good"','"required"');
+    const modify=route==='direct'
+      ? {a:'write_file',p:'target.test.js',content:stronger}
+      : {a:'shell',c:`node -e 'const fs=require("fs");fs.writeFileSync("target.test.js",${JSON.stringify(stronger)})'`};
+    const events=[];
+    const result=await runAgent({...base,workspace,maxTurns:5,completionAudit:false,diagnoseStuckTests:false,
+      autoVerifyBlindEdits:0,autoVerifyProbes:0,autoVerifyStaleTurns:0,
+      model:scriptedModel([write("module.exports='good'"),JSON.stringify({a:"write_file",p:"target.test.js",content:original}),runTests,JSON.stringify(modify),runTests]),
+      onEvent:e=>events.push(e)});
+    assert.equal(fs.readFileSync(path.join(workspace,'target.test.js'),'utf8'),stronger);
+    assert.equal(result.verification.status,'fail');
+    assert.equal(result.metrics.regressionReverts ?? 0,0);
+    assert.equal(result.metrics.landingReverts ?? 0,0);
+    assert.ok(events.some(e=>e.type==='regression_baseline_invalidated'));
+  });
+});

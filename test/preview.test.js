@@ -286,7 +286,7 @@ test('interaction checks admit render-loop UI updates while retaining broken har
   t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
   for(const broken of [false,true]){
     fs.writeFileSync(path.join(workspace,'index.html'), `<main>
-      <p>Space: Hard Drop. Press P to pause.</p><button id="start">Start</button>
+      <p>Space: Hard Drop awards 2 points per cell. Press P to pause.</p><button id="start">Start</button>
       <p>Score <span id="score">0</span></p><style>#overlay.hidden{opacity:0;pointer-events:none}</style><div id="overlay" class="hidden">Paused. Resume play.<button>Resume</button></div>
       </main><script>
       let playing=false, paused=false, score=0;
@@ -328,4 +328,16 @@ test('canvas pause controls are observed without requiring a DOM overlay', {skip
     if(mode==='toggle') assert.ok(report.interaction.snapshots.afterPause1.pauseControls.some(c=>c.text==='Resume'));
     if(mode==='button-only') assert.doesNotMatch(report.interaction.notes.join(' '),/Pause is advertised/);
   }
+});
+
+
+test('hard drop does not invent a drop-points requirement for a line-scoring game', {skip:compositeSkipReason(_chromiumSkip,_networkSkip)}, t => {
+  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-preview-drop-scoring-'));
+  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(workspace,'index.html'), `<h1>Line game</h1><p>Space: Hard Drop. Clear lines to score.</p>
+    <button id="start">Start</button><p>Score <span id="score">0</span></p>
+    <script>document.querySelector('button').onclick=function(){this.blur();};</script>`);
+  const report=runPreviewSync(workspace,'index.html',{interact:true,realtimeProbe:false});
+  assert.deepEqual(report.interaction.issues,[]);
+  assert.match(report.interaction.notes.join(' '),/Drop-point scoring is not established/);
 });

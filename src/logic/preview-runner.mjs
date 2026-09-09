@@ -481,9 +481,12 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
       const scoreAfter = numericHudValue(I.snapshots.afterKeys, "score");
       if (advertised("space") && /\\bhard\\s+drop\\b/i.test(String(document.body?.innerText || ""))
           && scoreBefore !== null && scoreAfter !== null && scoreAfter === scoreBefore) {
-        I.issues.push(
-          "Space/Hard Drop is advertised and a score HUD is present, but its value did not change after the hard drop. Verify that the handler awards drop points and refreshes the derived HUD."
-        );
+        const text = String(document.body?.innerText || '');
+        const rule = /\\bhard\\s+drop\\b[^.\\n]{0,80}/i.exec(text)?.[0] || '';
+        if (/\\b(?:awards?|earns?)\\b[^.\\n]{0,30}\\bpoints?\\b|\\+\\s*[1-9]\\d*\\s*(?:points?|pts?)\\b/i.test(rule)
+            && !/\\b(?:no|zero|not|never)\\b/i.test(rule)) {
+          I.issues.push('Hard Drop advertises points, but the score HUD value did not change after Space. Verify the advertised scoring and HUD update.');
+        } else I.notes.push('The score HUD did not change after Space/Hard Drop. Drop-point scoring is not established by this page; verify a scoring case required by the task before calling this a defect.');
       }
 
       dispatchKey("p", "KeyP");

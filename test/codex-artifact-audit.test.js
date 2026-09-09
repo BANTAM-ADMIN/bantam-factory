@@ -73,6 +73,23 @@ test("Codex artifact audit detects canonical, wire, and reuse tampering", () => 
   assert.ok(reuseReport.failures.some((failure) => failure.code === "thread_reuse"));
 });
 
+test("observation audit binds omitted code to the previous successful completion", () => {
+  const base = "instructions\n".repeat(420) + "<|im_start|>assistant\n";
+  const reply = JSON.stringify({ a: "write_file", p: "app.js", content: 'code\n'.repeat(2000) });
+  const canonical = base + reply + '<|im_end|>\n<|im_start|>user\nWrote file.\n<|im_end|>\n<|im_start|>assistant\n';
+  const first = call(0, base, buildCodexPromptDelivery(base), false);
+  first.response.normalized.content = reply;
+  const second = call(1, canonical, buildCodexPromptDelivery(canonical, {
+    mode: "delta", baseReference: "previous", basePrompt: base, acknowledgedCompletion: reply,
+  }), true);
+  const artifact = { modelCalls: [first, second] };
+  assert.equal(auditCodexPromptDelivery(artifact).status, "pass");
+  first.response.normalized.content = 'unacknowledged replacement';
+  const report = auditCodexPromptDelivery(artifact);
+  assert.equal(report.status, "fail");
+  assert.ok(report.failures.some(f => f.code === "acknowledged_completion"));
+});
+
 test("Codex artifact audit fails closed on missing evidence and ignores local artifacts", () => {
   const missing = exactArtifact();
   delete missing.modelCalls[0].response.normalized.codexPromptDelivery;

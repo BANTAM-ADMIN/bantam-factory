@@ -204,7 +204,7 @@ async function runPhase(workspace, actions, options = {}) {
   const result = await runAgent({
     task: "Fix target.js and verify the result. Leave the existing public test unchanged.",
     workspace, verificationScript: PHASE_VERIFY,
-    model: { assistantPrefill: "", actTemperature: null, async complete(prompt, request) {
+    model: { codex: options.codex === true, assistantPrefill: "", actTemperature: null, async complete(prompt, request) {
       calls.push({ prompt, options: request });
       const action = typeof actions === "function" ? actions(index++) : actions[index++];
       assert.ok(action, "the controller must not request unbounded repair actions");
@@ -366,6 +366,32 @@ test("failed-anchor line editing composes with stalled verification recovery", a
   assert.equal(result.turns[6].verificationEvidence.status, "pass");
   assert.equal(result.done, true);
   assert.equal(result.turns.at(-1).doneAccepted, true);
+  assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
+});
+
+test("Codex keeps its schema stable through failed-anchor recovery and rejects masked actions before execution", async t => {
+  const workspace = phaseFixture(t);
+  const actions = [
+    { a: "read_file", p: "target.js" },
+    { a: "replace", p: "target.js", old: 'absent anchor', new: PHASE_IMPLEMENTATION },
+    { a: "replace", p: "target.js", old: 'module.exports = "initial";\n', new: 'CORRUPTED\n' },
+    { a: "read_file", p: "target.js" },
+    { a: "edit_lines", p: "target.js", start: 1, end: 1, new: PHASE_IMPLEMENTATION.trimEnd() },
+    { a: "shell", c: PHASE_VERIFY },
+    { a: "done", summary: "Repaired and verified." },
+  ];
+  const { result, calls } = await runPhase(workspace, actions, {
+    codex: true, maxInvalidPerTurn: 1, promptTrajectory: "extension", immutableHistory: true,
+    autoForceEditAfter: 0,
+  });
+  assert.equal(result.done, true);
+  assert.equal(new Set(calls.map(call => JSON.stringify(call.options.jsonSchema))).size, 1);
+  assert.equal(result.rejectedOutputs.filter(row => row.kind === "action_policy").length, 1);
+  assert.ok(result.turns.every(turn => !String(turn.observation).includes("CORRUPTED")));
+  assert.match(calls[2].prompt, /ACTION POLICY FOR THIS TURN:/);
+  const policy = calls[2].prompt.slice(calls[2].prompt.lastIndexOf("ACTION POLICY FOR THIS TURN:"));
+  assert.doesNotMatch(policy.split(".")[0], /\breplace\b/);
+  assert.match(calls[3].prompt, /unavailable at this checkpoint/);
   assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
 });
 

@@ -18,6 +18,10 @@ const DEFAULT_CONTROL_TIMEOUT_MS = 30000;
 const DEFAULT_IDLE_TIMEOUT_MS = 120000;
 const PROMPT_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V1";
 const INCREMENTAL_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V2";
+const OBSERVATION_MARKER = "BANTAM_OBSERVATION_V1\n";
+const ASSISTANT_HEAD = "<|im_start|>assistant\n";
+const OBSERVATION_HEAD = "<|im_end|>\n<|im_start|>user\n";
+const OBSERVATION_TAIL = `<|im_end|>\n${ASSISTANT_HEAD}`;
 const MIN_DELTA_PREFIX_CHARS = 2048;
 const BASE_INSTRUCTIONS = [
   "You are the model runtime embedded inside the BANTAM agent harness.",
@@ -25,6 +29,7 @@ const BASE_INSTRUCTIONS = [
   "Do not call native Codex tools, inspect the workspace, or perform the requested task directly.",
   "Treat the user input as a fully assembled model prompt and produce only the completion it requests.",
   "When it requests a JSON action, return exactly one JSON object and no markdown or commentary.",
+  "BANTAM_OBSERVATION_V1 supplies new observations after your last action. Your previous answer is already in this thread; use the observations to choose the next action.",
 ].join(" ");
 
 // A deliberately narrow escape hatch from the constrained coding thread. The
@@ -103,6 +108,7 @@ export class CodexAppServer {
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
+    this.runLastCompletion = null;
     this.runThreadCalls = 0;
     this.child = null;
     this.lines = null;
@@ -121,6 +127,7 @@ export class CodexAppServer {
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
+    this.runLastCompletion = null;
     this.runThreadCalls = 0;
     return token;
   }
@@ -132,6 +139,7 @@ export class CodexAppServer {
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
+    this.runLastCompletion = null;
     this.runThreadCalls = 0;
     return true;
   }
@@ -308,6 +316,7 @@ export class CodexAppServer {
           mode: "delta",
           basePrompt: this.runLastPrompt,
           baseReference: "previous",
+          acknowledgedCompletion: this.runLastCompletion,
         });
         if (candidate.evidence.mode === "full-fallback") {
           rebaseReason = candidate.evidence.reason || "delta-fallback";
@@ -426,6 +435,7 @@ export class CodexAppServer {
       // retains its own assistant reply; subsequent input adds only new state.
       if (reuseRunThread && this.runThreadId === threadId) {
         this.runLastPrompt = String(prompt);
+        this.runLastCompletion = result.content;
       }
       return withThreadEvidence(result, {
         threadId,
@@ -460,6 +470,7 @@ export class CodexAppServer {
       mode: "delta",
       basePrompt: this.runLastPrompt,
       baseReference: "previous",
+      acknowledgedCompletion: this.runLastCompletion,
     });
   }
 
@@ -467,6 +478,7 @@ export class CodexAppServer {
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
+    this.runLastCompletion = null;
     this.runThreadCalls = 0;
   }
 
@@ -643,6 +655,7 @@ export class CodexAppServer {
     this.runThreadId = null;
     this.runThreadModel = null;
     this.runLastPrompt = null;
+    this.runLastCompletion = null;
     this.runThreadCalls = 0;
   }
 
@@ -712,6 +725,7 @@ export function buildCodexPromptDelivery(prompt, {
   // V1 remains available for reconstructing historical first-base artifacts.
   // Live run/delta delivery explicitly selects acknowledged previous-base V2.
   baseReference = "first",
+  acknowledgedCompletion = null,
 } = {}) {
   if (baseReference !== "first" && baseReference !== "previous") {
     throw new Error("invalid Codex delta base reference");
@@ -737,6 +751,33 @@ export function buildCodexPromptDelivery(prompt, {
   if (incremental && !canonical.startsWith(basePrompt)) return full("canonical-not-extension");
   const commonPrefixChars = commonPrefixLength(basePrompt, canonical);
   if (commonPrefixChars < minPrefixChars) return full("small-common-prefix");
+  // A native thread already contains the successfully completed assistant
+  // message. Re-sending a write_file body as escaped user input charges for it
+  // twice and makes every later cached request larger. Omit it only after an
+  // exact match at the canonical assistant boundary; never guess which bytes
+  // are model output. Rewritten/slimmed history uses the existing full/delta
+  // fallback. Hashes and reconstruction bookkeeping stay in local evidence.
+  const suffix = canonical.slice(commonPrefixChars);
+  if (incremental && typeof acknowledgedCompletion === "string" && acknowledgedCompletion
+      && basePrompt.endsWith(ASSISTANT_HEAD)
+      && suffix.startsWith(acknowledgedCompletion + OBSERVATION_HEAD)
+      && suffix.endsWith(OBSERVATION_TAIL)) {
+    const observations = suffix.slice(acknowledgedCompletion.length + OBSERVATION_HEAD.length,
+      -OBSERVATION_TAIL.length);
+    const delivered = OBSERVATION_MARKER + observations;
+    if (delivered.length < canonical.length) return {
+      text: delivered,
+      evidence: {
+        mode: "delta", format: "observation-v1", baseReference: "previous", reason: null,
+        baseSha256: sha256(basePrompt), canonicalSha256, deliveredSha256: sha256(delivered),
+        completionSha256: sha256(acknowledgedCompletion),
+        omittedAssistantChars: acknowledgedCompletion.length,
+        canonicalChars: canonical.length, deliveredChars: delivered.length,
+        commonPrefixChars, savedChars: canonical.length - delivered.length,
+        deliveredText: delivered,
+      },
+    };
+  }
   const payload = {
     baseSha256: sha256(basePrompt),
     keepPrefixChars: commonPrefixChars,
@@ -771,8 +812,16 @@ export function buildCodexPromptDelivery(prompt, {
   };
 }
 
-export function reconstructCodexPromptDelivery(basePrompt, delivered) {
+export function reconstructCodexPromptDelivery(basePrompt, delivered, { acknowledgedCompletion = null } = {}) {
   const text = String(delivered);
+  if (text.startsWith(OBSERVATION_MARKER)) {
+    if (typeof acknowledgedCompletion !== "string" || !acknowledgedCompletion
+        || !String(basePrompt).endsWith(ASSISTANT_HEAD)) {
+      throw new Error("Codex observation delivery requires its acknowledged assistant completion and base");
+    }
+    return basePrompt + acknowledgedCompletion + OBSERVATION_HEAD
+      + text.slice(OBSERVATION_MARKER.length) + OBSERVATION_TAIL;
+  }
   const incremental = text.startsWith(`${INCREMENTAL_DELTA_MARKER}\n`);
   if (!incremental && !text.startsWith(`${PROMPT_DELTA_MARKER}\n`)) return text;
   const jsonLine = text.split("\n").find((line) => line.startsWith("{"));

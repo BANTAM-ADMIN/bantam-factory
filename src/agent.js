@@ -798,6 +798,15 @@ async function runAgentCore({
     ...(fileOperationPolicy.enabled ? [FILE_OPS_FEATURE] : []),
     ...(probeEnabled ? [PROBE_ACTION_FEATURE] : []),
   ];
+  // Codex places the response schema before conversation history. Changing a
+  // per-turn grammar mask there invalidates the cached prefix for the entire
+  // run. Reserve recovery syntax once, then enforce the exact active mask in
+  // the controller below. Local constrained decoding keeps its per-turn GBNF.
+  const codexStableSchema = model?.codex === true && process.env.BANTAM_CODEX_STABLE_SCHEMA !== "0";
+  const codexActionFeatures = [...new Set([...baseActionFeatures, LINE_EDIT_FEATURE,
+    ...(patchActionPolicy.mode === "auto" ? [PATCH_ACTION_FEATURE] : [])])];
+  const codexActionJsonSchema = codexStableSchema
+    ? actionJsonSchema({ features: codexActionFeatures }) : null;
   // Is this a "build/create something" request (vs a question or a small edit)? On these the
   // deliverable is running code, so a plan-only answer before any file exists is premature —
   // the build-first guard below pushes the model to start writing instead of describing.
@@ -2275,9 +2284,13 @@ async function runAgentCore({
     const turnActionGrammar = excludeThisTurn.length || turnActionFeatures.length
       ? actionGrammar({ excludeVerbs: excludeThisTurn, features: turnActionFeatures })
       : ACTION_GRAMMAR;
-    const turnActionJsonSchema = excludeThisTurn.length || turnActionFeatures.length
+    const turnActionJsonSchema = codexActionJsonSchema ?? (excludeThisTurn.length || turnActionFeatures.length
       ? actionJsonSchema({ excludeVerbs: excludeThisTurn, features: turnActionFeatures })
-      : ACTION_JSON_SCHEMA;
+      : ACTION_JSON_SCHEMA);
+    const legalTurnVerbs = [...enabledTurnVerbs].filter(verb => !excludeThisTurn.includes(verb));
+    const codexActionPolicy = codexStableSchema
+      ? `[action-policy]\nACTION POLICY FOR THIS TURN: ${legalTurnVerbs.join(", ")}. Other actions are rejected before execution; inspect sub-actions obey the same policy.`
+      : "";
     if (maskedVerbForTurn) {
       metrics.repeatEscapeMasks++;
       onEvent({ type: "verb_mask_applied", verb: maskedVerbForTurn });
@@ -2613,7 +2626,7 @@ async function runAgentCore({
             "Follow the ordering literally in the next assertion-bearing probe. In particular, capture the returned Promise, trigger abort/reset while work is blocked, and only then await the Promise.",
           ].join("\n")
         : "";
-      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor]
+      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor, codexActionPolicy]
         .filter(Boolean)
         .join("\n\n");
       const decHintText = decHint
@@ -2980,6 +2993,20 @@ async function runAgentCore({
       if (parsed.ok) {
         degeneratePenalty = 0;
         const normalizedAction = normalizeWorkspaceAction(parsed.action);
+        const policyActions = normalizedAction.a === "inspect"
+          ? [normalizedAction, ...(normalizedAction.ops ?? [])] : [normalizedAction];
+        const maskedAction = codexStableSchema && useGrammar
+          ? policyActions.find(entry => !legalTurnVerbs.includes(entry.a)) : null;
+        if (maskedAction) {
+          metrics.invalid++;
+          const error = `Action "${maskedAction.a}" is unavailable at this checkpoint. ${codexActionPolicy}`;
+          rejectedOutputs.push({ turn: turns.length, attempt, rawOutput: out.content, error,
+            reasoning: turnReasoning, kind: "action_policy", target: normalizedAction.path ?? null,
+            tokens: out.tokens, stoppedLimit: Boolean(out.stoppedLimit) });
+          onEvent({ type: "invalid_action", error, raw: out.content });
+          repairObs = error;
+          continue;
+        }
         if (callerExcludedActions.includes(normalizedAction.a)
             || (normalizedAction.a === "probe" && !probeEnabled)) {
           metrics.invalid++;

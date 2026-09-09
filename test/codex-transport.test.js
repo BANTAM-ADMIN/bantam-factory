@@ -171,6 +171,49 @@ test("delta mode periodically rebases onto a fresh canonical thread", async (t) 
   assert.equal(codex.endRun(token), true);
 });
 
+test("observation delivery omits only the acknowledged reply and retains exact evidence", async (t) => {
+  const codex = server({ threadMode: "run", promptMode: "delta" });
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = "stable instructions\n".repeat(300) + "<|im_start|>assistant\n";
+  const first = await codex.complete(base);
+  const body = '<observation>\nERROR: not applied. Unicode 🐓, "quotes", \\paths\n</observation>\n'
+    + '[guidance-checklist]\nStill required: keyboard controls and pause.\n';
+  const canonical = base + first.content + '<|im_end|>\n<|im_start|>user\n'
+    + body + '<|im_end|>\n<|im_start|>assistant\n';
+  const next = await codex.complete(canonical);
+  assert.equal(next.codexPromptDelivery.format, "observation-v1");
+  assert.equal(next.codexPromptDelivery.deliveredText, "BANTAM_OBSERVATION_V1\n" + body);
+  assert.equal(reconstructCodexPromptDelivery(base, next.codexPromptDelivery.deliveredText,
+    { acknowledgedCompletion: first.content }), canonical);
+  assert.throws(() => reconstructCodexPromptDelivery(base, next.codexPromptDelivery.deliveredText), /acknowledged/);
+  assert.equal(codex.runLastCompletion, next.content);
+  codex.endRun(token);
+  assert.equal(codex.runLastCompletion, null);
+});
+
+test("observation delivery does not remove rewritten, unacknowledged, or boundary-ambiguous output", () => {
+  const base = "stable instructions\n".repeat(300) + "<|im_start|>assistant\n";
+  const reply = JSON.stringify({ a: "write_file", p: "game.html", content: 'code "λ"\n'.repeat(5000) });
+  const tail = '<|im_end|>\n<|im_start|>user\nWrote file.\n<|im_end|>\n<|im_start|>assistant\n';
+  const canonical = base + reply + tail;
+  const options = { mode: "delta", baseReference: "previous", basePrompt: base, acknowledgedCompletion: reply };
+  const lean = buildCodexPromptDelivery(canonical, options);
+  assert.equal(lean.evidence.format, "observation-v1");
+  assert.ok(lean.text.length < 100, "large generated code must not become new user input");
+  for (const [prompt, opts] of [
+    [canonical, { ...options, acknowledgedCompletion: null }],
+    [canonical, { ...options, acknowledgedCompletion: "different reply" }],
+    [base + reply + 'extra assistant bytes' + tail, options],
+    [canonical + 'unfinished boundary', options],
+    ['rewritten head' + canonical, options],
+  ]) {
+    const delivery = buildCodexPromptDelivery(prompt, opts);
+    assert.notEqual(delivery.evidence.format, "observation-v1");
+    assert.equal(reconstructCodexPromptDelivery(base, delivery.text), prompt);
+  }
+});
+
 test("an inefficient delta rebases instead of retaining a stale base", async (t) => {
   const codex = server({ threadMode: "run", promptMode: "delta" });
   t.after(() => codex.close());

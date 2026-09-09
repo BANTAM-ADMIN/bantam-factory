@@ -34,6 +34,7 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
   const failures = [];
   const bases = new Map();
   const previousPrompts = new Map();
+  const previousCompletions = new Map();
   const seenThreads = new Set();
   let auditedCalls = 0;
   let exactCalls = 0;
@@ -100,7 +101,8 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
       bases.set(threadId, canonical);
     } else if (delivery.mode === "delta") {
       deltaCalls++;
-      const incremental = Boolean(delivery.deliveredText?.startsWith("BANTAM_PROMPT_DELTA_V2\n"));
+      const observation = Boolean(delivery.deliveredText?.startsWith("BANTAM_OBSERVATION_V1\n"));
+      const incremental = observation || Boolean(delivery.deliveredText?.startsWith("BANTAM_PROMPT_DELTA_V2\n"));
       if (incremental !== (delivery.baseReference === "previous")) {
         fail("delta_reference", callIndex, "delta reference evidence disagrees with its versioned wire envelope");
         return;
@@ -115,7 +117,15 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
         return;
       }
       try {
-        reconstructed = reconstructCodexPromptDelivery(base, delivery.deliveredText);
+        const acknowledgedCompletion = previousCompletions.get(threadId);
+        if (observation && (delivery.baseSha256 !== sha256(base)
+            || typeof acknowledgedCompletion !== "string"
+            || delivery.completionSha256 !== sha256(acknowledgedCompletion)
+            || delivery.omittedAssistantChars !== acknowledgedCompletion.length)) {
+          fail("acknowledged_completion", callIndex, "observation delta does not match its recorded base and previous completion");
+          return;
+        }
+        reconstructed = reconstructCodexPromptDelivery(base, delivery.deliveredText, { acknowledgedCompletion });
       } catch (error) {
         fail("delta_parse", callIndex, boundedMessage(error));
         return;
@@ -144,6 +154,7 @@ export function auditCodexPromptDelivery(artifact, { includeCalls = false } = {}
     exactCalls++;
     exactCallIndices.add(callIndex);
     previousPrompts.set(threadId, canonical);
+    previousCompletions.set(threadId, normalized.content);
   });
 
   if (auditedCalls === 0) {

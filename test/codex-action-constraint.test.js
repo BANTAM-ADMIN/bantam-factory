@@ -3,9 +3,9 @@ import test from 'node:test';
 import { ModelClient } from '../src/model.js';
 import { actionJsonSchema } from '../src/grammar.js';
 
-test('schema opt-out affects only Codex actions; data schemas and other providers remain constrained', t => {
+test('default sampling affects only Codex actions; explicit schema opt-in restores constraints', t => {
   const old = process.env.BANTAM_CODEX_ACTION_SCHEMA;
-  process.env.BANTAM_CODEX_ACTION_SCHEMA = 'off';
+  delete process.env.BANTAM_CODEX_ACTION_SCHEMA;
   t.after(() => { if (old === undefined) delete process.env.BANTAM_CODEX_ACTION_SCHEMA; else process.env.BANTAM_CODEX_ACTION_SCHEMA = old; });
   const model = new ModelClient({ codex: true }); t.after(() => model.close());
   const schema = actionJsonSchema({ features: ['write_batch'] });
@@ -14,6 +14,10 @@ test('schema opt-out affects only Codex actions; data schemas and other provider
   assert.equal(body.constrainOutput, false);
   assert.deepEqual(body.outputSchema, schema, 'the action validation contract remains recorded');
   assert.ok(request.jsonSchemaSha256);
+  process.env.BANTAM_CODEX_ACTION_SCHEMA = 'on';
+  assert.equal(JSON.parse(model.buildRequest('choose an action', {jsonSchema: schema}).body).constrainOutput, undefined);
+  process.env.BANTAM_CODEX_ACTION_SCHEMA = 'off';
+  assert.equal(JSON.parse(model.buildRequest('choose an action', {jsonSchema: schema}).body).constrainOutput, false);
   const data = { type: 'object', properties: { json: { type: 'string' } }, required: ['json'], additionalProperties: false };
   assert.equal(JSON.parse(model.buildRequest('a declarative spec', { jsonSchema: data }).body).constrainOutput, undefined);
   const local = new ModelClient({}); t.after(() => local.close());

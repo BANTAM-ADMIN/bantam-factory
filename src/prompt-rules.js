@@ -366,15 +366,15 @@ const COMPACT_TEXT = {
   "fable.report-shape": "Finish with the observed outcome, what changed and the verification evidence. Complete necessary work before summarizing; name any remaining blocker explicitly.",
 };
 
-function activeRules(env) {
+function activeRules(env, compact = env.BANTAM_COMPACT_RULES === '1') {
   const rules = [...BASE_RULES, ...activeCandidateRules(env)];
-  if (env.BANTAM_COMPACT_RULES !== "1") return rules;
+  if (!compact) return rules;
   return rules.map(rule => ({ ...rule, text: COMPACT_TEXT[rule.id] ?? rule.text }));
 }
 
 /** The "Rules:" block body, including the explicitly selected wording. */
-export function composeRulesBlock(env = process.env) {
-  const rules = activeRules(env);
+export function composeRulesBlock(env = process.env, { compact } = {}) {
+  const rules = activeRules(env, compact);
   return rules.map((r) => `- ${r.text}`).join("\n");
 }
 
@@ -383,8 +383,8 @@ export function composeRulesBlock(env = process.env) {
  * evidence: a pass-rate delta with a different promptVersion is attributable, the
  * same promptVersion across arms proves the prompt was not the variable.
  */
-export function promptVersion(env = process.env) {
-  const rules = activeRules(env);
+export function promptVersion(env = process.env, { compact } = {}) {
+  const rules = activeRules(env, compact);
   const payload = JSON.stringify(rules.map((r) => [r.id, r.text]));
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 8);
 }

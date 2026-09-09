@@ -416,7 +416,7 @@ export class ModelClient {
     // every unrelated action field through one nullable sampling schema. The
     // runtime parser and checkpoint authority still validate the actual action.
     const unconstrainedAction = (this.codex || this.codexBacked)
-      && process.env.BANTAM_CODEX_ACTION_SCHEMA === 'off'
+      && process.env.BANTAM_CODEX_ACTION_SCHEMA !== 'on'
       && Array.isArray(opts.jsonSchema?.properties?.a?.enum);
 
     // OpenAI-compatible transport: raw-prompt /v1/completions, grammar passed

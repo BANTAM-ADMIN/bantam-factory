@@ -38,7 +38,7 @@ const REASONING_EFFORT_TEXT = {
   low: "Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.",
 };
 
-export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedShell = true, outputTokenCap = null, reasoningEffort = null } = {}) {
+export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedShell = true, outputTokenCap = null, reasoningEffort = null, compactRules } = {}) {
   const featureRules = actionPromptRules({ features: actionFeatures });
   // Real physics of the default docker executor (see dockerShellRunner: `docker
   // run --rm` per action). Without this line the model reasons from normal Unix
@@ -69,7 +69,7 @@ Actions (emit exactly one, as compact JSON):
 ${actionPromptMenu({ features: actionFeatures, outputTokenCap })}${extraRules}
 
 Rules:
-${composeRulesBlock()}`;
+${composeRulesBlock(process.env, { compact: compactRules })}`;
 }
 
 export const SYSTEM_PROMPT = systemPrompt();
@@ -434,6 +434,7 @@ function slimInspectReads(action, observation, completeReadPaths, staleReadPaths
 export const FROZEN_STABLE_END = Symbol.for("bantam.frozenStableEnd");
 
 export function buildPrompt({
+  compactRules,
   maxTurns = null,
   profileText = null,
   // Whether shell actions run in the per-action docker sandbox (the executor's
@@ -509,7 +510,7 @@ export function buildPrompt({
   // they are tired of restating, which is exactly why they go in by default.
   const profileBlock = profileText ? `\n\nOperator preferences (standing — apply unless the task says otherwise):\n${scrub(profileText)}` : "";
   const systemFlag = thinkEnabled ? (template.systemFlag ?? "") : "";
-  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort })}${interactiveNote}${profileBlock}\n${template.close}`;
+  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort, compactRules })}${interactiveNote}${profileBlock}\n${template.close}`;
   const planBlock = planText ? `\n\n${scrub(planText)}` : "";
   const skillsBlock = skillsText ? `\n\n${scrub(skillsText)}` : "";
   const toolsBlock = toolsText ? `\n\n${scrub(toolsText)}` : "";

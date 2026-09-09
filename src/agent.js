@@ -635,10 +635,15 @@ async function runAgentCore({
   // The conservative default passed a balanced live A/B; `true`/`1` forces it
   // on for every task and `false`/`0` restores serialized replaces.
   patchAction = process.env.BANTAM_PATCH_ACTION ?? "auto",
-  // Codex-oriented whole-file transaction. Opt-in until paired evidence shows
-  // that fewer physical calls outweigh the larger single completion on the
-  // target worker. Legacy one-file writes remain available in either arm.
-  writeBatch = envTruthy(process.env.BANTAM_WRITE_BATCH),
+  // Codex workers keep one action/authority loop without the long small-model
+  // explanations or a separate generation for each related file. Each switch
+  // has an explicit rollback; local worker defaults stay independently tuned.
+  compactRules = process.env.BANTAM_COMPACT_RULES === undefined
+    ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_COMPACT_RULES),
+  workspaceTree = process.env.BANTAM_WORKSPACE_TREE === undefined
+    ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WORKSPACE_TREE),
+  writeBatch = process.env.BANTAM_WRITE_BATCH === undefined
+    ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WRITE_BATCH),
   // Candidate fixture experiments remain opt-in until downstream qualification.
   probeEnabled = envTruthy(process.env.BANTAM_PROBE),
   // Direct delete/move actions only for tasks that explicitly name those file
@@ -995,7 +1000,7 @@ async function runAgentCore({
     ? `${text}\n\nVerification for this task — run it yourself with shell after an edit, do not wait to be told:\n  ${verificationScript}`
       + (verificationWorkspaceReadOnly ? "\nConfigured acceptance verification runs in Docker with the entire source workspace READ-ONLY and a fresh writable /tmp. Tests must create temporary fixtures with the platform temp directory (for Node: os.tmpdir() + fs.mkdtempSync), not inside the source workspace, and must not depend on scratch files from earlier shell actions. Ordinary edits and manual shell commands remain writable; their green results do not substitute for this read-only configured check. The harness runs the configured check before accepting done." : "")
     : text) + (numericWitnessText ? `\n\n${numericWitnessText}` : "");
-  let env = withVerificationNote(map ? `${map}\n\n${safeListing(workspace)}` : safeListing(workspace));
+  let env = withVerificationNote(map ? `${map}\n\n${safeListing(workspace, workspaceTree)}` : safeListing(workspace, workspaceTree));
   const thinkP = deriveThinkPrefills(model.assistantPrefill, model.thinkMarkers);
   // The bare assistant-turn opener for this template family (`<|im_start|>assistant\n`
   // for ChatML). Used as both the action prefill and the history prefill under
@@ -2044,7 +2049,7 @@ async function runAgentCore({
     // invariant; the external-change observation and reanchor carry the news
     // instead of a head rewrite that would invalidate the whole cached prefix.
     if (!extensionTrajectory) {
-      const listing = safeListing(workspace);
+      const listing = safeListing(workspace, workspaceTree);
       env = withVerificationNote(map ? `${map}\n\n${listing}` : listing);
     }
     onEvent({ type: "external_workspace_change", phase, paths: changed });
@@ -2871,7 +2876,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ compactRules, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -2953,7 +2958,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: model?.nPredict ?? null, reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
           return built;
         },
@@ -4033,7 +4038,7 @@ async function runAgentCore({
         });
         if (groundingMap) {
           map = codeMap(ground);
-          const listing = safeListing(workspace);
+          const listing = safeListing(workspace, workspaceTree);
           env = withVerificationNote(map ? `${map}\n\n${listing}` : listing);
         }
       } else if (!refreshed.ok) {
@@ -6791,7 +6796,7 @@ async function runAgentCore({
     rejectedOutputs,
     integrity,
     metrics,
-    promptVersion: promptVersion(), // ties this run's evidence to the exact active ruleset
+    promptVersion: promptVersion(process.env, { compact: compactRules }), // exact selected rules
     ...(modelCallStart !== null ? { modelCallStart } : {}),
     ...(typeof model?.requestCursor === "function" ? { modelCallEnd: model.requestCursor() } : {}),
   };
@@ -7892,8 +7897,8 @@ function formatVerifyRedDone({ command, detail, unchanged, remaining }) {
   return `${head}\n$ ${command}\n${detail}\nFix the code so this command passes, then emit done. (${remaining} rejection${remaining === 1 ? "" : "s"} left before the run is graded as-is.)`;
 }
 
-function safeListing(workspace) {
-  if (process.env.BANTAM_WORKSPACE_TREE === "1") {
+function safeListing(workspace, tree = process.env.BANTAM_WORKSPACE_TREE === '1') {
+  if (tree) {
     return workspaceListing(workspace, { depth: 1 });
   }
   try {

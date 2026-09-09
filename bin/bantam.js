@@ -2220,6 +2220,7 @@ if (cmd === undefined || cmd === "chat") {
       shellNetwork: args["dangerously-allow-net"] ? true : undefined,
       model,
       maxTurns: runMaxTurns,
+      ...(args["write-batch"] === true ? { writeBatch: true } : {}),
       verificationScript: args.verify || null,
       verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
       // --no-edit: answer questions about a codebase without touching it. The
@@ -3667,7 +3668,7 @@ async function execCommand() {
       verificationScript: verify || null,
       thinkMode: execThinkMode,
       grounding: !args["no-ground"],
-      writeBatch: args["write-batch"] === true || envTruthy("BANTAM_WRITE_BATCH"),
+      ...(args["write-batch"] === true ? { writeBatch: true } : {}),
       interactive: false,
       // Headless does not mean implementation. Without this distinction a
       // read-only audit has its answer rejected for failing to edit a file.

@@ -13,6 +13,7 @@
 
 import { QWEN_ASSISTANT_PREFILL, CHATML_TEMPLATE } from "./profiles.js";
 import { clipText as clipObservation, OBS_MAX } from "./clip.js";
+import { clipReadObservation } from "./read-observation.js";
 import { actionContractUpdateValid } from "./context-updates.js";
 import { editPaths, turnEditApplied } from "./edit-actions.js";
 import { START_WINDOW } from "./executor.js";
@@ -326,13 +327,13 @@ function resolvePointer(observation, stubbedTurns) {
   );
 }
 
-export function clipKeepingControllerAnnotation(observation, enabled = true, max = OBS_MAX) {
+export function clipKeepingControllerAnnotation(observation, enabled = true, max = OBS_MAX, clipBody = clipObservation) {
   const full = String(observation ?? "");
   if (full.length <= max) return full;
-  if (!enabled) return clipObservation(full, max);
+  if (!enabled) return clipBody(full, max);
 
   const starts = controllerAnnotationStarts(full);
-  if (!starts.length) return clipObservation(full, max);
+  if (!starts.length) return clipBody(full, max);
 
   const blocks = starts.map((start, i) => {
     const end = i + 1 < starts.length ? starts[i + 1] : full.length;
@@ -350,7 +351,7 @@ export function clipKeepingControllerAnnotation(observation, enabled = true, max
   // annotations still have something to comment on.
   const bodyBudget = Math.max(0, max - kept.length - 1);
   const body = full.slice(0, starts[0]);
-  const keptBody = body.length <= bodyBudget ? body : clipObservation(body, bodyBudget);
+  const keptBody = body.length <= bodyBudget ? body : clipBody(body, bodyBudget);
   const assembled = `${keptBody}${keptBody.endsWith("\n") ? "" : "\n"}${kept}`;
   return assembled.length <= max ? assembled : clipObservation(assembled, max);
 }
@@ -768,7 +769,8 @@ export function buildPrompt({
           preserveSlimmedControlAnnotations,
         ), preserveSlimmedControlAnnotations,
         turn.action?.a === "read_file" || turn.action?.a === "inspect"
-          ? Math.max(OBS_MAX, Math.min(24000, Number(readObservationMaxChars) || OBS_MAX)) : OBS_MAX));
+          ? Math.max(OBS_MAX, Math.min(24000, Number(readObservationMaxChars) || OBS_MAX)) : OBS_MAX,
+        turn.action?.a === "read_file" || turn.action?.a === "inspect" ? clipReadObservation : clipObservation));
     if (rewriteSuperseded) stubbedTurns.add(recordedTurn);
     const deliveredObservation = scrub(resolvePointer(observation, stubbedTurns));
     recordDeliveredSourceLines(deliveredObservation, deliveredSourceLines, recordedTurn);

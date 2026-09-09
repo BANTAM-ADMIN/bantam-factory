@@ -30,6 +30,7 @@ import { importDontRetypeSteer, greenfieldBuildShapeNote, selfInverseProbeSteer,
 import { shellContainsExactCommandSegment } from "./shell-lex.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "./verification-evidence.js";
 import { verificationCadenceEffect } from "./verification-cadence.js";
+import { pendingInitialVerifier } from "./verification-bootstrap.js";
 import { createRepairHandoff, repairHandoffContext, repairHandoffOffer } from "./repair-handoff.js";
 import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedFocusedFailure, focusedFailureReminder } from "./verification-recovery.js";
 import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote, wallClosureDue } from "./terminal-closure.js";
@@ -901,6 +902,7 @@ async function runAgentCore({
     protectedPath: (relative) => Boolean(editGuard?.(relative)),
     ...(resumingContext ? { snapshot: savedContextBasis?.testProvenance ?? null } : {}),
   });
+  const initialVerificationFiles = testProvenance.snapshot();
   // A pointer to REQUIREMENTS.md is not the requirement itself. Auxiliary
   // diagnosis must see the original supplied contract, not an edited document
   // or only its filename. Capture bounded, workspace-confined bytes up front.
@@ -1042,6 +1044,9 @@ async function runAgentCore({
   const bareTemplate = model.template ?? CHATML_TEMPLATE;
   const bareTurnPrefill = bareTemplate.open(bareTemplate.assistantRole);
   const taskNamedPaths = taskNamedSourcePaths(task, workspace);
+  // The paging guard teaches symbol lookup in code. An explicitly supplied
+  // specification has to be read to discover the requirements themselves.
+  const suppliedSpecPaths = new Set(taskExplicitSpecDocumentPaths(task).map(normalizeWorkspaceRel));
   const taskOutputPaths = extractTaskOutputPaths(task);
   // These additional model-designed cases are useful for local workers, but
   // duplicate Codex's own investigation by default. Explicit configured
@@ -1848,6 +1853,9 @@ async function runAgentCore({
     (generation, turn) => generation + (turnChangedWorkspace(turn) ? 1 : 0),
     0,
   );
+  let verificationImplementationStarted = turns.some(turn => turn.sourceEditedByShell
+    || (turnEditApplied(turn) && editPaths(turn.action ?? turn.parsedAction).some(p => !isDocumentArtifactPath(p))));
+  let verificationBootstrapNoted = false;
   // Restore the same serial browser-defect obligation on rewind/resume. The
   // preview proof is trusted state; later edits merely make it due for a
   // recheck, while a later preview rebuilds or closes the queue.
@@ -3912,6 +3920,12 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
+    if ([...directEditPaths, ...shellChangedPaths].some(p => !isDocumentArtifactPath(p))) verificationImplementationStarted = true;
+    const pendingVerifier = pendingInitialVerifier({ command: verificationScript, provenance: initialVerificationFiles,
+      implementationStarted: verificationImplementationStarted,
+      readFile: p => exec.safeReadText(exec.resolveExisting(p)),
+      exists: p => { try { exec.resolveExisting(p); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } },
+    });
     if (directEditSucceeded && action.a === "write_batch") {
       onEvent({ type: "write_batch_committed", files: directEditPaths });
     }
@@ -4304,7 +4318,8 @@ async function runAgentCore({
     // src/agent.js (1,500 lines) in 100-line windows to locate one signature,
     // where the cloud arms grep the identifier and jump. After three windowed
     // reads of one large file, name the faster tools.
-    if (action.a === "read_file" && typeof action.p === "string" && (action.limit || action.start)) {
+    if (action.a === "read_file" && typeof action.p === "string" && (action.limit || action.start)
+        && !suppliedSpecPaths.has(normalizeWorkspaceRel(action.p))) {
       const pages = (pagedReads.get(action.p) ?? 0) + 1;
       pagedReads.set(action.p, pages);
       const totalLines = /\((\d+) lines,/.exec(String(result.observation ?? ""));
@@ -4349,7 +4364,8 @@ async function runAgentCore({
         // entirely inside inspect batches; pagedReads keyed on bare read_file
         // actions never saw a single page, so nine growing re-reads drew no
         // steer. Same counter, same threshold, one firing per batch.
-        if ((op.limit || op.start) && Number(range.total) > 400) {
+        if ((op.limit || op.start) && Number(range.total) > 400
+            && !suppliedSpecPaths.has(normalizeWorkspaceRel(op.p))) {
           const pages = (pagedReads.get(op.p) ?? 0) + 1;
           pagedReads.set(op.p, pages);
           if (pages >= 3 && pages % 3 === 0 && !inspectPagingSteer) {
@@ -4435,7 +4451,7 @@ async function runAgentCore({
       if (editApplied) for (const p of editPaths(action)) editedSourcePaths.add(p);
       const ranVerification = Boolean(result.verificationEvidence);
       const probeOnly = action.a === "shell" && !ranVerification && /\b(?:python3?\s+-c|node\s+(?:-e|--eval))\b/.test(String(action.c ?? ""));
-      const cadenceNote = verifyCadenceSentinel.note({ editApplied, ranVerification, probeOnly });
+      const cadenceNote = pendingVerifier ? null : verifyCadenceSentinel.note({ editApplied, ranVerification, probeOnly });
       {
         // Maze films: sub-function patch chains at full context cost while
         // the suite stays red. See src/logic/repour.js for the shape.
@@ -5058,7 +5074,13 @@ async function runAgentCore({
       metrics.unverifiedEditSteers = (metrics.unverifiedEditSteers ?? 0) + 1;
       onEvent({ type: "unverified_edit_steer", edits: blindEditStreak, turns: turnsSinceVerify });
     }
-    if ((blindTrigger || probeTrigger || staleTrigger) && verificationScript && !result.scopedVerify
+    if ((blindTrigger || probeTrigger || staleTrigger) && pendingVerifier && !verificationBootstrapNoted
+        && !interrupted && !result.done) {
+      verificationBootstrapNoted = true;
+      result.observation += `\n[auto-verify] ${pendingVerifier} was absent in the supplied starter and is still missing. Planning notes and design reads do not make it runnable. Build the current milestone and its checks; automatic cadence checks begin once implementation starts. Completion still requires the configured verifier to pass.`;
+      onEvent({ type: 'auto_verify_deferred', reason: 'missing-initial-entrypoint', path: pendingVerifier });
+    }
+    if ((blindTrigger || probeTrigger || staleTrigger) && verificationScript && !pendingVerifier && !result.scopedVerify
         && !interrupted && !result.done) {
       const cadenceTrigger = { edits: blindEditStreak, turns: turnsSinceVerify, probes: probeStreak };
       onEvent({ type: "activity", label: "verifying" });

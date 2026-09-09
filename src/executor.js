@@ -12,6 +12,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { runProcess } from "./process-runner.js";
 import { clipText, OBS_MAX } from "./clip.js";
+import { clipReadObservation } from "./read-observation.js";
 
 // Lines of surrounding code echoed back after an edit_lines. The boundaries are
 // where line-pointer edits go wrong (a duplicated `} else if`, an orphaned
@@ -471,7 +472,7 @@ export class Executor {
     const shown = lines.slice(startIdx, endIdx);
     const numbered = shown.map((l, i) => `${startLine + i}\t${l}`).join("\n");
     const more = endIdx < lines.length
-      ? `\n... (${lines.length - endIdx} more lines — take bigger bites: omit "limit" to get up to ~600 lines per read)`
+      ? `\n... (${lines.length - endIdx} more lines; continue with "start":${endIdx + 1})`
       : `\n— end of file (${lines.length} lines); nothing beyond line ${lines.length}, do not re-read this range.`;
     // Reads get a far larger budget than generic observations: the 4k default
     // meant a 1,200-line file cost 12+ model turns to see once (the
@@ -480,7 +481,7 @@ export class Executor {
     const rendered = `${p} (${lines.length} lines, showing ${startLine}-${endIdx}):\n${numbered}${more}`;
     const fixtureHint = this.fixtureDefaultHints && rendered.length < READ_OBS_MAX - 1000
       ? fixtureDefaultHints({ path:p, source:text, startLine, endLine:endIdx }) : '';
-    return clipText(rendered + (fixtureHint ? `\n\n${fixtureHint}` : ''), READ_OBS_MAX);
+    return clipReadObservation(rendered + (fixtureHint ? `\n\n${fixtureHint}` : ''), READ_OBS_MAX);
   }
 
   listDir({ p }) {
@@ -604,6 +605,7 @@ export class Executor {
     const joined = parts.join("\n\n");
     const max = this.inspectMaxChars;
     if (joined.length <= max) return joined;
+    if (ops.some(op => op.a === "read_file")) return clipReadObservation(joined, max);
     // The bundle is clipped head+tail, so middle ops vanish and edge ops arrive
     // in part, with nothing saying which (2026-08-24 tour run: four listings,
     // `bin` never shown). Name every op that did not arrive whole so the next

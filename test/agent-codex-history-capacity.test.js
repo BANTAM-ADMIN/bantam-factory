@@ -20,8 +20,10 @@ test('the model client exposes only its selected native runtime capacity', () =>
 test('a large design read stays in the extension prompt after the first native capacity receipt', async t => {
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-codex-capacity-'));
   t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+  // Each read fits its own 24K delivery cap; together they still exceed the
+  // old 120K history cap. EOF must be genuinely delivered, not a clipped tail.
   for(let i=0;i<6;i++)fs.writeFileSync(path.join(workspace,`design-${i}.md`),
-    Array.from({length:180},(_,n)=>`Section ${i} line ${n}: `+String.fromCharCode(65+i).repeat(165)).join('\n')+`\nREQUIREMENT_${i}_END\n`);
+    Array.from({length:120},(_,n)=>`Section ${i} line ${n}: `+String.fromCharCode(65+i).repeat(165)).join('\n')+`\nREQUIREMENT_${i}_END\n`);
   const prompts=[],events=[];
   const model={assistantPrefill:'',actTemperature:null,codexBacked:true,contextWindowTokens:null,
     requestCursor(){return prompts.length;},

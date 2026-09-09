@@ -108,3 +108,35 @@ for (const via of ['read_file', 'inspect']) test(`user-supplied specification st
   assert.ok(events.every(event => event.type !== 'paging_steer'));
   assert.ok(prompts.every(prompt => !prompt.includes('STOP paging')));
 });
+
+for (const via of ['read_file','inspect']) test(`fresh required ${via} windows survive the no-progress threshold`, async t => {
+  const { dir } = fixture(t), events = [], controller = new AbortController();
+  const actions = Array.from({length:12},(_,i)=>{
+    const read={a:'read_file',p:'DESIGN.md',start:1+i*12,limit:12};
+    return via==='inspect'?{a:'inspect',ops:[read]}:read;
+  });
+  const result=await runAgent({workspace:dir,task:'Build the app specified in DESIGN.md. Read all requirements before writing its implementation.',
+    model:{assistantPrefill:'',async complete(){return {content:JSON.stringify(actions.shift()),tokens:1,stoppedEos:true,timings:{}};}},
+    maxTurns:100,interactive:false,useGrammar:false,grounding:false,openFilesView:false,signal:controller.signal,
+    shellSandbox:'host',promptTrajectory:'extension',progressNudgeAfter:3,
+    onEvent:e=>{
+      events.push(e);
+      if (events.filter(event=>event.type==='spec_read_progress').length===12) controller.abort();
+    }});
+  assert.equal(events.filter(e=>e.type==='spec_read_progress').length,12);
+  assert.equal(result.metrics.progressNudges,0);
+  assert.equal(result.metrics.progressGateRejections,0);
+});
+
+test('repeated clipped requirements do not earn credit for their undelivered tail', async t => {
+  const {dir}=fixture(t),events=[],controller=new AbortController();
+  const actions=Array.from({length:9},(_,i)=>({a:'read_file',p:'DESIGN.md',start:1,limit:300+i}));
+  await runAgent({workspace:dir,task:'Build the app specified in DESIGN.md. Read all requirements before writing its implementation.',
+    model:{assistantPrefill:'',async complete(){return {content:JSON.stringify(actions.shift()),tokens:1,stoppedEos:true,timings:{}};}},
+    maxTurns:100,interactive:false,useGrammar:false,grounding:false,openFilesView:false,signal:controller.signal,
+    shellSandbox:'host',promptTrajectory:'extension',progressNudgeAfter:3,
+    onEvent:e=>{events.push(e);if(e.type==='progress_nudge')controller.abort();}});
+  assert.equal(events.filter(e=>e.type==='spec_read_progress').length,1);
+  assert.ok(events.some(e=>e.type==='progress_nudge'));
+  assert.ok(events.find(e=>e.type==='spec_read_progress').end<300);
+});

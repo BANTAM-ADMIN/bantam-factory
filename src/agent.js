@@ -58,7 +58,8 @@ import { detectSiblings } from "./logic/completeness-critic.js";
 import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-anchors.js";
 import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, testFailureDetail, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
-import { buildPrompt, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
+import { buildPrompt, clipKeepingControllerAnnotation, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
+import { clipReadObservation } from "./read-observation.js";
 import { createContextUpdate, createActionContractUpdate } from "./context-updates.js";
 import { requiredOutputPaths } from "./logic/missing-outputs.js";
 import { deliverableNotice } from "./logic/deliverable-watch.js";
@@ -1688,6 +1689,7 @@ async function runAgentCore({
   // writing dbg1/dbg2/... one per turn instead of scripting the loop (script-churn.js).
   const churnState = createChurnState();
   const readLedger = new ReadLedger();  // union of line ranges already read, per file
+  const specProgressLedger = new ReadLedger(); // first delivery of task-named requirements, not reread credit
   const recordReadDelivery = (turn, observation, panelText) => {
     // Only the newest turn can add coverage: older snapshots may predate an
     // edit. This callback receives the scrubbed, clipped model-facing body,
@@ -6481,6 +6483,25 @@ async function runAgentCore({
       progress.progress = true;
       progress.reason = "verification";
     }
+    if (!progress.progress && readExecuted && !gateRejection && !duplicate
+        && (action.a === 'read_file' || action.a === 'inspect')) {
+      // A large supplied specification can require more windows than the
+      // no-progress threshold. Price the same bounded read view the prompt
+      // receives, so omitted tails cannot earn credit. Each range earns it
+      // once; revisiting the same document does not disable the loop guard.
+      const view = clipKeepingControllerAnnotation(result.observation, preserveSlimmedControlAnnotations,
+        Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)), clipReadObservation);
+      for (const op of action.a === 'inspect' ? action.ops : [action]) {
+        const specPath = normalizeWorkspaceRel(op.p);
+        if (!suppliedSpecPaths.has(specPath)) continue;
+        const range = deliveredReadRange(op, view);
+        if (!range || specProgressLedger.covers(specPath, range.start, range.end)) continue;
+        specProgressLedger.note(specPath, range.start, range.end, range.total);
+        progress.progress = true;
+        progress.reason = 'spec_read';
+        onEvent({ type: 'spec_read_progress', path: specPath, ...range });
+      }
+    }
     // Bound the progress credit a query can earn. Crediting every routed query removes anti-spiral
     // pressure when the model keeps investigating without writing. A query is untaxed, not infinitely
     // rewarded: past the budget it stops resetting progresslessTurns, so the nudge and then the gate
@@ -6493,7 +6514,7 @@ async function runAgentCore({
         metrics.queryBudgetBlocks = (metrics.queryBudgetBlocks ?? 0) + 1;
         onEvent({ type: "query_budget_spent", query: action.q, tool: queryToolUsed });
       }
-    } else if (progress.progress) {
+    } else if (progress.progress && progress.reason !== 'spec_read') {
       queryBudget.noteDeliverableProgress();
     }
     // Keep duplicate memory tied to observable filesystem state, not abstract progress. A passing

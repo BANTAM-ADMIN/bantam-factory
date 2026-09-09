@@ -1,4 +1,4 @@
-// The first screen: a compact card, centred to the terminal, one anchor, one
+// The first screen: a compact card, aligned near the prompt, one anchor, one
 // info column. Pure over its inputs so the layout is unit-testable without a
 // TTY — bin/bantam.js supplies the sprite, the painted rows, and the width.
 //
@@ -26,10 +26,11 @@ function padVisible(s, width) {
   return w >= width ? s : s + " ".repeat(width - w);
 }
 
-// Frame geometry. Left margin is wider than right so the sprite has air; the
-// column's own trailing pad supplies the rest.
-const MARGIN_L = 2;
+// A small inset keeps the sprite close to the left border. The whole card
+// starts near the prompt rather than drifting right on wider terminals.
+const MARGIN_L = 1;
 const MARGIN_R = 1;
+const OUTER_MARGIN = 2;
 const GAP = 2;
 const FRAME = 2;   // the two │ glyphs
 
@@ -95,6 +96,6 @@ export function renderFirstScreen({ cols, bird, lines, paint = (s) => s, gap = G
   const bottom = paint("╰" + "─".repeat(inner) + "╯");
   const framed = [top, ...rows.map((r) => paint("│") + r + paint("│")), bottom];
 
-  const left = " ".repeat(Math.floor((width - cardW) / 2));
+  const left = " ".repeat(Math.min(OUTER_MARGIN, width - cardW));
   return framed.map((r) => left + r).join("\n");
 }

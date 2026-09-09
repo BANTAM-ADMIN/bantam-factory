@@ -387,7 +387,7 @@ function renderBanner({ profileName, workspace, verify, tty, servedModel = null,
     : 'type a request, or "exit"');
 
   // The first screen is a compact card: the idle sprite, the wordmark, and one
-  // `key   value` column, centred to the terminal (src/logic/first-screen.js).
+  // `key   value` column, aligned near the prompt (src/logic/first-screen.js).
   // The 29-row pixel banner it replaces printed from column 0 with no width
   // awareness and was preceded by two grey metadata lines — the model was named
   // before the logo was. The full art still plays in `bantam strut`. Opt out

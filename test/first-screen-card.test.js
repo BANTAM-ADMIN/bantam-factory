@@ -7,7 +7,7 @@ import { loadAnimations } from "../src/rooster.js";
 // 2026-09-05. The startup banner was 54 columns of pixel art printed from column
 // 0 with no width awareness — left-anchored on any real terminal, 33 rows tall,
 // and preceded by two grey metadata lines that named the model before the logo
-// did. This pins the replacement: a card that centres, keeps every row the same
+// did. This pins the replacement: a card that fits, keeps every row the same
 // width, and never splits a colour escape.
 
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -21,14 +21,13 @@ test("every row of the card has the same visible width", () => {
   assert.equal(widths.size, 1, `ragged rows: ${[...widths].join(",")}`);
 });
 
-test("the card is centred on the terminal", () => {
-  const cols = 120;
-  const card = renderFirstScreen({ cols, bird: bird(), lines: lines() });
-  const first = rows(card)[0];
-  const lead = first.length - first.trimStart().length;
-  const cardW = visibleWidth(first.trimStart());
-  assert.equal(lead, Math.floor((cols - cardW) / 2), "left pad should centre the frame");
-  assert.ok(lead > 0, "a 120-column terminal leaves room to centre");
+test("the card stays near the prompt on wide terminals", () => {
+  for (const cols of [120, 200]) {
+    const card = renderFirstScreen({ cols, bird: bird(), lines: lines() });
+    const first = rows(card)[0];
+    const lead = first.length - first.trimStart().length;
+    assert.equal(lead, 2, "the rooster should not drift right as the terminal widens");
+  }
 });
 
 test("a terminal that exactly fits the card gets it flush, with no pad", () => {

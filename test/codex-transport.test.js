@@ -8,6 +8,7 @@ import {
   reconstructCodexPromptDelivery,
 } from "../src/codex-transport.js";
 import { actionJsonSchema } from "../src/grammar.js";
+import { parseAction } from "../src/actions.js";
 
 const fixture = fileURLToPath(
   new URL("./fixtures/fake-codex-app-server.js", import.meta.url),
@@ -245,6 +246,53 @@ test("observation delivery does not remove rewritten, unacknowledged, or boundar
     const delivery = buildCodexPromptDelivery(prompt, opts);
     assert.notEqual(delivery.evidence.format, "observation-v1");
     assert.equal(reconstructCodexPromptDelivery(base, delivery.text), prompt);
+  }
+});
+
+test('accepted-action observation preserves raw protocol evidence and the native thread', async t => {
+  const codex = server({threadMode: 'run', promptMode: 'delta'});
+  t.after(() => codex.close());
+  const token = codex.beginRun();
+  const base = 'decorated action fixture\n' + 'Stable instructions.\n'.repeat(300) + '<|im_start|>assistant\n';
+  const first = await codex.complete(base, {outputSchema: actionJsonSchema(), constrainOutput: false});
+  assert.match(first.content, /Extra prose, not a second action/);
+  const parsed = parseAction(first.content);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.strictJson, false, 'the controller still sees the protocol violation');
+  assert.equal(codex.runLastCompletion, first.content, 'the acknowledged raw reply is retained');
+  const observation = '[error] Write rejected by scope policy. File was not modified.\n[guidance-checklist]\nStill required: preserve the existing public API.\n';
+  const canonical = base + JSON.stringify(parsed.action) + '<|im_end|>\n<|im_start|>user\n'
+    + observation + '<|im_end|>\n<|im_start|>assistant\n';
+  const next = await codex.complete(canonical);
+  assert.equal(next.codexThread.threadReused, true);
+  assert.equal(next.codexPromptDelivery.format, 'action-observation-v1');
+  assert.ok(next.codexPromptDelivery.deliveredText.endsWith(observation));
+  assert.doesNotMatch(next.codexPromptDelivery.deliveredText, /export const answer/);
+  assert.equal(reconstructCodexPromptDelivery(base, next.codexPromptDelivery.deliveredText,
+    {acknowledgedCompletion: first.content}), canonical);
+  assert.throws(() => reconstructCodexPromptDelivery(base, next.codexPromptDelivery.deliveredText), /acknowledged valid action/);
+  codex.endRun(token);
+});
+
+test('accepted-action dedupe requires the same validated action without JSON repair', () => {
+  const base = 'Stable instructions.\n'.repeat(300) + '<|im_start|>assistant\n';
+  const action = {a: 'write_file', p: 'game.html', content: 'code "λ"\\\n'.repeat(5000)};
+  const accepted = JSON.stringify(action);
+  const tail = '<|im_end|>\n<|im_start|>user\nWrite failed; no bytes changed.\n<|im_end|>\n<|im_start|>assistant\n';
+  const canonical = base + accepted + tail;
+  const options = {mode: 'delta', baseReference: 'previous', basePrompt: base};
+  for (const reply of [accepted + '\nExtra prose.', 'A proposed action:\n' + accepted,
+    JSON.stringify(action, null, 2), accepted + '\n{"a":"shell","c":"unexecuted"}']) {
+    const delivery = buildCodexPromptDelivery(canonical, {...options, acknowledgedCompletion: reply});
+    assert.equal(delivery.evidence.format, 'action-observation-v1');
+    assert.ok(delivery.text.length < 400, 'generated code is not echoed back as new input');
+    assert.equal(reconstructCodexPromptDelivery(base, delivery.text, {acknowledgedCompletion: reply}), canonical);
+  }
+  for (const reply of [null, 'not an action', '{"a":"shell","c":"different"}\n' + accepted,
+    JSON.stringify({...action, p: 'different.html'}), '{"a":"write_file","p":"game.html","content":"literal\nnewline"}']) {
+    const delivery = buildCodexPromptDelivery(canonical, {...options, acknowledgedCompletion: reply});
+    assert.notEqual(delivery.evidence.format, 'action-observation-v1');
+    assert.equal(reconstructCodexPromptDelivery(base, delivery.text), canonical);
   }
 });
 

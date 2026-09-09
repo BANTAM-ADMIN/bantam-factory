@@ -12,7 +12,7 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import readline from "node:readline";
-import { ActionSchema } from "./actions.js";
+import { ActionSchema, parseAction } from "./actions.js";
 
 const DEFAULT_COMMAND = process.env.BANTAM_CODEX_COMMAND || "codex";
 const DEFAULT_CONTROL_TIMEOUT_MS = 30000;
@@ -20,6 +20,8 @@ const DEFAULT_IDLE_TIMEOUT_MS = 120000;
 const PROMPT_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V1";
 const INCREMENTAL_DELTA_MARKER = "BANTAM_PROMPT_DELTA_V2";
 const OBSERVATION_MARKER = "BANTAM_OBSERVATION_V1\n";
+const ACTION_OBSERVATION_MARKER = "BANTAM_ACTION_OBSERVATION_V1\n"
+  + "BANTAM selected the first JSON action in your last reply. Surrounding prose and additional objects were not actions. Your reply is already in this thread; continue from the reported result below.\n";
 const ASSISTANT_HEAD = "<|im_start|>assistant\n";
 const OBSERVATION_HEAD = "<|im_end|>\n<|im_start|>user\n";
 const OBSERVATION_TAIL = `<|im_end|>\n${ASSISTANT_HEAD}`;
@@ -836,6 +838,34 @@ export function buildCodexPromptDelivery(prompt, {
       },
     };
   }
+  // Unconstrained workers can surround an otherwise valid action with prose.
+  // The controller records that protocol violation and selects its first JSON
+  // object through parseAction. Reuse that SAME parser, and omit the duplicate
+  // only when its exact serialized action is the canonical history entry.
+  // Never normalize the raw response here: protocol warnings and audit bytes
+  // must remain observable. Repaired JSON and changed workspace paths fall back.
+  if (incremental && basePrompt.endsWith(ASSISTANT_HEAD)
+      && typeof acknowledgedCompletion === "string" && acknowledgedCompletion
+      && suffix.endsWith(OBSERVATION_TAIL)) {
+    const parsed = parseAction(acknowledgedCompletion);
+    const accepted = parsed.ok && !parsed.repairedJson ? JSON.stringify(parsed.action) : null;
+    if (accepted && suffix.startsWith(accepted + OBSERVATION_HEAD)) {
+      const observations = suffix.slice(accepted.length + OBSERVATION_HEAD.length, -OBSERVATION_TAIL.length);
+      const delivered = ACTION_OBSERVATION_MARKER + observations;
+      if (delivered.length < canonical.length) return {
+        text: delivered,
+        evidence: {
+          mode: "delta", format: "action-observation-v1", baseReference: "previous", reason: null,
+          baseSha256: sha256(basePrompt), canonicalSha256, deliveredSha256: sha256(delivered),
+          completionSha256: sha256(acknowledgedCompletion), acceptedActionSha256: sha256(accepted),
+          omittedAssistantChars: accepted.length,
+          canonicalChars: canonical.length, deliveredChars: delivered.length,
+          commonPrefixChars, savedChars: canonical.length - delivered.length,
+          deliveredText: delivered,
+        },
+      };
+    }
+  }
   const payload = {
     baseSha256: sha256(basePrompt),
     keepPrefixChars: commonPrefixChars,
@@ -872,6 +902,14 @@ export function buildCodexPromptDelivery(prompt, {
 
 export function reconstructCodexPromptDelivery(basePrompt, delivered, { acknowledgedCompletion = null } = {}) {
   const text = String(delivered);
+  if (text.startsWith(ACTION_OBSERVATION_MARKER)) {
+    const parsed = typeof acknowledgedCompletion === "string" ? parseAction(acknowledgedCompletion) : null;
+    if (!parsed?.ok || parsed.repairedJson || !String(basePrompt).endsWith(ASSISTANT_HEAD)) {
+      throw new Error("Codex action observation requires its acknowledged valid action and base");
+    }
+    return basePrompt + JSON.stringify(parsed.action) + OBSERVATION_HEAD
+      + text.slice(ACTION_OBSERVATION_MARKER.length) + OBSERVATION_TAIL;
+  }
   if (text.startsWith(OBSERVATION_MARKER)) {
     if (typeof acknowledgedCompletion !== "string" || !acknowledgedCompletion
         || !String(basePrompt).endsWith(ASSISTANT_HEAD)) {

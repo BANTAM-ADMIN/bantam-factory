@@ -146,6 +146,8 @@ lines.on("line", (line) => {
   }
   const text = promptText === 'quoted whitespace'
     ? JSON.stringify({ a: 'write_file', p: 'large.txt', content: ' '.repeat(6000) + '"\\end' })
+    : promptText.startsWith('decorated action fixture\n')
+    ? JSON.stringify({ a: 'write_file', p: 'result.js', content: 'export const answer = 42;\n' }) + '\nExtra prose, not a second action.'
     : params.outputSchema
     ? JSON.stringify({
       a: "respond",

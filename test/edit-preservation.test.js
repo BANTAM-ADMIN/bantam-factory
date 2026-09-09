@@ -9,6 +9,29 @@ const witness = (oldSource, newSource, options = {}) => createEditPreservationWi
   path: "worker.mjs", before: oldSource, after: newSource, ...options,
 });
 
+test('replacing an explicit throw-only starter does not demand regeneration of the implementation', () => {
+  const stub = "export function processItems(items) { throw new Error('processItems is not implemented'); }\n";
+  const receipt = witness(stub, before + added);
+  assert.equal(receipt.removedStatementCount, 1, 'the removal is still recorded');
+  assert.equal(receipt.replacedPlaceholderCount, 1);
+  assert.equal(receipt.reviewRequired, false);
+  assert.equal(receipt.candidateVerified, false);
+  assert.match(formatEditPreservationWitness(receipt), /implementation-start/);
+  assert.equal(formatEditPreservationReview(receipt), '');
+  for (const body of [
+    "throw new Error('invalid input');",
+    "if (items.length) throw new Error('not implemented');",
+    "audit(items); throw new Error('not implemented');",
+    "throw new Error(message);",
+  ]) {
+    assert.equal(witness(`function processItems(items) { ${body} }`, before + added).reviewRequired, true, body);
+  }
+  const real = 'function existing(){ validate(); return 1; }';
+  const mixed = witness(stub + real, before + added + real.replace('validate(); ', ''));
+  assert.equal(mixed.replacedPlaceholderCount, 1);
+  assert.equal(mixed.reviewRequired, true, 'a placeholder cannot conceal an unrelated removal');
+});
+
 test("identifies executable statements lost while appending a separate feature", () => {
   const after = before.replace("  normalize(items);\n  validate(items);\n", "") + added;
   const receipt = witness(before, after);

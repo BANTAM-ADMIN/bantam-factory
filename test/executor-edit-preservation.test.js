@@ -21,6 +21,19 @@ function fixture(t) {
   return { workspace, executor: new Executor(workspace, { shellSandbox: "host" }) };
 }
 
+test('a whole-file implementation and its tests replace a throw-only starter in one transaction', async t => {
+  const { workspace, executor } = fixture(t);
+  fs.writeFileSync(path.join(workspace, 'source.mjs'), "export function report(xs) { throw new Error('not implemented'); }\n");
+  const result = await executor.execute({ a:'write_batch', files:[
+    { p:'source.mjs', content:preserved },
+    { p:'test/new.test.mjs', content:'import {report} from "../source.mjs"; import assert from "node:assert/strict"; assert.deepEqual(report([2,1]),[1,2]);' },
+  ] });
+  assert.equal(result.editOutcome.applied, true, result.observation);
+  assert.equal(result.editOutcome.preservationReviews, undefined);
+  assert.equal(fs.readFileSync(path.join(workspace, 'source.mjs'), 'utf8'), preserved);
+  assert.ok(fs.existsSync(path.join(workspace, 'test/new.test.mjs')));
+});
+
 for (const action of [
   { a: "replace", p: "source.mjs", old: before, new: after },
   { a: "replace", p: "source.mjs", old: before, new: after, line: 1 },

@@ -92,6 +92,23 @@ function uniqueFunctions(functions) {
   return map;
 }
 
+// A function consisting solely of an explicit unimplemented exception is a
+// starter, not an implementation whose statements must survive an addition.
+// Keep the removal in the witness; exempt only this narrow shape from the
+// additive-loss review. Conditional throws, ordinary error contracts, side
+// effects and removals elsewhere in the same transaction still receive review.
+function replacesPlaceholder(statement, afterOwner) {
+  const body = statement.owner?.node?.body;
+  const thrown = statement.node?.argument;
+  return Boolean(afterOwner && body?.type === 'BlockStatement'
+    && body.body.length === 1 && body.body[0] === statement.node
+    && statement.node.type === 'ThrowStatement'
+    && thrown?.type === 'NewExpression' && thrown.callee?.type === 'Identifier'
+    && thrown.callee.name === 'Error' && thrown.arguments.length === 1
+    && thrown.arguments[0]?.type === 'Literal' && typeof thrown.arguments[0].value === 'string'
+    && /\bnot (?:yet )?implemented\b/i.test(thrown.arguments[0].value));
+}
+
 function location(node) {
   return { startLine: node.loc.start.line, startColumn: node.loc.start.column + 1,
     endLine: node.loc.end.line, endColumn: node.loc.end.column + 1 };
@@ -255,9 +272,10 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
   const retainedOwner = (statement) => statement.owner && oldFunctions.get(statement.owner.name) === statement.owner
     ? newFunctions.get(statement.owner.name) ?? null : null;
   const retainedRemovals = removed.filter((statement) => retainedOwner(statement));
+  const placeholders = new Set(retainedRemovals.filter(statement => replacesPlaceholder(statement, retainedOwner(statement))));
   const operations = removedChainOperations(oldTree, newTree, removed,
     [...remaining.values()].flat(), retainedOwner, before, after);
-  const additiveReplacementRisk = retainedRemovals.length > 0 && additions.length > 0;
+  const additiveReplacementRisk = retainedRemovals.some(statement => !placeholders.has(statement)) && additions.length > 0;
   const details = removed.slice(0, MAX_REMOVED).map((statement) => {
     const afterOwner = retainedOwner(statement);
     const nearby = oldTree.statements.filter((candidate) => candidate.owner === statement.owner
@@ -278,6 +296,7 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
     after: { sha256: sha256(after), bytes: Buffer.byteLength(after) },
     removedStatementCount: removed.length,
     removedFromRetainedFunctions: retainedRemovals.length,
+    ...(placeholders.size ? { replacedPlaceholderCount: placeholders.size } : {}),
     addedTopLevelFunctionCount: additions.length,
     additiveReplacementRisk,
     chainRemovalRisk: operations.length > 0,
@@ -296,6 +315,9 @@ export function createEditPreservationWitness({ path, before, after, runtimePath
 /** Exact change feedback, not a refusal; caller owns any confirm-once policy. */
 export function formatEditPreservationWitness(witness) {
   if (!witness) return "";
+  if (witness.replacedPlaceholderCount === witness.removedStatementCount && !witness.reviewRequired) {
+    return `[implementation-start] Replaced ${witness.replacedPlaceholderCount} explicit throw-only unimplemented placeholder(s). Verify the new implementation against the task; placeholder replacement is not correctness evidence.`;
+  }
   const afterLabel = witness.phase === "applied" ? "CURRENT AFTER" : "STAGED AFTER";
   const excerpt = (value) => {
     const quoted = JSON.stringify(value);

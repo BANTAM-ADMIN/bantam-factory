@@ -10,7 +10,7 @@ const json=file=>JSON.parse(read(file));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const data=json('builds.json');
 
-test('playable comparison files match recorded deliveries, prompts, usage and estimate arithmetic',()=>{
+test('playable comparison files match recorded deliveries, prompts and measured token usage',()=>{
   assert.equal(data.taskSha256,sha(data.sharedBrief));
   const ids=new Set();
   for(const row of data.comparisons){
@@ -24,17 +24,15 @@ test('playable comparison files match recorded deliveries, prompts, usage and es
     assert.equal(record.usage.calls.reduce((sum,c)=>sum+c.usage.outputTokens,0),record.usage.outputTokens);
     assert.equal(record.usage.inputTokens-record.usage.cacheHitTokens,row.usage.freshInputTokens);
     assert.equal(record.usage.cacheHitTokens,row.usage.cacheHitTokens);
-    const usage=row.usage;
-    const low=(usage.freshInputTokens*10+usage.cacheHitTokens+usage.outputTokens*50)/1e6;
-    assert.equal(usage.apiEquivalentUsd.low,low);
-    assert.equal(usage.apiEquivalentUsd.high,low+usage.freshInputTokens*2.5/1e6);
+    assert.equal(record.usage.inputTokens,row.usage.inputTokens);
     for(const file of [row.file,row.record])assert.ok(SHOWCASE_STATIC_FILES.includes('examples/arcade/'+file));
     for(const match of bytes.toString().matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))new vm.Script(match[1]);
     for(const action of record.actions){assert.ok(action.observation===null||typeof action.observation==='string');assert.ok(!Object.hasOwn(action,'reasoning'));}
     assert.doesNotMatch(JSON.stringify(record),/"rawUsage"|"threadId"|"rawOutput"|\/home\/deveraux\//);
   }
   for(const key of ['left','right'])assert.ok(ids.has(data.defaults[key]));
-  assert.match(data.usageNote,/Codex account/);assert.match(data.usageNote,/no per-run dollar charge/);
+  assert.match(data.usageNote,/Prefix-cache tokens are included in total input/);
+  assert.doesNotMatch(read('index.html').toString()+read('builds.json').toString(), /API equivalent|apiEquivalent|token-price estimate|actualCostUsd/);
 });
 
 test('the two Astra games independently passed desktop and phone playtests',()=>{
@@ -46,7 +44,7 @@ test('the two Astra games independently passed desktop and phone playtests',()=>
   }
 });
 
-test('the current factory build and context saving match the retained records',()=>{
+test('the current factory build and prefix-cache reuse match the retained records',()=>{
   const current=json('astra-factory-context.json'),previous=json('astra-factory.json');
   assert.equal(current.playtest.pass,true);assert.deepEqual(current.playtest.errors,[]);
   assert.deepEqual(current.playtest.externalRequests,[]);
@@ -57,6 +55,6 @@ test('the current factory build and context saving match the retained records',(
     assert.ok(view.controlsBottom<=view.screenHeight);
   }
   assert.equal(current.prompt,previous.prompt);
-  assert.equal(data.contextImprovement.percentLessFreshInput,
-    Math.round(100*(1-current.usage.freshInputTokens/previous.usage.freshInputTokens)));
+  assert.equal(data.contextReuse.percentCached,
+    Math.round(100*current.usage.cacheHitTokens/current.usage.inputTokens));
 });

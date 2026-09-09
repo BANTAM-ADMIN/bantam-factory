@@ -5,7 +5,7 @@
       "id": "astra-factory",
       "label": "Earlier factory build",
       "title": "Moonstack",
-      "model": "Inside BANTAM FACTORY · GPT-6 Astra",
+      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
       "file": "astra-factory.html",
       "record": "astra-factory.json",
       "wallMs": 420169,
@@ -17,7 +17,7 @@
       "id": "astra-factory-context",
       "label": "Current factory build",
       "title": "Afterglow",
-      "model": "Inside BANTAM FACTORY · GPT-6 Astra",
+      "model": "Inside BANTAM FACTORY \u00b7 GPT-6 Astra",
       "file": "astra-factory-context.html",
       "record": "astra-factory-context.json",
       "wallMs": 485277,
@@ -29,13 +29,13 @@
   "comparisons": [
     {
       "id": "astra-factory-context",
-      "label": "Astra · BANTAM FACTORY",
+      "label": "Astra \u00b7 BANTAM FACTORY",
       "title": "Afterglow",
-      "model": "GPT-6 Astra · medium",
+      "model": "GPT-6 Astra \u00b7 medium",
       "file": "astra-factory-context.html",
       "record": "astra-factory-context.json",
       "wallMs": 485277,
-      "result": "Complete · browser playtested",
+      "result": "Complete \u00b7 browser playtested",
       "review": "Mint, navy and peach with a compact arcade layout. Touch controls fit below the board on both phone widths. Its 17 tests cover the engine and real browser interactions, including pause, restart confirmation, touch release and storage failures.",
       "usage": {
         "astraCalls": 16,
@@ -43,22 +43,18 @@
         "cacheHitTokens": 421248,
         "outputTokens": 13420,
         "localOutputTokens": null,
-        "apiEquivalent": "$1.51–$1.61",
-        "apiEquivalentUsd": {
-          "low": 1.505688,
-          "high": 1.6090479999999998
-        }
+        "inputTokens": 462592
       }
     },
     {
       "id": "astra-cli",
-      "label": "Astra · Codex CLI",
+      "label": "Astra \u00b7 Codex CLI",
       "title": "Afterglow",
-      "model": "GPT-6 Astra · medium",
+      "model": "GPT-6 Astra \u00b7 medium",
       "file": "astra-cli.html",
       "record": "astra-cli.json",
       "wallMs": 404937,
-      "result": "Complete · browser playtested",
+      "result": "Complete \u00b7 browser playtested",
       "review": "Cream, teal and lime with a distinctive editorial layout. Sound, personal bests and a three-piece queue add character. Its checks exercise movement, hold, line clearing, level changes and game over. Touch controls sit further down the page.",
       "usage": {
         "astraCalls": 19,
@@ -66,11 +62,7 @@
         "cacheHitTokens": 430208,
         "outputTokens": 10848,
         "localOutputTokens": null,
-        "apiEquivalent": "$1.23–$1.30",
-        "apiEquivalentUsd": {
-          "low": 1.234368,
-          "high": 1.2998079999999999
-        }
+        "inputTokens": 456384
       }
     }
   ],
@@ -81,14 +73,13 @@
   "comparisonNote": "One shared brief. Identical starting files. Astra at medium effort in both harnesses. These are the files each delivered.",
   "sharedBrief": "Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file called arcade.html.\n\nMake it feel like a little arcade game someone would actually want to keep. Choose a memorable name and visual style. Be creative: add thoughtful touches and delightful extras where they improve the experience.\n\nIt needs a real playable board, falling pieces that move and rotate, line clearing, scoring, a next-piece preview, hold, pause/resume, restart, and a game-over state. Include clear keyboard controls and touch controls that work on a phone. Make the interface comfortable on a small screen and attractive on a desktop. Sound is optional; if you add it, include a mute control.\n\nEverything must work offline from this single file: no downloads, build step, external assets, or third-party dependencies. Use inline CSS and classic inline JavaScript. Keep the supplied package.json and test/delivery.test.js unchanged. Those starter tests check delivery packaging only. Add your own meaningful checks, inspect your work, and fix what you find before you finish.\n",
   "conditions": "Each fresh build received ten minutes and the same prompt and starting files. Two supplied tests cover packaging; the agents added their own checks. We played the untouched files in Chromium at desktop, 390 px and 320 px widths. Native Codex delivered in 404.9 s; the latest factory build took 485.3 s. This repeat uses the stable-schema and observation-only context fixes. All earlier attempts remain in the record. Native Codex overlapped local work; the factory repeat followed the supervisor run. CPU and provider conditions differ between recording windows.",
-  "usageNote": "Usage comes from saved model receipts. Fresh input excludes cached input; output includes reported reasoning. These runs used a Codex account, which supplied no per-run dollar charge. The price range treats fresh input as ordinary input through all cache writes. The factory repeat used no auxiliary model calls; earlier attempts may include unmetered local preview vision.",
+  "usageNote": "Recorded input, output, prefix-cache tokens and wall clock. Prefix-cache tokens are included in total input. Output includes reported reasoning. Figures include the factory\u2019s recorded checks.",
   "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
-  "contextImprovement": {
-    "percentLessFreshInput": 61,
-    "previousFreshInputTokens": 105422,
-    "freshInputTokens": 41344,
-    "description": "The same brief, with the updated factory. Fresh input fell from 105,422 to 41,344 tokens. The new build retained 17 passing tests and passed the browser playtest.",
-    "previousRecord": "astra-factory.json",
+  "contextReuse": {
+    "percentCached": 91,
+    "inputTokens": 462592,
+    "cacheHitTokens": 421248,
+    "description": "421,248 of 462,592 input tokens came from prefix cache. The game retained 17 passing tests and passed the browser playtest.",
     "record": "astra-factory-context.json"
   }
 }

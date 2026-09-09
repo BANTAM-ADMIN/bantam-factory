@@ -103,12 +103,7 @@
         },
         "localOutputTokens": null,
         "localObservedOutputTokens": 45768,
-        "localUsageComplete": false,
-        "actualCostUsd": null,
-        "astraApiEquivalentUsd": {
-          "low": 1.44885,
-          "high": 1.58544
-        }
+        "localUsageComplete": false
       },
       "contextAudit": {
         "originalTaskPresentInEverySupervisorRequest": true,
@@ -200,8 +195,7 @@
         },
         "supervisorMissingReceipts": 1,
         "localObservedOutputTokens": 43966,
-        "localUsageComplete": false,
-        "actualCostUsd": null
+        "localUsageComplete": false
       },
       "integratedJobs": 0,
       "workerTests": {
@@ -246,8 +240,7 @@
           "freshInputTokens": 69220
         },
         "localObservedOutputTokens": 53340,
-        "localUsageComplete": false,
-        "actualCostUsd": null
+        "localUsageComplete": false
       },
       "subsequentHarnessFixes": [
         "Preserve strengthened tests instead of rolling them back",
@@ -300,8 +293,7 @@
           "outputTokens": 52500,
           "cacheHitTokens": 4368038,
           "freshInputTokens": 295779
-        },
-        "costUsd": null
+        }
       },
       "verifiedJobs": 1,
       "note": "The lifecycle milestone integrated after 43 passing checks. A later worker stopped at 44/45 tests with a stale generated fixture reference. A separate diagnostic replay corrected the fixture and passed 45/45; that diagnostic is not this recorded outcome."

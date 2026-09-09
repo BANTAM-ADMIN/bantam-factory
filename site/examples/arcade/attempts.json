@@ -170,6 +170,141 @@
         "pageErrors": [],
         "result": "Targeted post-run checks pass; requested behavioral test file and final verification were not completed."
       }
+    },
+    {
+      "id": "astra-supervised-local-steering",
+      "kind": "supervisor qualification",
+      "startedAt": "2026-09-08T23:28:16.501Z",
+      "wallMs": 910161,
+      "wallLimitMs": 900000,
+      "completed": false,
+      "reason": "Worker retained 17 passing tests but did not reach accepted completion; recovery remained outside the next sandbox.",
+      "supervisorCalls": 31,
+      "operatorStopped": false,
+      "sourceCommit": "b14e31307d0ee197c2be765326667d5d843ba07e",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
+      "artifactSha256": "c880881eacfbb999024cb679b459657663fd40bff45ee183cd42fad6caa30dde",
+      "contextAudit": {
+        "originalTaskPresentInEverySupervisorRequest": true,
+        "originalTaskPresentInEveryWorkerDecision": true,
+        "supervisorMessagesDelivered": 6,
+        "sourceUnchanged": true,
+        "cleanupPassed": true
+      },
+      "usage": {
+        "supervisorMeasuredSubset": {
+          "inputTokens": 849677,
+          "outputTokens": 2676,
+          "cacheHitTokens": 799488,
+          "freshInputTokens": 50189
+        },
+        "supervisorMissingReceipts": 1,
+        "localObservedOutputTokens": 43966,
+        "localUsageComplete": false,
+        "actualCostUsd": null
+      },
+      "integratedJobs": 0,
+      "workerTests": {
+        "passed": 17,
+        "failed": 0,
+        "acceptedCompletion": false
+      },
+      "subsequentHarnessFixes": [
+        "Canvas pause indicator recognition",
+        "Wall-clock closing action admission",
+        "Failed-job snapshot recovery",
+        "Actual exceptions in diagnostic context",
+        "One diagnostic per verification before returning control"
+      ]
+    },
+    {
+      "id": "astra-supervised-local-recovery",
+      "kind": "supervisor qualification",
+      "startedAt": "2026-09-08T23:52:59.450Z",
+      "wallMs": 903582,
+      "wallLimitMs": 900000,
+      "completed": false,
+      "reason": "Two verified milestones integrated; presentation review and UI checks remained unfinished at the comparison deadline.",
+      "supervisorCalls": 31,
+      "sourceCommit": "6b6b84443acdcd7ecefd1f7a69f25d28a32b9686",
+      "operatorStopped": false,
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
+      "artifactSha256": "f01413dec10de090972de4dcb8d92a9e8cdcda088849bc5e789271320e9a1ecb",
+      "integratedJobs": 2,
+      "contextAudit": {
+        "originalTaskPresentInEverySupervisorRequest": true,
+        "originalTaskPresentInEveryWorkerDecision": true,
+        "supervisorMessagesDelivered": 6,
+        "sourceUnchanged": true,
+        "cleanupPassed": true
+      },
+      "usage": {
+        "supervisor": {
+          "inputTokens": 1146596,
+          "outputTokens": 2734,
+          "cacheHitTokens": 1077376,
+          "freshInputTokens": 69220
+        },
+        "localObservedOutputTokens": 53340,
+        "localUsageComplete": false,
+        "actualCostUsd": null
+      },
+      "subsequentHarnessFixes": [
+        "Preserve strengthened tests instead of rolling them back",
+        "Do not invent hard-drop point requirements",
+        "Wake supervisor on changed worker evidence"
+      ]
+    },
+    {
+      "id": "bantam-codex-astra-context",
+      "kind": "fresh build after context fixes",
+      "startedAt": "2026-09-09T00:24:30.197Z",
+      "wallMs": 485277,
+      "completed": true,
+      "projectChecksPassed": true,
+      "artifactSha256": "b6b4a43bd6556aba89d9a13f3afb45e85dc0ab73d28592220b05d4f5baea2d33",
+      "taskSha256": "395fe501ed10a73f2c9c2ab0a25da6dbe04b11f190de1fc23359597d1e82c55f",
+      "record": "astra-factory-context.json",
+      "browserPlaytestPassed": true
+    },
+    {
+      "id": "astra-supervised-local-continuation",
+      "kind": "supervisor continuation from retained recovery candidate",
+      "startedAt": "2026-09-09T00:09:35.201Z",
+      "wallMs": 894870,
+      "parent": "astra-supervised-local-recovery",
+      "completed": false,
+      "reason": "supervisor observed-token admission limit reached",
+      "supervisorCalls": 39,
+      "usage": {
+        "supervisor": {
+          "inputTokens": 2034704,
+          "outputTokens": 4809,
+          "cacheHitTokens": 1946752,
+          "freshInputTokens": 87952
+        },
+        "local": {
+          "inputTokens": 2629113,
+          "outputTokens": 47691,
+          "cacheHitTokens": 2421286,
+          "freshInputTokens": 207827
+        },
+        "codexWorker": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheHitTokens": 0,
+          "freshInputTokens": 0
+        },
+        "total": {
+          "inputTokens": 4663817,
+          "outputTokens": 52500,
+          "cacheHitTokens": 4368038,
+          "freshInputTokens": 295779
+        },
+        "costUsd": null
+      },
+      "verifiedJobs": 1,
+      "note": "The lifecycle milestone integrated after 43 passing checks. A later worker stopped at 44/45 tests with a stale generated fixture reference. A separate diagnostic replay corrected the fixture and passed 45/45; that diagnostic is not this recorded outcome."
     }
   ],
   "notes": [

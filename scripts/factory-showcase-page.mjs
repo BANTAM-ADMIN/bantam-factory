@@ -13,6 +13,7 @@ export const SHOWCASE_STATIC_FILES=Object.freeze([
   'examples/tetris/index.html','examples/tetris/BANTAMTETRIS.html','examples/tetris/build.json',
   'examples/arcade/index.html','examples/arcade/arcade.css','examples/arcade/arcade.js','examples/arcade/builds.json','examples/arcade/attempts.json',
   'examples/arcade/astra-cli.html','examples/arcade/astra-cli.json','examples/arcade/astra-factory.html','examples/arcade/astra-factory.json',
+  'examples/arcade/astra-factory-context.html','examples/arcade/astra-factory-context.json',
 ]);
 const ARMS=Object.freeze([
   ['bantam-local-27b','BANTAM FACTORY','Qwen 27B, local'],

@@ -45,3 +45,18 @@ test('the two Astra games independently passed desktop and phone playtests',()=>
     for(const width of [320,390]){const check=record.playtest.viewports.find(v=>v.width===width);assert.equal(check.overflow,false);assert.equal(check.touch_drop_scores,true);}
   }
 });
+
+test('the current factory build and context saving match the retained records',()=>{
+  const current=json('astra-factory-context.json'),previous=json('astra-factory.json');
+  assert.equal(current.playtest.pass,true);assert.deepEqual(current.playtest.errors,[]);
+  assert.deepEqual(current.playtest.externalRequests,[]);
+  assert.ok(Object.values(current.playtest.checks).every(v=>v===true));
+  for(const width of [320,390]){
+    const view=current.playtest.viewports.find(v=>v.width===width);
+    assert.equal(view.horizontalOverflow,false);assert.equal(view.touchMovesPiece,true);
+    assert.ok(view.controlsBottom<=view.screenHeight);
+  }
+  assert.equal(current.prompt,previous.prompt);
+  assert.equal(data.contextImprovement.percentLessFreshInput,
+    Math.round(100*(1-current.usage.freshInputTokens/previous.usage.freshInputTokens)));
+});

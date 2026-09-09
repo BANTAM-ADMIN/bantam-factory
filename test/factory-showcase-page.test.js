@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {renderFactoryShowcase,renderShowcaseResults,renderShowcaseHighlights,renderCodexEfficiency,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
+import {renderFactoryShowcase,renderShowcaseResults,renderShowcaseHighlights,renderCodexEfficiency,renderCodexHighlight,showcaseAssets,SHOWCASE_STATIC_FILES} from '../scripts/factory-showcase-page.mjs';
 
 const gallery=()=>({cards:[{id:'context-packet',recorded:true,rows:[
   {arm:'bantam-local-27b',model:'Qwen 27B · same local weights',wallMs:58123,passed:true,outcome:'PASS',groupsPassed:5,groupsTotal:5},
@@ -90,6 +90,38 @@ test('hero speedups require two completed same-model records and use their actua
   assert.equal(renderShowcaseHighlights(data),'');
 });
 
+test('hero token savings distinguish complete counts from a conservative measured lower bound',()=>{
+  const data=gallery(),[factory,peer]=data.cards[0].rows;
+  Object.assign(factory,{accountingComplete:true,tokens:{inputTokens:100,outputTokens:10}});
+  Object.assign(peer,{accountingComplete:true,tokens:{inputTokens:400,outputTokens:50}});
+  let html=renderShowcaseHighlights(data);
+  assert.match(html,/>75%<\/b> less input/);assert.match(html,/>80%<\/b> less output/);
+  assert.doesNotMatch(html,/data-lower-bound/);
+  Object.assign(peer,{accountingComplete:false,tokens:null,tokenSubset:{inputTokens:301,outputTokens:31},measuredRequests:18,requests:19});
+  html=renderShowcaseHighlights(data);
+  assert.match(html,/>≥66%<\/b> less input/);assert.match(html,/>≥67%<\/b> less output/);
+  assert.match(html,/recorded requests alone/);
+  peer.tokenSubset={inputTokens:50,outputTokens:null};
+  assert.doesNotMatch(renderShowcaseHighlights(data),/proof-tokens|more input/,'partial counts cannot establish that the full total was smaller');
+  factory.accountingComplete=false;
+  assert.doesNotMatch(renderShowcaseHighlights(data),/proof-tokens/);
+});
+
+test('Codex hero uses its reviewed pair and only claims measured improvements with matching passes',()=>{
+  const row=(arm,n)=>({arm,model:'GPT-6 Astra · '+(n===1?'wrapped':'native')+' CLI',passed:true,accountingComplete:true,
+    groupsPassed:5,groupsTotal:5,wallMs:n*1000,tokens:{inputTokens:n*2000,outputTokens:n*100,cacheHitTokens:n*1500}});
+  const card={id:'snapshot-drift-qualified-4',recorded:true,rows:[row('bantam-codex-astra',1),row('codex-astra',2)]};
+  const data={codex:{cards:[card]}},html=renderCodexHighlight(data);
+  assert.equal((html.match(/50<span>%/g)||[]).length,3);
+  assert.match(html,/1,500 prefix-cache tokens reused/);
+  assert.match(html,/Factory 500 · CLI 1,000/);
+  assert.match(html,/same Astra/);assert.match(html,/one recorded pair/);
+  for(const change of [r=>r.passed=false,r=>r.accountingComplete=false,r=>r.tokens.cacheHitTokens=9000,r=>r.model='Other model',r=>r.wallMs=3000]){
+    const altered=structuredClone(data);change(altered.codex.cards[0].rows[0]);
+    assert.equal(renderCodexHighlight(altered),'');
+  }
+});
+
 test('the scrolling race shares the table records and never includes private fields or archived references',()=>{
   const data=gallery();data.cards[0].rows[0].privatePrompt='PRIVATE_DO_NOT_PUBLISH';
   const html=renderFactoryShowcase(data),json=html.match(/<script id="fight-preview" type="application\/json">(.*?)<\/script>/s)[1];
@@ -103,6 +135,8 @@ test('the scrolling race shares the table records and never includes private fie
   assert.equal(context.window.DEMOS.hardware.steps.flatMap(s=>s.out||[]).some(s=>s.includes('17.92 GB')),true);
   assert.doesNotMatch(context.window.DEMOS.hardware.steps.flatMap(s=>s.out||[]).join('\n'),/19.0 GB|0.6 GB|3.2 GB/);
   assert.match(html,/headerRooster/);assert.match(html,/data-demo="sandbox"/);
+  assert.match(html,/<meta property="og:description" content="Codex Astra, Sol, Terra, or a local 27B/);
+  assert.match(html,/<meta property="og:image" content="[^"]*bantam-factory-stations\.png"/);
   assert.ok(html.indexOf('class="hero-factory"')<html.indexOf('id="stage"'));
 });
 

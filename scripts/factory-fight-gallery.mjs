@@ -103,6 +103,8 @@ function readCardPackage(dir,id){
     groupsTotal:row.groupsTotal,accountingComplete:row.accounting.complete,
     tokens:row.accounting.complete?Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens']
       .map(key=>[key,row.accounting.full?.[key]??null])):null,
+    ...(!row.accounting.complete?{tokenSubset:Object.fromEntries(['inputTokens','outputTokens','cacheHitTokens']
+      .map(key=>[key,row.accounting.subset?.[key]??null])),measuredRequests:row.accounting.measuredRequests,requests:row.accounting.requests}:{}),
     ...(row.performance?{performance:publicPerformance(row.performance)}:{})}))};
 }
 

@@ -91,11 +91,44 @@ export function renderShowcaseHighlights(data){
       ||!Number.isFinite(factory.wallMs)||!Number.isFinite(peer.wallMs)||factory.wallMs<=0||peer.wallMs/factory.wallMs<1.05)return [];
     const hash=new URLSearchParams({card:id,view:'results',layout:'compare',left:factory.arm,right:peer.arm});
     rigs.push(performanceView(factory.performance)?.hardware??null);
-    return [`<a class="proof-fight" href="${id}/share/index.html#${E(hash)}"><strong>${(peer.wallMs/factory.wallMs).toFixed(1)}<span>×</span></strong><span class="proof-peer">faster than ${E(peer.label)}</span><span class="proof-job">${E(card.title)} <span aria-hidden="true">↗</span></span><span class="proof-times"><span>Factory ${seconds(factory.wallMs)}</span><span>${E(peer.label)} ${seconds(peer.wallMs)}</span></span></a>`];
+    const savings=renderTokenSavings(factory,peer);
+    return [`<a class="proof-fight" href="${id}/share/index.html#${E(hash)}"><strong>${(peer.wallMs/factory.wallMs).toFixed(1)}<span>×</span></strong><span class="proof-peer">faster than ${E(peer.label)}</span>${savings}<span class="proof-job">${E(card.title)} <span aria-hidden="true">↗</span></span><span class="proof-times"><span>Factory ${seconds(factory.wallMs)}</span><span>${E(peer.label)} ${seconds(peer.wallMs)}</span></span></a>`];
   });
   if(!highlights.length)return '';
   const rig=rigs.every(r=>r&&r===rigs[0])?`${E(rigs[0])} · `:'';
-  return `<section class="hero-proof" aria-labelledby="proof-heading"><div class="proof-heading"><h2 id="proof-heading">Same 27B. Faster finishes.</h2><p>Selected fights. Both completed the job.<br>${rig}Same local weights.</p></div><div class="proof-fights">${highlights.join('')}</div></section>`;
+  return `<section class="hero-proof" aria-labelledby="proof-heading"><div class="proof-heading"><h2 id="proof-heading">Same 27B. Less waste.<br>Faster finishes.</h2><p>Selected fights. Both completed the job.<br>${rig}Same local weights.</p></div><div class="proof-fights">${highlights.join('')}</div>${highlights.some(h=>h.includes('data-lower-bound'))?'<p class="proof-note">≥ means at least: Hermes has one request without token counters. Its saving is measured against the recorded requests alone.</p>':''}</section>`;
+}
+
+function renderTokenSavings(factory,peer){
+  if(!factory.accountingComplete)return '';
+  const lowerBound=!peer.accountingComplete,base=lowerBound?peer.tokenSubset:peer.tokens;
+  const metrics=['inputTokens','outputTokens'].flatMap(key=>{
+    const used=factory.tokens?.[key],reference=base?.[key];
+    if(!Number.isSafeInteger(used)||used<0||!Number.isSafeInteger(reference)||reference<=0)return [];
+    const change=1-used/reference;
+    if(lowerBound&&change<=0)return [];
+    const percent=lowerBound?Math.floor(change*100):Math.round(Math.abs(change)*100);
+    if(percent===0)return [];
+    return [`<span><b>${lowerBound?'≥':''}${percent}%</b> ${change>=0?'less':'more'} ${key==='inputTokens'?'input':'output'}</span>`];
+  });
+  return metrics.length?`<span class="proof-tokens"${lowerBound?' data-lower-bound="true"':''}>${metrics.join('')}</span>`:'';
+}
+
+export function renderCodexHighlight(data){
+  const card=data.codex?.cards?.find(c=>c.id==='snapshot-drift-qualified-4'&&c.recorded);
+  const factory=card?.rows.find(r=>r.arm==='bantam-codex-astra'),native=card?.rows.find(r=>r.arm==='codex-astra');
+  if(!factory||!native||[factory,native].some(r=>!r.passed||!r.accountingComplete
+    ||!r.model?.startsWith('GPT-6 Astra · ')||!Number.isFinite(r.wallMs)||r.wallMs<=0
+    ||!['inputTokens','outputTokens','cacheHitTokens'].every(k=>Number.isSafeInteger(r.tokens?.[k])&&r.tokens[k]>=0)
+    ||r.tokens.cacheHitTokens>r.tokens.inputTokens||r.groupsTotal!==5||r.groupsPassed!==5))return '';
+  const measures=[['inputTokens','less input'],['outputTokens','less output'],['wallMs','less time']].map(([key,label])=>{
+    const a=key==='wallMs'?factory.wallMs:factory.tokens[key],b=key==='wallMs'?native.wallMs:native.tokens[key];
+    return {value:b>0?Math.round((1-a/b)*100):0,label};
+  });
+  if(measures.some(m=>m.value<=0))return '';
+  const hash=new URLSearchParams({card:'snapshot-drift',view:'results',layout:'compare',left:factory.arm,right:native.arm});
+  const fresh=r=>(r.tokens.inputTokens-r.tokens.cacheHitTokens).toLocaleString('en-US');
+  return `<section class="hero-codex" aria-labelledby="hero-codex-heading"><div class="hero-codex-copy"><p class="hero-codex-label">YOUR CODEX ACCOUNT. A BETTER FACTORY.</p><h2 id="hero-codex-heading">More from Astra.</h2><p>Put Codex inside BANTAM FACTORY. In this recorded fight, the same Astra finished sooner with fewer tokens. Both delivered tools passed all five acceptance checks.</p><a href="codex/${E(card.id)}/share/index.html#${E(hash)}">See Astra’s work <span aria-hidden="true">↗</span></a><a href="#codex">Compare Sol and Terra ↓</a></div><div class="hero-codex-proof"><div class="hero-codex-metrics">${measures.map(m=>`<div><strong>${m.value}<span>%</span></strong><span>${m.label}</span></div>`).join('')}</div><p class="hero-codex-cache"><b>${factory.tokens.cacheHitTokens.toLocaleString('en-US')} prefix-cache tokens reused.</b><br>Uncached input: Factory ${fresh(factory)} · CLI ${fresh(native)}</p><p class="hero-codex-condition">Snapshot checker · Astra, medium effort · one recorded pair.<br>Prefix-cache tokens are included in input.</p></div></section>`;
 }
 export function showcaseRows(data){
   return data.cards.filter(c=>c.recorded).map(card=>{
@@ -139,6 +172,7 @@ export function renderFactoryShowcase(data,{intro=false}={}){
   };
   insert('FIGHT_RESULTS',renderShowcaseResults(data));
   insert('FIGHT_HIGHLIGHTS',renderShowcaseHighlights(data));
+  insert('CODEX_HIGHLIGHT',renderCodexHighlight(data));
   insert('FIGHT_SPEEDS',renderShowcaseSpeeds(data));
   insert('CODEX_EFFICIENCY',renderCodexEfficiency(data));
   const hardware=JSON.parse(read('hardware.json'));

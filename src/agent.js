@@ -1858,6 +1858,11 @@ async function runAgentCore({
   let verificationImplementationStarted = turns.some(turn => turn.sourceEditedByShell
     || (turnEditApplied(turn) && editPaths(turn.action ?? turn.parsedAction).some(p => !isDocumentArtifactPath(p))));
   let verificationBootstrapNoted = false;
+  const pendingVerifierEntrypoint = () => pendingInitialVerifier({ command: verificationScript, provenance: initialVerificationFiles,
+    implementationStarted: verificationImplementationStarted,
+    readFile: p => exec.safeReadText(exec.resolveExisting(p)),
+    exists: p => { try { exec.resolveExisting(p); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } },
+  });
   // Restore the same serial browser-defect obligation on rewind/resume. The
   // preview proof is trusted state; later edits merely make it due for a
   // recheck, while a later preview rebuilds or closes the queue.
@@ -2228,7 +2233,12 @@ async function runAgentCore({
     // The 3-bounce duplicate breaker applies in BOTH modes: the autonomous
     // self-hosting runs looped on deduped repeats with the breaker gated
     // interactive-only (v2: 15 bounces; v3: 10 subrange re-reads).
-    const recoveryEvidence = latestVerificationRecovery(turns);
+    const pendingVerifierAtDecision = pendingVerifierEntrypoint();
+    const latestRecovery = latestVerificationRecovery(turns);
+    // An absent starter check is still a failed execution, but forcing another
+    // check cannot make its entrypoint exist. Preserve unrelated check recovery.
+    const recoveryEvidence = pendingVerifierAtDecision && latestRecovery
+      && isConfiguredAuditCommand(latestRecovery.command, verificationScript) ? null : latestRecovery;
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
@@ -2275,6 +2285,7 @@ async function runAgentCore({
     const currentCliFailed = cliVerification?.generation === workspaceEditGeneration && cliVerification?.status === "failed";
     let verificationWorkflow = currentFailure && !currentCliFailed
       ? { ...verificationFailureContext(currentFailure, {
+          pendingEntrypoint: pendingVerifierAtDecision,
           workspace: exec.realWorkspace,
           readSource: p => exec.safeReadText(exec.resolveExisting(p)),
           facts: [cliSourceNote, ...failureSourceFacts.map(formatObjectConstructionFacts)].filter(Boolean),
@@ -2483,7 +2494,7 @@ async function runAgentCore({
     const panelOptions = { focusByPath, mutationFocusByPath, editedPaths: editedPathsThisRun };
     const temporalState = stateAsOf(recordTurns(turns), turns.length);
     const repositoryState = tools?.get("map") ? temporalState.repositoryQuery : null;
-    const repairContext = repairHandoffContext(turns, { generation: workspaceEditGeneration, workspace: exec.realWorkspace,
+    const repairContext = pendingVerifierAtDecision && currentFailure ? null : repairHandoffContext(turns, { generation: workspaceEditGeneration, workspace: exec.realWorkspace,
       readSource: p => exec.safeReadText(exec.resolveExisting(p)) })
       || repairHandoffOffer(turns.at(-1), { generation: workspaceEditGeneration, workspace: exec.realWorkspace });
     // A long task restatement can clip ordinary guidance. Carry the bounded
@@ -2493,7 +2504,7 @@ async function runAgentCore({
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
-      suppressDuringCurrentFailure: Boolean(currentFailure || currentCliFailed),
+      suppressDuringCurrentFailure: Boolean((currentFailure && !pendingVerifierAtDecision) || currentCliFailed),
       pendingVerification: auditRecovery,
     });
     let repositoryText = "";
@@ -3923,11 +3934,7 @@ async function runAgentCore({
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
     if ([...directEditPaths, ...shellChangedPaths].some(p => !isDocumentArtifactPath(p))) verificationImplementationStarted = true;
-    const pendingVerifier = pendingInitialVerifier({ command: verificationScript, provenance: initialVerificationFiles,
-      implementationStarted: verificationImplementationStarted,
-      readFile: p => exec.safeReadText(exec.resolveExisting(p)),
-      exists: p => { try { exec.resolveExisting(p); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } },
-    });
+    const pendingVerifier = pendingVerifierEntrypoint();
     if (directEditSucceeded && action.a === "write_batch") {
       onEvent({ type: "write_batch_committed", files: directEditPaths });
     }

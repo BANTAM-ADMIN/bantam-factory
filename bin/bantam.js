@@ -1356,18 +1356,7 @@ if (usingApi && !model.deepseek && model.chatDialect && !envTruthy("BANTAM_SKIP_
   process.stderr.write(honored
     ? "chat dialect: response_format json_schema honored — actions arrive schema-shaped and are validated locally\n"
     : "chat dialect: schema probe did not return {\"ok\":true} — actions are validated locally; malformed ones become repair turns\n");
-  // Held-open sessions (codexapi `session_id`): byte-extension prompts send only
-  // their new user content. Enabled when the server lists sessions; opt out
-  // with BANTAM_CHAT_SESSIONS=0. They pay under the extension trajectory only —
-  // a rebuilt prompt rebases onto a fresh session every turn.
-  if (!/^(0|false|no|off)$/i.test(String(process.env.BANTAM_CHAT_SESSIONS ?? ""))) {
-    const sessionsListed = await fetch(`${model.apiUrl}/sessions`, { headers: model.apiKey ? { Authorization: `Bearer ${model.apiKey}` } : {} })
-      .then((r) => r.ok).catch(() => false);
-    if (sessionsListed) {
-      model.enableChatSessions({ prefix: "bantam" });
-      process.stderr.write("chat dialect: sessions held open — extension-trajectory turns send only their new content (BANTAM_CHAT_SESSIONS=0 to disable)\n");
-    }
-  }
+  if (model.chatSessions) process.stderr.write("chat dialect: session reuse enabled — new observations only\n");
 } else if (usingApi && !model.deepseek && savedApi?.grammar !== true && !envTruthy("BANTAM_SKIP_GRAMMAR_CHECK")) {
   let honored = false;
   try {

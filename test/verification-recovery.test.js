@@ -204,7 +204,7 @@ async function runPhase(workspace, actions, options = {}) {
   const result = await runAgent({
     task: "Fix target.js and verify the result. Leave the existing public test unchanged.",
     workspace, verificationScript: PHASE_VERIFY,
-    model: { codex: options.codex === true, assistantPrefill: "", actTemperature: null, async complete(prompt, request) {
+    model: { codex: options.codex === true, codexBacked: options.codexBacked === true, assistantPrefill: "", actTemperature: null, async complete(prompt, request) {
       calls.push({ prompt, options: request });
       const action = typeof actions === "function" ? actions(index++) : actions[index++];
       assert.ok(action, "the controller must not request unbounded repair actions");
@@ -369,7 +369,7 @@ test("failed-anchor line editing composes with stalled verification recovery", a
   assert.equal(fs.readFileSync(path.join(workspace, "target.js"), "utf8"), PHASE_IMPLEMENTATION);
 });
 
-test("Codex keeps its schema stable through failed-anchor recovery and rejects masked actions before execution", async t => {
+for (const backend of ["codex", "codexBacked"]) test(`${backend} keeps its schema stable through failed-anchor recovery and rejects masked actions before execution`, async t => {
   const workspace = phaseFixture(t);
   const actions = [
     { a: "read_file", p: "target.js" },
@@ -381,7 +381,7 @@ test("Codex keeps its schema stable through failed-anchor recovery and rejects m
     { a: "done", summary: "Repaired and verified." },
   ];
   const { result, calls } = await runPhase(workspace, actions, {
-    codex: true, maxInvalidPerTurn: 1, promptTrajectory: "extension", immutableHistory: true,
+    [backend]: true, maxInvalidPerTurn: 1, promptTrajectory: "extension", immutableHistory: true,
     autoForceEditAfter: 0,
   });
   assert.equal(result.done, true);

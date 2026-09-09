@@ -599,7 +599,7 @@ async function runAgentCore({
   preEditSynthesis = envTruthy(process.env.BANTAM_PREEDIT_SYNTHESIS),
   // After the first green test following an edit, ask for one explicit requirement-to-code audit.
   // A paired cohort preserved 8/8 strict passes and improved unseen checks from 8/18 to 14/18.
-  completionAudit = completionAuditEnabled(undefined, { codex: model?.codex === true }),
+  completionAudit = completionAuditEnabled(undefined, { codex: model?.codex === true || model?.codexBacked === true }),
   visualCompletionAudit = visualCompletionAuditEnabled(),
   // Reinterpret only task-named accepted string languages at the post-green
   // boundary. Exact-turn replay improved 0/3 -> 3/3 and a rotated full-task
@@ -802,7 +802,7 @@ async function runAgentCore({
   // per-turn grammar mask there invalidates the cached prefix for the entire
   // run. Reserve recovery syntax once, then enforce the exact active mask in
   // the controller below. Local constrained decoding keeps its per-turn GBNF.
-  const codexStableSchema = model?.codex === true && process.env.BANTAM_CODEX_STABLE_SCHEMA !== "0";
+  const codexStableSchema = (model?.codex === true || model?.codexBacked === true) && process.env.BANTAM_CODEX_STABLE_SCHEMA !== "0";
   const codexActionFeatures = [...new Set([...baseActionFeatures, LINE_EDIT_FEATURE,
     ...(patchActionPolicy.mode === "auto" ? [PATCH_ACTION_FEATURE] : [])])];
   const codexActionJsonSchema = codexStableSchema
@@ -939,7 +939,7 @@ async function runAgentCore({
     task,
     visualTask,
     onEvent,
-    codex: model?.codex,
+    codex: model?.codex === true || model?.codexBacked === true,
     codexModel: model?.modelName,
     codexEffort: model?.codexEffort,
     signal,

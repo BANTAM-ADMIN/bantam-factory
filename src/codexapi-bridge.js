@@ -20,6 +20,7 @@ const RECOMMENDED = [
   { id: "gpt-5.6-luna", short: "luna", effort: "medium", role: "fast" },
   { id: "gpt-5.6-terra", short: "terra", effort: "medium", role: "everyday" },
   { id: "gpt-5.6-sol", short: "sol", effort: "high", role: "hard" },
+  { id: "gpt-6-astra", short: "astra", effort: "medium", role: "frontier" },
 ];
 
 const stripSlash = (u) => String(u).replace(/\/+$/, "");

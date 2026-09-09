@@ -54,7 +54,11 @@ export class ChatSessionPlanner {
     const text = String(prompt ?? "");
     if (this.run && typeof this.run.lastPrompt === "string") {
       const base = withoutOpenAssistant(this.run.lastPrompt);
-      if (text.startsWith(base)) {
+      const acknowledged = this.run.lastCompletion;
+      // Dropping the assistant suffix is safe only if the bridge actually
+      // acknowledged those exact bytes. A rewrite or synthetic reply rebases.
+      const reply = `${START}assistant\n${acknowledged}${END}\n`;
+      if (typeof acknowledged === 'string' && text.startsWith(base + reply)) {
         const users = chatMessagesFromPrompt(text.slice(base.length)).filter((m) => m.role === "user" && m.content);
         if (users.length) {
           return this._pend({ sessionId: this.run.id, delta: true, kind: "delta",
@@ -72,13 +76,14 @@ export class ChatSessionPlanner {
   _pend(plan) { this.pending = plan; return plan; }
 
   /** The call succeeded: the session now holds this prompt's content. */
-  commit(plan, prompt) {
+  commit(plan, prompt, completion = null) {
     if (!plan) return;
     if (plan.kind === "ephemeral") { this.stats.ephemeral += 1; return; }
-    if (plan.kind === "delta") { this.stats.delta += 1; this.run.lastPrompt = String(prompt); return; }
+    const lastCompletion = typeof completion === 'string' ? completion.trim() : null;
+    if (plan.kind === "delta") { this.stats.delta += 1; this.run.lastPrompt = String(prompt); this.run.lastCompletion = lastCompletion; return; }
     if (plan.kind === "rebase") { this.stats.rebases += 1; if (this.run) this._retire(this.run.id); }
     else this.stats.full += 1;
-    this.run = { id: plan.sessionId, head: headOf(String(prompt)), lastPrompt: String(prompt) };
+    this.run = { id: plan.sessionId, head: headOf(String(prompt)), lastPrompt: String(prompt), lastCompletion };
   }
 
   /** The server reported the session gone (409 session_unavailable). */
@@ -93,6 +98,14 @@ export class ChatSessionPlanner {
     this.retired.push(id);
     const result = this.deleteSession?.(id);
     if (result && typeof result.then === "function") this.deletes.push(result.catch(() => {}));
+  }
+
+  beginRun() {
+    // A grammar probe is a different conversation. Do not let its head make
+    // every real task turn look like an ephemeral auxiliary request.
+    if (this.run) this._retire(this.run.id);
+    this.run = null;
+    this.pending = null;
   }
 
   /**

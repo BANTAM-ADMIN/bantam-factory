@@ -247,6 +247,7 @@ export class ModelClient {
    */
   enableChatSessions({ prefix = "bantam" } = {}) {
     if (!this.chatDialect) return null;
+    if (this.chatSessions) return this.chatSessions;
     this.chatSessions = new ChatSessionPlanner({
       prefix,
       deleteSession: (id) => {
@@ -255,6 +256,20 @@ export class ModelClient {
       },
     });
     return this.chatSessions;
+  }
+
+  // The HTTP bridge is still a Codex model, but must never dispatch through
+  // the direct app-server transport. Keep capability and transport separate.
+  get codexBacked() { return this.codex || this.chatSessions !== null; }
+
+  async detectChatSessions() {
+    if (!this.apiMode || !this.chatDialect || this.deepseek || this.chatSessions
+      || /^(0|false|no|off)$/i.test(String(process.env.BANTAM_CHAT_SESSIONS ?? ""))) return;
+    try {
+      const res = await fetch(`${this.apiUrl}/sessions`, {headers: this.apiKey ? {Authorization:`Bearer ${this.apiKey}`} : {}, signal:AbortSignal.timeout(2500)});
+      const listing = res.ok ? await res.json() : null;
+      if (listing?.object === 'list' && Array.isArray(listing.data)) this.enableChatSessions();
+    } catch { /* Generic chat endpoints may not implement bridge sessions. */ }
   }
 
   /** Send a request captured by buildRequest()/requestLog() without reconstructing its body. */
@@ -322,7 +337,7 @@ export class ModelClient {
       const exchange = {};
       try {
         const result = await this._completeOnce(request, requestOptions, exchange);
-        if (request.chatSession) this.chatSessions?.commit(request.chatSession.plan, request.chatSession.prompt);
+        if (request.chatSession) this.chatSessions?.commit(request.chatSession.plan, request.chatSession.prompt, result.content);
         attempt.status = "ok";
         attempt.completedAt = new Date().toISOString();
         attempt.response = exchange.response ?? null;
@@ -441,7 +456,12 @@ export class ModelClient {
           messages: plan?.messages ?? null,
           sessionId: plan?.sessionId ?? null,
         });
-        if (plan) chatSession = { plan, prompt };
+        if (plan) {
+          // The bridge's conversational persona conflicts with an agent loop.
+          // Preserve an explicit operator override; this is a bridge extension.
+          body.chat_preamble ??= false;
+          chatSession = { plan, prompt };
+        }
       } else {
         url = `${this.apiUrl}/completions`;
         body = buildOpenAiBody({
@@ -870,6 +890,7 @@ export class ModelClient {
     const headers = this.apiMode && this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined;
     try {
       const res = await fetch(url, { method: "GET", headers });
+      if (res.ok) await this.detectChatSessions();
       return res.ok;
     } catch {
       return false;
@@ -969,6 +990,7 @@ export class ModelClient {
   }
 
   beginAgentRun() {
+    this.chatSessions?.beginRun();
     if (!this.codex || this.codexThreadMode !== "run") return null;
     // Establish the boundary before the first lazy completion so no request can
     // accidentally escape into an unscoped persistent conversation.

@@ -26,13 +26,64 @@ test("the first call opens a run session with the full transcript", () => {
   assert.ok(plan.sessionId?.startsWith("t-"));
   assert.equal(plan.delta, false);
   assert.deepEqual(plan.messages.map((m) => m.role), ["system", "user"]);
-  planner.commit(plan, P0);
+  planner.commit(plan, P0, REPLY);
   assert.equal(planner.stats.full, 1);
+});
+
+test('an altered or unacknowledged assistant reply is never silently dropped', () => {
+  for (const reply of [null, '{"a":"read_file","p":"other.js"}']) {
+    const planner = new ChatSessionPlanner(); const first = planner.plan(P0);
+    planner.commit(first, P0, reply);
+    const next = planner.plan(P1);
+    assert.equal(next.kind, 'rebase'); assert.notEqual(next.sessionId, first.sessionId);
+    assert.ok(next.messages.some(m => m.role === 'assistant' && m.content === REPLY));
+  }
+});
+
+test('a startup grammar probe cannot capture the main run session', async () => {
+  const client = new ModelClient({apiUrl:'http://bridge/v1', apiDialect:'chat'});
+  client.enableChatSessions(); const planner=client.chatSessions;
+  const deleted=[]; planner.deleteSession=async id=>{deleted.push(id);};
+  const probe='\u003c|im_start|>user\nReply with ok.\u003c|im_end|>\n'+OPEN;
+  const preliminary=planner.plan(probe); planner.commit(preliminary,probe,'ok');
+  client.beginAgentRun();
+  const first=planner.plan(P0);assert.equal(first.kind,'full');planner.commit(first,P0,REPLY);
+  assert.equal(planner.plan(P1).kind,'delta');
+  await client.endAgentRun(null);
+  assert.deepEqual(deleted,[preliminary.sessionId,first.sessionId]);
+});
+
+test('health enables bridge sessions for headless runs without calling a model or changing transport', async t => {
+  const requests = []; const original = globalThis.fetch;
+  t.after(() => {globalThis.fetch = original;});
+  globalThis.fetch = async (url, options) => {
+    requests.push({url, method:options.method ?? 'GET'});
+    return new Response(JSON.stringify({object:'list', data:[]}));
+  };
+  const client = new ModelClient({apiUrl:'http://bridge:8787/v1', apiDialect:'chat', model:'gpt-6-astra:medium'});
+  assert.equal(await client.health(), true); assert.equal(client.codex, false); assert.equal(client.codexBacked, true);
+  const planner = client.chatSessions; client.enableChatSessions(); assert.equal(client.chatSessions, planner);
+  assert.deepEqual(requests.map(r => r.method), ['GET','GET']);
+  const request = client.buildRequest(P0, {});
+  assert.match(request.url, /\/chat\/completions$/);
+  assert.equal(JSON.parse(request.body).chat_preamble, false);
+  await client.endAgentRun(null);
+});
+
+test('unsupported endpoints and explicit session opt-out keep ordinary chat transport', async t => {
+  const original = globalThis.fetch, old = process.env.BANTAM_CHAT_SESSIONS;
+  t.after(() => {globalThis.fetch=original; if(old===undefined)delete process.env.BANTAM_CHAT_SESSIONS;else process.env.BANTAM_CHAT_SESSIONS=old;});
+  globalThis.fetch = async url => new Response('{}', {status:String(url).endsWith('/sessions') ? 404 : 200});
+  const client = new ModelClient({apiUrl:'http://chat/v1',apiDialect:'chat'});
+  assert.equal(await client.health(), true); assert.equal(client.codexBacked, false);
+  process.env.BANTAM_CHAT_SESSIONS='0';
+  let calls=0; globalThis.fetch=async()=>{calls++;return new Response('{"object":"list","data":[]}');};
+  assert.equal(await client.health(),true);assert.equal(calls,1);assert.equal(client.chatSessions,null);
 });
 
 test("a byte-extension sends only the new user content, without the assistant's own reply", () => {
   const planner = new ChatSessionPlanner({ prefix: "t" });
-  const first = planner.plan(P0); planner.commit(first, P0);
+  const first = planner.plan(P0); planner.commit(first, P0, REPLY);
   const plan = planner.plan(P1);
   assert.equal(plan.sessionId, first.sessionId);
   assert.equal(plan.delta, true);
@@ -41,14 +92,14 @@ test("a byte-extension sends only the new user content, without the assistant's 
   assert.match(plan.messages[0].content, /<observation>\nsrc:\na\.js/);
   assert.match(plan.messages[0].content, /Reminder — your objective/, "several new user turns are joined into the one message the server reads");
   assert.doesNotMatch(plan.messages[0].content, /list_dir/, "the thread already holds its reply");
-  planner.commit(plan, P1);
+  planner.commit(plan, P1, REPLY);
   assert.equal(planner.stats.delta, 1);
 });
 
 test("a rebuilt main line (same head, not an extension) rebases onto a new session", () => {
   const planner = new ChatSessionPlanner({ prefix: "t" });
-  const first = planner.plan(P0); planner.commit(first, P0);
-  const second = planner.plan(P1); planner.commit(second, P1);
+  const first = planner.plan(P0); planner.commit(first, P0, REPLY);
+  const second = planner.plan(P1); planner.commit(second, P1, REPLY);
   // The harness rewrote observation 1 in place (a stub) — same head, not an extension of P1.
   const rebuilt = SYS + TASK + OPEN + REPLY + "<|im_end|>\n<|im_start|>user\n<observation>\n[turn 1: src — earlier snapshot omitted]\n</observation>\n<|im_end|>\n" + GUIDE + OPEN;
   const plan = planner.plan(rebuilt);
@@ -62,7 +113,7 @@ test("a rebuilt main line (same head, not an extension) rebases onto a new sessi
 
 test("an auxiliary prompt with a different head is ephemeral and leaves the run session intact", () => {
   const planner = new ChatSessionPlanner({ prefix: "t" });
-  const first = planner.plan(P0); planner.commit(first, P0);
+  const first = planner.plan(P0); planner.commit(first, P0, REPLY);
   const aux = "<|im_start|>system\nSummarize.<|im_end|>\n<|im_start|>user\nSummarize this.<|im_end|>\n" + OPEN;
   const plan = planner.plan(aux);
   assert.equal(plan.sessionId, null);
@@ -76,7 +127,7 @@ test("an auxiliary prompt with a different head is ephemeral and leaves the run 
 
 test("after the server reports the session gone, the next call is a full transcript on a new id", () => {
   const planner = new ChatSessionPlanner({ prefix: "t" });
-  const first = planner.plan(P0); planner.commit(first, P0);
+  const first = planner.plan(P0); planner.commit(first, P0, REPLY);
   planner.lost();
   const plan = planner.plan(P1);
   assert.notEqual(plan.sessionId, first.sessionId);
@@ -90,7 +141,7 @@ test("the chat dialect carries session_id and the delta messages in the body", (
   const r0 = JSON.parse(client.buildRequest(P0, {}).body);
   assert.match(r0.session_id, /^run-/);
   assert.equal(r0.messages.length, 2);
-  client.chatSessions.commit(client.chatSessions.pending, P0);
+  client.chatSessions.commit(client.chatSessions.pending, P0, REPLY);
   const r1 = JSON.parse(client.buildRequest(P1, {}).body);
   assert.equal(r1.session_id, r0.session_id);
   assert.equal(r1.messages.length, 1);

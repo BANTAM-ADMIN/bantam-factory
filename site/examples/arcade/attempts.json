@@ -390,7 +390,6 @@
     "The playable Astra factory build follows preview fixes. Earlier attempts and local refinements remain recorded here.",
     "Native and wrapped Astra fresh builds had 10-minute limits. The supervisor diagnostics exposed a Bash-only verifier and render-loop preview misclassification. The final qualification used those fixes and a 15-minute limit; it reached the deadline before repair completion and final verification.",
     "Generated games have no maintainer edits. Raw prompts, account data and model reasoning remain private.",
-    "The supervisor qualification used Astra only for supervision and the local 27B for all product edits. It retained the original brief in every decision. The integrated candidate had gameplay defects; the unintegrated repair snapshot passes targeted post-run checks. Neither is presented as a completed showcase build.",
-    "Astra API-equivalent estimates use the same standard rates and cache-write range as the playable comparison; actual Codex account charges were not supplied. Local usage is a measured lower bound because cancelled requests lack complete receipts."
+    "The supervisor qualification used Astra only for supervision and the local 27B for all product edits. It retained the original brief in every decision. The integrated candidate had gameplay defects; the unintegrated repair snapshot passes targeted post-run checks. Neither is presented as a completed showcase build."
   ]
 }

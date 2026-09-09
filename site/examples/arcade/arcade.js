@@ -14,6 +14,8 @@ async function showRecord(run,container){
   pre.textContent=JSON.stringify(row.action??row.command,null,2)+(row.observation?'\n\n'+row.observation:'');entry.append(summary,pre);container.append(entry);
  }
  if(record.finalResponse){const final=document.createElement('pre');final.textContent=record.finalResponse;container.append(final);}
+ if(record.verificationOutput){const entry=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent='Read the complete test output';pre.textContent=record.verificationOutput;entry.append(summary,pre);container.append(entry);}
+ for(const file of record.files??[]){const entry=document.createElement('details'),summary=document.createElement('summary'),pre=document.createElement('pre');summary.textContent=file.path;pre.textContent=file.text;entry.append(summary,pre);container.append(entry);}
 }
 function selectVersion(run){
  recordEpoch.set($('build-actions'),(recordEpoch.get($('build-actions'))??0)+1);selected=run;$('game').src=run.file;$('game').title=run.title;$('game-title').textContent=run.title;

@@ -23,6 +23,16 @@ const ASSISTANT_HEAD = "<|im_start|>assistant\n";
 const OBSERVATION_HEAD = "<|im_end|>\n<|im_start|>user\n";
 const OBSERVATION_TAIL = `<|im_end|>\n${ASSISTANT_HEAD}`;
 const MIN_DELTA_PREFIX_CHARS = 2048;
+// BANTAM executes tools; its text worker does not need Codex's second tool
+// menu. These supported feature switches remove ~3k input tokens per request
+// in the recorded Astra calibration. Image workers explicitly retain their
+// image-generation capability. Caller thread configuration remains explicit.
+const EMBEDDED_CONFIG = {
+  'features.shell_tool': false, 'features.multi_agent': false,
+  'features.view_image': false, 'features.image_generation': false,
+  'features.sleep_tool': false, 'features.skill_search': false,
+  'features.goals': false, web_search: 'disabled',
+};
 const BASE_INSTRUCTIONS = [
   "You are the model runtime embedded inside the BANTAM agent harness.",
   "BANTAM owns the conversation, tools, workspace operations, and verification.",
@@ -538,6 +548,9 @@ export class CodexAppServer {
   }
 
   async _startThread(model, { baseInstructions = BASE_INSTRUCTIONS } = {}) {
+    const imageWorker = baseInstructions === IMAGE_INSTRUCTIONS || baseInstructions === IMAGE_EDIT_INSTRUCTIONS;
+    const config = { ...EMBEDDED_CONFIG,
+      ...(imageWorker ? {'features.image_generation': true} : {}), ...this.threadConfig };
     const started = await this.request("thread/start", {
       model,
       cwd: this.cwd,
@@ -545,7 +558,7 @@ export class CodexAppServer {
       approvalPolicy: "never",
       sandbox: "read-only",
       environments: [],
-      ...(this.threadConfig ? { config: this.threadConfig } : {}),
+      config,
       baseInstructions,
       developerInstructions: baseInstructions,
     });

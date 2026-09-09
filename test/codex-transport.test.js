@@ -65,6 +65,22 @@ test("Codex image broker returns a saved path without raw image bytes", async (t
   assert.equal(Object.hasOwn(image, "result"), false);
 });
 
+test("embedded text workers omit native tool menus while image workers retain generation", async t => {
+  const codex = server(), starts = [], request = codex.request.bind(codex);
+  codex.request = (method, params) => { if (method === 'thread/start') starts.push(params); return request(method, params); };
+  t.after(() => codex.close());
+  await codex.complete('respond through the schema');
+  await codex.generateImage('synthetic image');
+  for (const start of starts) {
+    assert.equal(start.sandbox, 'read-only');
+    assert.equal(start.config['features.shell_tool'], false);
+    assert.equal(start.config['features.multi_agent'], false);
+    assert.equal(start.config.web_search, 'disabled');
+  }
+  assert.equal(starts[0].config['features.image_generation'], false);
+  assert.equal(starts[1].config['features.image_generation'], true);
+});
+
 test("run-scoped Codex mode reuses one thread only inside an explicit run", async (t) => {
   const codex = server({ threadMode: "run", promptMode: "full" });
   t.after(() => codex.close());

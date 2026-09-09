@@ -80,12 +80,14 @@ Every run above passed all five independent check groups. Astra and Sol figures
 combine two paired repeats; Terra is one pair. Cards show wall clock, input,
 output and prefix-cache tokens, plus the complete work.
 
-**Latest Astra fights: 50% less input, 10% less output, 8% less wall time.**
-Totals across two fresh matched jobs, both 5/5 in both harnesses.
-Open the [context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
-or [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html)
-to compare solo Astra and Astra supervising Terra or Sol. Every action, delivered
-file, and token counter is there; supervised totals include both models.
+**Astra’s latest snapshot checker: 41% less input, 10% less output, 3% less wall time.**
+Both attempts passed all five acceptance groups. [Watch the complete fight →](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-3/share/index.html)
+
+Explore the [context packer](https://bantam-admin.github.io/bantam-factory/codex/context-packet-qualified-1/share/index.html)
+and [stream decoder](https://bantam-admin.github.io/bantam-factory/codex/stream-framer-qualified-1/share/index.html)
+too. All three cards compare solo Astra and Astra supervising Terra or Sol, with
+every action, delivered file, and token counter. Supervised totals include both
+models; prefix-cache hits are shown separately within input tokens.
 
 **[Play what Astra built in BANTAM FACTORY and native Codex →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
 Same brief. Two playable games. Every recorded action and the delivered files.

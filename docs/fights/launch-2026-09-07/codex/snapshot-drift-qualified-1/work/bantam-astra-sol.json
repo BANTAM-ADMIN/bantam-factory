@@ -1,0 +1,995 @@
+{
+  "schema": "bantam.fight-work.v1",
+  "card": "snapshot-drift",
+  "arm": "bantam-astra-sol",
+  "wallMs": 478597,
+  "outcome": "PASS",
+  "accepted": true,
+  "completed": true,
+  "publicExit": 0,
+  "hiddenExit": 0,
+  "protectedChanges": 0,
+  "startedAt": "2026-09-09T07:12:43.926Z",
+  "task": "# Snapshot drift: extend the supplied selected-file manifest tool\n\nThe supplied `snapshot.js` already exports synchronous `createManifest(root,\npaths)`. Keep that behavior and add synchronous `verifyManifest(root, manifest)`\nplus a CLI. Node.js builtins only. This is a bounded local file checker, not a\nconcurrent-filesystem or hostile-workload security claim.\n\n`root` must name an existing directory and must not itself be a symlink. A\nselected path is a nonempty canonical relative POSIX-style path: reject `/`\nprefixes, backslashes, NUL, empty segments, `.` and `..` segments. Spaces, tabs,\nnewlines and Unicode are valid filename characters. Every component beneath\nroot must be non-symlink; intermediate components must be directories and the\nfinal component must be a regular file. Do not follow symlinks even if they\npoint inside root. The checker must not modify selected files.\n\n`createManifest(root, paths)` accepts an array of unique selected paths (empty\nis allowed) and returns exactly:\n\n```\n{version: 1, files: [{path, sha256, size, mode}]}\n```\n\nEntries use JavaScript `<`/`>` string ordering, not locale ordering. SHA-256 is\n64 lowercase hexadecimal characters over exact file bytes; size is byte count;\nmode is the numeric permission bits `stat.mode & 0o777`. Missing, unsafe, or\ninvalid selections throw an Error. Preserve this existing behavior.\n\n`verifyManifest(root, manifest)` first validates the complete manifest. It must\nbe a non-null non-array object with `version` exactly 1 and `files` an array.\nEach entry must be a non-null non-array object, with a unique valid selected\npath, a 64-character lowercase hexadecimal `sha256`, nonnegative safe-integer\n`size`, and integer `mode` in 0..511. Unknown object fields are ignored.\nManifest entries need not arrive sorted. Neither API may mutate its input\narrays or objects. Invalid manifests or roots throw an\nError; do not partially report them as drift.\n\nReturn exactly:\n\n```\n{\n  ok: BOOLEAN,\n  unchanged: [PATH],\n  changed: [{path: PATH, reasons: ['content', 'mode']}],\n  missing: [PATH],\n  unsafe: [PATH]\n}\n```\n\nEach selected entry appears in exactly one array. If any path component is\nmissing, classify `missing`. If an existing component is a symlink, an\nintermediate component is not a directory, or the final component is not a\nregular file, classify `unsafe` (stop at that component; do not follow it).\nOtherwise compare the current regular file: a different SHA-256 OR byte size\nadds reason `content`; different permission bits add `mode`. Reasons contain\nonly the differences, always in the order `content`, then `mode`. No differences\nmeans `unchanged`. Each array is sorted by path using JavaScript string order.\n`ok` is true exactly when changed, missing, and unsafe are all empty. Unselected\nfiles are irrelevant. Other filesystem failures (such as permission errors)\nthrow an Error; no concurrent filesystem mutation is tested.\n\nCLI:\n\n- `node snapshot.js create ROOT [PATH ...]` prints the manifest JSON and exits 0.\n- `node snapshot.js verify ROOT MANIFEST_FILE` reads UTF-8 JSON, prints the\n  drift report, and exits 0 for `ok: true`, 1 for drift.\n- Invalid arguments, invalid JSON/manifest/root/selection, unreadable input,\n  and other errors exit 2, with a nonempty stderr message and no stdout.\n\nSuccessful reports are one JSON value followed by newline, with no other\nstdout and no stderr. Importing the module must not run the CLI. Do not add\nthird-party dependencies or modify `package.json` or existing public tests.\nYou may add tests. Run `npm test` before finishing. All arms receive the same\nfixed starter; hidden acceptance adds values, not hidden requirements.\n",
+  "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+  "source": "supervisor-actions-worker-turns-and-committed-integrations",
+  "actions": [
+    {
+      "name": "supervisor-read",
+      "category": "inspect",
+      "request": {
+        "action": "read",
+        "jobs": [],
+        "target": "snapshot.js",
+        "text": ""
+      },
+      "output": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\n\nfunction validateRoot(root) {\n  const stat = fs.lstatSync(root);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) throw Error('invalid selected path');\n}\nfunction inspect(root, selected) {\n  const parts = selected.split('/'); let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try { stat = fs.lstatSync(current); }\n    catch (error) { if (error.code === 'ENOENT') return {kind:'missing'}; throw error; }\n    if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return {kind:'unsafe'};\n    if (i === parts.length - 1) {\n      const bytes = fs.readFileSync(current);\n      return {kind:'file',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),size:bytes.length,mode:stat.mode & 0o777};\n    }\n  }\n}\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {version:1,files:[...paths].sort().map(selected => {\n    const current = inspect(root, selected);\n    if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n    return {path:selected,sha256:current.sha256,size:current.size,mode:current.mode};\n  })};\n}\n// Add verifyManifest and the CLI without weakening createManifest.\n",
+      "atMs": 6905,
+      "endedMs": 6912,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-1"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat package.json && find test -type f -maxdepth 2 -print && cat test/snapshot.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "c703dcaf5edc35154fdedccb61bba9b80746f318",
+        "stderr": "",
+        "stderrChars": 0,
+        "stderrTruncated": false,
+        "stdout": "{\"name\":\"factory-snapshot-drift\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\ntest/snapshot.test.js\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport * as snapshot from '../snapshot.js';\nfunction fixture(t) {\n  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'snapshot-public-'));\n  fs.writeFileSync(path.join(dir,'a.txt'),'abc'); fs.chmodSync(path.join(dir,'a.txt'),0o640);\n  t.after(() => fs.rmSync(dir,{recursive:true,force:true})); return dir;\n}\ntest('existing builder hashes exact bytes and permission bits', t => {\n  const root = fixture(t);\n  assert.deepEqual(snapshot.createManifest(root,['a.txt']),{version:1,files:[{\n    path:'a.txt',sha256:crypto.createHash('sha256').update('abc').digest('hex'),size:3,mode:0o640,\n  }]});\n});\ntest('new verifier reports unchanged, content and missing', t => {\n  const root = fixture(t), manifest = snapshot.createManifest(root,['a.txt']);\n  assert.deepEqual(snapshot.verifyManifest(root,manifest),{ok:true,unchanged:['a.txt'],changed:[],missing:[],unsafe:[]});\n  fs.writeFileSync(path.join(root,'a.txt'),'xyz');\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).changed,[{path:'a.txt',reasons:['content']}]);\n  fs.unlinkSync(path.join(root,'a.txt'));\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).missing,['a.txt']);\n});\ntest('unsafe selections and invalid manifests throw', t => {\n  const root = fixture(t);\n  assert.throws(() => snapshot.createManifest(root,['../outside']));\n  assert.throws(() => snapshot.verifyManifest(root,{version:2,files:[]}));\n});\n",
+        "stdoutChars": 1687,
+        "stdoutTruncated": false,
+        "timedOut": false
+      },
+      "atMs": 10082,
+      "endedMs": 10722,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-2"
+    },
+    {
+      "name": "supervisor-dispatch",
+      "category": "edit",
+      "request": {
+        "action": "dispatch",
+        "jobs": [
+          {
+            "id": "snapshot-extension",
+            "worker": "sol",
+            "task": "Implement the complete bounded snapshot tool extension in snapshot.js: synchronous verifyManifest and CLI, preserving createManifest contract from original brief. Validate complete manifest before inspecting any selected files, ignore unknown fields, never mutate inputs; classify missing/unsafe/changed/unchanged exactly and sort using JS string order with content then mode reasons. Root must be existing directory and not itself symlink (include trailing-slash root symlink spellings); reject unsafe selected components without following them. CLI must enforce exact command arity, output one JSON newline on success, exit 0/1 for verify status and exit 2 with nonempty stderr and empty stdout for errors; importing must not execute CLI. Use builtins only, do not modify package.json or existing public tests. Add retained deterministic node:test tests covering manifest validation fields/duplicates and full validation before file inspection, immutable frozen inputs, byte hashing/size/mode distinctions, all drift classifications, JS path ordering with whitespace/newline/Unicode filenames, non-symlink component traversal and invalid roots/selections, empty inputs, unselected files, and CLI success/drift/error/import behavior. Fixtures must be explicitly installed and cleaned up, including symlinks and type replacements. Run npm test.",
+            "context": "Inspected starter snapshot.js: ESM fs/path/crypto, validateRoot calls lstatSync(root), validatePath checks canonical segments, inspect traverses each component with lstatSync returning missing for ENOENT and unsafe for symlink/wrong type; hashes read bytes. createManifest validates selections/duplicates and copies then sorts. No verifier or CLI yet. Potential root validation pitfall: lstat on a symlink directory path with trailing slash follows it on POSIX; ensure contract holds without weakening builder. package.json is type:module with npm test = node --test. Existing test/snapshot.test.js contains 3 tests: exact bytes/permissions builder; verifier unchanged/content/missing (currently fails missing export); invalid selection and manifest version. Original brief is complete acceptance contract; this small utility should be one coherent implementation with retained behavior tests.",
+            "verify": "npm test",
+            "dependsOn": [],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "snapshot-extension"
+        ],
+        "waited": true
+      },
+      "atMs": 29685,
+      "endedMs": 150191,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-3"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "snapshot.js",
+              "start": 1,
+              "limit": 300
+            },
+            {
+              "a": "read_file",
+              "p": "test/snapshot.test.js",
+              "start": 1,
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "start": 1,
+              "limit": 100
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"snapshot.js\",\"start\":1,\"limit\":300}\nsnapshot.js (44 lines, showing 1-44):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport crypto from 'node:crypto';\n4\t\n5\tfunction validateRoot(root) {\n6\t  const stat = fs.lstatSync(root);\n7\t  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n8\t}\n9\tfunction validatePath(selected) {\n10\t  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n11\t    || selected.includes('\\\\') || selected.includes('\\0')\n12\t    || selected.split('/').some(part => !part || part === '.' || part === '..')) throw Error('invalid selected path');\n13\t}\n14\tfunction inspect(root, selected) {\n15\t  const parts = selected.split('/'); let current = root;\n16\t  for (let i = 0; i < parts.length; i++) {\n17\t    current = path.join(current, parts[i]);\n18\t    let stat;\n19\t    try { stat = fs.lstatSync(current); }\n20\t    catch (error) { if (error.code === 'ENOENT') return {kind:'missing'}; throw error; }\n21\t    if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return {kind:'unsafe'};\n22\t    if (i === parts.length - 1) {\n23\t      const bytes = fs.readFileSync(current);\n24\t      return {kind:'file',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),size:bytes.length,mode:stat.mode & 0o777};\n25\t    }\n26\t  }\n27\t}\n28\texport function createManifest(root, paths) {\n29\t  validateRoot(root);\n30\t  if (!Array.isArray(paths)) throw Error('paths must be an array');\n31\t  const seen = new Set();\n32\t  for (const selected of paths) {\n33\t    validatePath(selected);\n34\t    if (seen.has(selected)) throw Error('duplicate selection');\n35\t    seen.add(selected);\n36\t  }\n37\t  return {version:1,files:[...paths].sort().map(selected => {\n38\t    const current = inspect(root, selected);\n39\t    if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n40\t    return {path:selected,sha256:current.sha256,size:current.size,mode:current.mode};\n41\t  })};\n42\t}\n43\t// Add verifyManifest and the CLI without weakening createManifest.\n44\t\n— end of file (44 lines); nothing beyond line 44, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/snapshot.test.js\",\"start\":1,\"limit\":400}\ntest/snapshot.test.js (32 lines, showing 1-32):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os from 'node:os';\n5\timport path from 'node:path';\n6\timport crypto from 'node:crypto';\n7\timport * as snapshot from '../snapshot.js';\n8\tfunction fixture(t) {\n9\t  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'snapshot-public-'));\n10\t  fs.writeFileSync(path.join(dir,'a.txt'),'abc'); fs.chmodSync(path.join(dir,'a.txt'),0o640);\n11\t  t.after(() => fs.rmSync(dir,{recursive:true,force:true})); return dir;\n12\t}\n13\ttest('existing builder hashes exact bytes and permission bits', t => {\n14\t  const root = fixture(t);\n15\t  assert.deepEqual(snapshot.createManifest(root,['a.txt']),{version:1,files:[{\n16\t    path:'a.txt',sha256:crypto.createHash('sha256').update('abc').digest('hex'),size:3,mode:0o640,\n17\t  }]});\n18\t});\n19\ttest('new verifier reports unchanged, content and missing', t => {\n20\t  const root = fixture(t), manifest = snapshot.createManifest(root,['a.txt']);\n21\t  assert.deepEqual(snapshot.verifyManifest(root,manifest),{ok:true,unchanged:['a.txt'],changed:[],missing:[],unsafe:[]});\n22\t  fs.writeFileSync(path.join(root,'a.txt'),'xyz');\n23\t  assert.deepEqual(snapshot.verifyManifest(root,manifest).changed,[{path:'a.txt',reasons:['content']}]);\n24\t  fs.unlinkSync(path.join(root,'a.txt'));\n25\t  assert.deepEqual(snapshot.verifyManifest(root,manifest).missing,['a.txt']);\n26\t});\n27\ttest('unsafe selections and invalid manifests throw', t => {\n28\t  const root = fixture(t);\n29\t  assert.throws(() => snapshot.createManifest(root,['../outside']));\n30\t  assert.throws(() => snapshot.verifyManifest(root,{version:2,files:[]}));\n31\t});\n32\t\n— end of file (32 lines); nothing beyond line 32, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"package.json\",\"start\":1,\"limit\":100}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-snapshot-drift\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.",
+      "atMs": 38821,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 0,
+      "id": "action-4"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "write_file",
+          "p": "snapshot.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport { fileURLToPath } from 'node:url';\n\nfunction validateRoot(root) {\n  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n  // before checking the object named by the caller.\n  let checked = root;\n  if (typeof root === 'string') {\n    const parsedRoot = path.parse(root).root;\n    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n  }\n  const stat = fs.lstatSync(checked);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\n\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n    throw Error('invalid selected path');\n  }\n}\n\nfunction inspect(root, selected) {\n  const parts = selected.split('/');\n  let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try {\n      stat = fs.lstatSync(current);\n    } catch (error) {\n      if (error.code === 'ENOENT') return { kind: 'missing' };\n      throw error;\n    }\n    const final = i === parts.length - 1;\n    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n      return { kind: 'unsafe' };\n    }\n    if (final) {\n      const bytes = fs.readFileSync(current);\n      return {\n        kind: 'file',\n        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n        size: bytes.length,\n        mode: stat.mode & 0o777,\n      };\n    }\n  }\n}\n\nfunction compareStrings(a, b) {\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {\n    version: 1,\n    files: [...paths].sort(compareStrings).map(selected => {\n      const current = inspect(root, selected);\n      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n    }),\n  };\n}\n\nfunction validateManifest(manifest) {\n  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n    throw Error('manifest must be an object');\n  }\n  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n\n  const seen = new Set();\n  const entries = [];\n  for (const entry of manifest.files) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw Error('manifest file entry must be an object');\n    }\n    validatePath(entry.path);\n    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n    seen.add(entry.path);\n    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }\n    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n  }\n  return entries;\n}\n\nexport function verifyManifest(root, manifest) {\n  // Validate and copy every entry before touching root or any selected path.\n  const entries = validateManifest(manifest);\n  validateRoot(root);\n\n  const unchanged = [];\n  const changed = [];\n  const missing = [];\n  const unsafe = [];\n  for (const entry of entries) {\n    const current = inspect(root, entry.path);\n    if (current.kind === 'missing') {\n      missing.push(entry.path);\n    } else if (current.kind === 'unsafe') {\n      unsafe.push(entry.path);\n    } else {\n      const reasons = [];\n      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n      if (current.mode !== entry.mode) reasons.push('mode');\n      if (reasons.length) changed.push({ path: entry.path, reasons });\n      else unchanged.push(entry.path);\n    }\n  }\n  unchanged.sort(compareStrings);\n  changed.sort((a, b) => compareStrings(a.path, b.path));\n  missing.sort(compareStrings);\n  unsafe.sort(compareStrings);\n  return {\n    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n    unchanged,\n    changed,\n    missing,\n    unsafe,\n  };\n}\n\nfunction runCli(argv) {\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n    const value = verifyManifest(args[0], manifest);\n    return { value, status: value.ok ? 0 : 1 };\n  }\n  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    const result = runCli(process.argv.slice(2));\n    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n    process.exitCode = result.status;\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`${message || 'error'}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+        }
+      },
+      "output": "[edit-preservation] Staged bytes remove 2 executable statement(s) by AST comparison; 4 new top-level function(s).\nAn existing function loses statements while new top-level functions are added.\nAdded functions: compareStrings (AFTER L54), validateManifest (AFTER L77), verifyManifest (AFTER L102), runCli (AFTER L138).\n- BEFORE snapshot.js:6 in validateRoot: \"const stat = fs.lstatSync(root);\"\n  STAGED AFTER snapshot.js:15 (next-retained-statement): \"throw Error('root must be a non-symlink directory');\".\n- BEFORE snapshot.js:37 in createManifest: \"return {version:1,files:[...paths].sort().map(selected => {\\n    const current = inspect(root, selected);\\n    if (current.kind !== 'file') throw Err… [display clipped] [excerpt clipped]\n  STAGED AFTER snapshot.js:65 (previous-retained-statement): \"seen.add(selected);\".\nThis is observed source change, NOT proof of a bug, preservation, or correctness. Intentional removals/refactors remain allowed. If you intended an addition, preserve the existing anchor statements and insert around them. Base the next edit and verification on the AFTER bytes, not an earlier implementation or working note.\n[edit-preservation review] No files were changed by this refused transaction. If the removal was accidental, preserve the required existing statements/operations and submit the corrected edit. If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim. Review identity: sha256:9761103bbba9ae770013b2feb25b4dfdb6881dcd85752173c2fe368608c96d0b.",
+      "atMs": 112489,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 1,
+      "id": "action-5"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 155088,
+      "endedMs": 275116,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-6"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "write_file",
+          "p": "snapshot.js",
+          "content": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport { fileURLToPath } from 'node:url';\n\nfunction validateRoot(root) {\n  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n  // before checking the object named by the caller.\n  let checked = root;\n  if (typeof root === 'string') {\n    const parsedRoot = path.parse(root).root;\n    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n  }\n  const stat = fs.lstatSync(checked);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\n\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n    throw Error('invalid selected path');\n  }\n}\n\nfunction inspect(root, selected) {\n  const parts = selected.split('/');\n  let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try {\n      stat = fs.lstatSync(current);\n    } catch (error) {\n      if (error.code === 'ENOENT') return { kind: 'missing' };\n      throw error;\n    }\n    const final = i === parts.length - 1;\n    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n      return { kind: 'unsafe' };\n    }\n    if (final) {\n      const bytes = fs.readFileSync(current);\n      return {\n        kind: 'file',\n        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n        size: bytes.length,\n        mode: stat.mode & 0o777,\n      };\n    }\n  }\n}\n\nfunction compareStrings(a, b) {\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {\n    version: 1,\n    files: [...paths].sort(compareStrings).map(selected => {\n      const current = inspect(root, selected);\n      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n    }),\n  };\n}\n\nfunction validateManifest(manifest) {\n  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n    throw Error('manifest must be an object');\n  }\n  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n\n  const seen = new Set();\n  const entries = [];\n  for (const entry of manifest.files) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw Error('manifest file entry must be an object');\n    }\n    validatePath(entry.path);\n    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n    seen.add(entry.path);\n    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }\n    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n  }\n  return entries;\n}\n\nexport function verifyManifest(root, manifest) {\n  // Validate and copy every entry before touching root or any selected path.\n  const entries = validateManifest(manifest);\n  validateRoot(root);\n\n  const unchanged = [];\n  const changed = [];\n  const missing = [];\n  const unsafe = [];\n  for (const entry of entries) {\n    const current = inspect(root, entry.path);\n    if (current.kind === 'missing') {\n      missing.push(entry.path);\n    } else if (current.kind === 'unsafe') {\n      unsafe.push(entry.path);\n    } else {\n      const reasons = [];\n      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n      if (current.mode !== entry.mode) reasons.push('mode');\n      if (reasons.length) changed.push({ path: entry.path, reasons });\n      else unchanged.push(entry.path);\n    }\n  }\n  unchanged.sort(compareStrings);\n  changed.sort((a, b) => compareStrings(a.path, b.path));\n  missing.sort(compareStrings);\n  unsafe.sort(compareStrings);\n  return {\n    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n    unchanged,\n    changed,\n    missing,\n    unsafe,\n  };\n}\n\nfunction runCli(argv) {\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n    const value = verifyManifest(args[0], manifest);\n    return { value, status: value.ok ? 0 : 1 };\n  }\n  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    const result = runCli(process.argv.slice(2));\n    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n    process.exitCode = result.status;\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`${message || 'error'}\\n`);\n    process.exitCode = 2;\n  }\n}\n"
+        }
+      },
+      "output": "wrote 5716 bytes to snapshot.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `bytes` is also referenced in: test/snapshot.test.js\n  `createManifest` is also referenced in: test/snapshot.test.js",
+      "atMs": 167751,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 2,
+      "id": "action-7"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "write_file",
+          "p": "test/snapshot-extension.test.js",
+          "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = '0'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-extension-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\nfunction write(root, name, contents, mode = 0o640) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n  fs.chmodSync(target, mode);\n}\nfunction entry(overrides = {}) {\n  return { path: 'a', sha256: hash, size: 0, mode: 0, ...overrides };\n}\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\ntest('manifest validation covers shape, fields, paths, and duplicates', t => {\n  const root = fixture(t);\n  const invalid = [\n    null, [], {}, { version: 2, files: [] }, { version: 1, files: null },\n    { version: 1, files: [null] }, { version: 1, files: [[]] },\n    { version: 1, files: [entry({ path: '' })] },\n    { version: 1, files: [entry({ path: '/a' })] },\n    { version: 1, files: [entry({ path: 'a//b' })] },\n    { version: 1, files: [entry({ path: 'a/../b' })] },\n    { version: 1, files: [entry({ path: 'a\\\\b' })] },\n    { version: 1, files: [entry({ sha256: 'A'.repeat(64) })] },\n    { version: 1, files: [entry({ sha256: '0'.repeat(63) })] },\n    { version: 1, files: [entry({ size: -1 })] },\n    { version: 1, files: [entry({ size: 1.5 })] },\n    { version: 1, files: [entry({ size: Number.MAX_SAFE_INTEGER + 1 })] },\n    { version: 1, files: [entry({ mode: -1 })] },\n    { version: 1, files: [entry({ mode: 512 })] },\n    { version: 1, files: [entry(), entry()] },\n  ];\n  for (const manifest of invalid) assert.throws(() => verifyManifest(root, manifest));\n});\n\ntest('complete manifest validation precedes file inspection and unknown fields are ignored', t => {\n  const root = fixture(t);\n  write(root, 'a', 'data');\n  const original = fs.readFileSync;\n  let reads = 0;\n  fs.readFileSync = (...args) => { reads++; return original(...args); };\n  try {\n    assert.throws(() => verifyManifest(root, {\n      version: 1, ignored: true,\n      files: [entry({ path: 'a' }), entry({ path: 'bad', size: -1 })],\n    }));\n    assert.equal(reads, 0);\n  } finally {\n    fs.readFileSync = original;\n  }\n  const manifest = createManifest(root, ['a']);\n  manifest.extra = { ignored: true };\n  manifest.files[0].extra = 42;\n  assert.equal(verifyManifest(root, manifest).ok, true);\n});\n\ntest('frozen inputs remain immutable and empty manifests work', t => {\n  const root = fixture(t);\n  write(root, 'b', 'b'); write(root, 'a', 'a');\n  const paths = Object.freeze(['b', 'a']);\n  assert.deepEqual(createManifest(root, paths).files.map(x => x.path), ['a', 'b']);\n  const manifest = createManifest(root, ['b', 'a']);\n  for (const item of manifest.files) Object.freeze(item);\n  Object.freeze(manifest.files); Object.freeze(manifest);\n  assert.deepEqual(verifyManifest(root, manifest).unchanged, ['a', 'b']);\n  assert.deepEqual(createManifest(root, []), { version: 1, files: [] });\n  assert.deepEqual(verifyManifest(root, Object.freeze({ version: 1, files: Object.freeze([]) })),\n    { ok: true, unchanged: [], changed: [], missing: [], unsafe: [] });\n});\n\ntest('byte content, size, modes, and every drift class are distinguished', t => {\n  const root = fixture(t);\n  write(root, 'same', Buffer.from([0, 255, 10]), 0o600);\n  write(root, 'content', 'abc', 0o600);\n  write(root, 'size', 'long', 0o600);\n  write(root, 'mode', 'mode', 0o600);\n  write(root, 'both', 'both', 0o600);\n  write(root, 'gone', 'gone', 0o600);\n  write(root, 'unsafe', 'file', 0o600);\n  const manifest = createManifest(root, ['unsafe', 'same', 'size', 'mode', 'gone', 'content', 'both']);\n  write(root, 'content', 'xyz', 0o600);\n  write(root, 'size', 'x', 0o600);\n  fs.chmodSync(path.join(root, 'mode'), 0o644);\n  write(root, 'both', 'different', 0o644);\n  fs.rmSync(path.join(root, 'gone'));\n  fs.rmSync(path.join(root, 'unsafe')); fs.mkdirSync(path.join(root, 'unsafe'));\n  fs.writeFileSync(path.join(root, 'unselected'), 'ignored');\n  assert.deepEqual(verifyManifest(root, manifest), {\n    ok: false,\n    unchanged: ['same'],\n    changed: [\n      { path: 'both', reasons: ['content', 'mode'] },\n      { path: 'content', reasons: ['content'] },\n      { path: 'mode', reasons: ['mode'] },\n      { path: 'size', reasons: ['content'] },\n    ],\n    missing: ['gone'], unsafe: ['unsafe'],\n  });\n});\n\ntest('uses JavaScript path order for whitespace, newline, and Unicode', t => {\n  const root = fixture(t);\n  const names = ['é', 'z', '\\nname', ' name', '😀', 'Z', '\\tname'];\n  for (const name of names) write(root, name, name);\n  const expected = [...names].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n  const manifest = createManifest(root, [...names].reverse());\n  assert.deepEqual(manifest.files.map(x => x.path), expected);\n  assert.deepEqual(verifyManifest(root, { version: 1, files: [...manifest.files].reverse() }).unchanged, expected);\n});\n\ntest('components are not followed and invalid roots are rejected', t => {\n  const root = fixture(t);\n  const outside = fixture(t);\n  write(outside, 'target', 'x');\n  fs.symlinkSync(outside, path.join(root, 'link'));\n  write(root, 'plain', 'x');\n  const base = createManifest(root, ['plain']).files[0];\n  const manifests = pathName => ({ version: 1, files: [{ ...base, path: pathName }] });\n  assert.deepEqual(verifyManifest(root, manifests('link/target')).unsafe, ['link/target']);\n  fs.mkdirSync(path.join(root, 'dir')); fs.symlinkSync(path.join(outside, 'target'), path.join(root, 'dir/final'));\n  assert.deepEqual(verifyManifest(root, manifests('dir/final')).unsafe, ['dir/final']);\n  assert.deepEqual(verifyManifest(root, manifests('missing/child')).missing, ['missing/child']);\n  assert.throws(() => createManifest(`${path.join(root, 'link')}${path.sep}`, []));\n  assert.throws(() => verifyManifest(`${path.join(root, 'link')}${path.sep}`, { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'plain'), { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'absent'), { version: 1, files: [] }));\n});\n\ntest('CLI create and verify success, drift, errors, and import behavior', t => {\n  const root = fixture(t);\n  write(root, 'a', 'abc');\n  let result = cli('create', root, 'a');\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.match(result.stdout, /^\\{.*\\}\\n$/s);\n  const manifestFile = path.join(root, 'manifest.json');\n  fs.writeFileSync(manifestFile, result.stdout);\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.equal(JSON.parse(result.stdout).ok, true); assert.equal(result.stdout.endsWith('\\n'), true);\n  write(root, 'a', 'changed');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 1); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, false);\n  for (const args of [[], ['create'], ['verify', root], ['verify', root, manifestFile, 'extra']]) {\n    result = cli(...args); assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  }\n  fs.writeFileSync(manifestFile, '{bad');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  result = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(new URL('../snapshot.js', import.meta.url).href)}`], { encoding: 'utf8' });\n  assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');\n});\n"
+        }
+      },
+      "output": "wrote 8005 bytes to test/snapshot-extension.test.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `verifyManifest` is also referenced in: snapshot.js, test/snapshot.test.js\n  `fixture` is also referenced in: test/snapshot.test.js\n  `manifest` is also referenced in: snapshot.js, test/snapshot.test.js\n[peer] `createManifest` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `compareStrings` (snapshot.js:58):\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n— `runCli` (snapshot.js:142):\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 259578,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 3,
+      "id": "action-8"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 10 tests passed.\n$ npm test\ncwd: /workers/snapshot-extension\nsandbox: docker:alpine:3\nexit 0\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.291584\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.718391\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.975232\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 2.369405\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.53784\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.513159\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 209.675179\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 8 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.251011\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 9 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 1.058867\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 10 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.655695\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 266.511182",
+      "atMs": 263345,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 4,
+      "id": "action-9"
+    },
+    {
+      "name": "supervisor-wait",
+      "category": "other",
+      "request": {
+        "action": "wait",
+        "jobs": [],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "waited": true
+      },
+      "atMs": 279024,
+      "endedMs": 329870,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-10"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "snapshot-extension",
+        "action": {
+          "a": "done",
+          "summary": "Implemented synchronous verifyManifest with complete upfront validation, immutable input handling, exact drift classification/reason ordering, JavaScript path sorting, safe non-symlink traversal, and trailing-slash root-symlink rejection. Added create/verify CLI behavior with exact arity, JSON-line output, status codes 0/1/2, clean error streams, and import safety. Added deterministic node:test coverage for validation, ordering, hashing/modes, drift classes, frozen inputs, unsafe traversal/roots, and CLI behavior. Verified with npm test: all 10 tests passed."
+        }
+      },
+      "output": "",
+      "atMs": 327228,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 5,
+      "id": "action-11"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "snapshot-extension"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "snapshot.js",
+          "test/snapshot-extension.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.219645\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.68348\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.914112\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 2.016383\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.267288\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.279029\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 206.472245\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 8 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.11986\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 9 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 0.944316\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 10 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.584574\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 10\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 262.134173\n",
+          "stderr": "",
+          "stdoutChars": 1916,
+          "stderrChars": 0,
+          "stdoutTruncated": false,
+          "stderrTruncated": false
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 329863,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-12"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "cat snapshot.js && cat test/snapshot-extension.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "f8cea8f4810e8fef3e7ad3836439c61794406b3d",
+        "stderr": "",
+        "stderrChars": 0,
+        "stderrTruncated": false,
+        "stdout": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport { fileURLToPath } from 'node:url';\n\nfunction validateRoot(root) {\n  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n  // before checking the object named by the caller.\n  let checked = root;\n  if (typeof root === 'string') {\n    const parsedRoot = path.parse(root).root;\n    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n  }\n  const stat = fs.lstatSync(checked);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\n\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n    throw Error('invalid selected path');\n  }\n}\n\nfunction inspect(root, selected) {\n  const parts = selected.split('/');\n  let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try {\n      stat = fs.lstatSync(current);\n    } catch (error) {\n      if (error.code === 'ENOENT') return { kind: 'missing' };\n      throw error;\n    }\n    const final = i === parts.length - 1;\n    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n      return { kind: 'unsafe' };\n    }\n    if (final) {\n      const bytes = fs.readFileSync(current);\n      return {\n        kind: 'file',\n        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n        size: bytes.length,\n        mode: stat.mode & 0o777,\n      };\n    }\n  }\n}\n\nfunction compareStrings(a, b) {\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {\n    version: 1,\n    files: [...paths].sort(compareStrings).map(selected => {\n      const current = inspect(root, selected);\n      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n    }),\n  };\n}\n\nfunction validateManifest(manifest) {\n  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n    throw Error('manifest must be an object');\n  }\n  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n\n  const seen = new Set();\n  const entries = [];\n  for (const entry of manifest.files) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw Error('manifest file entry must be an object');\n    }\n    validatePath(entry.path);\n    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n    seen.add(entry.path);\n    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }\n    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n  }\n  return entries;\n}\n\nexport function verifyManifest(root, manifest) {\n  // Validate and copy every entry before touching root or any selected path.\n  const entries = validateManifest(manifest);\n  validateRoot(root);\n\n  const unchanged = [];\n  const changed = [];\n  const missing = [];\n  const unsafe = [];\n  for (const entry of entries) {\n    const current = inspect(root, entry.path);\n    if (current.kind === 'missing') {\n      missing.push(entry.path);\n    } else if (current.kind === 'unsafe') {\n      unsafe.push(entry.path);\n    } else {\n      const reasons = [];\n      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n      if (current.mode !== entry.mode) reasons.push('mode');\n      if (reasons.length) changed.push({ path: entry.path, reasons });\n      else unchanged.push(entry.path);\n    }\n  }\n  unchanged.sort(compareStrings);\n  changed.sort((a, b) => compareStrings(a.path, b.path));\n  missing.sort(compareStrings);\n  unsafe.sort(compareStrings);\n  return {\n    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n    unchanged,\n    changed,\n    missing,\n    unsafe,\n  };\n}\n\nfunction runCli(argv) {\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n    const value = verifyManifest(args[0], manifest);\n    return { value, status: value.ok ? 0 : 1 };\n  }\n  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    const result = runCli(process.argv.slice(2));\n    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n    process.exitCode = result.status;\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`${message || 'error'}\\n`);\n    process.exitCode = 2;\n  }\n}\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = '0'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-extension-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\nfunction write(root, name, contents, mode = 0o640) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n  fs.chmodSync(target, mode);\n}\nfunction entry(overrides = {}) {\n  return { path: 'a', sha256: hash, size: 0, mode: 0, ...overrides };\n}\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\ntest('manifest validation covers shape, fields, paths, and duplicates', t => {\n  const root = fixture(t);\n  const invalid = [\n    null, [], {}, { version: 2, files: [] }, { version: 1, files: null },\n    { version: 1, files: [null] }, { version: 1, files: [[]] },\n    { version: 1, files: [entry({ path: '' })] },\n    { version: 1, files: [entry({ path: '/a' })] },\n    { version: 1, files: [entry({ path: 'a//b' })] },\n    { version: 1, files: [entry({ path: 'a/../b' })] },\n    { version: 1, files: [entry({ path: 'a\\\\b' })] },\n    { version: 1, files: [entry({ sha256: 'A'.repeat(64) })] },\n    { version: 1, files: [entry({ sha256: '0'.repeat(63) })] },\n    { version: 1, files: [entry({ size: -1 })] },\n    { version: 1, files: [entry({ size: 1.5 })] },\n    { version: 1, files: [entry({ size: Number.MAX_SAFE_INTEGER + 1 })] },\n    { version: 1, files: [entry({ mode: -1 })] },\n    { version: 1, files: [entry({ mode: 512 })] },\n    { version: 1, files: [entry(), entry()] },\n  ];\n  for (const manifest of invalid) assert.throws(() => verifyManifest(root, manifest));\n});\n\ntest('complete manifest validation precedes file inspection and unknown fields are ignored', t => {\n  const root = fixture(t);\n  write(root, 'a', 'data');\n  const original = fs.readFileSync;\n  let reads = 0;\n  fs.readFileSync = (...args) => { reads++; return original(...args); };\n  try {\n    assert.throws(() => verifyManifest(root, {\n      version: 1, ignored: true,\n      files: [entry({ path: 'a' }), entry({ path: 'bad', size: -1 })],\n    }));\n    assert.equal(reads, 0);\n  } finally {\n    fs.readFileSync = original;\n  }\n  const manifest = createManifest(root, ['a']);\n  manifest.extra = { ignored: true };\n  manifest.files[0].extra = 42;\n  assert.equal(verifyManifest(root, manifest).ok, true);\n});\n\ntest('frozen inputs remain immutable and empty manifests work', t => {\n  const root = fixture(t);\n  write(root, 'b', 'b'); write(root, 'a', 'a');\n  const paths = Object.freeze(['b', 'a']);\n  assert.deepEqual(createManifest(root, paths).files.map(x => x.path), ['a', 'b']);\n  const manifest = createManifest(root, ['b', 'a']);\n  for (const item of manifest.files) Object.freeze(item);\n  Object.freeze(manifest.files); Object.freeze(manifest);\n  assert.deepEqual(verifyManifest(root, manifest).unchanged, ['a', 'b']);\n  assert.deepEqual(createManifest(root, []), { version: 1, files: [] });\n  assert.deepEqual(verifyManifest(root, Object.freeze({ version: 1, files: Object.freeze([]) })),\n    { ok: true, unchanged: [], changed: [], missing: [], unsafe: [] });\n});\n\ntest('byte content, size, modes, and every drift class are distinguished', t => {\n  const root = fixture(t);\n  write(root, 'same', Buffer.from([0, 255, 10]), 0o600);\n  write(root, 'content', 'abc', 0o600);\n  write(root, 'size', 'long', 0o600);\n  write(root, 'mode', 'mode', 0o600);\n  write(root, 'both', 'both', 0o600);\n  write(root, 'gone', 'gone', 0o600);\n  write(root, 'unsafe', 'file', 0o600);\n  const manifest = createManifest(root, ['unsafe', 'same', 'size', 'mode', 'gone', 'content', 'both']);\n  write(root, 'content', 'xyz', 0o600);\n  write(root, 'size', 'x', 0o600);\n  fs.chmodSync(path.join(root, 'mode'), 0o644);\n  write(root, 'both', 'different', 0o644);\n  fs.rmSync(path.join(root, 'gone'));\n  fs.rmSync(path.join(root, 'unsafe')); fs.mkdirSync(path.join(root, 'unsafe'));\n  fs.writeFileSync(path.join(root, 'unselected'), 'ignored');\n  assert.deepEqual(verifyManifest(root, manifest), {\n    ok: false,\n    unchanged: ['same'],\n    changed: [\n      { path: 'both', reasons: ['content', 'mode'] },\n      { path: 'content', reasons: ['content'] },\n      { path: 'mode', reasons: ['mode'] },\n      { path: 'size', reasons: ['content'] },\n    ],\n    missing: ['gone'], unsafe: ['unsafe'],\n  });\n});\n\ntest('uses JavaScript path order for whitespace, newline, and Unicode', t => {\n  const root = fixture(t);\n  const names = ['é', 'z', '\\nname', ' name', '😀', 'Z', '\\tname'];\n  for (const name of names) write(root, name, name);\n  const expected = [...names].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n  const manifest = createManifest(root, [...names].reverse());\n  assert.deepEqual(manifest.files.map(x => x.path), expected);\n  assert.deepEqual(verifyManifest(root, { version: 1, files: [...manifest.files].reverse() }).unchanged, expected);\n});\n\ntest('components are not followed and invalid roots are rejected', t => {\n  const root = fixture(t);\n  const outside = fixture(t);\n  write(outside, 'target', 'x');\n  fs.symlinkSync(outside, path.join(root, 'link'));\n  write(root, 'plain', 'x');\n  const base = createManifest(root, ['plain']).files[0];\n  const manifests = pathName => ({ version: 1, files: [{ ...base, path: pathName }] });\n  assert.deepEqual(verifyManifest(root, manifests('link/target')).unsafe, ['link/target']);\n  fs.mkdirSync(path.join(root, 'dir')); fs.symlinkSync(path.join(outside, 'target'), path.join(root, 'dir/final'));\n  assert.deepEqual(verifyManifest(root, manifests('dir/final')).unsafe, ['dir/final']);\n  assert.deepEqual(verifyManifest(root, manifests('missing/child')).missing, ['missing/child']);\n  assert.throws(() => createManifest(`${path.join(root, 'link')}${path.sep}`, []));\n  assert.throws(() => verifyManifest(`${path.join(root, 'link')}${path.sep}`, { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'plain'), { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'absent'), { version: 1, files: [] }));\n});\n\ntest('CLI create and verify success, drift, errors, and import behavior', t => {\n  const root = fixture(t);\n  write(root, 'a', 'abc');\n  let result = cli('create', root, 'a');\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.match(result.stdout, /^\\{.*\\}\\n$/s);\n  const manifestFile = path.join(root, 'manifest.json');\n  fs.writeFileSync(manifestFile, result.stdout);\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.equal(JSON.parse(result.stdout).ok, true); assert.equal(result.stdout.endsWith('\\n'), true);\n  write(root, 'a', 'changed');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 1); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, false);\n  for (const args of [[], ['create'], ['verify', root], ['verify', root, manifestFile, 'extra']]) {\n    result = cli(...args); assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  }\n  fs.writeFileSync(manifestFile, '{bad');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  result = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(new URL('../snapshot.js', import.meta.url).href)}`], { encoding: 'utf8' });\n  assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');\n});\n",
+        "stdoutChars": 13721,
+        "stdoutTruncated": false,
+        "timedOut": false
+      },
+      "atMs": 332749,
+      "endedMs": 333729,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-13"
+    },
+    {
+      "name": "supervisor-dispatch",
+      "category": "edit",
+      "request": {
+        "action": "dispatch",
+        "jobs": [
+          {
+            "id": "strict-hash-validation",
+            "worker": "sol",
+            "task": "Repair SHA validation to require exactly 64 lowercase hex characters: current /^[0-9a-f]{64}$/ permits a trailing line terminator in JavaScript. Add explicit length check or strict end assertion, and retained tests rejecting valid-length hash followed by newline, carriage return, CRLF, U+2028 and U+2029; test a correct lowercase 64-character case too. Extend retained tests for uncovered distinctions: correct hash with deliberately wrong size must report content; intermediate regular file must be unsafe not missing; internal and dangling symlinks must be unsafe; multiple entries in changed/missing/unsafe must be sorted even when input reversed; injected filesystem EACCES must throw not drift; CLI invalid manifest, invalid selection/root, missing manifest file and empty create must have specified statuses/streams. Do not modify public tests/package.json. Run npm test.",
+            "context": "Reviewed integrated snapshot.js and test/snapshot-extension.test.js. validateManifest uses typeof sha256 string and /^[0-9a-f]{64}$/. JavaScript $ can match immediately before a final line terminator, violating exactly 64 characters. Other implementation logic appears aligned: full manifest validation first, copies entries, lstat traversal, OR comparison for content, sorting, CLI guarded by entrypoint. Existing added tests cover common cases but do not isolate size-only mismatch or intermediate file, internal/dangling symlinks, FS error propagation and several CLI errors. snapshot-extension passed and integrated; work directly from current candidate.",
+            "verify": "npm test",
+            "dependsOn": [
+              "snapshot-extension"
+            ],
+            "resumeFrom": ""
+          }
+        ],
+        "target": "",
+        "text": ""
+      },
+      "output": {
+        "admitted": [
+          "strict-hash-validation"
+        ],
+        "waited": true
+      },
+      "atMs": 347590,
+      "endedMs": 461379,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-14"
+    },
+    {
+      "name": "inspect",
+      "category": "inspect",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "inspect",
+          "ops": [
+            {
+              "a": "read_file",
+              "p": "snapshot.js",
+              "start": 1,
+              "limit": 320
+            },
+            {
+              "a": "read_file",
+              "p": "test/snapshot-extension.test.js",
+              "start": 1,
+              "limit": 400
+            },
+            {
+              "a": "read_file",
+              "p": "test/snapshot.test.js",
+              "start": 1,
+              "limit": 320
+            },
+            {
+              "a": "read_file",
+              "p": "package.json",
+              "start": 1,
+              "limit": 120
+            }
+          ]
+        }
+      },
+      "output": "# 1 {\"a\":\"read_file\",\"p\":\"snapshot.js\",\"start\":1,\"limit\":320}\nsnapshot.js (164 lines, showing 1-164):\n1\timport fs from 'node:fs';\n2\timport path from 'node:path';\n3\timport crypto from 'node:crypto';\n4\timport { fileURLToPath } from 'node:url';\n5\t\n6\tfunction validateRoot(root) {\n7\t  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n8\t  // before checking the object named by the caller.\n9\t  let checked = root;\n10\t  if (typeof root === 'string') {\n11\t    const parsedRoot = path.parse(root).root;\n12\t    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n13\t  }\n14\t  const stat = fs.lstatSync(checked);\n15\t  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n16\t}\n17\t\n18\tfunction validatePath(selected) {\n19\t  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n20\t    || selected.includes('\\\\') || selected.includes('\\0')\n21\t    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n22\t    throw Error('invalid selected path');\n23\t  }\n24\t}\n25\t\n26\tfunction inspect(root, selected) {\n27\t  const parts = selected.split('/');\n28\t  let current = root;\n29\t  for (let i = 0; i < parts.length; i++) {\n30\t    current = path.join(current, parts[i]);\n31\t    let stat;\n32\t    try {\n33\t      stat = fs.lstatSync(current);\n34\t    } catch (error) {\n35\t      if (error.code === 'ENOENT') return { kind: 'missing' };\n36\t      throw error;\n37\t    }\n38\t    const final = i === parts.length - 1;\n39\t    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n40\t      return { kind: 'unsafe' };\n41\t    }\n42\t    if (final) {\n43\t      const bytes = fs.readFileSync(current);\n44\t      return {\n45\t        kind: 'file',\n46\t        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n47\t        size: bytes.length,\n48\t        mode: stat.mode & 0o777,\n49\t      };\n50\t    }\n51\t  }\n52\t}\n53\t\n54\tfunction compareStrings(a, b) {\n55\t  return a < b ? -1 : a > b ? 1 : 0;\n56\t}\n57\t\n58\texport function createManifest(root, paths) {\n59\t  validateRoot(root);\n60\t  if (!Array.isArray(paths)) throw Error('paths must be an array');\n61\t  const seen = new Set();\n62\t  for (const selected of paths) {\n63\t    validatePath(selected);\n64\t    if (seen.has(selected)) throw Error('duplicate selection');\n65\t    seen.add(selected);\n66\t  }\n67\t  return {\n68\t    version: 1,\n69\t    files: [...paths].sort(compareStrings).map(selected => {\n70\t      const current = inspect(root, selected);\n71\t      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n72\t      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n73\t    }),\n74\t  };\n75\t}\n76\t\n77\tfunction validateManifest(manifest) {\n78\t  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n79\t    throw Error('manifest must be an object');\n80\t  }\n81\t  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n82\t\n83\t  const seen = new Set();\n84\t  const entries = [];\n85\t  for (const entry of manifest.files) {\n86\t    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n87\t      throw Error('manifest file entry must be an object');\n88\t    }\n89\t    validatePath(entry.path);\n90\t    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n91\t    seen.add(entry.path);\n92\t    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n93\t      throw Error('invalid sha256');\n94\t    }\n95\t    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n96\t    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n97\t    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n98\t  }\n99\t  return entries;\n100\t}\n101\t\n102\texport function verifyManifest(root, manifest) {\n103\t  // Validate and copy every entry before touching root or any selected path.\n104\t  const entries = validateManifest(manifest);\n105\t  validateRoot(root);\n106\t\n107\t  const unchanged = [];\n108\t  const changed = [];\n109\t  const missing = [];\n110\t  const unsafe = [];\n111\t  for (const entry of entries) {\n112\t    const current = inspect(root, entry.path);\n113\t    if (current.kind === 'missing') {\n114\t      missing.push(entry.path);\n115\t    } else if (current.kind === 'unsafe') {\n116\t      unsafe.push(entry.path);\n117\t    } else {\n118\t      const reasons = [];\n119\t      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n120\t      if (current.mode !== entry.mode) reasons.push('mode');\n121\t      if (reasons.length) changed.push({ path: entry.path, reasons });\n122\t      else unchanged.push(entry.path);\n123\t    }\n124\t  }\n125\t  unchanged.sort(compareStrings);\n126\t  changed.sort((a, b) => compareStrings(a.path, b.path));\n127\t  missing.sort(compareStrings);\n128\t  unsafe.sort(compareStrings);\n129\t  return {\n130\t    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n131\t    unchanged,\n132\t    changed,\n133\t    missing,\n134\t    unsafe,\n135\t  };\n136\t}\n137\t\n138\tfunction runCli(argv) {\n139\t  const [command, ...args] = argv;\n140\t  if (command === 'create') {\n141\t    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n142\t    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n143\t  }\n144\t  if (command === 'verify') {\n145\t    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n146\t    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n147\t    const value = verifyManifest(args[0], manifest);\n148\t    return { value, status: value.ok ? 0 : 1 };\n149\t  }\n150\t  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n151\t}\n152\t\n153\tif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n154\t  try {\n155\t    const result = runCli(process.argv.slice(2));\n156\t    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n157\t    process.exitCode = result.status;\n158\t  } catch (error) {\n159\t    const message = error instanceof Error ? error.message : String(error);\n160\t    process.stderr.write(`${message || 'error'}\\n`);\n161\t    process.exitCode = 2;\n162\t  }\n163\t}\n164\t\n— end of file (164 lines); nothing beyond line 164, do not re-read this range.\n\n# 2 {\"a\":\"read_file\",\"p\":\"test/snapshot-extension.test.js\",\"start\":1,\"limit\":400}\ntest/snapshot-extension.test.js (169 lines, showing 1-169):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os from 'node:os';\n5\timport path from 'node:path';\n6\timport { spawnSync } from 'node:child_process';\n7\timport { fileURLToPath } from 'node:url';\n8\timport { createManifest, verifyManifest } from '../snapshot.js';\n9\t\n10\tconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\n11\tconst hash = '0'.repeat(64);\n12\t\n13\tfunction fixture(t) {\n14\t  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-extension-'));\n15\t  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n16\t  return root;\n17\t}\n18\tfunction write(root, name, contents, mode = 0o640) {\n19\t  const target = path.join(root, name);\n20\t  fs.mkdirSync(path.dirname(target), { recursive: true });\n21\t  fs.writeFileSync(target, contents);\n22\t  fs.chmodSync(target, mode);\n23\t}\n24\tfunction entry(overrides = {}) {\n25\t  return { path: 'a', sha256: hash, size: 0, mode: 0, ...overrides };\n26\t}\n27\tfunction cli(...args) {\n28\t  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n29\t}\n30\t\n31\ttest('manifest validation covers shape, fields, paths, and duplicates', t => {\n32\t  const root = fixture(t);\n33\t  const invalid = [\n34\t    null, [], {}, { version: 2, files: [] }, { version: 1, files: null },\n35\t    { version: 1, files: [null] }, { version: 1, files: [[]] },\n36\t    { version: 1, files: [entry({ path: '' })] },\n37\t    { version: 1, files: [entry({ path: '/a' })] },\n38\t    { version: 1, files: [entry({ path: 'a//b' })] },\n39\t    { version: 1, files: [entry({ path: 'a/../b' })] },\n40\t    { version: 1, files: [entry({ path: 'a\\\\b' })] },\n41\t    { version: 1, files: [entry({ sha256: 'A'.repeat(64) })] },\n42\t    { version: 1, files: [entry({ sha256: '0'.repeat(63) })] },\n43\t    { version: 1, files: [entry({ size: -1 })] },\n44\t    { version: 1, files: [entry({ size: 1.5 })] },\n45\t    { version: 1, files: [entry({ size: Number.MAX_SAFE_INTEGER + 1 })] },\n46\t    { version: 1, files: [entry({ mode: -1 })] },\n47\t    { version: 1, files: [entry({ mode: 512 })] },\n48\t    { version: 1, files: [entry(), entry()] },\n49\t  ];\n50\t  for (const manifest of invalid) assert.throws(() => verifyManifest(root, manifest));\n51\t});\n52\t\n53\ttest('complete manifest validation precedes file inspection and unknown fields are ignored', t => {\n54\t  const root = fixture(t);\n55\t  write(root, 'a', 'data');\n56\t  const original = fs.readFileSync;\n57\t  let reads = 0;\n58\t  fs.readFileSync = (...args) => { reads++; return original(...args); };\n59\t  try {\n60\t    assert.throws(() => verifyManifest(root, {\n61\t      version: 1, ignored: true,\n62\t      files: [entry({ path: 'a' }), entry({ path: 'bad', size: -1 })],\n63\t    }));\n64\t    assert.equal(reads, 0);\n65\t  } finally {\n66\t    fs.readFileSync = original;\n67\t  }\n68\t  const manifest = createManifest(root, ['a']);\n69\t  manifest.extra = { ignored: true };\n70\t  manifest.files[0].extra = 42;\n71\t  assert.equal(verifyManifest(root, manifest).ok, true);\n72\t});\n73\t\n74\ttest('frozen inputs remain immutable and empty manifests work', t => {\n75\t  const root = fixture(t);\n76\t  write(root, 'b', 'b'); write(root, 'a', 'a');\n77\t  const paths = Object.freeze(['b', 'a']);\n78\t  assert.deepEqual(createManifest(root, paths).files.map(x => x.path), ['a', 'b']);\n79\t  const manifest = createManifest(root, ['b', 'a']);\n80\t  for (const item of manifest.files) Object.freeze(item);\n81\t  Object.freeze(manifest.files); Object.freeze(manifest);\n82\t  assert.deepEqual(verifyManifest(root, manifest).unchanged, ['a', 'b']);\n83\t  assert.deepEqual(createManifest(root, []), { version: 1, files: [] });\n84\t  assert.deepEqual(verifyManifest(root, Object.freeze({ version: 1, files: Object.freeze([]) })),\n85\t    { ok: true, unchanged: [], changed: [], missing: [], unsafe: [] });\n86\t});\n87\t\n88\ttest('byte content, size, modes, and every drift class are distinguished', t => {\n89\t  const root = fixture(t);\n90\t  write(root, 'same', Buffer.from([0, 255, 10]), 0o600);\n91\t  write(root, 'content', 'abc', 0o600);\n92\t  write(root, 'size', 'long', 0o600);\n93\t  write(root, 'mode', 'mode', 0o600);\n94\t  write(root, 'both', 'both', 0o600);\n95\t  write(root, 'gone', 'gone', 0o600);\n96\t  write(root, 'unsafe', 'file', 0o600);\n97\t  const manifest = createManifest(root, ['unsafe', 'same', 'size', 'mode', 'gone', 'content', 'both']);\n98\t  write(root, 'content', 'xyz', 0o600);\n99\t  write(root, 'size', 'x', 0o600);\n100\t  fs.chmodSync(path.join(root, 'mode'), 0o644);\n101\t  write(root, 'both', 'different', 0o644);\n102\t  fs.rmSync(path.join(root, 'gone'));\n103\t  fs.rmSync(path.join(root, 'unsafe')); fs.mkdirSync(path.join(root, 'unsafe'));\n104\t  fs.writeFileSync(path.join(root, 'unselected'), 'ignored');\n105\t  assert.deepEqual(verifyManifest(root, manifest), {\n106\t    ok: false,\n107\t    unchanged: ['same'],\n108\t    changed: [\n109\t      { path: 'both', reasons: ['content', 'mode'] },\n110\t      { path: 'content', reasons: ['content'] },\n111\t      { path: 'mode', reasons: ['mode'] },\n112\t      { path: 'size', reasons: ['content'] },\n113\t    ],\n114\t    missing: ['gone'], unsafe: ['unsafe'],\n115\t  });\n116\t});\n117\t\n118\ttest('uses JavaScript path order for whitespace, newline, and Unicode', t => {\n119\t  const root = fixture(t);\n120\t  const names = ['é', 'z', '\\nname', ' name', '😀', 'Z', '\\tname'];\n121\t  for (const name of names) write(root, name, name);\n122\t  const expected = [...names].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n123\t  const manifest = createManifest(root, [...names].reverse());\n124\t  assert.deepEqual(manifest.files.map(x => x.path), expected);\n125\t  assert.deepEqual(verifyManifest(root, { version: 1, files: [...manifest.files].reverse() }).unchanged, expected);\n126\t});\n127\t\n128\ttest('components are not followed and invalid roots are rejected', t => {\n129\t  const root = fixture(t);\n130\t  const outside = fixture(t);\n131\t  write(outside, 'target', 'x');\n132\t  fs.symlinkSync(outside, path.join(root, 'link'));\n133\t  write(root, 'plain', 'x');\n134\t  const base = createManifest(root, ['plain']).files[0];\n135\t  const manifests = pathName => ({ version: 1, files: [{ ...base, path: pathName }] });\n136\t  assert.deepEqual(verifyManifest(root, manifests('link/target')).unsafe, ['link/target']);\n137\t  fs.mkdirSync(path.join(root, 'dir')); fs.symlinkSync(path.join(outside, 'target'), path.join(root, 'dir/final'));\n138\t  assert.deepEqual(verifyManifest(root, manifests('dir/final')).unsafe, ['dir/final']);\n139\t  assert.deepEqual(verifyManifest(root, manifests('missing/child')).missing, ['missing/child']);\n140\t  assert.throws(() => createManifest(`${path.join(root, 'link')}${path.sep}`, []));\n141\t  assert.throws(() => verifyManifest(`${path.join(root, 'link')}${path.sep}`, { version: 1, files: [] }));\n142\t  assert.throws(() => verifyManifest(path.join(root, 'plain'), { version: 1, files: [] }));\n143\t  assert.throws(() => verifyManifest(path.join(root, 'absent'), { version: 1, files: [] }));\n144\t});\n145\t\n146\ttest('CLI create and verify success, drift, errors, and import behavior', t => {\n147\t  const root = fixture(t);\n148\t  write(root, 'a', 'abc');\n149\t  let result = cli('create', root, 'a');\n150\t  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n151\t  assert.match(result.stdout, /^\\{.*\\}\\n$/s);\n152\t  const manifestFile = path.join(root, 'manifest.json');\n153\t  fs.writeFileSync(manifestFile, result.stdout);\n154\t  result = cli('verify', root, manifestFile);\n155\t  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n156\t  assert.equal(JSON.parse(result.stdout).ok, true); assert.equal(result.stdout.endsWith('\\n'), true);\n157\t  write(root, 'a', 'changed');\n158\t  result = cli('verify', root, manifestFile);\n159\t  assert.equal(result.status, 1); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, false);\n160\t  for (const args of [[], ['create'], ['verify', root], ['verify', root, manifestFile, 'extra']]) {\n161\t    result = cli(...args); assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n162\t  }\n163\t  fs.writeFileSync(manifestFile, '{bad');\n164\t  result = cli('verify', root, manifestFile);\n165\t  assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n166\t  result = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(new URL('../snapshot.js', import.meta.url).href)}`], { encoding: 'utf8' });\n167\t  assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');\n168\t});\n169\t\n— end of file (169 lines); nothing beyond line 169, do not re-read this range.\n\n# 3 {\"a\":\"read_file\",\"p\":\"test/snapshot.test.js\",\"start\":1,\"limit\":320}\ntest/snapshot.test.js (32 lines, showing 1-32):\n1\timport test from 'node:test';\n2\timport assert from 'node:assert/strict';\n3\timport fs from 'node:fs';\n4\timport os from 'node:os';\n5\timport path from 'node:path';\n6\timport crypto from 'node:crypto';\n7\timport * as snapshot from '../snapshot.js';\n8\tfunction fixture(t) {\n9\t  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'snapshot-public-'));\n10\t  fs.writeFileSync(path.join(dir,'a.txt'),'abc'); fs.chmodSync(path.join(dir,'a.txt'),0o640);\n11\t  t.after(() => fs.rmSync(dir,{recursive:true,force:true})); return dir;\n12\t}\n13\ttest('existing builder hashes exact bytes and permission bits', t => {\n14\t  const root = fixture(t);\n15\t  assert.deepEqual(snapshot.createManifest(root,['a.txt']),{version:1,files:[{\n16\t    path:'a.txt',sha256:crypto.createHash('sha256').update('abc').digest('hex'),size:3,mode:0o640,\n17\t  }]});\n18\t});\n19\ttest('new verifier reports unchanged, content and missing', t => {\n20\t  const root = fixture(t), manifest = snapshot.createManifest(root,['a.txt']);\n21\t  assert.deepEqual(snapshot.verifyManifest(root,manifest),{ok:true,unchanged:['a.txt'],changed:[],missing:[],unsafe:[]});\n22\t  fs.writeFileSync(path.join(root,'a.txt'),'xyz');\n23\t  assert.deepEqual(snapshot.verifyManifest(root,manifest).changed,[{path:'a.txt',reasons:['content']}]);\n24\t  fs.unlinkSync(path.join(root,'a.txt'));\n25\t  assert.deepEqual(snapshot.verifyManifest(root,manifest).missing,['a.txt']);\n26\t});\n27\ttest('unsafe selections and invalid manifests throw', t => {\n28\t  const root = fixture(t);\n29\t  assert.throws(() => snapshot.createManifest(root,['../outside']));\n30\t  assert.throws(() => snapshot.verifyManifest(root,{version:2,files:[]}));\n31\t});\n32\t\n— end of file (32 lines); nothing beyond line 32, do not re-read this range.\n\n# 4 {\"a\":\"read_file\",\"p\":\"package.json\",\"start\":1,\"limit\":120}\npackage.json (2 lines, showing 1-2):\n1\t{\"name\":\"factory-snapshot-drift\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n2\t\n— end of file (2 lines); nothing beyond line 2, do not re-read this range.",
+      "atMs": 356545,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 0,
+      "id": "action-15"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "replace",
+          "p": "snapshot.js",
+          "old": "    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }",
+          "new": "    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }"
+        }
+      },
+      "output": "replaced 1 occurrence in snapshot.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `entry` is also referenced in: test/snapshot-extension.test.js\n  `invalid` is also referenced in: test/snapshot-extension.test.js, test/snapshot.test.js\n[peer] `invalid` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `validatePath` (snapshot.js:22):\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n    throw Error('invalid selected path');\n  }\n}",
+      "atMs": 374662,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 1,
+      "id": "action-16"
+    },
+    {
+      "name": "write_file",
+      "category": "edit",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "write_file",
+          "p": "test/snapshot-milestone.test.js",
+          "content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = 'a'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-milestone-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\n\nfunction write(root, name, contents = name) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n}\n\nfunction manifestEntry(pathname, overrides = {}) {\n  return { path: pathname, sha256: hash, size: 0, mode: 0, ...overrides };\n}\n\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\nfunction assertCliError(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('sha256 validation requires exactly 64 lowercase hexadecimal characters', t => {\n  const root = fixture(t);\n  const valid = { version: 1, files: [manifestEntry('absent')] };\n  assert.deepEqual(verifyManifest(root, valid).missing, ['absent']);\n\n  for (const terminator of ['\\n', '\\r', '\\r\\n', '\\u2028', '\\u2029']) {\n    const invalid = {\n      version: 1,\n      files: [manifestEntry('absent', { sha256: hash + terminator })],\n    };\n    assert.throws(() => verifyManifest(root, invalid), /sha256/);\n  }\n});\n\ntest('a correct hash paired with a deliberately wrong size reports content drift', t => {\n  const root = fixture(t);\n  write(root, 'file', 'unchanged bytes');\n  const manifest = createManifest(root, ['file']);\n  manifest.files[0].size += 1;\n  assert.deepEqual(verifyManifest(root, manifest).changed, [\n    { path: 'file', reasons: ['content'] },\n  ]);\n});\n\ntest('intermediate files and internal or dangling symlinks are unsafe', t => {\n  const root = fixture(t);\n  write(root, 'basis', 'basis');\n  write(root, 'middle', 'not a directory');\n  write(root, 'inside', 'target');\n  fs.symlinkSync('inside', path.join(root, 'internal-link'));\n  fs.symlinkSync('does-not-exist', path.join(root, 'dangling-link'));\n\n  const basis = createManifest(root, ['basis']).files[0];\n  const verifyPath = pathname => verifyManifest(root, {\n    version: 1,\n    files: [{ ...basis, path: pathname }],\n  });\n  assert.deepEqual(verifyPath('middle/child').unsafe, ['middle/child']);\n  assert.deepEqual(verifyPath('internal-link').unsafe, ['internal-link']);\n  assert.deepEqual(verifyPath('dangling-link').unsafe, ['dangling-link']);\n});\n\ntest('multiple changed, missing, and unsafe entries are sorted with reversed input', t => {\n  const root = fixture(t);\n  const names = ['changed-z', 'changed-a', 'missing-z', 'missing-a', 'unsafe-z', 'unsafe-a'];\n  for (const name of names) write(root, name, `original ${name}`);\n  const manifest = createManifest(root, names);\n\n  write(root, 'changed-z', 'new z');\n  write(root, 'changed-a', 'new a');\n  fs.rmSync(path.join(root, 'missing-z'));\n  fs.rmSync(path.join(root, 'missing-a'));\n  for (const name of ['unsafe-z', 'unsafe-a']) {\n    fs.rmSync(path.join(root, name));\n    fs.mkdirSync(path.join(root, name));\n  }\n  manifest.files.reverse();\n\n  const report = verifyManifest(root, manifest);\n  assert.deepEqual(report.changed, [\n    { path: 'changed-a', reasons: ['content'] },\n    { path: 'changed-z', reasons: ['content'] },\n  ]);\n  assert.deepEqual(report.missing, ['missing-a', 'missing-z']);\n  assert.deepEqual(report.unsafe, ['unsafe-a', 'unsafe-z']);\n});\n\ntest('filesystem EACCES is thrown rather than classified as drift', t => {\n  const root = fixture(t);\n  write(root, 'locked', 'data');\n  const manifest = createManifest(root, ['locked']);\n  const target = path.join(root, 'locked');\n  const original = fs.lstatSync;\n  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });\n  fs.lstatSync = pathname => {\n    if (pathname === target) throw denied;\n    return original(pathname);\n  };\n  try {\n    assert.throws(() => verifyManifest(root, manifest), error => error === denied);\n  } finally {\n    fs.lstatSync = original;\n  }\n});\n\ntest('CLI error and empty-create contracts specify status and streams', t => {\n  const root = fixture(t);\n  const manifestFile = path.join(root, 'manifest.json');\n\n  let result = cli('create', root);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, '{\"version\":1,\"files\":[]}\\n');\n\n  fs.writeFileSync(manifestFile, JSON.stringify({ version: 1, files: [manifestEntry('x', { sha256: 'bad' })] }));\n  assertCliError(cli('verify', root, manifestFile));\n  assertCliError(cli('create', root, '../invalid'));\n  assertCliError(cli('create', path.join(root, 'missing-root')));\n  assertCliError(cli('verify', root, path.join(root, 'missing-manifest.json')));\n});\n"
+        }
+      },
+      "output": "wrote 5067 bytes to test/snapshot-milestone.test.js\n[impact] Cross-file references for symbols in this edit — if the change alters their contract, these sites are affected:\n  `createManifest` is also referenced in: snapshot.js, test/snapshot-extension.test.js, test/snapshot.test.js\n  `verifyManifest` is also referenced in: snapshot.js, test/snapshot-extension.test.js, test/snapshot.test.js\n  `script` is also referenced in: test/snapshot-extension.test.js\n[peer] `createManifest` is also handled elsewhere in this repo. These functions operate on it — check whether they do something around it your edit is missing:\n— `compareStrings` (snapshot.js:58):\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n— `runCli` (snapshot.js:143):\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n[async-test guard] This test introduced `assert.throws`. Confirm the subject throws synchronously. If it is `async` or returns a Promise, use `await assert.rejects(...)` and preserve the API's rejection timing; do not make production code throw synchronously to satisfy this probe.",
+      "atMs": 435641,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 2,
+      "id": "action-17"
+    },
+    {
+      "name": "replace",
+      "category": "edit",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "replace",
+          "p": "snapshot.js",
+          "old": "    if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }",
+          "new": "    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }"
+        }
+      },
+      "output": "ERROR: \"old\" text not found in snapshot.js. Your text matches the file up to line 92, then DIVERGES: the file continues \"entry.sha256.length !== 64\\n      || !/^[0-9a-f]{64}$/.test(e\" but your \"old\" continues \"!/^[0-9a-f]{64}$/.test(entry.sha256)) {\\n      throw Error('i\". Use read_file on snapshot.js for current bytes beyond this clipped view, or replace a shorter unique span already shown exactly.",
+      "atMs": 442254,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 3,
+      "id": "action-18"
+    },
+    {
+      "name": "read_file",
+      "category": "inspect",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "read_file",
+          "p": "snapshot.js",
+          "start": 86,
+          "limit": 16
+        }
+      },
+      "output": "snapshot.js (165 lines, showing 86-101):\n86\t    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n87\t      throw Error('manifest file entry must be an object');\n88\t    }\n89\t    validatePath(entry.path);\n90\t    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n91\t    seen.add(entry.path);\n92\t    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n93\t      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n94\t      throw Error('invalid sha256');\n95\t    }\n96\t    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n97\t    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n98\t    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n99\t  }\n100\t  return entries;\n101\t}\n... (64 more lines — take bigger bites: omit \"limit\" to get up to ~600 lines per read)",
+      "atMs": 447013,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 4,
+      "id": "action-19"
+    },
+    {
+      "name": "shell",
+      "category": "command",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "shell",
+          "c": "npm test"
+        }
+      },
+      "output": "VERDICT: all 16 tests passed.\n$ npm test\ncwd: /workers/strict-hash-validation\nsandbox: docker:alpine:3\nexit 0\n\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.199044\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.784691\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.935213\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 2.522207\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.618511\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.60559\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 209.362934\n  ...\n# Subtest: sha256 validation requires exactly 64 lowercase hexadecimal characters\nok 8 - sha256 validation requires exactly 64 lowercase hexadecimal characters\n  ---\n  duration_ms: 2.724658\n  ...\n# Subtest: a correct hash paired with a deliberately wrong size reports content drift\nok 9 - a correct hash paired with a deliberately wrong size reports content drift\n  ---\n  duration_ms: 1.57272\n  ...\n# Subtest: intermediate files and internal or dangling symlinks are unsafe\nok 10 - intermediate files and internal or dangling symlinks are unsafe\n  ---\n  duration_ms: 1.914552\n  ...\n# Subtest: multiple changed, missing, and unsafe entries are sorted with reversed input\nok 11 - multiple changed, missing, and unsafe entries are sorted with reversed input\n  ---\n  duration_ms: 1.876553\n  ...\n# Subtest: filesystem EACCES is thrown rather than classified as drift\nok 12 - filesystem EACCES is thrown rather than classified as drift\n  ---\n  duration_ms: 0.924716\n  ...\n# Subtest: CLI error and empty-create contracts specify status and streams\nok 13 - CLI error and empty-create contracts specify status and streams\n  ---\n  duration_ms: 115.87563\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 14 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.263931\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 15 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 1.070227\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 16 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.709714\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 266.098092",
+      "atMs": 449641,
+      "endedMs": null,
+      "exitCode": 0,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 5,
+      "id": "action-20"
+    },
+    {
+      "name": "done",
+      "category": "finish",
+      "request": {
+        "job": "strict-hash-validation",
+        "action": {
+          "a": "done",
+          "summary": "Repaired SHA-256 manifest validation with an explicit 64-character length requirement. Added retained tests for all five trailing line terminators, a valid lowercase hash, size-only content drift, intermediate files and internal/dangling symlinks, sorting of multiple drift classes under reversed input, EACCES propagation, and CLI invalid/error plus empty-create stream/status contracts. `npm test` passes all 16 tests."
+        }
+      },
+      "output": "",
+      "atMs": 458728,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-worker-sol",
+      "turn": 6,
+      "id": "action-21"
+    },
+    {
+      "name": "integrate-worker",
+      "category": "other",
+      "request": {
+        "job": "strict-hash-validation"
+      },
+      "output": {
+        "pass": true,
+        "integrated": true,
+        "changedFiles": [
+          "snapshot.js",
+          "test/snapshot-milestone.test.js"
+        ],
+        "verification": {
+          "pass": true,
+          "code": 0,
+          "timedOut": false,
+          "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.163914\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.674931\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.887262\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 1.870022\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.210358\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.239158\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 209.823979\n  ...\n# Subtest: sha256 validation requires exactly 64 lowercase hexadecimal characters\nok 8 - sha256 validation requires exactly 64 lowercase hexadecimal characters\n  ---\n  duration_ms: 2.666707\n  ...\n# Subtest: a correct hash paired with a deliberately wrong size reports content drift\nok 9 - a correct hash paired with a deliberately wrong size reports content drift\n  ---\n  duration_ms: 1.450479\n  ...\n# Subtest: intermediate files and internal or dangling symlinks are unsafe\nok 10 - intermediate files and internal or dangling symlinks are unsafe\n  ---\n  duration_ms: 1.671131\n  ...\n# Subtest: multiple changed, missing, and unsafe entries are sorted with reversed input\nok 11 - multiple changed, missing, and unsafe entries are sorted with reversed input\n  ---\n  duration_ms: 1.431509\n  ...\n# Subtest: filesystem EACCES is thrown rather than classified as drift\nok 12 - filesystem EACCES is thrown rather than classified as drift\n  ---\n  duration_ms: 0.777115\n  ...\n# Subtest: CLI error and empty-create contracts specify status and streams\nok 13 - CLI error and empty-create contracts specify status and streams\n  ---\n  duration_ms: 120.312959\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 14 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.169061\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 15 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 1.023037\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 16 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.573813\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 264.498173\n",
+          "stderr": "",
+          "stdoutChars": 3072,
+          "stderrChars": 0,
+          "stdoutTruncated": false,
+          "stderrTruncated": false
+        },
+        "conflict": null,
+        "error": null
+      },
+      "atMs": 461372,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-integration",
+      "id": "action-22"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "git diff c703dcaf5edc35154fdedccb61bba9b80746f318 --stat && grep -n -A3 'typeof entry.sha256' snapshot.js && cat test/snapshot-milestone.test.js"
+      },
+      "output": {
+        "code": 129,
+        "pass": false,
+        "snapshot": "b6d04d790e06dc2eb1d2a9aa9b5bdf6ea301ab3d",
+        "stderr": "warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>\n\nDiff output format options\n    -p, --patch           generate patch\n    -s, --no-patch        suppress diff output\n    -u                    generate patch\n    -U, --unified[=<n>]   generate diffs with <n> lines context\n    -W, --[no-]function-context\n                          generate diffs with <n> lines context\n    --raw                 generate the diff in raw format\n    --patch-with-raw      synonym for '-p --raw'\n    --patch-with-stat     synonym for '-p --stat'\n    --numstat             machine friendly --stat\n    --shortstat           output only the last line of --stat\n    -X, --dirstat[=<param1,param2>...]\n                          output the distribution of relative amount of changes for each sub-directory\n    --cumulative          synonym for --dirstat=cumulative\n    --dirstat-by-file[=<param1,param2>...]\n                          synonym for --dirstat=files,param1,param2...\n    --check               warn if changes introduce conflict markers or whitespace errors\n    --summary             condensed summary such as creations, renames and mode changes\n    --name-only           show only names of changed files\n    --name-status         show only names and status of changed files\n    --stat[=<width>[,<name-width>[,<count>]]]\n                          generate diffstat\n    --stat-width <width>  generate diffstat with a given width\n    --stat-name-width <width>\n                          generate diffstat with a given name width\n    --stat-graph-width <width>\n                          generate diffstat with a given graph width\n    --stat-count <count>  generate diffstat with limited lines\n    --[no-]compact-summary\n                          generate compact summary in diffstat\n    --binary              output a binary diff that can be applied\n    --[no-]full-index     show full pre- and post-image object names on the \"index\" lines\n    --[no-]color[=<when>] show colored diff\n    --ws-error-highlight <kind>\n                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff\n    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat\n    --[no-]abbrev[=<n>]   use <n> digits to display object names\n    --src-prefix <prefix> show the given source prefix instead of \"a/\"\n    --dst-prefix <prefix> show the given destination prefix instead of \"b/\"\n    --line-prefix <prefix>\n                          prepend an additional prefix to every line of output\n    --no-prefix           do not show any source or destination prefix\n    --default-prefix      use default prefixes a/ and b/\n    --inter-hunk-context <n>\n                          show context between diff hunks up to the specified number of lines\n    --output-indicator-new <char>\n                          specify the character to indicate a new line instead of '+'\n    --\n[3357 characters omitted; full output retained in the check record]\nries from the index\n    --ita-visible-in-index\n                          treat 'git add -N' entries as real in the index\n    -S <string>           look for differences that change the number of occurrences of the specified string\n    -G <regex>            look for differences that change the number of occurrences of the specified regex\n    --pickaxe-all         show all changes in the changeset with -S or -G\n    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression\n    -O <file>             control the order in which files appear in the output\n    --rotate-to <path>    show the change in the specified path first\n    --skip-to <path>      skip the output to the specified path\n    --find-object <object-id>\n                          look for differences that change the number of occurrences of the specified object\n    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]\n                          select files by diff type\n    --output <file>       output to a specific file\n\n",
+        "stderrChars": 7357,
+        "stderrTruncated": true,
+        "stdout": "",
+        "stdoutChars": 0,
+        "stdoutTruncated": false,
+        "timedOut": false
+      },
+      "atMs": 467027,
+      "endedMs": 467530,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-23"
+    },
+    {
+      "name": "supervisor-check",
+      "category": "other",
+      "request": {
+        "action": "check",
+        "jobs": [],
+        "target": "",
+        "text": "grep -n -A3 'typeof entry.sha256' snapshot.js && cat test/snapshot-milestone.test.js"
+      },
+      "output": {
+        "code": 0,
+        "pass": true,
+        "snapshot": "215a5f51cb2487e8efc31b25dcb6060236ec371c",
+        "stderr": "",
+        "stderrChars": 0,
+        "stderrTruncated": false,
+        "stdout": "92:    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n93-      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n94-      throw Error('invalid sha256');\n95-    }\nimport test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = 'a'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-milestone-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\n\nfunction write(root, name, contents = name) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n}\n\nfunction manifestEntry(pathname, overrides = {}) {\n  return { path: pathname, sha256: hash, size: 0, mode: 0, ...overrides };\n}\n\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\nfunction assertCliError(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('sha256 validation requires exactly 64 lowercase hexadecimal characters', t => {\n  const root = fixture(t);\n  const valid = { version: 1, files: [manifestEntry('absent')] };\n  assert.deepEqual(verifyManifest(root, valid).missing, ['absent']);\n\n  for (const terminator of ['\\n', '\\r', '\\r\\n', '\\u2028', '\\u2029']) {\n    const invalid = {\n      version: 1,\n      files: [manifestEntry('absent', { sha256: hash + terminator })],\n    };\n    assert.throws(() => verifyManifest(root, invalid), /sha256/);\n  }\n});\n\ntest('a correct hash paired with a deliberately wrong size reports content drift', t => {\n  const root = fixture(t);\n  write(root, 'file', 'unchanged bytes');\n  const manifest = createManifest(root, ['file']);\n  manifest.files[0].size += 1;\n  assert.deepEqual(verifyManifest(root, manifest).changed, [\n    { path: 'file', reasons: ['content'] },\n  ]);\n});\n\ntest('intermediate files and internal or dangling symlinks are unsafe', t => {\n  const root = fixture(t);\n  write(root, 'basis', 'basis');\n  write(root, 'middle', 'not a directory');\n  write(root, 'inside', 'target');\n  fs.symlinkSync('inside', path.join(root, 'internal-link'));\n  fs.symlinkSync('does-not-exist', path.join(root, 'dangling-link'));\n\n  const basis = createManifest(root, ['basis']).files[0];\n  const verifyPath = pathname => verifyManifest(root, {\n    version: 1,\n    files: [{ ...basis, path: pathname }],\n  });\n  assert.deepEqual(verifyPath('middle/child').unsafe, ['middle/child']);\n  assert.deepEqual(verifyPath('internal-link').unsafe, ['internal-link']);\n  assert.deepEqual(verifyPath('dangling-link').unsafe, ['dangling-link']);\n});\n\ntest('multiple changed, missing, and unsafe entries are sorted with reversed input', t => {\n  const root = fixture(t);\n  const names = ['changed-z', 'changed-a', 'missing-z', 'missing-a', 'unsafe-z', 'unsafe-a'];\n  for (const name of names) write(root, name, `original ${name}`);\n  const manifest = createManifest(root, names);\n\n  write(root, 'changed-z', 'new z');\n  write(root, 'changed-a', 'new a');\n  fs.rmSync(path.join(root, 'missing-z'));\n  fs.rmSync(path.join(root, 'missing-a'));\n  for (const name of ['unsafe-z', 'unsafe-a']) {\n    fs.rmSync(path.join(root, name));\n    fs.mkdirSync(path.join(root, name));\n  }\n  manifest.files.reverse();\n\n  const report = verifyManifest(root, manifest);\n  assert.deepEqual(report.changed, [\n    { path: 'changed-a', reasons: ['content'] },\n    { path: 'changed-z', reasons: ['content'] },\n  ]);\n  assert.deepEqual(report.missing, ['missing-a', 'missing-z']);\n  assert.deepEqual(report.unsafe, ['unsafe-a', 'unsafe-z']);\n});\n\ntest('filesystem EACCES is thrown rather than classified as drift', t => {\n  const root = fixture(t);\n  write(root, 'locked', 'data');\n  const manifest = createManifest(root, ['locked']);\n  const target = path.join(root, 'locked');\n  const original = fs.lstatSync;\n  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });\n  fs.lstatSync = pathname => {\n    if (pathname === target) throw denied;\n    return original(pathname);\n  };\n  try {\n    assert.throws(() => verifyManifest(root, manifest), error => error === denied);\n  } finally {\n    fs.lstatSync = original;\n  }\n});\n\ntest('CLI error and empty-create contracts specify status and streams', t => {\n  const root = fixture(t);\n  const manifestFile = path.join(root, 'manifest.json');\n\n  let result = cli('create', root);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, '{\"version\":1,\"files\":[]}\\n');\n\n  fs.writeFileSync(manifestFile, JSON.stringify({ version: 1, files: [manifestEntry('x', { sha256: 'bad' })] }));\n  assertCliError(cli('verify', root, manifestFile));\n  assertCliError(cli('create', root, '../invalid'));\n  assertCliError(cli('create', path.join(root, 'missing-root')));\n  assertCliError(cli('verify', root, path.join(root, 'missing-manifest.json')));\n});\n",
+        "stdoutChars": 5242,
+        "stdoutTruncated": false,
+        "timedOut": false
+      },
+      "atMs": 471263,
+      "endedMs": 471911,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-24"
+    },
+    {
+      "name": "supervisor-finish",
+      "category": "other",
+      "request": {
+        "action": "finish",
+        "jobs": [],
+        "target": "",
+        "text": "Implemented synchronous verifyManifest and create/verify CLI while preserving createManifest. Added deterministic validation, drift, symlink, ordering, immutability, and CLI tests. npm test passes all 16 tests; package.json and existing public tests are unchanged."
+      },
+      "output": {
+        "pass": true,
+        "code": 0,
+        "timedOut": false,
+        "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.148674\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.65987\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.782271\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 1.845012\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.210398\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.229748\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 208.153769\n  ...\n# Subtest: sha256 validation requires exactly 64 lowercase hexadecimal characters\nok 8 - sha256 validation requires exactly 64 lowercase hexadecimal characters\n  ---\n  duration_ms: 2.590006\n  ...\n# Subtest: a correct hash paired with a deliberately wrong size reports content drift\nok 9 - a correct hash paired with a deliberately wrong size reports content drift\n  ---\n  duration_ms: 1.423069\n  ...\n# Subtest: intermediate files and internal or dangling symlinks are unsafe\nok 10 - intermediate files and internal or dangling symlinks are unsafe\n  ---\n  duration_ms: 1.428689\n  ...\n# Subtest: multiple changed, missing, and unsafe entries are sorted with reversed input\nok 11 - multiple changed, missing, and unsafe entries are sorted with reversed input\n  ---\n  duration_ms: 1.371699\n  ...\n# Subtest: filesystem EACCES is thrown rather than classified as drift\nok 12 - filesystem EACCES is thrown rather than classified as drift\n  ---\n  duration_ms: 0.613724\n  ...\n# Subtest: CLI error and empty-create contracts specify status and streams\nok 13 - CLI error and empty-create contracts specify status and streams\n  ---\n  duration_ms: 116.601426\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 14 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.13099\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 15 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 0.959316\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 16 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.590584\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 260.451888\n",
+        "stderr": "",
+        "stdoutChars": 3070,
+        "stderrChars": 0,
+        "stdoutTruncated": false,
+        "stderrTruncated": false
+      },
+      "atMs": 477354,
+      "endedMs": null,
+      "exitCode": null,
+      "state": "recorded",
+      "source": "factory-supervisor",
+      "id": "action-25"
+    }
+  ],
+  "stations": [
+    {
+      "type": "station.started",
+      "atMs": 30464,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 30471,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 30478,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 30484,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 30491,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 328229,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 328236,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 328244,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 328251,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 328259,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 328267,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 328274,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 328281,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 348375,
+      "station": "intake-1",
+      "stationRef": "station:compatibility-intake@1:sha256:1459ae0e4151eb65c94fe14e64d6db38a8fb1102bbce922d995d47ca24d0c6e7",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 348382,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 348389,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 348395,
+      "station": "intake-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 348402,
+      "station": "agent-1",
+      "stationRef": "station:compatibility-agent-loop@1:sha256:e36bb381882c9418e86ce076481efd8e51941e36d0eb05673ae602a7993bbff0",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 459705,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 459713,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 459720,
+      "station": "agent-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.started",
+      "atMs": 459728,
+      "station": "verification-1",
+      "stationRef": "station:compatibility-verification@1:sha256:fed5ffa27d4eb8d53f9a014e555d8119e960000fd7b925634fdb11d3bd0efebc",
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "station.completed",
+      "atMs": 459735,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "gauge.result",
+      "atMs": 459742,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": "pass",
+      "verdict": null
+    },
+    {
+      "type": "station.released",
+      "atMs": 459750,
+      "station": "verification-1",
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    },
+    {
+      "type": "job.released",
+      "atMs": 459757,
+      "station": null,
+      "stationRef": null,
+      "status": null,
+      "verdict": null
+    }
+  ],
+  "events": [],
+  "finalResponse": "Implemented synchronous verifyManifest and create/verify CLI while preserving createManifest. Added deterministic validation, drift, symlink, ordering, immutability, and CLI tests. npm test passes all 16 tests; package.json and existing public tests are unchanged.",
+  "finalResponseKind": "delivery",
+  "files": [
+    {
+      "path": "package.json",
+      "state": "unchanged",
+      "beforeSha256": "72de32bf7852ef0780e669ba9b02203ec7ea28c11d6c8c4263136bd72d14c666",
+      "afterSha256": "72de32bf7852ef0780e669ba9b02203ec7ea28c11d6c8c4263136bd72d14c666",
+      "before": "{\"name\":\"factory-snapshot-drift\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "after": "{\"name\":\"factory-snapshot-drift\",\"private\":true,\"type\":\"module\",\"scripts\":{\"test\":\"node --test\"}}\n",
+      "displaySha256": "72de32bf7852ef0780e669ba9b02203ec7ea28c11d6c8c4263136bd72d14c666",
+      "diff": ""
+    },
+    {
+      "path": "snapshot.js",
+      "state": "changed",
+      "beforeSha256": "81f3375aa1c860f10864be482d8eeca0cee02843d736933708936aacedf97923",
+      "afterSha256": "33cdecbbc07a4e36c965ff23a8513a1634fab792757d57a4bef3d0895738c972",
+      "before": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\n\nfunction validateRoot(root) {\n  const stat = fs.lstatSync(root);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) throw Error('invalid selected path');\n}\nfunction inspect(root, selected) {\n  const parts = selected.split('/'); let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try { stat = fs.lstatSync(current); }\n    catch (error) { if (error.code === 'ENOENT') return {kind:'missing'}; throw error; }\n    if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return {kind:'unsafe'};\n    if (i === parts.length - 1) {\n      const bytes = fs.readFileSync(current);\n      return {kind:'file',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),size:bytes.length,mode:stat.mode & 0o777};\n    }\n  }\n}\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {version:1,files:[...paths].sort().map(selected => {\n    const current = inspect(root, selected);\n    if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n    return {path:selected,sha256:current.sha256,size:current.size,mode:current.mode};\n  })};\n}\n// Add verifyManifest and the CLI without weakening createManifest.\n",
+      "after": "import fs from 'node:fs';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport { fileURLToPath } from 'node:url';\n\nfunction validateRoot(root) {\n  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n  // before checking the object named by the caller.\n  let checked = root;\n  if (typeof root === 'string') {\n    const parsedRoot = path.parse(root).root;\n    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n  }\n  const stat = fs.lstatSync(checked);\n  if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n}\n\nfunction validatePath(selected) {\n  if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n    || selected.includes('\\\\') || selected.includes('\\0')\n    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n    throw Error('invalid selected path');\n  }\n}\n\nfunction inspect(root, selected) {\n  const parts = selected.split('/');\n  let current = root;\n  for (let i = 0; i < parts.length; i++) {\n    current = path.join(current, parts[i]);\n    let stat;\n    try {\n      stat = fs.lstatSync(current);\n    } catch (error) {\n      if (error.code === 'ENOENT') return { kind: 'missing' };\n      throw error;\n    }\n    const final = i === parts.length - 1;\n    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n      return { kind: 'unsafe' };\n    }\n    if (final) {\n      const bytes = fs.readFileSync(current);\n      return {\n        kind: 'file',\n        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n        size: bytes.length,\n        mode: stat.mode & 0o777,\n      };\n    }\n  }\n}\n\nfunction compareStrings(a, b) {\n  return a < b ? -1 : a > b ? 1 : 0;\n}\n\nexport function createManifest(root, paths) {\n  validateRoot(root);\n  if (!Array.isArray(paths)) throw Error('paths must be an array');\n  const seen = new Set();\n  for (const selected of paths) {\n    validatePath(selected);\n    if (seen.has(selected)) throw Error('duplicate selection');\n    seen.add(selected);\n  }\n  return {\n    version: 1,\n    files: [...paths].sort(compareStrings).map(selected => {\n      const current = inspect(root, selected);\n      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n    }),\n  };\n}\n\nfunction validateManifest(manifest) {\n  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n    throw Error('manifest must be an object');\n  }\n  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n\n  const seen = new Set();\n  const entries = [];\n  for (const entry of manifest.files) {\n    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n      throw Error('manifest file entry must be an object');\n    }\n    validatePath(entry.path);\n    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n    seen.add(entry.path);\n    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n      throw Error('invalid sha256');\n    }\n    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n  }\n  return entries;\n}\n\nexport function verifyManifest(root, manifest) {\n  // Validate and copy every entry before touching root or any selected path.\n  const entries = validateManifest(manifest);\n  validateRoot(root);\n\n  const unchanged = [];\n  const changed = [];\n  const missing = [];\n  const unsafe = [];\n  for (const entry of entries) {\n    const current = inspect(root, entry.path);\n    if (current.kind === 'missing') {\n      missing.push(entry.path);\n    } else if (current.kind === 'unsafe') {\n      unsafe.push(entry.path);\n    } else {\n      const reasons = [];\n      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n      if (current.mode !== entry.mode) reasons.push('mode');\n      if (reasons.length) changed.push({ path: entry.path, reasons });\n      else unchanged.push(entry.path);\n    }\n  }\n  unchanged.sort(compareStrings);\n  changed.sort((a, b) => compareStrings(a.path, b.path));\n  missing.sort(compareStrings);\n  unsafe.sort(compareStrings);\n  return {\n    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n    unchanged,\n    changed,\n    missing,\n    unsafe,\n  };\n}\n\nfunction runCli(argv) {\n  const [command, ...args] = argv;\n  if (command === 'create') {\n    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n  }\n  if (command === 'verify') {\n    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n    const value = verifyManifest(args[0], manifest);\n    return { value, status: value.ok ? 0 : 1 };\n  }\n  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n}\n\nif (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n  try {\n    const result = runCli(process.argv.slice(2));\n    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n    process.exitCode = result.status;\n  } catch (error) {\n    const message = error instanceof Error ? error.message : String(error);\n    process.stderr.write(`${message || 'error'}\\n`);\n    process.exitCode = 2;\n  }\n}\n",
+      "displaySha256": "33cdecbbc07a4e36c965ff23a8513a1634fab792757d57a4bef3d0895738c972",
+      "diff": "--- starter/snapshot.js\n+++ delivered/snapshot.js\n@@ -1,30 +1,60 @@\n import fs from 'node:fs';\n import path from 'node:path';\n import crypto from 'node:crypto';\n+import { fileURLToPath } from 'node:url';\n \n function validateRoot(root) {\n-  const stat = fs.lstatSync(root);\n+  // lstat(\"link/\") follows the link on POSIX, so remove trailing separators\n+  // before checking the object named by the caller.\n+  let checked = root;\n+  if (typeof root === 'string') {\n+    const parsedRoot = path.parse(root).root;\n+    while (checked.length > parsedRoot.length && checked.endsWith(path.sep)) checked = checked.slice(0, -1);\n+  }\n+  const stat = fs.lstatSync(checked);\n   if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('root must be a non-symlink directory');\n }\n+\n function validatePath(selected) {\n   if (typeof selected !== 'string' || !selected || selected.startsWith('/')\n     || selected.includes('\\\\') || selected.includes('\\0')\n-    || selected.split('/').some(part => !part || part === '.' || part === '..')) throw Error('invalid selected path');\n+    || selected.split('/').some(part => !part || part === '.' || part === '..')) {\n+    throw Error('invalid selected path');\n+  }\n }\n+\n function inspect(root, selected) {\n-  const parts = selected.split('/'); let current = root;\n+  const parts = selected.split('/');\n+  let current = root;\n   for (let i = 0; i < parts.length; i++) {\n     current = path.join(current, parts[i]);\n     let stat;\n-    try { stat = fs.lstatSync(current); }\n-    catch (error) { if (error.code === 'ENOENT') return {kind:'missing'}; throw error; }\n-    if (stat.isSymbolicLink() || (i === parts.length - 1 ? !stat.isFile() : !stat.isDirectory())) return {kind:'unsafe'};\n-    if (i === parts.length - 1) {\n+    try {\n+      stat = fs.lstatSync(current);\n+    } catch (error) {\n+      if (error.code === 'ENOENT') return { kind: 'missing' };\n+      throw error;\n+    }\n+    const final = i === parts.length - 1;\n+    if (stat.isSymbolicLink() || (final ? !stat.isFile() : !stat.isDirectory())) {\n+      return { kind: 'unsafe' };\n+    }\n+    if (final) {\n       const bytes = fs.readFileSync(current);\n-      return {kind:'file',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),size:bytes.length,mode:stat.mode & 0o777};\n+      return {\n+        kind: 'file',\n+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),\n+        size: bytes.length,\n+        mode: stat.mode & 0o777,\n+      };\n     }\n   }\n }\n+\n+function compareStrings(a, b) {\n+  return a < b ? -1 : a > b ? 1 : 0;\n+}\n+\n export function createManifest(root, paths) {\n   validateRoot(root);\n   if (!Array.isArray(paths)) throw Error('paths must be an array');\n@@ -34,10 +64,101 @@\n     if (seen.has(selected)) throw Error('duplicate selection');\n     seen.add(selected);\n   }\n-  return {version:1,files:[...paths].sort().map(selected => {\n-    const current = inspect(root, selected);\n-    if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n-    return {path:selected,sha256:current.sha256,size:current.size,mode:current.mode};\n-  })};\n+  return {\n+    version: 1,\n+    files: [...paths].sort(compareStrings).map(selected => {\n+      const current = inspect(root, selected);\n+      if (current.kind !== 'file') throw Error(`${current.kind} selected path`);\n+      return { path: selected, sha256: current.sha256, size: current.size, mode: current.mode };\n+    }),\n+  };\n }\n-// Add verifyManifest and the CLI without weakening createManifest.\n+\n+function validateManifest(manifest) {\n+  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {\n+    throw Error('manifest must be an object');\n+  }\n+  if (manifest.version !== 1 || !Array.isArray(manifest.files)) throw Error('invalid manifest');\n+\n+  const seen = new Set();\n+  const entries = [];\n+  for (const entry of manifest.files) {\n+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {\n+      throw Error('manifest file entry must be an object');\n+    }\n+    validatePath(entry.path);\n+    if (seen.has(entry.path)) throw Error('duplicate manifest path');\n+    seen.add(entry.path);\n+    if (typeof entry.sha256 !== 'string' || entry.sha256.length !== 64\n+      || !/^[0-9a-f]{64}$/.test(entry.sha256)) {\n+      throw Error('invalid sha256');\n+    }\n+    if (!Number.isSafeInteger(entry.size) || entry.size < 0) throw Error('invalid size');\n+    if (!Number.isInteger(entry.mode) || entry.mode < 0 || entry.mode > 0o777) throw Error('invalid mode');\n+    entries.push({ path: entry.path, sha256: entry.sha256, size: entry.size, mode: entry.mode });\n+  }\n+  return entries;\n+}\n+\n+export function verifyManifest(root, manifest) {\n+  // Validate and copy every entry before touching root or any selected path.\n+  const entries = validateManifest(manifest);\n+  validateRoot(root);\n+\n+  const unchanged = [];\n+  const changed = [];\n+  const missing = [];\n+  const unsafe = [];\n+  for (const entry of entries) {\n+    const current = inspect(root, entry.path);\n+    if (current.kind === 'missing') {\n+      missing.push(entry.path);\n+    } else if (current.kind === 'unsafe') {\n+      unsafe.push(entry.path);\n+    } else {\n+      const reasons = [];\n+      if (current.sha256 !== entry.sha256 || current.size !== entry.size) reasons.push('content');\n+      if (current.mode !== entry.mode) reasons.push('mode');\n+      if (reasons.length) changed.push({ path: entry.path, reasons });\n+      else unchanged.push(entry.path);\n+    }\n+  }\n+  unchanged.sort(compareStrings);\n+  changed.sort((a, b) => compareStrings(a.path, b.path));\n+  missing.sort(compareStrings);\n+  unsafe.sort(compareStrings);\n+  return {\n+    ok: changed.length === 0 && missing.length === 0 && unsafe.length === 0,\n+    unchanged,\n+    changed,\n+    missing,\n+    unsafe,\n+  };\n+}\n+\n+function runCli(argv) {\n+  const [command, ...args] = argv;\n+  if (command === 'create') {\n+    if (args.length < 1) throw Error('usage: snapshot.js create ROOT [PATH ...]');\n+    return { value: createManifest(args[0], args.slice(1)), status: 0 };\n+  }\n+  if (command === 'verify') {\n+    if (args.length !== 2) throw Error('usage: snapshot.js verify ROOT MANIFEST_FILE');\n+    const manifest = JSON.parse(fs.readFileSync(args[1], 'utf8'));\n+    const value = verifyManifest(args[0], manifest);\n+    return { value, status: value.ok ? 0 : 1 };\n+  }\n+  throw Error('usage: snapshot.js create ROOT [PATH ...] | verify ROOT MANIFEST_FILE');\n+}\n+\n+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {\n+  try {\n+    const result = runCli(process.argv.slice(2));\n+    process.stdout.write(`${JSON.stringify(result.value)}\\n`);\n+    process.exitCode = result.status;\n+  } catch (error) {\n+    const message = error instanceof Error ? error.message : String(error);\n+    process.stderr.write(`${message || 'error'}\\n`);\n+    process.exitCode = 2;\n+  }\n+}\n"
+    },
+    {
+      "path": "test/snapshot-extension.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "c2933f57230f0bff9fa62518d15b4f2720f9731c1520a6dc97c2b27cfa3799bc",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = '0'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-extension-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\nfunction write(root, name, contents, mode = 0o640) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n  fs.chmodSync(target, mode);\n}\nfunction entry(overrides = {}) {\n  return { path: 'a', sha256: hash, size: 0, mode: 0, ...overrides };\n}\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\ntest('manifest validation covers shape, fields, paths, and duplicates', t => {\n  const root = fixture(t);\n  const invalid = [\n    null, [], {}, { version: 2, files: [] }, { version: 1, files: null },\n    { version: 1, files: [null] }, { version: 1, files: [[]] },\n    { version: 1, files: [entry({ path: '' })] },\n    { version: 1, files: [entry({ path: '/a' })] },\n    { version: 1, files: [entry({ path: 'a//b' })] },\n    { version: 1, files: [entry({ path: 'a/../b' })] },\n    { version: 1, files: [entry({ path: 'a\\\\b' })] },\n    { version: 1, files: [entry({ sha256: 'A'.repeat(64) })] },\n    { version: 1, files: [entry({ sha256: '0'.repeat(63) })] },\n    { version: 1, files: [entry({ size: -1 })] },\n    { version: 1, files: [entry({ size: 1.5 })] },\n    { version: 1, files: [entry({ size: Number.MAX_SAFE_INTEGER + 1 })] },\n    { version: 1, files: [entry({ mode: -1 })] },\n    { version: 1, files: [entry({ mode: 512 })] },\n    { version: 1, files: [entry(), entry()] },\n  ];\n  for (const manifest of invalid) assert.throws(() => verifyManifest(root, manifest));\n});\n\ntest('complete manifest validation precedes file inspection and unknown fields are ignored', t => {\n  const root = fixture(t);\n  write(root, 'a', 'data');\n  const original = fs.readFileSync;\n  let reads = 0;\n  fs.readFileSync = (...args) => { reads++; return original(...args); };\n  try {\n    assert.throws(() => verifyManifest(root, {\n      version: 1, ignored: true,\n      files: [entry({ path: 'a' }), entry({ path: 'bad', size: -1 })],\n    }));\n    assert.equal(reads, 0);\n  } finally {\n    fs.readFileSync = original;\n  }\n  const manifest = createManifest(root, ['a']);\n  manifest.extra = { ignored: true };\n  manifest.files[0].extra = 42;\n  assert.equal(verifyManifest(root, manifest).ok, true);\n});\n\ntest('frozen inputs remain immutable and empty manifests work', t => {\n  const root = fixture(t);\n  write(root, 'b', 'b'); write(root, 'a', 'a');\n  const paths = Object.freeze(['b', 'a']);\n  assert.deepEqual(createManifest(root, paths).files.map(x => x.path), ['a', 'b']);\n  const manifest = createManifest(root, ['b', 'a']);\n  for (const item of manifest.files) Object.freeze(item);\n  Object.freeze(manifest.files); Object.freeze(manifest);\n  assert.deepEqual(verifyManifest(root, manifest).unchanged, ['a', 'b']);\n  assert.deepEqual(createManifest(root, []), { version: 1, files: [] });\n  assert.deepEqual(verifyManifest(root, Object.freeze({ version: 1, files: Object.freeze([]) })),\n    { ok: true, unchanged: [], changed: [], missing: [], unsafe: [] });\n});\n\ntest('byte content, size, modes, and every drift class are distinguished', t => {\n  const root = fixture(t);\n  write(root, 'same', Buffer.from([0, 255, 10]), 0o600);\n  write(root, 'content', 'abc', 0o600);\n  write(root, 'size', 'long', 0o600);\n  write(root, 'mode', 'mode', 0o600);\n  write(root, 'both', 'both', 0o600);\n  write(root, 'gone', 'gone', 0o600);\n  write(root, 'unsafe', 'file', 0o600);\n  const manifest = createManifest(root, ['unsafe', 'same', 'size', 'mode', 'gone', 'content', 'both']);\n  write(root, 'content', 'xyz', 0o600);\n  write(root, 'size', 'x', 0o600);\n  fs.chmodSync(path.join(root, 'mode'), 0o644);\n  write(root, 'both', 'different', 0o644);\n  fs.rmSync(path.join(root, 'gone'));\n  fs.rmSync(path.join(root, 'unsafe')); fs.mkdirSync(path.join(root, 'unsafe'));\n  fs.writeFileSync(path.join(root, 'unselected'), 'ignored');\n  assert.deepEqual(verifyManifest(root, manifest), {\n    ok: false,\n    unchanged: ['same'],\n    changed: [\n      { path: 'both', reasons: ['content', 'mode'] },\n      { path: 'content', reasons: ['content'] },\n      { path: 'mode', reasons: ['mode'] },\n      { path: 'size', reasons: ['content'] },\n    ],\n    missing: ['gone'], unsafe: ['unsafe'],\n  });\n});\n\ntest('uses JavaScript path order for whitespace, newline, and Unicode', t => {\n  const root = fixture(t);\n  const names = ['é', 'z', '\\nname', ' name', '😀', 'Z', '\\tname'];\n  for (const name of names) write(root, name, name);\n  const expected = [...names].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n  const manifest = createManifest(root, [...names].reverse());\n  assert.deepEqual(manifest.files.map(x => x.path), expected);\n  assert.deepEqual(verifyManifest(root, { version: 1, files: [...manifest.files].reverse() }).unchanged, expected);\n});\n\ntest('components are not followed and invalid roots are rejected', t => {\n  const root = fixture(t);\n  const outside = fixture(t);\n  write(outside, 'target', 'x');\n  fs.symlinkSync(outside, path.join(root, 'link'));\n  write(root, 'plain', 'x');\n  const base = createManifest(root, ['plain']).files[0];\n  const manifests = pathName => ({ version: 1, files: [{ ...base, path: pathName }] });\n  assert.deepEqual(verifyManifest(root, manifests('link/target')).unsafe, ['link/target']);\n  fs.mkdirSync(path.join(root, 'dir')); fs.symlinkSync(path.join(outside, 'target'), path.join(root, 'dir/final'));\n  assert.deepEqual(verifyManifest(root, manifests('dir/final')).unsafe, ['dir/final']);\n  assert.deepEqual(verifyManifest(root, manifests('missing/child')).missing, ['missing/child']);\n  assert.throws(() => createManifest(`${path.join(root, 'link')}${path.sep}`, []));\n  assert.throws(() => verifyManifest(`${path.join(root, 'link')}${path.sep}`, { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'plain'), { version: 1, files: [] }));\n  assert.throws(() => verifyManifest(path.join(root, 'absent'), { version: 1, files: [] }));\n});\n\ntest('CLI create and verify success, drift, errors, and import behavior', t => {\n  const root = fixture(t);\n  write(root, 'a', 'abc');\n  let result = cli('create', root, 'a');\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.match(result.stdout, /^\\{.*\\}\\n$/s);\n  const manifestFile = path.join(root, 'manifest.json');\n  fs.writeFileSync(manifestFile, result.stdout);\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n  assert.equal(JSON.parse(result.stdout).ok, true); assert.equal(result.stdout.endsWith('\\n'), true);\n  write(root, 'a', 'changed');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 1); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, false);\n  for (const args of [[], ['create'], ['verify', root], ['verify', root, manifestFile, 'extra']]) {\n    result = cli(...args); assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  }\n  fs.writeFileSync(manifestFile, '{bad');\n  result = cli('verify', root, manifestFile);\n  assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n  result = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(new URL('../snapshot.js', import.meta.url).href)}`], { encoding: 'utf8' });\n  assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');\n});\n",
+      "displaySha256": "c2933f57230f0bff9fa62518d15b4f2720f9731c1520a6dc97c2b27cfa3799bc",
+      "diff": "--- starter/test/snapshot-extension.test.js\n+++ delivered/test/snapshot-extension.test.js\n@@ -0,0 +1,168 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import { spawnSync } from 'node:child_process';\n+import { fileURLToPath } from 'node:url';\n+import { createManifest, verifyManifest } from '../snapshot.js';\n+\n+const script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\n+const hash = '0'.repeat(64);\n+\n+function fixture(t) {\n+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-extension-'));\n+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n+  return root;\n+}\n+function write(root, name, contents, mode = 0o640) {\n+  const target = path.join(root, name);\n+  fs.mkdirSync(path.dirname(target), { recursive: true });\n+  fs.writeFileSync(target, contents);\n+  fs.chmodSync(target, mode);\n+}\n+function entry(overrides = {}) {\n+  return { path: 'a', sha256: hash, size: 0, mode: 0, ...overrides };\n+}\n+function cli(...args) {\n+  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n+}\n+\n+test('manifest validation covers shape, fields, paths, and duplicates', t => {\n+  const root = fixture(t);\n+  const invalid = [\n+    null, [], {}, { version: 2, files: [] }, { version: 1, files: null },\n+    { version: 1, files: [null] }, { version: 1, files: [[]] },\n+    { version: 1, files: [entry({ path: '' })] },\n+    { version: 1, files: [entry({ path: '/a' })] },\n+    { version: 1, files: [entry({ path: 'a//b' })] },\n+    { version: 1, files: [entry({ path: 'a/../b' })] },\n+    { version: 1, files: [entry({ path: 'a\\\\b' })] },\n+    { version: 1, files: [entry({ sha256: 'A'.repeat(64) })] },\n+    { version: 1, files: [entry({ sha256: '0'.repeat(63) })] },\n+    { version: 1, files: [entry({ size: -1 })] },\n+    { version: 1, files: [entry({ size: 1.5 })] },\n+    { version: 1, files: [entry({ size: Number.MAX_SAFE_INTEGER + 1 })] },\n+    { version: 1, files: [entry({ mode: -1 })] },\n+    { version: 1, files: [entry({ mode: 512 })] },\n+    { version: 1, files: [entry(), entry()] },\n+  ];\n+  for (const manifest of invalid) assert.throws(() => verifyManifest(root, manifest));\n+});\n+\n+test('complete manifest validation precedes file inspection and unknown fields are ignored', t => {\n+  const root = fixture(t);\n+  write(root, 'a', 'data');\n+  const original = fs.readFileSync;\n+  let reads = 0;\n+  fs.readFileSync = (...args) => { reads++; return original(...args); };\n+  try {\n+    assert.throws(() => verifyManifest(root, {\n+      version: 1, ignored: true,\n+      files: [entry({ path: 'a' }), entry({ path: 'bad', size: -1 })],\n+    }));\n+    assert.equal(reads, 0);\n+  } finally {\n+    fs.readFileSync = original;\n+  }\n+  const manifest = createManifest(root, ['a']);\n+  manifest.extra = { ignored: true };\n+  manifest.files[0].extra = 42;\n+  assert.equal(verifyManifest(root, manifest).ok, true);\n+});\n+\n+test('frozen inputs remain immutable and empty manifests work', t => {\n+  const root = fixture(t);\n+  write(root, 'b', 'b'); write(root, 'a', 'a');\n+  const paths = Object.freeze(['b', 'a']);\n+  assert.deepEqual(createManifest(root, paths).files.map(x => x.path), ['a', 'b']);\n+  const manifest = createManifest(root, ['b', 'a']);\n+  for (const item of manifest.files) Object.freeze(item);\n+  Object.freeze(manifest.files); Object.freeze(manifest);\n+  assert.deepEqual(verifyManifest(root, manifest).unchanged, ['a', 'b']);\n+  assert.deepEqual(createManifest(root, []), { version: 1, files: [] });\n+  assert.deepEqual(verifyManifest(root, Object.freeze({ version: 1, files: Object.freeze([]) })),\n+    { ok: true, unchanged: [], changed: [], missing: [], unsafe: [] });\n+});\n+\n+test('byte content, size, modes, and every drift class are distinguished', t => {\n+  const root = fixture(t);\n+  write(root, 'same', Buffer.from([0, 255, 10]), 0o600);\n+  write(root, 'content', 'abc', 0o600);\n+  write(root, 'size', 'long', 0o600);\n+  write(root, 'mode', 'mode', 0o600);\n+  write(root, 'both', 'both', 0o600);\n+  write(root, 'gone', 'gone', 0o600);\n+  write(root, 'unsafe', 'file', 0o600);\n+  const manifest = createManifest(root, ['unsafe', 'same', 'size', 'mode', 'gone', 'content', 'both']);\n+  write(root, 'content', 'xyz', 0o600);\n+  write(root, 'size', 'x', 0o600);\n+  fs.chmodSync(path.join(root, 'mode'), 0o644);\n+  write(root, 'both', 'different', 0o644);\n+  fs.rmSync(path.join(root, 'gone'));\n+  fs.rmSync(path.join(root, 'unsafe')); fs.mkdirSync(path.join(root, 'unsafe'));\n+  fs.writeFileSync(path.join(root, 'unselected'), 'ignored');\n+  assert.deepEqual(verifyManifest(root, manifest), {\n+    ok: false,\n+    unchanged: ['same'],\n+    changed: [\n+      { path: 'both', reasons: ['content', 'mode'] },\n+      { path: 'content', reasons: ['content'] },\n+      { path: 'mode', reasons: ['mode'] },\n+      { path: 'size', reasons: ['content'] },\n+    ],\n+    missing: ['gone'], unsafe: ['unsafe'],\n+  });\n+});\n+\n+test('uses JavaScript path order for whitespace, newline, and Unicode', t => {\n+  const root = fixture(t);\n+  const names = ['é', 'z', '\\nname', ' name', '😀', 'Z', '\\tname'];\n+  for (const name of names) write(root, name, name);\n+  const expected = [...names].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);\n+  const manifest = createManifest(root, [...names].reverse());\n+  assert.deepEqual(manifest.files.map(x => x.path), expected);\n+  assert.deepEqual(verifyManifest(root, { version: 1, files: [...manifest.files].reverse() }).unchanged, expected);\n+});\n+\n+test('components are not followed and invalid roots are rejected', t => {\n+  const root = fixture(t);\n+  const outside = fixture(t);\n+  write(outside, 'target', 'x');\n+  fs.symlinkSync(outside, path.join(root, 'link'));\n+  write(root, 'plain', 'x');\n+  const base = createManifest(root, ['plain']).files[0];\n+  const manifests = pathName => ({ version: 1, files: [{ ...base, path: pathName }] });\n+  assert.deepEqual(verifyManifest(root, manifests('link/target')).unsafe, ['link/target']);\n+  fs.mkdirSync(path.join(root, 'dir')); fs.symlinkSync(path.join(outside, 'target'), path.join(root, 'dir/final'));\n+  assert.deepEqual(verifyManifest(root, manifests('dir/final')).unsafe, ['dir/final']);\n+  assert.deepEqual(verifyManifest(root, manifests('missing/child')).missing, ['missing/child']);\n+  assert.throws(() => createManifest(`${path.join(root, 'link')}${path.sep}`, []));\n+  assert.throws(() => verifyManifest(`${path.join(root, 'link')}${path.sep}`, { version: 1, files: [] }));\n+  assert.throws(() => verifyManifest(path.join(root, 'plain'), { version: 1, files: [] }));\n+  assert.throws(() => verifyManifest(path.join(root, 'absent'), { version: 1, files: [] }));\n+});\n+\n+test('CLI create and verify success, drift, errors, and import behavior', t => {\n+  const root = fixture(t);\n+  write(root, 'a', 'abc');\n+  let result = cli('create', root, 'a');\n+  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n+  assert.match(result.stdout, /^\\{.*\\}\\n$/s);\n+  const manifestFile = path.join(root, 'manifest.json');\n+  fs.writeFileSync(manifestFile, result.stdout);\n+  result = cli('verify', root, manifestFile);\n+  assert.equal(result.status, 0); assert.equal(result.stderr, '');\n+  assert.equal(JSON.parse(result.stdout).ok, true); assert.equal(result.stdout.endsWith('\\n'), true);\n+  write(root, 'a', 'changed');\n+  result = cli('verify', root, manifestFile);\n+  assert.equal(result.status, 1); assert.equal(result.stderr, ''); assert.equal(JSON.parse(result.stdout).ok, false);\n+  for (const args of [[], ['create'], ['verify', root], ['verify', root, manifestFile, 'extra']]) {\n+    result = cli(...args); assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n+  }\n+  fs.writeFileSync(manifestFile, '{bad');\n+  result = cli('verify', root, manifestFile);\n+  assert.equal(result.status, 2); assert.equal(result.stdout, ''); assert.notEqual(result.stderr, '');\n+  result = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(new URL('../snapshot.js', import.meta.url).href)}`], { encoding: 'utf8' });\n+  assert.equal(result.status, 0); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');\n+});\n"
+    },
+    {
+      "path": "test/snapshot-milestone.test.js",
+      "state": "added",
+      "beforeSha256": null,
+      "afterSha256": "b107b669c91eacf3052d583338cc28abccdb853715ad5a8c3cd681ea90395781",
+      "before": null,
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport { createManifest, verifyManifest } from '../snapshot.js';\n\nconst script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\nconst hash = 'a'.repeat(64);\n\nfunction fixture(t) {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-milestone-'));\n  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n  return root;\n}\n\nfunction write(root, name, contents = name) {\n  const target = path.join(root, name);\n  fs.mkdirSync(path.dirname(target), { recursive: true });\n  fs.writeFileSync(target, contents);\n}\n\nfunction manifestEntry(pathname, overrides = {}) {\n  return { path: pathname, sha256: hash, size: 0, mode: 0, ...overrides };\n}\n\nfunction cli(...args) {\n  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n}\n\nfunction assertCliError(result) {\n  assert.equal(result.status, 2);\n  assert.equal(result.stdout, '');\n  assert.notEqual(result.stderr, '');\n}\n\ntest('sha256 validation requires exactly 64 lowercase hexadecimal characters', t => {\n  const root = fixture(t);\n  const valid = { version: 1, files: [manifestEntry('absent')] };\n  assert.deepEqual(verifyManifest(root, valid).missing, ['absent']);\n\n  for (const terminator of ['\\n', '\\r', '\\r\\n', '\\u2028', '\\u2029']) {\n    const invalid = {\n      version: 1,\n      files: [manifestEntry('absent', { sha256: hash + terminator })],\n    };\n    assert.throws(() => verifyManifest(root, invalid), /sha256/);\n  }\n});\n\ntest('a correct hash paired with a deliberately wrong size reports content drift', t => {\n  const root = fixture(t);\n  write(root, 'file', 'unchanged bytes');\n  const manifest = createManifest(root, ['file']);\n  manifest.files[0].size += 1;\n  assert.deepEqual(verifyManifest(root, manifest).changed, [\n    { path: 'file', reasons: ['content'] },\n  ]);\n});\n\ntest('intermediate files and internal or dangling symlinks are unsafe', t => {\n  const root = fixture(t);\n  write(root, 'basis', 'basis');\n  write(root, 'middle', 'not a directory');\n  write(root, 'inside', 'target');\n  fs.symlinkSync('inside', path.join(root, 'internal-link'));\n  fs.symlinkSync('does-not-exist', path.join(root, 'dangling-link'));\n\n  const basis = createManifest(root, ['basis']).files[0];\n  const verifyPath = pathname => verifyManifest(root, {\n    version: 1,\n    files: [{ ...basis, path: pathname }],\n  });\n  assert.deepEqual(verifyPath('middle/child').unsafe, ['middle/child']);\n  assert.deepEqual(verifyPath('internal-link').unsafe, ['internal-link']);\n  assert.deepEqual(verifyPath('dangling-link').unsafe, ['dangling-link']);\n});\n\ntest('multiple changed, missing, and unsafe entries are sorted with reversed input', t => {\n  const root = fixture(t);\n  const names = ['changed-z', 'changed-a', 'missing-z', 'missing-a', 'unsafe-z', 'unsafe-a'];\n  for (const name of names) write(root, name, `original ${name}`);\n  const manifest = createManifest(root, names);\n\n  write(root, 'changed-z', 'new z');\n  write(root, 'changed-a', 'new a');\n  fs.rmSync(path.join(root, 'missing-z'));\n  fs.rmSync(path.join(root, 'missing-a'));\n  for (const name of ['unsafe-z', 'unsafe-a']) {\n    fs.rmSync(path.join(root, name));\n    fs.mkdirSync(path.join(root, name));\n  }\n  manifest.files.reverse();\n\n  const report = verifyManifest(root, manifest);\n  assert.deepEqual(report.changed, [\n    { path: 'changed-a', reasons: ['content'] },\n    { path: 'changed-z', reasons: ['content'] },\n  ]);\n  assert.deepEqual(report.missing, ['missing-a', 'missing-z']);\n  assert.deepEqual(report.unsafe, ['unsafe-a', 'unsafe-z']);\n});\n\ntest('filesystem EACCES is thrown rather than classified as drift', t => {\n  const root = fixture(t);\n  write(root, 'locked', 'data');\n  const manifest = createManifest(root, ['locked']);\n  const target = path.join(root, 'locked');\n  const original = fs.lstatSync;\n  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });\n  fs.lstatSync = pathname => {\n    if (pathname === target) throw denied;\n    return original(pathname);\n  };\n  try {\n    assert.throws(() => verifyManifest(root, manifest), error => error === denied);\n  } finally {\n    fs.lstatSync = original;\n  }\n});\n\ntest('CLI error and empty-create contracts specify status and streams', t => {\n  const root = fixture(t);\n  const manifestFile = path.join(root, 'manifest.json');\n\n  let result = cli('create', root);\n  assert.equal(result.status, 0);\n  assert.equal(result.stderr, '');\n  assert.equal(result.stdout, '{\"version\":1,\"files\":[]}\\n');\n\n  fs.writeFileSync(manifestFile, JSON.stringify({ version: 1, files: [manifestEntry('x', { sha256: 'bad' })] }));\n  assertCliError(cli('verify', root, manifestFile));\n  assertCliError(cli('create', root, '../invalid'));\n  assertCliError(cli('create', path.join(root, 'missing-root')));\n  assertCliError(cli('verify', root, path.join(root, 'missing-manifest.json')));\n});\n",
+      "displaySha256": "b107b669c91eacf3052d583338cc28abccdb853715ad5a8c3cd681ea90395781",
+      "diff": "--- starter/test/snapshot-milestone.test.js\n+++ delivered/test/snapshot-milestone.test.js\n@@ -0,0 +1,138 @@\n+import test from 'node:test';\n+import assert from 'node:assert/strict';\n+import fs from 'node:fs';\n+import os from 'node:os';\n+import path from 'node:path';\n+import { spawnSync } from 'node:child_process';\n+import { fileURLToPath } from 'node:url';\n+import { createManifest, verifyManifest } from '../snapshot.js';\n+\n+const script = fileURLToPath(new URL('../snapshot.js', import.meta.url));\n+const hash = 'a'.repeat(64);\n+\n+function fixture(t) {\n+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snapshot-milestone-'));\n+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));\n+  return root;\n+}\n+\n+function write(root, name, contents = name) {\n+  const target = path.join(root, name);\n+  fs.mkdirSync(path.dirname(target), { recursive: true });\n+  fs.writeFileSync(target, contents);\n+}\n+\n+function manifestEntry(pathname, overrides = {}) {\n+  return { path: pathname, sha256: hash, size: 0, mode: 0, ...overrides };\n+}\n+\n+function cli(...args) {\n+  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });\n+}\n+\n+function assertCliError(result) {\n+  assert.equal(result.status, 2);\n+  assert.equal(result.stdout, '');\n+  assert.notEqual(result.stderr, '');\n+}\n+\n+test('sha256 validation requires exactly 64 lowercase hexadecimal characters', t => {\n+  const root = fixture(t);\n+  const valid = { version: 1, files: [manifestEntry('absent')] };\n+  assert.deepEqual(verifyManifest(root, valid).missing, ['absent']);\n+\n+  for (const terminator of ['\\n', '\\r', '\\r\\n', '\\u2028', '\\u2029']) {\n+    const invalid = {\n+      version: 1,\n+      files: [manifestEntry('absent', { sha256: hash + terminator })],\n+    };\n+    assert.throws(() => verifyManifest(root, invalid), /sha256/);\n+  }\n+});\n+\n+test('a correct hash paired with a deliberately wrong size reports content drift', t => {\n+  const root = fixture(t);\n+  write(root, 'file', 'unchanged bytes');\n+  const manifest = createManifest(root, ['file']);\n+  manifest.files[0].size += 1;\n+  assert.deepEqual(verifyManifest(root, manifest).changed, [\n+    { path: 'file', reasons: ['content'] },\n+  ]);\n+});\n+\n+test('intermediate files and internal or dangling symlinks are unsafe', t => {\n+  const root = fixture(t);\n+  write(root, 'basis', 'basis');\n+  write(root, 'middle', 'not a directory');\n+  write(root, 'inside', 'target');\n+  fs.symlinkSync('inside', path.join(root, 'internal-link'));\n+  fs.symlinkSync('does-not-exist', path.join(root, 'dangling-link'));\n+\n+  const basis = createManifest(root, ['basis']).files[0];\n+  const verifyPath = pathname => verifyManifest(root, {\n+    version: 1,\n+    files: [{ ...basis, path: pathname }],\n+  });\n+  assert.deepEqual(verifyPath('middle/child').unsafe, ['middle/child']);\n+  assert.deepEqual(verifyPath('internal-link').unsafe, ['internal-link']);\n+  assert.deepEqual(verifyPath('dangling-link').unsafe, ['dangling-link']);\n+});\n+\n+test('multiple changed, missing, and unsafe entries are sorted with reversed input', t => {\n+  const root = fixture(t);\n+  const names = ['changed-z', 'changed-a', 'missing-z', 'missing-a', 'unsafe-z', 'unsafe-a'];\n+  for (const name of names) write(root, name, `original ${name}`);\n+  const manifest = createManifest(root, names);\n+\n+  write(root, 'changed-z', 'new z');\n+  write(root, 'changed-a', 'new a');\n+  fs.rmSync(path.join(root, 'missing-z'));\n+  fs.rmSync(path.join(root, 'missing-a'));\n+  for (const name of ['unsafe-z', 'unsafe-a']) {\n+    fs.rmSync(path.join(root, name));\n+    fs.mkdirSync(path.join(root, name));\n+  }\n+  manifest.files.reverse();\n+\n+  const report = verifyManifest(root, manifest);\n+  assert.deepEqual(report.changed, [\n+    { path: 'changed-a', reasons: ['content'] },\n+    { path: 'changed-z', reasons: ['content'] },\n+  ]);\n+  assert.deepEqual(report.missing, ['missing-a', 'missing-z']);\n+  assert.deepEqual(report.unsafe, ['unsafe-a', 'unsafe-z']);\n+});\n+\n+test('filesystem EACCES is thrown rather than classified as drift', t => {\n+  const root = fixture(t);\n+  write(root, 'locked', 'data');\n+  const manifest = createManifest(root, ['locked']);\n+  const target = path.join(root, 'locked');\n+  const original = fs.lstatSync;\n+  const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });\n+  fs.lstatSync = pathname => {\n+    if (pathname === target) throw denied;\n+    return original(pathname);\n+  };\n+  try {\n+    assert.throws(() => verifyManifest(root, manifest), error => error === denied);\n+  } finally {\n+    fs.lstatSync = original;\n+  }\n+});\n+\n+test('CLI error and empty-create contracts specify status and streams', t => {\n+  const root = fixture(t);\n+  const manifestFile = path.join(root, 'manifest.json');\n+\n+  let result = cli('create', root);\n+  assert.equal(result.status, 0);\n+  assert.equal(result.stderr, '');\n+  assert.equal(result.stdout, '{\"version\":1,\"files\":[]}\\n');\n+\n+  fs.writeFileSync(manifestFile, JSON.stringify({ version: 1, files: [manifestEntry('x', { sha256: 'bad' })] }));\n+  assertCliError(cli('verify', root, manifestFile));\n+  assertCliError(cli('create', root, '../invalid'));\n+  assertCliError(cli('create', path.join(root, 'missing-root')));\n+  assertCliError(cli('verify', root, path.join(root, 'missing-manifest.json')));\n+});\n"
+    },
+    {
+      "path": "test/snapshot.test.js",
+      "state": "unchanged",
+      "beforeSha256": "bdfa436f5ccfacf04baa5549588195262d3eacfd43a37bdefadb8076a7e5b5da",
+      "afterSha256": "bdfa436f5ccfacf04baa5549588195262d3eacfd43a37bdefadb8076a7e5b5da",
+      "before": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport * as snapshot from '../snapshot.js';\nfunction fixture(t) {\n  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'snapshot-public-'));\n  fs.writeFileSync(path.join(dir,'a.txt'),'abc'); fs.chmodSync(path.join(dir,'a.txt'),0o640);\n  t.after(() => fs.rmSync(dir,{recursive:true,force:true})); return dir;\n}\ntest('existing builder hashes exact bytes and permission bits', t => {\n  const root = fixture(t);\n  assert.deepEqual(snapshot.createManifest(root,['a.txt']),{version:1,files:[{\n    path:'a.txt',sha256:crypto.createHash('sha256').update('abc').digest('hex'),size:3,mode:0o640,\n  }]});\n});\ntest('new verifier reports unchanged, content and missing', t => {\n  const root = fixture(t), manifest = snapshot.createManifest(root,['a.txt']);\n  assert.deepEqual(snapshot.verifyManifest(root,manifest),{ok:true,unchanged:['a.txt'],changed:[],missing:[],unsafe:[]});\n  fs.writeFileSync(path.join(root,'a.txt'),'xyz');\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).changed,[{path:'a.txt',reasons:['content']}]);\n  fs.unlinkSync(path.join(root,'a.txt'));\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).missing,['a.txt']);\n});\ntest('unsafe selections and invalid manifests throw', t => {\n  const root = fixture(t);\n  assert.throws(() => snapshot.createManifest(root,['../outside']));\n  assert.throws(() => snapshot.verifyManifest(root,{version:2,files:[]}));\n});\n",
+      "after": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport os from 'node:os';\nimport path from 'node:path';\nimport crypto from 'node:crypto';\nimport * as snapshot from '../snapshot.js';\nfunction fixture(t) {\n  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'snapshot-public-'));\n  fs.writeFileSync(path.join(dir,'a.txt'),'abc'); fs.chmodSync(path.join(dir,'a.txt'),0o640);\n  t.after(() => fs.rmSync(dir,{recursive:true,force:true})); return dir;\n}\ntest('existing builder hashes exact bytes and permission bits', t => {\n  const root = fixture(t);\n  assert.deepEqual(snapshot.createManifest(root,['a.txt']),{version:1,files:[{\n    path:'a.txt',sha256:crypto.createHash('sha256').update('abc').digest('hex'),size:3,mode:0o640,\n  }]});\n});\ntest('new verifier reports unchanged, content and missing', t => {\n  const root = fixture(t), manifest = snapshot.createManifest(root,['a.txt']);\n  assert.deepEqual(snapshot.verifyManifest(root,manifest),{ok:true,unchanged:['a.txt'],changed:[],missing:[],unsafe:[]});\n  fs.writeFileSync(path.join(root,'a.txt'),'xyz');\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).changed,[{path:'a.txt',reasons:['content']}]);\n  fs.unlinkSync(path.join(root,'a.txt'));\n  assert.deepEqual(snapshot.verifyManifest(root,manifest).missing,['a.txt']);\n});\ntest('unsafe selections and invalid manifests throw', t => {\n  const root = fixture(t);\n  assert.throws(() => snapshot.createManifest(root,['../outside']));\n  assert.throws(() => snapshot.verifyManifest(root,{version:2,files:[]}));\n});\n",
+      "displaySha256": "bdfa436f5ccfacf04baa5549588195262d3eacfd43a37bdefadb8076a7e5b5da",
+      "diff": ""
+    }
+  ],
+  "checks": [
+    {
+      "title": "Project tests",
+      "exitCode": 0,
+      "stdout": "\n> test\n> node --test\n\nTAP version 13\n# Subtest: manifest validation covers shape, fields, paths, and duplicates\nok 1 - manifest validation covers shape, fields, paths, and duplicates\n  ---\n  duration_ms: 2.174114\n  ...\n# Subtest: complete manifest validation precedes file inspection and unknown fields are ignored\nok 2 - complete manifest validation precedes file inspection and unknown fields are ignored\n  ---\n  duration_ms: 1.671061\n  ...\n# Subtest: frozen inputs remain immutable and empty manifests work\nok 3 - frozen inputs remain immutable and empty manifests work\n  ---\n  duration_ms: 1.798392\n  ...\n# Subtest: byte content, size, modes, and every drift class are distinguished\nok 4 - byte content, size, modes, and every drift class are distinguished\n  ---\n  duration_ms: 1.835652\n  ...\n# Subtest: uses JavaScript path order for whitespace, newline, and Unicode\nok 5 - uses JavaScript path order for whitespace, newline, and Unicode\n  ---\n  duration_ms: 1.219938\n  ...\n# Subtest: components are not followed and invalid roots are rejected\nok 6 - components are not followed and invalid roots are rejected\n  ---\n  duration_ms: 1.234267\n  ...\n# Subtest: CLI create and verify success, drift, errors, and import behavior\nok 7 - CLI create and verify success, drift, errors, and import behavior\n  ---\n  duration_ms: 208.216159\n  ...\n# Subtest: sha256 validation requires exactly 64 lowercase hexadecimal characters\nok 8 - sha256 validation requires exactly 64 lowercase hexadecimal characters\n  ---\n  duration_ms: 2.627877\n  ...\n# Subtest: a correct hash paired with a deliberately wrong size reports content drift\nok 9 - a correct hash paired with a deliberately wrong size reports content drift\n  ---\n  duration_ms: 1.44367\n  ...\n# Subtest: intermediate files and internal or dangling symlinks are unsafe\nok 10 - intermediate files and internal or dangling symlinks are unsafe\n  ---\n  duration_ms: 1.45204\n  ...\n# Subtest: multiple changed, missing, and unsafe entries are sorted with reversed input\nok 11 - multiple changed, missing, and unsafe entries are sorted with reversed input\n  ---\n  duration_ms: 1.367899\n  ...\n# Subtest: filesystem EACCES is thrown rather than classified as drift\nok 12 - filesystem EACCES is thrown rather than classified as drift\n  ---\n  duration_ms: 0.607094\n  ...\n# Subtest: CLI error and empty-create contracts specify status and streams\nok 13 - CLI error and empty-create contracts specify status and streams\n  ---\n  duration_ms: 116.782307\n  ...\n# Subtest: existing builder hashes exact bytes and permission bits\nok 14 - existing builder hashes exact bytes and permission bits\n  ---\n  duration_ms: 3.15022\n  ...\n# Subtest: new verifier reports unchanged, content and missing\nok 15 - new verifier reports unchanged, content and missing\n  ---\n  duration_ms: 0.948256\n  ...\n# Subtest: unsafe selections and invalid manifests throw\nok 16 - unsafe selections and invalid manifests throw\n  ---\n  duration_ms: 0.580644\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 260.985422\n",
+      "stderr": ""
+    },
+    {
+      "title": "Independent acceptance",
+      "exitCode": 0,
+      "stdout": "{\"schema\":\"bantam.factory-card-grade.v1\",\"card\":\"snapshot-drift\",\"pass\":true,\"groups\":[{\"name\":\"builder-bytes-order-and-empty\",\"pass\":true},{\"name\":\"all-drift-categories-and-source-binding\",\"pass\":true},{\"name\":\"non-symlink-components-and-missing-ancestors\",\"pass\":true},{\"name\":\"manifest-and-selection-validation\",\"pass\":true},{\"name\":\"cli-create-verify-drift-and-errors\",\"pass\":true}]}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": [
+    {
+      "kind": "run-manifest",
+      "sha256": "e04666620f022950f402cf0c38958588eab985c5b9f1d6f0cbc52e34855c4df6"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "4ab0fa8653f021d8d48f0f74e26892d984d57e41fbb81c0d39509fc2b177cbe6"
+    },
+    {
+      "kind": "committed-integration",
+      "sha256": "21daea4822d3448f582c2c21526b1aafb6a6ec1c5d8449f2466ae464ac82c5e8"
+    },
+    {
+      "kind": "supervisor-completion-record",
+      "sha256": "c5cb817fb95b7a32434bb8d1e86df6be50ab67f96d370358289150a69f19e098"
+    },
+    {
+      "kind": "supervisor-action-journal",
+      "sha256": "cb0a5c2f146e2d069bf3fadef16a72a2d310a8cf8afbef0d0df8c6b4ded572b2"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "0efe34770ad08e605abd58a13b1fdda68800ce7cfab9148089d3a4193167a35f"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "ba8396f895765c7b7b858cb5a29880a0f8ac7e04504ccaacaa6bad7c561f8280"
+    },
+    {
+      "kind": "factory-turn-record",
+      "sha256": "2a1923e77fec98786b37e7beef6f6970dda14be578257dc63a454eba95cc0549"
+    },
+    {
+      "kind": "factory-station-journal",
+      "sha256": "e1701f0ffd3cca9b01e59f862ea102408a9e91748946acab2f910c37bcc78f13"
+    },
+    {
+      "kind": "acceptance-output",
+      "sha256": "f42b988e502af5f652455a8e56d87d9afbf589ac1a96034bd2b094b60b7dd752"
+    }
+  ],
+  "coverage": {
+    "recordedActions": 25,
+    "withResults": 25,
+    "normalizedPathOccurrences": 2,
+    "replayedToolRecords": 0
+  },
+  "explanation": {
+    "title": "Expand the boundary tests.",
+    "paragraphs": [
+      {
+        "text": "Sol implemented and tested the extension. Astra reviewed the code and requested explicit digest-length validation plus additional boundary tests. The original non-multiline regex already rejected trailing line terminators; that review request did not establish a reproduced hash-validation bug.",
+        "actions": [
+          "action-3",
+          "action-13",
+          "action-14"
+        ]
+      },
+      {
+        "text": "Sol made digest length explicit and retained assertions for line terminators, size-only drift, unsafe path components, report ordering, filesystem errors and CLI failures. Astra reviewed the integrated result and finished; all five independent acceptance groups passed. Both models are included in the token totals.",
+        "actions": [
+          "action-17",
+          "action-24",
+          "action-25"
+        ]
+      }
+    ]
+  }
+}

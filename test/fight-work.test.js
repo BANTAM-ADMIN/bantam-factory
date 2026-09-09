@@ -71,6 +71,23 @@ test('a post-run mutation review binds its source change and controls without al
   ]) {const invalid=structuredClone(value);mutate(invalid);assert.throws(()=>validateFightWork(invalid,row,'context-packet'),/Mutation review/);}
 });
 
+test('additional source checks retain their real outcome and bind the exact probe to delivered bytes', () => {
+  const value=fixture(), probe="import assert from 'node:assert/strict';\nassert.equal(true, false);\n";
+  value.checks.push({title:'Post-run review',description:'Additional checks against the unchanged program.',
+    exitCode:1,stdout:'1 test failed',stderr:'',sourceReview:{schema:'bantam.delivered-source-review.v1',
+      sourcePath:'tool.js',sourceSha256:value.files[0].afterSha256,probeSource:probe,probeSha256:sha(probe)}});
+  assert.equal(validateFightWork(value,row,'context-packet').outcome,'PASS');
+  assert.equal(value.checks[1].exitCode,1);
+  for(const mutate of [
+    v=>v.checks[1].sourceReview.sourceSha256='f'.repeat(64),
+    v=>v.checks[1].sourceReview.sourcePath='other.js',
+    v=>v.checks[1].sourceReview.probeSource+='// changed',
+    v=>v.checks[1].sourceReview.probeSha256='f'.repeat(64),
+    v=>v.checks[1].exitCode=null,
+    v=>v.checks[1].mutationReview={},
+  ]) {const copy=structuredClone(value);mutate(copy);assert.throws(()=>validateFightWork(copy,row,'context-packet'),/Source review/);}
+});
+
 test('native work extraction retains original Hermes tool history across compaction and excludes private Claude records', () => {
   const script=String.raw`
 import importlib.util,json,pathlib,sqlite3,tempfile

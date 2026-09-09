@@ -1,0 +1,153 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 68929,
+      "sha256": "ab8bfc07493ee2e242a535c7ba77e68a481e2a953a7f2e304c488227c92500c9",
+      "arm": "codex-astra",
+      "wallMs": 143097,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 7,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "A complete native extension.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the project, implemented the verifier and CLI, and corrected an import-test fixture. It finished in eight model requests and passed all five original acceptance groups.",
+            "actions": [
+              "action-2",
+              "action-4",
+              "action-5",
+              "action-7"
+            ]
+          },
+          {
+            "text": "Six additional checks were run after the recording. Five passed; a root containing an ancestor symlink followed by .. selected the lexical directory instead of the directory reached by the filesystem. Open Tests for the exact probe and result.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 70681,
+      "sha256": "d682497cefa5386f4e45f425aa52145930f07278b394a5c234cdae958393b1e2",
+      "arm": "bantam-codex-astra",
+      "wallMs": 138597,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 8,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "One batch. Less context. A finished tool.",
+        "paragraphs": [
+          {
+            "text": "Astra inspected the starter and tests together, then applied the three-part API and CLI patch once. It retained executable checks and exercised the CLI before finishing. The run used seven model requests and passed all five original acceptance groups.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-4",
+              "action-7",
+              "action-8"
+            ]
+          },
+          {
+            "text": "Compared with this fresh native Astra run, the factory used 41% less input, 10% less output and 3% less wall time. Native had more prefix-cache hits. Both finished programs missed the same root-identity case in the six additional post-run checks; all results are in Tests.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 268684,
+      "sha256": "d586ef8e0bb2ce6443d323da0d790741c2c39164353a01fc726ca5a27b39f0ed",
+      "arm": "bantam-astra-terra",
+      "wallMs": 470046,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 50,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Review caught the wrong directory.",
+        "paragraphs": [
+          {
+            "text": "Astra reviewed Terra’s code and caught a root-identity defect: resolving link/.. as text can choose a different directory from the one the filesystem reaches. Terra repaired the path handling and retained a regression assertion, with Astra steering the distinction between JavaScript and native filesystem resolution.",
+            "actions": [
+              "action-33",
+              "action-34",
+              "action-39",
+              "action-48"
+            ]
+          },
+          {
+            "text": "All five original acceptance groups passed. In six identical additional checks, this was the only finished program to pass all six; the other three missed root identity. Both supervisor and worker usage are counted. This deeper review took substantially more time and tokens than either solo run.",
+            "actions": [
+              "action-49",
+              "action-50"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 170213,
+      "sha256": "9f81a0c678c1cbdf44e860353dc45fd396078678c830bc2a819942bcd484f24d",
+      "arm": "bantam-astra-sol",
+      "wallMs": 486474,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 31,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Sol checks the supervisor, too.",
+        "paragraphs": [
+          {
+            "text": "Astra suspected that the digest regex accepted a trailing newline and commissioned a repair. Sol’s runtime probe disproved that diagnosis. Astra acknowledged the evidence, corrected its instruction, and asked Sol to finish with explicit validation and retained tests.",
+            "actions": [
+              "action-13",
+              "action-24",
+              "action-29"
+            ]
+          },
+          {
+            "text": "The integrated project passed all five original acceptance groups. It passed five of the six additional post-run checks and missed root identity. The recording also exposed a handoff bug that froze an earlier worker’s generated tests; that factory issue was fixed in the following revision.",
+            "actions": [
+              "action-17",
+              "action-30",
+              "action-31"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

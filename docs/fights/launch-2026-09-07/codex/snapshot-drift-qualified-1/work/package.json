@@ -1,0 +1,158 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "codex-astra.json",
+      "bytes": 55019,
+      "sha256": "e687b0b68b8ffbc227e8880f09a69809779e42bdf46d53bbb055af6c8c84066d",
+      "arm": "codex-astra",
+      "wallMs": 134220,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "A complete native extension.",
+        "paragraphs": [
+          {
+            "text": "Native Astra inspected the supplied project, extended the manifest API and CLI, and added tests. It completed in six model requests and passed all five independent acceptance groups. Open the files to inspect the delivered implementation and assertions.",
+            "actions": [
+              "action-1",
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 66506,
+      "sha256": "880b859044c908053673e46d56f1b2fb9cffb2cfeae3d768b0163c55985eb6bc",
+      "arm": "bantam-codex-astra",
+      "wallMs": 139863,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 11,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Correct work. Too many small edits.",
+        "paragraphs": [
+          {
+            "text": "Astra preserved the existing manifest builder, implemented drift verification and CLI behavior, and added executable tests. All five independent acceptance groups passed.",
+            "actions": [
+              "action-5",
+              "action-9",
+              "action-11"
+            ]
+          },
+          {
+            "text": "The factory had not offered its atomic patch tool at the start of this small-project task. Astra made five separate replacement edits and needed ten model requests. This recording exposed the routing problem addressed by the next batch-edit round.",
+            "actions": [
+              "action-2",
+              "action-3",
+              "action-4",
+              "action-5",
+              "action-8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 218555,
+      "sha256": "5ea93cd195e2e7bf368430c2b5b2779f04b85bffc2d116f81a5146cd8839a8a4",
+      "arm": "bantam-astra-terra",
+      "wallMs": 459990,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 45,
+      "files": 6,
+      "changedFiles": 4,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Review the repair, too.",
+        "paragraphs": [
+          {
+            "text": "The first worker request stalled and BANTAM retried it. The full wall time includes that delay. Its missing usage receipt leaves the combined token total unknown; the recorded timeout is included in Actions.",
+            "actions": [
+              "action-3"
+            ]
+          },
+          {
+            "text": "Astra requested explicit digest-length validation and a repair for a symlink root spelled with a trailing slash. After Terra’s changes, Astra caught a new empty-root regression and assigned a focused correction with API and CLI tests.",
+            "actions": [
+              "action-25",
+              "action-36"
+            ]
+          },
+          {
+            "text": "Three worker jobs were integrated, reviewed and verified. The finished project passed all five independent acceptance groups. The complete changes and retained regression tests are available below.",
+            "actions": [
+              "action-44",
+              "action-45"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 179675,
+      "sha256": "4b18af51b6d12254031bbe99ab55465dffd9dca26bad46be7246ff7fcfb1fb17",
+      "arm": "bantam-astra-sol",
+      "wallMs": 478597,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 25,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Expand the boundary tests.",
+        "paragraphs": [
+          {
+            "text": "Sol implemented and tested the extension. Astra reviewed the code and requested explicit digest-length validation plus additional boundary tests. The original non-multiline regex already rejected trailing line terminators; that review request did not establish a reproduced hash-validation bug.",
+            "actions": [
+              "action-3",
+              "action-13",
+              "action-14"
+            ]
+          },
+          {
+            "text": "Sol made digest length explicit and retained assertions for line terminators, size-only drift, unsafe path components, report ordering, filesystem errors and CLI failures. Astra reviewed the integrated result and finished; all five independent acceptance groups passed. Both models are included in the token totals.",
+            "actions": [
+              "action-17",
+              "action-24",
+              "action-25"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

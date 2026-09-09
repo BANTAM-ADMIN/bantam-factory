@@ -128,10 +128,12 @@ export function fightWorkBrowser(replayEvents) {
       const passed=String(check.stdout??'').match(/^# pass (\d+)$/m)?.[1];
       const failed=String(check.stdout??'').match(/^# fail (\d+)$/m)?.[1];
       const mutation=check.mutationReview?.schema==='bantam.test-mutation-review.v1';
+      const sourceReview=check.sourceReview?.schema==='bantam.delivered-source-review.v1';
       const verdict=mutation?(check.exitCode===1?'CAUGHT':check.exitCode===0?'MISSED':'UNKNOWN'):(check.exitCode===0?'PASS':check.exitCode===null?'UNKNOWN':'FAIL');
       const good=mutation?check.exitCode===1:check.exitCode===0;
       return `<section class="check-result${mutation?' mutation-review':''}"><div class="check-heading"><h5>${E(check.title)}</h5><span class="${verdict==='UNKNOWN'?'':good?'good':'bad'}">${verdict} · exit ${E(check.exitCode??'unknown')}</span></div>
         ${mutation?`<p>${E(check.description)}</p><details class="work-extra"><summary>Exact source change and control results</summary>${code(check.mutationReview)}</details>`:''}
+        ${sourceReview?`<p>${E(check.description)}</p><details class="work-extra"><summary>Exact check source and file hashes</summary>${code(check.sourceReview)}</details>`:''}
         ${groups?`<ul class="grade-groups">${groups.map(g=>`<li class="grade-entry"><span class="${g.pass?'good':'bad'}">${g.pass?'✓':'×'}</span><div><strong>${E(g.name.replaceAll('-',' '))}</strong>${g.error?`<details><summary>See the failure</summary>${code(g.error)}</details>`:''}</div></li>`).join('')}</ul>`:tests?`<p class="test-counts"><strong>${E(passed??'?')}</strong> passed · <strong>${E(failed??'?')}</strong> failed · ${E(tests)} tests</p>`:''}
         <details class="work-extra"><summary>Full recorded output</summary>${code(check.stdout)}${check.stderr?code(check.stderr):''}</details></section>`;
     };

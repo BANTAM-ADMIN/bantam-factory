@@ -1,0 +1,5 @@
+# snapshot-drift · solo and supervised
+
+4 recorded attempts on the same public task, starting files and independent checks. All Codex models use medium effort. Supervised lanes include Astra and its BANTAM Terra or Sol worker in their totals. No local inference or maintainer edits to candidate code. Each attempt had a ten-minute recording window.
+
+Factory revision: 46df8f2d4f2a952f9b1a17b2a816c6e6832fbab3. Prefix-cache tokens are part of input. The token table separates the two roles; action replay includes both. Every scheduled lane for this card is published.

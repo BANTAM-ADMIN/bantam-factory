@@ -1,0 +1,143 @@
+{
+  "schema": "bantam.reviewed-fight-work.v1",
+  "card": "snapshot-drift",
+  "files": [
+    {
+      "path": "bantam-codex-astra.json",
+      "bytes": 66449,
+      "sha256": "56e862e1cd9ace3e752af69dc1797307c8df65feec02bbbd15e1841787283457",
+      "arm": "bantam-codex-astra",
+      "wallMs": 152907,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 6,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Batch the edit. Keep the checks.",
+        "paragraphs": [
+          {
+            "text": "With atomic patches available from the first turn, Astra combined the imports, root handling and new API/CLI into one patch. It completed in six model requests, down from ten in the first factory round, and passed all five independent acceptance groups.",
+            "actions": [
+              "action-2",
+              "action-4",
+              "action-6"
+            ]
+          },
+          {
+            "text": "The preservation review still asked for the entire patch a second time: it treated a changed fs.lstatSync argument as a missing call. This round used 25% less input than native Codex but took longer. The following round tests the narrower preservation check.",
+            "actions": [
+              "action-2",
+              "action-3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "codex-astra.json",
+      "bytes": 55388,
+      "sha256": "e0acbd8f6f8389b3eff19d2342b796fc8c7b3596dd9b73df07fdf762231c9c1c",
+      "arm": "codex-astra",
+      "wallMs": 135605,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 5,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Another clean native run.",
+        "paragraphs": [
+          {
+            "text": "Native Astra completed the same extension and retained tests in six model requests. It passed all five independent acceptance groups. This fresh native run accompanies the factory’s batch-edit revision.",
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-terra.json",
+      "bytes": 254372,
+      "sha256": "63934e13bdc41fb165f7a5ad2e5ba9a9177129dca30080556563181e485ce53a",
+      "arm": "bantam-astra-terra",
+      "wallMs": 462268,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 46,
+      "files": 5,
+      "changedFiles": 3,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Keep the contract precise.",
+        "paragraphs": [
+          {
+            "text": "Astra reviewed Terra’s implementation and commissioned stricter hash validation, raw root-path handling, and missing behavioral tests. It corrected a generated fixture that normalized away the very path component it was meant to test.",
+            "actions": [
+              "action-16",
+              "action-25"
+            ]
+          },
+          {
+            "text": "A later review caught an overrestriction: the selected root cannot be a symlink, but its ancestors may be. Terra repaired that distinction and retained positive and negative cases. All five independent acceptance groups passed; the full token total counts every supervisor and worker call.",
+            "actions": [
+              "action-38",
+              "action-44",
+              "action-45",
+              "action-46"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "bantam-astra-sol.json",
+      "bytes": 188977,
+      "sha256": "908c243f7464f68dfdfc0b3730cc014c90813f89de5ac70b1eaebec7943d34b6",
+      "arm": "bantam-astra-sol",
+      "wallMs": 447620,
+      "outcome": "PASS",
+      "accepted": true,
+      "completed": true,
+      "publicExit": 0,
+      "hiddenExit": 0,
+      "protectedChanges": 0,
+      "actions": 30,
+      "files": 4,
+      "changedFiles": 2,
+      "taskSha256": "f35376471fbcfb7b3a8356a8891c8b337954a396acee619c696e018d89daffcc",
+      "explanation": {
+        "title": "Correct the fixture. Check the boundary.",
+        "paragraphs": [
+          {
+            "text": "Astra steered Sol through an incorrect test expectation: a regular file used as an intermediate path component belongs in unsafe. The correction retained the case and its assertion.",
+            "actions": [
+              "action-11"
+            ]
+          },
+          {
+            "text": "Review then caught root normalization stripping a literal POSIX backslash. Sol repaired that boundary and added regressions, isolated size-only drift, and used a read spy to check that complete manifest validation precedes file reads. Astra reviewed the integrated result; all five independent acceptance groups passed.",
+            "actions": [
+              "action-23",
+              "action-29",
+              "action-30"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

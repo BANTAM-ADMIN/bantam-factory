@@ -62,6 +62,17 @@ export function validateFightWork(value, row, card) {
     names.add(file.path);
   }
   for (const check of value.checks) {
+    if (Object.hasOwn(check, 'sourceReview')) {
+      const review = check.sourceReview, file = value.files.find(f => f.path === review?.sourcePath);
+      if (review?.schema !== 'bantam.delivered-source-review.v1' || !file?.after
+          || ![0,1].includes(check.exitCode) || !text(check.description,2000)
+          || !hex(review.sourceSha256) || review.sourceSha256 !== file.afterSha256
+          || sha(file.after) !== review.sourceSha256
+          || !text(review.probeSource,48000) || !review.probeSource
+          || !hex(review.probeSha256) || sha(review.probeSource) !== review.probeSha256
+          || Object.hasOwn(check, 'mutationReview'))
+        throw Error('Source review must bind its probe to the unchanged delivered source');
+    }
     if (!Object.hasOwn(check, 'mutationReview')) continue;
     const review=check.mutationReview, file=value.files.find(f=>f.path===review?.sourcePath);
     if (review?.schema!=='bantam.test-mutation-review.v1' || !file?.after

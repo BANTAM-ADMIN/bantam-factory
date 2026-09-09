@@ -1952,6 +1952,7 @@ async function runAgentCore({
   // fragment; cleared as soon as a valid action parses. A first attempt is
   // never penalised, because repeated tokens are correct in code.
   let degeneratePenalty = 0;
+  let decisionWorkingNote = "";
   const historyWindow = extensionTrajectory ? createHistoryWindow({
     charBudget: historyCharBudget, readObservationMaxChars, pinHead: true,
     onRebase: receipt => {
@@ -1968,7 +1969,24 @@ async function runAgentCore({
         source:configuredHistoryBudget ? 'operator-history' : configuredContextTokens ? 'operator-context' : 'runtime'});
       historyCharBudget = nextBudget;
     }
-    return historyWindow(Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h);
+    const candidates = Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h;
+    let retained = historyWindow(candidates);
+    // An unchanged note is normally appended only once. Once that turn leaves
+    // the history window, equality with lastFoldedGuidance no longer proves
+    // residency. Restore the CURRENT, already authority-checked note beside the
+    // newest observation before this decision, including an overflow retry.
+    if (extensionTrajectory && decisionWorkingNote && turns.length
+        && !retained.some(turn => String(turn.observation ?? "").includes(decisionWorkingNote))) {
+      const last = turns.at(-1);
+      if (candidates.includes(last)) {
+        last.observation = `${String(last.observation ?? "")}\n\n${decisionWorkingNote}`;
+        turnRenderCache.delete(last.i);
+        onEvent({ type: "working_checkpoint_restored", turn: last.i, chars: decisionWorkingNote.length });
+        onEvent({ type: "observation_annotated", turn: turns.length - 1, observation: last.observation });
+        retained = historyWindow(candidates);
+      }
+    }
+    return retained;
   };
   // Count the rendered bytes, not an annotation that might have been clipped.
   // This boundary is the exact prompt passed to ModelClient, NOT evidence that
@@ -2509,6 +2527,7 @@ async function runAgentCore({
       suppressDuringCurrentFailure: Boolean((currentFailure && !pendingVerifierAtDecision) || currentCliFailed),
       pendingVerification: auditRecovery,
     });
+    decisionWorkingNote = workingNoteReanchor.startsWith("[working-checkpoint") ? workingNoteReanchor : "";
     let repositoryText = "";
     let repositoryTurnId = null;
     if (repositoryState) {

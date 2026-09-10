@@ -1362,7 +1362,9 @@ export class Executor {
       cwd: this.realWorkspace,
       statSize: (f) => { try { return fs.statSync(path.resolve(this.realWorkspace, f)).size; } catch { return null; } },
     });
-    const killNote = killSignalNote(code, {
+    // A kill issued by our own deadline/cancel/output guard is not evidence
+    // of OOM. The typed stop reason below owns the diagnostic in that case.
+    const killNote = res.timedOut || res.aborted || res.bufferExceeded ? "" : killSignalNote(code, {
       memoryLimitBytes: cgroupMemoryLimit((f) => fs.readFileSync(f, "utf8")),
       producedOutput: Boolean(cleanStdout || cleanStderr),
       // process-runner flattens a signal death to code 1; the signal name is the

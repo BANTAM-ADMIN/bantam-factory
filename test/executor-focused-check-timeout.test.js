@@ -90,3 +90,11 @@ test("a real hanging ad-hoc check is stopped by the verification deadline", asyn
   assert.match(result.observation, /Verification was killed/);
   assert.doesNotMatch(result.observation, /nohup/);
 });
+
+
+test("controller-issued SIGKILL does not misdiagnose a timeout as out of memory", async t => {
+  const { executor } = fixture(t, { code: 1, signal: "SIGKILL", timedOut: true });
+  const result = await executor.execute({ a: "shell", c: "node check_contract.mjs" });
+  assert.match(result.observation, /Verification was killed after 3s/);
+  assert.doesNotMatch(result.observation, /out-of-memory|Reduce PEAK memory|\[killed\]/);
+});

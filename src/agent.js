@@ -1173,6 +1173,8 @@ async function runAgentCore({
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
           workspaceCoherence: {
+            ...(Number.isSafeInteger(t.workspaceCoherence.generation) && t.workspaceCoherence.generation >= 0
+              ? { generation: t.workspaceCoherence.generation } : {}),
             fingerprints: { ...(t.workspaceCoherence.fingerprints ?? {}) },
             pendingPaths: Array.isArray(t.workspaceCoherence.pendingPaths)
               ? t.workspaceCoherence.pendingPaths.slice()
@@ -1872,10 +1874,7 @@ async function runAgentCore({
       }
     }
   }
-  let workspaceEditGeneration = turns.reduce(
-    (generation, turn) => generation + (turnChangedWorkspace(turn) ? 1 : 0),
-    0,
-  );
+  let workspaceEditGeneration = restoredWorkspaceGeneration(turns);
   const verificationObservedPaths = new Set(turns.flatMap(turn => [
     ...(turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []),
     ...(turn.shellChangedPaths ?? []),
@@ -6809,6 +6808,7 @@ async function runAgentCore({
       ...(result.shellScopeRollback ? { shellScopeRollback: result.shellScopeRollback } : {}),
       ...(stateAuditIssued ? { stateAudit: stateAuditSnapshot() } : {}),
       workspaceCoherence: {
+        generation: workspaceEditGeneration,
         fingerprints: workspaceCoherence.snapshot(),
         pendingPaths: [...pendingExternalChanges],
       },
@@ -6912,6 +6912,7 @@ async function runAgentCore({
       observation: result.observation,
       rawObservation,
       workspaceCoherence: {
+        generation: workspaceEditGeneration,
         fingerprints: workspaceCoherence.snapshot(),
         pendingPaths: [...pendingExternalChanges],
       },
@@ -7135,6 +7136,36 @@ function successfulReadPaths(turn) {
 function turnChangedWorkspace(turn) {
   return turnEditApplied(turn)
     || (Array.isArray(turn?.shellChangedPaths) && turn.shellChangedPaths.length > 0);
+}
+
+// Generation includes controller restores and external edits, not just worker
+// mutations. Persist the end-of-turn value with its filesystem fingerprints:
+// a failing check may have run BEFORE the controller restored a newer tree.
+export function restoredWorkspaceGeneration(turns) {
+  let generation = 0, legacyReceiptGeneration = 0;
+  for (const turn of turns) {
+    const saved = turn?.workspaceCoherence?.generation;
+    if (Number.isSafeInteger(saved) && saved >= 0) {
+      generation = saved;
+      legacyReceiptGeneration = 0;
+      continue;
+    }
+    if (turnChangedWorkspace(turn)) generation++;
+    // Old artifacts have no end-of-turn revision. A receipt can establish that
+    // counting edits underestimates it, but cannot certify the final restored
+    // bytes. Enter a fresh generation when that ambiguity is observed; never
+    // reuse a receipt merely by adopting its number as the current revision.
+    for (const evidence of [turn?.verificationEvidence, turn?.shellExecution,
+      turn?.environmentVerification,
+      ...(Array.isArray(turn?.verificationReceipts?.entries) ? turn.verificationReceipts.entries : []).flatMap(entry =>
+        [entry?.verificationEvidence, entry?.shellExecution])]) {
+      const recorded = evidence?.generation;
+      if (Number.isSafeInteger(recorded) && recorded >= 0 && recorded < Number.MAX_SAFE_INTEGER) {
+        legacyReceiptGeneration = Math.max(legacyReceiptGeneration, recorded);
+      }
+    }
+  }
+  return legacyReceiptGeneration > generation ? legacyReceiptGeneration + 1 : generation;
 }
 
 function sameStrings(left, right) {

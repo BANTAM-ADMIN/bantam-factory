@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { runAgent } from '../src/agent.js';
+import { runAgent, restoredWorkspaceGeneration } from '../src/agent.js';
+import { buildArtifact } from '../src/artifact.js';
+import { RunCheckpoint } from '../src/run-checkpoint.js';
 
 const verify = { a: 'shell', c: 'node --test check.test.cjs' };
 const write = (p, content) => ({ a: 'write_file', p, content });
@@ -25,7 +27,7 @@ async function fixture(t, actions) {
       assert.ok(actions.length, 'unexpected model call');
       return { content: JSON.stringify(actions.shift()), tokens: 1, stoppedEos: true };
     } }, onEvent: event => { events.push(event); if (event.type === 'observation') observed++; } });
-  return { result, events, prompts, read: name => fs.readFileSync(path.join(workspace, name), 'utf8') };
+  return { workspace, result, events, prompts, read: name => fs.readFileSync(path.join(workspace, name), 'utf8') };
 }
 
 test('a failed later edit restores the latest equally passing tree, preserving verified feature work', async t => {
@@ -52,4 +54,46 @@ test('rechecking the same restored green bytes does not reset the per-snapshot s
   assert.equal(result.metrics.regressionReverts, 2);
   assert.ok(events.some(e => e.type === 'regression_guard_standdown' && e.revertsOfThisSnapshot === 2));
   assert.ok(!events.some(e => e.type === 'external_workspace_change'));
+});
+
+test('a resume after controller rollback preserves its revision through artifact and crash checkpoint', async t => {
+  const { workspace, result, events } = await fixture(t, [
+    write('target.cjs', 'module.exports = 1;\n'), verify,
+    write('target.cjs', 'module.exports = 2;\n'), verify,
+  ]);
+  const last = result.turns.at(-1);
+  assert.equal(result.metrics.regressionReverts, 1);
+  assert.equal(last.shellExecution.generation, 2, 'the failed command ran before rollback');
+  assert.equal(last.workspaceCoherence.generation, 3, 'rollback advances the final tree revision');
+  const artifact = JSON.parse(JSON.stringify(buildArtifact({ runId: 'resume-restore', stamp: 'test', result })));
+  const checkpoint = new RunCheckpoint({ autosaveEvery: 0 });
+  for (const event of events) checkpoint.note(event);
+  for (const resumeTurns of [artifact.turns, JSON.parse(JSON.stringify(checkpoint.turns()))]) {
+    assert.equal(resumeTurns.at(-1).workspaceCoherence.generation, 3);
+    let observed = false;
+    const resumed = await runAgent({ workspace, task: 'Check the restored implementation.',
+      resumeTurns, maxTurns: Infinity, shouldAbort: () => observed,
+      interactive: true, useGrammar: false, grounding: false, shellSandbox: 'host',
+      verificationScript: verify.c, thinkMode: 'never', completionAudit: false,
+      autoVerifyBlindEdits: 0, autoVerifyProbes: 0, autoVerifyStaleTurns: 0,
+      model: { assistantPrefill: '', async complete() { return { content: JSON.stringify(verify), tokens: 1, stoppedEos: true }; } },
+      onEvent: event => { if (event.type === 'observation') observed = true; },
+    });
+    assert.equal(resumed.turns.at(-1).shellExecution.generation, 3);
+    assert.equal(resumed.turns.at(-1).verificationEvidence.status, 'pass');
+    assert.equal(resumed.turns.at(-1).workspaceCoherence.generation, 3);
+    assert.deepEqual(resumed.turns.slice(0, resumeTurns.length).map(t => t.workspaceCoherence?.generation),
+      resumeTurns.map(t => t.workspaceCoherence?.generation));
+  }
+});
+
+test('legacy generation disagreement invalidates old proof instead of adopting its receipt number', () => {
+  const turns = [{ action: write('a.js', 'one'), editApplied: true },
+    { action: verify, shellExecution: { generation: 4 } }];
+  assert.equal(restoredWorkspaceGeneration(turns), 5);
+  assert.equal(restoredWorkspaceGeneration([...turns, { workspaceCoherence: { generation: 6 } },
+    { action: write('a.js', 'two'), editApplied: true }]), 7);
+  assert.equal(restoredWorkspaceGeneration([{ action: verify, observation: 'generation 999; PASS',
+    workspaceCoherence: { generation: -3 }, shellExecution: { generation: '999' } }]), 0,
+  'prose and malformed stamps cannot create a revision or evidence');
 });

@@ -196,7 +196,7 @@ test("a later implementation milestone keeps old proof stale without ordering un
       assert.match(text, /Continue any unfinished implementation milestone/);
       assert.match(text, /focused assertion for the behavior changed/);
       assert.match(text, /Do not rerun an unrelated check after each edit/);
-    } else assert.match(text, /Next: run exactly "node check-summary.mjs" directly/, 'a newly authored check supplies a specific current launcher');
+    } else assert.match(text, /reuse "node check-summary.mjs" directly if it covers the behavior changed/, 'a newly authored check supplies a specific current launcher without claiming coverage');
     assert.doesNotMatch(text, /Next: rerun "node check-api.mjs"/);
     assert.ok(!requests[i].jsonSchema.properties.a.enum.includes('done'));
     for (const verb of ['write_file','replace','read_file','shell']) assert.ok(requests[i].jsonSchema.properties.a.enum.includes(verb));

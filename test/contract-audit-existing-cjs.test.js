@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { existingFocusedCheck } from '../src/contract-audit-recovery.js';
-import { contractAuditDecisionContext } from '../src/contract-audit-phase.js';
+import { contractAuditDecisionContext, contractAuditPhaseState, verificationWorkflowPromptText } from '../src/contract-audit-phase.js';
 import { runAgent } from '../src/agent.js';
 
 const source = "const { collectItems } = require('../source.cjs'); const assert = require('node:assert/strict'); assert.deepEqual(collectItems([]), []);";
@@ -34,6 +34,27 @@ test('an actual failed execution without a source hint requests repair instead o
   assert.match(context.text, /rerun the affected check directly/);
   assert.doesNotMatch(context.text, /create a new workspace check/);
   assert.equal(context.phase, 'focused');
+});
+
+test('an existing source check does not prescribe the next action for another implementation milestone', () => {
+  const checkCandidate = existingFocusedCheck(['test/edge.cjs'], () => source, { generation: 9 });
+  const pending = { generation: 9, needsFocused: true, needsProject: true,
+    configuredCommand: 'npm test', checkCandidate };
+  const before = structuredClone(pending);
+  const decision = contractAuditDecisionContext(pending);
+  const phase = contractAuditPhaseState(pending);
+  for (const text of [decision.text, phase.note]) {
+    assert.match(text, /Continue any unfinished implementation milestone/);
+    assert.match(text, /verification boundary/);
+    assert.match(text, /if it covers the behavior changed/);
+    assert.match(text, /node test\/edge.cjs/);
+    assert.doesNotMatch(text, /Next: run exactly/);
+    assert.match(text, /fresh configured project verification/);
+  }
+  assert.deepEqual(pending, before, 'advisory text supplies no execution credit');
+  assert.equal(decision.phase, 'focused');
+  assert.ok(phase.excludeVerbs.includes('done'));
+  assert.ok(verificationWorkflowPromptText(decision).includes(decision.text), 'bounded newest-turn guidance survives delivery');
 });
 
 for (const resumed of [false, true]) test(`a real failed CommonJS check remains repairable${resumed ? ' after resuming' : ''} and requires fresh checks`, async t => {

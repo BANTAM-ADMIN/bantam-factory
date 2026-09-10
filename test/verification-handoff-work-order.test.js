@@ -103,7 +103,7 @@ test('successful custom checks get an explicit non-admission reason and the curr
       if (step === 4) {
         const current = prompt.slice(prompt.lastIndexOf('[verification workflow: current decision]'));
         assert.match(current, /ran and exited 0/);assert.match(current, /NOT ADMITTED/);
-        assert.match(current, /no recognized node:assert binding/);assert.match(current, /run exactly "node --test test\/edge.test.js"/);
+        assert.match(current, /no recognized node:assert binding/);assert.match(current, /reuse "node --test test\/edge.test.js" directly if it covers the behavior changed/);
         assert.ok(!options.jsonSchema.properties.a.enum.includes('done'));
       }
       if (step === 5) assert.match(prompt.slice(prompt.lastIndexOf('[verification workflow: current decision]')), /VERIFICATION READY/);

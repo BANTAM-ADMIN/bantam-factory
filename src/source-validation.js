@@ -252,7 +252,13 @@ function enclosingContainer(before, filePath, runtimePath, offset) {
   const visit = (node) => {
     if (!node || typeof node.type !== "string") return;
     if (!(node.start <= offset && offset <= node.end)) return;
-    if (STATEMENT_HOSTILE_NODES.has(node.type)) found = node;   // innermost wins
+    // A method/callback/static body admits statements even when its ancestor
+    // is a class, object, array, or argument list. Reset that outer context at
+    // the body boundary; a nested expression can establish a new one below.
+    // Otherwise a malformed statement *inside* a method is misleadingly
+    // diagnosed as a statement inserted directly among class members.
+    if (node.type === "BlockStatement" || node.type === "StaticBlock" || node.type === "Program") found = null;
+    else if (STATEMENT_HOSTILE_NODES.has(node.type)) found = node;   // innermost wins
     for (const key of Object.keys(node)) {
       if (key === "type" || key === "start" || key === "end" || key === "loc") continue;
       const value = node[key];

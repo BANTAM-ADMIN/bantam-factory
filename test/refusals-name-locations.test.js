@@ -191,6 +191,41 @@ test("an ordinary statement insertion inside a block gets no container note", ()
     "a block is where statements belong — naming it would be noise");
 });
 
+test("method and callback bodies do not inherit an outer expression's statement prohibition", () => {
+  // A real local run's method edit left an extra closing brace. The gate
+  // correctly refused it, but named the containing class as if the edit had
+  // inserted a statement between methods. Bodies inside object/array/call
+  // expressions have the same boundary: statements belong in the body.
+  for (const [head, tail] of [
+    ["export class Agent {\n  update() {", "  }\n}"],
+    ["const agent = {\n  update() {", "  }\n};"],
+    ["consume(() => {", "});"],
+    ["const callbacks = [() => {", "}];"],
+    ["class Agent {\n  static {", "  }\n}"],
+  ]) {
+    const before = `${head}\n    work();\n${tail}\n`;
+    const after = before.replace("    work();", "    if (ready) {\n      work();");
+    const result = validateSourceTransition({ path: "agent.js", before, after });
+    assert.equal(result.ok, false, head);
+    assert.match(result.message, /failed to parse:/, head);
+    assert.match(result.message, /staged result around your edit/, head);
+    assert.doesNotMatch(result.message, /a statement cannot appear there/, head);
+  }
+});
+
+test("inner object properties and direct class members still identify an invalid statement location", () => {
+  const before = "class Agent {\n  update() {\n    const values = {\n      count: 1,\n    };\n  }\n}\n";
+  const after = before.replace("      count: 1,", "      if (ready) work();\n      count: 1,");
+  const nested = validateSourceTransition({ path: "agent.js", before, after });
+  assert.equal(nested.ok, false);
+  assert.match(nested.message, /inside an object literal that opens at line 3/);
+  const directBefore = "class Agent {\n  update() {}\n}\n";
+  const direct = validateSourceTransition({ path: "agent.js", before: directBefore,
+    after: directBefore.replace("  update() {}", "  if (ready) work();\n  update() {}") });
+  assert.equal(direct.ok, false);
+  assert.match(direct.message, /inside a class body that opens at line 1/);
+});
+
 test("the container note is skipped when the pre-edit file does not parse", () => {
   const broken = "export function a( {\n";
   const { ok, message } = validateSourceTransition({ path: "src/x.js", before: broken, after: "export function a( {\nif (x) {\n" });

@@ -149,6 +149,18 @@ function analyzeModule(modulePath) {
   const classes = new Map();
   const exportBindings = new Map();
   let exportsComplete = true;
+  // This pass enumerates ESM declarations, not Node's CommonJS interop export
+  // detection. A legacy export must not become a confident "nothing named"
+  // warning for a valid import. Leave that module's export set incomplete;
+  // runtime checks still establish whether a particular named import works.
+  const bindings = collectBindingCounts(ast);
+  walk(ast, node => {
+    if (node.type !== "MemberExpression" || node.object?.type !== "Identifier") return;
+    const object = node.object.name;
+    const property = node.computed ? node.property?.value : node.property?.name;
+    if ((object === "module" && property === "exports" && !bindings.has("module"))
+        || (object === "exports" && !bindings.has("exports"))) exportsComplete = false;
+  });
   for (const node of ast.body) {
     if (node.type === "ExportNamedDeclaration") {
       const decl = node.declaration;

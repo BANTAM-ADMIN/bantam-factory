@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { checkEditedApi } from "../src/api-check.js";
 
 const tempDirs = [];
@@ -27,6 +28,21 @@ function write(directory, relativePath, source) {
 }
 
 describe("edited API checker", () => {
+  it("does not mistake CommonJS exports for an empty ESM export list", async () => {
+    const workspace = fixture();
+    write(workspace, "harness.cjs", 'function withGame() { return 42; }\nmodule.exports = { withGame };\n');
+    const entry = write(workspace, "check.mjs", 'import { withGame } from "./harness.cjs";\nexport const result = withGame();\n');
+    assert.equal((await import(pathToFileURL(entry).href)).result, 42);
+    assert.deepEqual(checkEditedApi(workspace, "check.mjs"), []);
+  });
+
+  it("CommonJS-looking comments and local objects do not hide missing ESM exports", () => {
+    const workspace = fixture();
+    write(workspace, "module.mjs", '// module.exports = { imaginary };\nconst module = { exports: {} };\nvoid module.exports;\nexport const real = 42;\n');
+    write(workspace, "check.mjs", 'import { imaginary } from "./module.mjs";\n');
+    assert.match(checkEditedApi(workspace, "check.mjs")[0], /imaginary.*exports: real/);
+  });
+
   it("accepts existing named exports and instance methods", () => {
     const workspace = fixture();
     write(workspace, "client.js", "export class Client { run() {} }\nexport const version = 1;\n");

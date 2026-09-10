@@ -1,5 +1,6 @@
 // Optional, consent-first Astra supervisor; private candidate and evidence.
 import fs from 'node:fs';
+import {readJsonFile} from './json-file.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CodexAppServer } from './codex-transport.js';
@@ -271,12 +272,12 @@ export async function runForeman(plan, { log = () => {} } = {}) {
       if (recorder) { usage = await recorder.close(); settlement = await settleServerCounters(plan.endpoint); write(path.join(dir, 'settlement.json'), settlement); if (settlement.observedBusy && !settlement.settled) ac.abort(); }
       try { await cleanupForemanContainers(cids); } catch (error) { ac.abort(); throw error; }
     }
+    const workerArtifact = await readJsonFile(path.join(dir, 'run.json')).catch(() => null);
     if (job.worker !== 'local') {
-      usage = cornerUsage('bantam-codex', {armDir: dir});
+      usage = cornerUsage('bantam-codex', {armDir: dir, run: workerArtifact});
       if (usage) usage = {...usage, freshInputTokens: usage.inputTokens - usage.cacheHitTokens};
       if (!clean(result) && usage) usage = { ...usage, complete: false, reason: 'worker process did not complete; recorded responses may omit in-flight usage' };
     }
-    const workerArtifact = readJson(path.join(dir, 'run.json'));
     const accepted = acceptedBantamCompletion(workerArtifact);
     const after = store.capture(ws, {message: `settled ${job.id}`});
     const checked = await check(ws, job.verify, signal); write(path.join(dir, 'verification.json'), checked);

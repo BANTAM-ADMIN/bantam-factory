@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Fresh, separately sealed cards; no candidate repair or automatic promotion.
 import fs from 'node:fs';
+import {readJsonFile} from '../src/json-file.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -264,7 +265,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     for(const [label,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
       fs.writeFileSync(path.join(dir,`${label}.stdout.log`),record.stdout);fs.writeFileSync(path.join(dir,`${label}.stderr.log`),record.stderr);
     }
-    let saved=null;try{saved=JSON.parse(fs.readFileSync(path.join(dir,'run.json'),'utf8'));}catch{}
+    let saved=null;try{saved=await readJsonFile(path.join(dir,'run.json'));}catch{}
     let native=null;try{native=JSON.parse(fs.readFileSync(path.join(dir,'native/result.json'),'utf8'));}catch{}
     let nativeLaunch=null;try{nativeLaunch=JSON.parse(fs.readFileSync(path.join(dir,'native/launch.json'),'utf8'));}catch{}
     const acceptedCompletion=arm.startsWith('bantam')?acceptedBantamCompletion(saved):null;
@@ -272,7 +273,7 @@ export async function runFactoryFights({output,endpoint='http://127.0.0.1:8085',
     const candidatePass=!tampered.length&&clean(grading.publicResult)&&clean(grading.hidden)&&grading.record?.pass===true;
     const processCompleted=clean(result)&&acceptedCompletion!==false;
     const nativeResponseUsage=NATIVE_CODEX_MODELS[arm]?codexSessionUsage(path.join(dir,'native-sessions'),{processCompleted:clean(result)}):null;
-    const cliUsage=arm.startsWith('claude-')?claudeStreamUsage(result.stdout):cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
+    const cliUsage=arm.startsWith('claude-')?claudeStreamUsage(result.stdout):cornerUsage(arm,{armDir:dir,run:saved,rawLines:result.stdout.split('\n')});
     const usage=wireUsage??nativeResponseUsage??cliUsage;
     if(usage&&usage.freshInputTokens==null&&usage.inputTokens!=null&&usage.cacheHitTokens!=null)usage.freshInputTokens=usage.inputTokens-usage.cacheHitTokens;
     const noModelRequest=LOCAL.has(arm)&&wireUsage.requests===0;

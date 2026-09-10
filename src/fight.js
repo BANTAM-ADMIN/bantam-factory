@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { writeFightReplay } from "./fight-replay.js";
 import { resolveCodexapiConfig } from "./codexapi-bridge.js";
 import { loadUserSettings } from "./logic/user-settings.js";
+import { readJsonFile } from "./json-file.js";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Rival-harness isolation homes. Overridable; default under ~/.bantam so a
@@ -366,11 +367,11 @@ export function startFight({ task, arms, materialsDir = null, dir = null, port =
     };
     child.stdout.on("data", onChunk);
     child.stderr.on("data", onChunk);
-    child.on("close", (code) => {
+    child.on("close", async (code) => {
       const wallMs = Date.now() - armT0;
       const artifacts = listArtifacts(ws, armT0 - 1000, { materialsDir });
       let usage = null;
-      try { usage = cornerUsage(c.name, { armDir: path.dirname(ws), rawLines }); } catch { /* usage is evidence, never a blocker */ }
+      try { usage = await readCornerUsage(c.name, { armDir: path.dirname(ws), rawLines }); } catch { /* usage is evidence, never a blocker */ }
       results.push({ arm: c.name, wallMs, exitCode: code, lines: lineCount, artifacts, usage });
       broadcast({ arm: c.name, kind: "done", text: `finished — exit ${code}, ${(wallMs / 1000).toFixed(1)}s, ${artifacts.length} artifact(s)`, t: wallMs, wallMs, exitCode: code, artifacts });
       resolve();
@@ -751,11 +752,13 @@ export async function narratePostmortem({ task, cmds, post, verdicts, laneText, 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
 
 /** Usage for one corner. BANTAM arms: their run artifact. CLIs: their own tail. */
-export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
+export function cornerUsage(name, { armDir = null, rawLines = [], run = undefined } = {}) {
   if (name.startsWith("bantam")) {
-    if (!armDir) return null;
-    let r;
-    try { r = JSON.parse(fs.readFileSync(path.join(armDir, "run.json"), "utf8")); } catch { return null; }
+    let r = run;
+    if (r === undefined) {
+      if (!armDir) return null;
+      try { r = JSON.parse(fs.readFileSync(path.join(armDir, "run.json"), "utf8")); } catch { return null; }
+    }
     // Checkpoints written before final metrics are not zero-token runs.
     if (!r?.metrics?.usage) return null;
     const u = r.metrics.usage;
@@ -837,6 +840,15 @@ export function cornerUsage(name, { armDir = null, rawLines = [] } = {}) {
 }
 
 const fmt = (n) => (Number.isFinite(n) ? n.toLocaleString("en-US") : "—");
+
+/** File-backed callers use a streaming read; a long run can exceed V8's string limit. */
+export async function readCornerUsage(name, options = {}) {
+  if (!name.startsWith("bantam") || options.run !== undefined) return cornerUsage(name, options);
+  if (!options.armDir) return null;
+  let run;
+  try { run = await readJsonFile(path.join(options.armDir, "run.json")); } catch { return null; }
+  return cornerUsage(name, { ...options, run });
+}
 
 /** One table: corner, verdict, wall, turns, input, output, prefix reuse. */
 // Bench-fault vs harness-fault, from the lane's own artifacts. The operator's

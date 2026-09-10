@@ -7,7 +7,7 @@ import {freshCommand,cleanFightEnv,inspectLocalModel,FIGHT_ARMS,executeContender
 import {startModelRecorder} from './fight-model-proxy.mjs';
 import {execute,changedSealedFiles,treeHashes} from './repobrief-astra-fights.mjs';
 import {runShellProcess} from '../src/executor.js';
-import {cornerUsage} from '../src/fight.js';
+import {readCornerUsage} from '../src/fight.js';
 import {readCompetitorRegistry} from '../src/competitor-registry.js';
 const write=(p,data)=>fs.writeFileSync(p,JSON.stringify(data,null,2)+'\n');
 export async function preflight(output,arms=FIGHT_ARMS,{peerExecutables=readCompetitorRegistry().tools,peerOutputTokens=8192}={}){
@@ -33,7 +33,7 @@ export async function preflight(output,arms=FIGHT_ARMS,{peerExecutables=readComp
     finally{usage=recorder?await recorder.close():null;}
     const check=await runShellProcess(workspace,'npm test',{shellSandbox:'docker',shellNetwork:false,workspaceReadOnly:true,timeoutMs:15000});
     fs.writeFileSync(path.join(dir,'check.stdout.log'),check.stdout);fs.writeFileSync(path.join(dir,'check.stderr.log'),check.stderr);
-    usage??=cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
+    usage??=await readCornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')});
     const protectedChanged=changedSealedFiles(Object.fromEntries(Object.entries(seal).filter(([p])=>p!=='sum.js')),workspace);
     const row={arm,pass:result.code===0&&!result.timedOut&&check.code===0&&!protectedChanged.length,wallMs:result.wallMs,exitCode:result.code,timedOut:result.timedOut,checkExit:check.code,protectedChanged,usage};
     results.push(row);write(path.join(dir,'result.json'),row);write(path.join(output,'results.json'),results);

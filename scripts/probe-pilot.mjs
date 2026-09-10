@@ -2,6 +2,7 @@
 // Reuse the existing fight execution/usage/sealing machinery. No retries,
 // teacher calls, hidden-test repair feedback, or automatic runtime promotion.
 import fs from 'node:fs';
+import {readJsonFile} from '../src/json-file.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -51,7 +52,7 @@ export async function runProbePilot(output) {
     fs.writeFileSync(path.join(dir,'grade.stdout.log'),grade.stdout);
     fs.writeFileSync(path.join(dir,'grade.stderr.log'),grade.stderr);
     let saved = null;
-    try { saved = JSON.parse(fs.readFileSync(path.join(dir,'run.json'),'utf8')); } catch {}
+    try { saved = await readJsonFile(path.join(dir,'run.json')); } catch {}
     const turns = saved?.result?.turns ?? saved?.turns ?? [];
     const probes = turns.filter(turn => (turn.action ?? turn.parsedAction)?.a === 'probe').map(turn => ({i:turn.i,status:turn.probeEvidence?.projection?.status,reason:turn.probeEvidence?.projection?.reason,experimentId:turn.probeEvidence?.experimentId,inputCount:turn.probeEvidence?.inputs?.length ?? 0}));
     const instrumentUsed = probes.some(probe => probe.experimentId && probe.status);
@@ -62,7 +63,7 @@ export async function runProbePilot(output) {
       acceptedCompletion:acceptedBantamCompletion(saved),exitCode:result.code,timedOut:result.timedOut,wallMs:result.wallMs,tampered,
       graderExitCode:grade.code,probes,instrumentUsed,instrumentCompleted,
       instructedUseSatisfied:condition === 'baseline' || instrumentUsed,
-      usage:cornerUsage('bantam-local-27b',{armDir:dir,rawLines:result.stdout.split('\n')}),
+      usage:cornerUsage('bantam-local-27b',{armDir:dir,run:saved,rawLines:result.stdout.split('\n')}),
       finalFiles:treeHashes(workspace,{excludeGenerated:true})};
     write(path.join(dir,'result.json'),row);
     manifest.results.push(row); save();

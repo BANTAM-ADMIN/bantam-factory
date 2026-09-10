@@ -2,6 +2,7 @@
 // Post-fix validation against the original sealed tasks, graders and starters.
 // Each invocation has a new evidence directory; never overwrite a scored run.
 import fs from 'node:fs';
+import {readJsonFile} from '../src/json-file.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -65,14 +66,14 @@ export async function validateContextFixes({sourceEvidence,output,stages=[1,2,3]
     const tampered=changedSealedFiles(protectedSeal,workspace);
     const grade=await gradeCandidate(workspace,stage,kitSeal);
     fs.writeFileSync(path.join(dir,'grade.stdout.log'),grade.stdout);fs.writeFileSync(path.join(dir,'grade.stderr.log'),grade.stderr);
-    let saved=null;try{saved=JSON.parse(fs.readFileSync(path.join(dir,'run.json')));}catch{}
+    let saved=null;try{saved=await readJsonFile(path.join(dir,'run.json'));}catch{}
     const candidatePass=!tampered.length&&grade.code===0&&!grade.timedOut&&!grade.bufferExceeded&&!grade.aborted;
     const acceptedCompletion=acceptedBantamCompletion(saved);
     const row={stage,arm,pass:candidatePass&&acceptedCompletion&&result.code===0&&!result.timedOut&&!result.bufferExceeded&&!result.aborted,
       candidatePass,acceptedCompletion,exitCode:result.code,timedOut:result.timedOut,wallMs:result.wallMs,
       tampered,graderExitCode:grade.code,graderTimedOut:grade.timedOut,
       taskSha256:sha(task),materialSeal:oldStage.materialSeal,
-      usage:cornerUsage(arm,{armDir:dir,rawLines:result.stdout.split('\n')}),finalFiles:treeHashes(workspace,{excludeGenerated:true})};
+      usage:cornerUsage(arm,{armDir:dir,run:saved,rawLines:result.stdout.split('\n')}),finalFiles:treeHashes(workspace,{excludeGenerated:true})};
     writeJson(path.join(dir,'result.json'),row);manifest.results.push(row);save();
     process.stdout.write(`Card ${stage}: ${arm} ${row.pass?'PASS':'FAIL'} (${(row.wallMs/1000).toFixed(1)}s)\n`);
     if(!row.pass&&stopOnFailure){manifest.stopped='First failed post-fix sample retained; inspect before expanding validation.';break;}

@@ -2,6 +2,7 @@
 // Three cumulative, same-starter project cards. Candidate code is written only
 // by the contenders. Raw evidence remains local; no publishing or narrator.
 import fs from "node:fs";
+import {readJsonFile} from '../src/json-file.js';
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -204,7 +205,7 @@ export async function runCards(outputRoot, { timeoutMs = 480_000, reuseFirstPair
         if (JSON.stringify(treeHashes(path.join(oldDir, "ws"), { excludeGenerated: true })) !== JSON.stringify(reuse.finalFiles)) throw new Error("prior candidate changed");
         if (!reuse.candidatePass || reuse.exitCode !== 0 || reuse.timedOut || reuse.bufferExceeded || reuse.graderTimedOut || reuse.tampered.length) throw new Error("prior candidate did not pass unchanged checks");
         fs.cpSync(oldDir, runDir, { recursive: true, dereference: false });
-        const acceptedCompletion = arm.startsWith("bantam") ? acceptedBantamCompletion(JSON.parse(fs.readFileSync(path.join(runDir, "run.json"), "utf8"))) : null;
+        const acceptedCompletion = arm.startsWith("bantam") ? acceptedBantamCompletion(await readJsonFile(path.join(runDir, "run.json"))) : null;
         const summary = { ...reuse, acceptedCompletion, pass: acceptedCompletion !== false, importedFrom: oldDir,
           originalResultSha256: sha(fs.readFileSync(path.join(oldDir, "result.json"))) };
         writeJson(path.join(runDir, "result.json"), summary);
@@ -226,13 +227,12 @@ export async function runCards(outputRoot, { timeoutMs = 480_000, reuseFirstPair
       const grader = await gradeCandidate(workspace, stage, kitSeal);
       fs.writeFileSync(path.join(runDir, "grade.stdout.log"), grader.stdout);
       fs.writeFileSync(path.join(runDir, "grade.stderr.log"), grader.stderr);
-      const usage = cornerUsage(arm, { armDir: runDir, rawLines: result.stdout.split("\n") });
-      let acceptedCompletion = null;
+      let saved = null;
       if (arm.startsWith("bantam")) {
-        try { const saved = JSON.parse(fs.readFileSync(path.join(runDir, "run.json"), "utf8"));
-          acceptedCompletion = acceptedBantamCompletion(saved);
-        } catch { acceptedCompletion = false; }
+        try { saved = await readJsonFile(path.join(runDir, "run.json")); } catch { /* missing evidence stays unaccepted */ }
       }
+      const usage = cornerUsage(arm, { armDir: runDir, run: saved, rawLines: result.stdout.split("\n") });
+      const acceptedCompletion = arm.startsWith("bantam") ? acceptedBantamCompletion(saved) : null;
       const candidatePass = tampered.length === 0 && grader.code === 0 && !grader.timedOut && !grader.bufferExceeded && !grader.aborted;
       const pass = candidatePass && result.code === 0 && !result.timedOut && !result.bufferExceeded && !result.aborted && acceptedCompletion !== false;
       const summary = { arm, pass, exitCode: result.code, timedOut: result.timedOut, bufferExceeded: result.bufferExceeded,

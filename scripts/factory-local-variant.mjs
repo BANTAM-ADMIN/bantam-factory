@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // A separately identified BANTAM/local-model series. Never relabels historical arms.
 import fs from 'node:fs';
+import {readJsonFile} from '../src/json-file.js';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -256,7 +257,7 @@ export async function runLocalVariant(input) {
       for(const [name,record] of [['public',grading.publicResult],['hidden',grading.hidden]]){
         fs.writeFileSync(path.join(dir,`${name}.stdout.log`),record.stdout,{mode:0o600});fs.writeFileSync(path.join(dir,`${name}.stderr.log`),record.stderr,{mode:0o600});
       }
-      let saved=null;try{saved=JSON.parse(fs.readFileSync(path.join(dir,'run.json'),'utf8'));}catch{}
+      let saved=null;try{saved=await readJsonFile(path.join(dir,'run.json'));}catch{}
       const verdict=variantVerdict({processResult:result,grading,tampered,saved,usage});
       const row={...item,...verdict,wallMs:result.wallMs,startedAt:result.startedAt,exitCode:result.code,timedOut:result.timedOut,aborted:result.aborted,bufferExceeded:result.bufferExceeded,
         taskSha256:sha(task),materialSeal:materials,tampered,grade:grading.record,publicExit:grading.publicResult.code,hiddenExit:grading.hidden.code,

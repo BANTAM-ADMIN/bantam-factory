@@ -103,6 +103,11 @@ test("local visual questions reach the image model and scope the returned adviso
   assert.equal(calls[0].endpoint, 'http://local.invalid');
   assert.equal(calls[0].image, path.join(root, 'combat frame.png'));
   assert.ok(calls[0].options.prompt.endsWith(`Specific question: ${question}`));
+  assert.match(calls[0].options.prompt, /First establish whether the requested subject is visible/);
+  assert.match(calls[0].options.prompt, /question is not evidence/);
+  assert.doesNotMatch(calls[0].options.prompt, /every piece of visible text/,
+    'a focused visual question must not spend its response budget on an unrelated inventory');
+  assert.match(result, /Vision interpretation.*not verification proof/);
   assert.equal(tool.lastOutcome.status, 'pass');
   tool.answer('view_image combat frame.png');
   assert.equal(calls.length, 2);

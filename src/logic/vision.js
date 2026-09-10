@@ -221,6 +221,19 @@ const DESCRIBE = "You are helping with a coding task. Describe this image concre
   "every piece of visible text (verbatim), the layout and structure, colors, shapes, UI elements, and " +
   "anything a developer would need — error messages, diagrams, mockups, code. Be specific and literal.";
 
+// A question can contain a false premise (for example, an enemy behind the
+// camera). Establish visibility before assessing its details; a full scene
+// inventory can consume the bounded reply before it answers the actual question.
+function imageQuestionPrompt(question) {
+  return question
+    ? "Inspect only the supplied image. First establish whether the requested subject is visible and where it is. "
+      + "The question is not evidence that an object or feature exists. If absent, obscured or too small to judge, say so; do not invent details. "
+      + "Answer the specific question first and concisely, using visible evidence. Distinguish observations from uncertainty. "
+      + `Do not inventory unrelated scene details.\n\nSpecific question: ${question}`
+    : DESCRIBE;
+}
+const VISION_INTERPRETATION = "Vision interpretation (model output, not verification proof):";
+
 const IMG_MIME = { png: "png", jpg: "jpeg", jpeg: "jpeg", gif: "gif", webp: "webp", bmp: "bmp" };
 
 export async function describeImageWithCodex(absPath, prompt, {
@@ -313,7 +326,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
           tool.lastOutcome = failedVisionOutcome("image_missing", `no image at ${rel}`, true);
           return `no image at ${rel} (check the path).`;
         }
-        const c = describe(endpoint, abs, { prompt: question ? `${DESCRIBE}\n\nSpecific question: ${question}` : DESCRIBE });
+        const c = describe(endpoint, abs, { prompt: imageQuestionPrompt(question) });
         if (!c) {
           tool.lastOutcome = failedVisionOutcome(
             "empty_vision_response",
@@ -323,7 +336,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
           return `[view_image] the vision model returned no description for ${rel}.`;
         }
         tool.lastOutcome = { status: "pass", path: rel };
-        return `${rel}:\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { question, description: c })}`;
+        return `${rel}:\n${VISION_INTERPRETATION}\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { question, description: c })}`;
       } catch (e) {
         tool.lastOutcome = {
           status: "error",
@@ -377,9 +390,7 @@ export function codexViewImageTool(workspace, {
           tool.lastOutcome = failedVisionOutcome("image_missing", `no image at ${rel}`, true);
           return `no image at ${rel} (check the path).`;
         }
-        const prompt = question
-          ? `${DESCRIBE}\n\nSpecific question: ${question}`
-          : DESCRIBE;
+        const prompt = imageQuestionPrompt(question);
         const runtime = runtimeFactory({
           cwd: workspace,
           model,
@@ -425,7 +436,7 @@ export function codexViewImageTool(workspace, {
               : failedVisionOutcome("empty_vision_response", `Codex returned no description for ${rel}`, true);
           }
           if (!content) return `[view_image:codex] Codex returned no description for ${rel}.`;
-          return `[view_image:codex ${model}/${effort}] ${rel}:\n${content.length > 6000 ? `${content.slice(0, 6000)}\n… [clipped]` : content}${deterministicImageFacts(abs, { question, description: content })}`;
+          return `[view_image:codex ${model}/${effort}] ${rel}:\n${VISION_INTERPRETATION}\n${content.length > 6000 ? `${content.slice(0, 6000)}\n… [clipped]` : content}${deterministicImageFacts(abs, { question, description: content })}`;
         } finally {
           runtime.close();
         }

@@ -2,6 +2,22 @@ import path from "node:path";
 import { directTestSuggestion } from "./executor.js";
 import { isFocusedAuditCommand } from "./contract-audit-recovery.js";
 import { shellSegments, splitShellWords } from "./shell-lex.js";
+import {isConfiguredAuditCommand} from './verification-command.js';
+
+// These literal display-only pipelines cannot satisfy the existing direct
+// audit receipt. Refuse BEFORE paying for a run that must immediately repeat.
+// Do not rewrite shell programs or interpret setup, quotes, data filters,
+// substitutions, file redirections, or other pipeline shapes.
+export function filteredAuditCheckRefusal(command, {pending = null} = {}) {
+  if ((pending?.needsFocused !== true && pending?.needsProject !== true) || typeof command !== 'string' || command.length > 8192) return null;
+  const match = command.match(/^([A-Za-z0-9_./ \t=-]+?)(?:[ \t]+2>&1)?[ \t]*\|[ \t]*(?:head|tail)(?:[ \t]+(?:-\d+|-n[ \t]*\d+|--lines=\d+))?[ \t]*$/);
+  const direct = match?.[1].trim();
+  if (!direct || (!isFocusedAuditCommand(direct, pending.configuredCommand)
+      && !isConfiguredAuditCommand(direct, pending.configuredCommand))) return null;
+  const nextAction = {a:'shell', c:direct};
+  const correction = `[scope] Filtered audit check was not executed: this output pipeline cannot provide the required direct execution receipt. Next standalone action: ${JSON.stringify(nextAction)}. The harness captures and bounds test output while retaining failure summaries. No command was rewritten or run; no verification credit was granted.`;
+  return correction.length <= 650 ? {kind:'filtered-audit-check', nextAction, correction} : null;
+}
 
 // Only literal, flat command sequences are understood. In particular, a
 // heredoc body, substitution, pipeline or shell wrapper is not a list of

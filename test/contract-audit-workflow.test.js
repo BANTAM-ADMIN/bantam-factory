@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { compoundAuditCleanupRefusal } from "../src/contract-audit-workflow.js";
+import { compoundAuditCleanupRefusal, filteredAuditCheckRefusal } from "../src/contract-audit-workflow.js";
 import { directTestSuggestion } from "../src/executor.js";
 import { isFocusedAuditCommand } from "../src/contract-audit-recovery.js";
 import { clipKeepingControllerAnnotation } from "../src/prompt.js";
@@ -80,7 +80,10 @@ test("existing standalone-test safety is unchanged unless a focused predicate is
   assert.equal(directTestSuggestion("cd /workspace && npm test"), null);
 });
 
-test("two refused check/delete attempts preserve files and generation, then direct focus and project verification permit DONE", async t => {
+for (const scenario of [
+  {name:'check/delete', command:'node items.verify.mjs && npm test && rm -f items.verify.mjs && npm test', metric:'compoundAuditCleanupRefusals', message:/Requested compound command was not executed/},
+  {name:'output-filter', command:'node items.verify.mjs 2>&1 | tail -8', metric:'filteredAuditCheckRefusals', message:/Filtered audit check was not executed/},
+]) test(`two refused ${scenario.name} attempts preserve files and generation, then direct focus and project verification permit DONE`, async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-audit-cleanup-"));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   fs.mkdirSync(path.join(workspace, "src"));
@@ -92,7 +95,7 @@ test("two refused check/delete attempts preserve files and generation, then dire
   fs.writeFileSync(path.join(workspace, "src/items.js"), "export function collectItems() { throw Error('TODO'); }\n");
   const good = "export function collectItems(token, items) { if (!Array.isArray(items)) throw Error('items'); if (typeof token !== 'string' || !token.length) throw Error('token'); return [...items]; }\n";
   const check = "import assert from 'node:assert/strict'; import { collectItems } from './src/items.js'; assert.throws(() => collectItems('', []), Error); assert.deepEqual(collectItems('valid', []), []);\n";
-  const compound = "node items.verify.mjs && npm test && rm -f items.verify.mjs && npm test";
+  const compound = scenario.command;
   const actions = [
     { a: "write_file", p: "src/items.js", content: good },
     { a: "write_file", p: "items.verify.mjs", content: check },
@@ -126,13 +129,13 @@ test("two refused check/delete attempts preserve files and generation, then dire
   assert.equal(result.reachedDone, true, JSON.stringify(result.turns.map(turn => ({ a: turn.action, obs: turn.observation?.slice(-900) }))));
   assert.equal(result.turns.length, 7);
   assert.equal(auditCalls, 1);
-  assert.equal(result.metrics.compoundAuditCleanupRefusals, 2);
+  assert.equal(result.metrics[scenario.metric], 2);
   assert.equal(events.filter(event => event.type === "verification_workflow_refusal").length, 2);
   assert.ok(processes.every(process => !process.args.some(arg => String(arg).includes(compound))), "neither compound was launched or rewritten behind the worker's back");
   for (const i of [3, 4]) {
     assert.equal(result.turns[i].shellExecution, null);
     assert.equal(result.turns[i].verificationEvidence, null);
-    assert.match(result.turns[i].observation, /Requested compound command was not executed/);
+    assert.match(result.turns[i].observation, scenario.message);
     assert.ok(prompts[i + 1].includes('{"a":"shell","c":"node items.verify.mjs"}'));
   }
   const focused = result.turns[5];
@@ -147,4 +150,18 @@ test("two refused check/delete attempts preserve files and generation, then dire
   assert.equal(fs.readFileSync(path.join(workspace, "src/items.js"), "utf8"), good);
   assert.equal(fs.readFileSync(path.join(workspace, "package.json"), "utf8"), packageText);
   assert.equal(fs.readFileSync(path.join(workspace, "test/public.test.js"), "utf8"), publicTest);
+});
+
+
+test('only bounded literal audit output filters receive an exact pre-execution correction',()=>{
+  for(const command of ['node test/smoke.js 2>&1 | tail -8','node test/perf.js | head -n 20','npm test | tail','node test/perf.js | tail --lines=20']) {
+    const refusal=filteredAuditCheckRefusal(command,OPTIONS);
+    assert.equal(refusal?.kind,'filtered-audit-check',command);
+    assert.equal(refusal.nextAction.c,command.split('|')[0].trim().replace(/ 2>&1$/,''));
+    assert.ok(clipKeepingControllerAnnotation('long output\n'.repeat(2000)+'\n'+refusal.correction).includes(refusal.correction));
+    assert.equal(filteredAuditCheckRefusal(command,{pending:null}),null);
+  }
+  for(const command of ['cat data.txt | head -8','node test/smoke.js | grep PASS','node test/smoke.js | tail -f','node test/smoke.js | tail result.txt','node test/smoke.js | tail -8 > result.txt','node test/smoke.js | tail -8 && touch marker','cd /workspace && node test/smoke.js | tail -8',"node 'test/space test.js' | tail -8",'node $(echo test/smoke.js) | tail -8','node test/smoke.js || tail -8','node test/smoke.js | tail -8\necho done']) {
+    assert.equal(filteredAuditCheckRefusal(command,OPTIONS),null,command);
+  }
 });

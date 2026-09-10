@@ -42,7 +42,7 @@ import { contractStateAuditEnabled, collectionContractAuditApplies, collectContr
 import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, sameAuditCommand, existingFocusedCheck, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { contractAuditMeasuredFacts } from "./contract-audit-measured-facts.js";
 import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
-import { compoundAuditCleanupRefusal } from "./contract-audit-workflow.js";
+import { compoundAuditCleanupRefusal, filteredAuditCheckRefusal } from "./contract-audit-workflow.js";
 import { protectedAuditWitnessCleanupRefusal } from "./contract-audit-witness-retention.js";
 import { currentConfiguredFailure, verificationFailureContext } from "./verification-failure-context.js";
 import { collectObjectConstructionFacts, formatObjectConstructionFacts } from "./object-construction-facts.js";
@@ -3519,6 +3519,7 @@ async function runAgentCore({
       ? "[investigation budget reached] You have investigated enough. Do NOT read files or run more commands. If the user asked a QUESTION, your next action must be \"respond\" with your answer. If they asked you to BUILD/CREATE/CHANGE something, do NOT respond with a plan — START WRITING it NOW with write_file (or replace); build the first runnable slice and keep going."
       : null;
     const beforeShellFiles = !gateRejection && !interactiveStop && action.a === "shell" ? snapshotWorkspaceFiles(workspace) : null;
+    const auditOutputFilterRefusal = beforeShellFiles ? filteredAuditCheckRefusal(action.c, {pending:auditRecovery}) : null;
     const auditCleanupRefusal = beforeShellFiles ? compoundAuditCleanupRefusal(action.c, {
       pending: auditRecovery, workspace: exec.realWorkspace,
       sourcePaths: [...beforeShellFiles.keys()].filter(p => SOURCE_EXT_RE.test(p) && !isGeneratedPath(p)),
@@ -3602,7 +3603,7 @@ async function runAgentCore({
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
         turn.shellExecution && (sameAuditCommand(turn.shellExecution.command, action.c)
           || sameAuditCommand(turn.shellExecution.executedCommand, action.c)));
-    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditWitnessRefusal && !nodeCheckRefusal
+    const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditOutputFilterRefusal && !auditWitnessRefusal && !nodeCheckRefusal
       && requestedDocumentReviews.length === 0
       && readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
       ? repetition.check(action)
@@ -3678,6 +3679,10 @@ async function runAgentCore({
       }
     } else if (gateRejection) {
       result = { observation: gateRejection };
+    } else if (auditOutputFilterRefusal) {
+      result = {observation:auditOutputFilterRefusal.correction, auditOutputFilterRefusal};
+      metrics.filteredAuditCheckRefusals = (metrics.filteredAuditCheckRefusals ?? 0) + 1;
+      onEvent({type:'verification_workflow_refusal', turn:turns.length, ...auditOutputFilterRefusal});
     } else if (auditCleanupRefusal) {
       result = { observation: auditCleanupRefusal.correction, auditCleanupRefusal };
       metrics.compoundAuditCleanupRefusals = (metrics.compoundAuditCleanupRefusals ?? 0) + 1;
@@ -6761,6 +6766,9 @@ async function runAgentCore({
         controllerStop: result.controllerStop, shellScopeRollback: result.shellScopeRollback,
       }], { generation: workspaceEditGeneration, workspace: exec.realWorkspace, configuredCommand: verificationScript });
       if (failure) result.observation += `\n${focusedFailureReminder(failure)}`;
+    }
+    if (result.auditOutputFilterRefusal && !result.observation.endsWith(result.auditOutputFilterRefusal.correction)) {
+      result.observation += `\n${result.auditOutputFilterRefusal.correction}`;
     }
     if (result.auditCleanupRefusal && !result.observation.endsWith(result.auditCleanupRefusal.correction)) {
       result.observation += `\n${result.auditCleanupRefusal.correction}`;

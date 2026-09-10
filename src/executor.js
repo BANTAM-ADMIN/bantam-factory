@@ -529,7 +529,15 @@ export class Executor {
     const shown = hits.slice(0, max)
       .map((h) => `${h.file}:${h.line}: ${h.text}`)
       .join("\n");
-    if (shown) return clipText(shown);
+    if (shown) {
+      // A bounded result list is not an exhaustive map of the implementation.
+      // Keep this notice at the head so character clipping cannot hide that
+      // later matches were omitted. Hitting the scan cap gives a lower bound.
+      const notice = hits.length > max
+        ? `[search limited] Showing ${max} of ${hits.length >= hitCap ? 'at least ' : ''}${hits.length} matches. Narrow q/p or increase limit to see more.\n`
+        : '';
+      return clipText(notice + shown);
+    }
     return clipText(this.searchMissDiagnosis({ q, p, re }));
   }
 

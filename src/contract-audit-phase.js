@@ -20,8 +20,10 @@ function focusedWorkOrder(pending) {
     && !c.path.startsWith('/') && !c.path.split('/').includes('..')
     && [ `node ${c.path}`, `node --test ${c.path}` ].includes(c.command);
   if (!diagnostic && !candidate) return '';
+  const failed = diagnostic && d.reason === 'execution-failed';
   return diagnostic + (candidate
-    ? `Existing authored check located in CURRENT source: ${JSON.stringify(c.path)} (sha256 ${c.sourceSha256}). Next: run exactly ${JSON.stringify(c.command)} directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. `
+    ? `Existing authored check located in CURRENT source: ${JSON.stringify(c.path)} (sha256 ${c.sourceSha256}). ${failed ? 'Repair the demonstrated source or fixture defect before retrying; then' : 'Next:'} run exactly ${JSON.stringify(c.command)} directly. It imports local code and uses node:assert; this is a launcher hint, NOT proof of coverage or correctness. If a specific public-contract obligation is missing, add one discriminating assertion; do not build another comprehensive suite just to obtain a receipt. `
+    : failed ? 'Next: use the observed failure to repair a demonstrated source or fixture defect, then rerun the affected check directly. Preserve its assertions and use the existing check where possible; a failed execution does not require creating a replacement suite. '
     : `${STANDALONE_NODE_CHECK} Start with one discriminating fixture/assertion and execute it before expanding coverage. `)
     + 'A successful admitted focused check still requires fresh configured project verification. No completion gate is waived.';
 }

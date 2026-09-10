@@ -416,8 +416,18 @@ export function existingFocusedCheck(paths, readSource, { generation } = {}) {
       if (typeof source !== 'string' || Buffer.byteLength(source) > 32000 || !inlineNodeAssertion(source)) continue;
       const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', allowAwaitOutsideFunction: true });
       const imports = ast.body.filter(n => n.type === 'ImportDeclaration').map(n => n.source.value);
-      // Require a literal local subject import. Unknown dynamic/CJS layouts
-      // fall back to a minimal witness; never guess their entrypoint.
+      // Ordinary CommonJS checks are just as reusable as ESM checks. Only
+      // inspect literal top-level bindings; do not execute the file or infer
+      // a subject from a dynamic loader or an uncalled nested function.
+      for (const statement of ast.body) if (statement.type === 'VariableDeclaration') {
+        for (const { init } of statement.declarations) {
+          if (init?.type === 'CallExpression' && init.callee.type === 'Identifier'
+              && init.callee.name === 'require' && init.arguments.length === 1
+              && init.arguments[0].type === 'Literal' && typeof init.arguments[0].value === 'string')
+            imports.push(init.arguments[0].value);
+        }
+      }
+      // A local import is a launcher hint, not proof of coverage or execution.
       if (!imports.some(s => /^\.{1,2}\//.test(s))) continue;
       const nodeTest = imports.some(s => /^(?:node:)?test$/.test(s));
       const command = `node ${nodeTest ? '--test ' : ''}${p}`;

@@ -75,6 +75,7 @@
   "dependencies": {
     "@discoveryjs/json-ext": "1.1.0",
     "acorn": "^8.17.0",
-    "acorn-walk": "^8.3.5"
+    "acorn-walk": "^8.3.5",
+    "undici": "6.28.1"
   }
 }

@@ -7,6 +7,7 @@
 // model, but callers can select another profile as we benchmark more models.
 
 import crypto from "node:crypto";
+import { getGlobalDispatcher } from "undici";
 import { snapshotJsonValue } from "./json-file.js";
 import { resolveProfile } from "./profiles.js";
 import { ChatSessionPlanner } from "./chat-sessions.js";
@@ -18,6 +19,18 @@ import { buildChatBody, chatTransportFidelity, decomposeRenderedPrompt } from ".
 
 const FALLBACK_ENDPOINT = "http://localhost:8085";
 const MAX_DETERMINISTIC_SEED = 0xFFFFFFFE;
+
+// A non-streaming model may spend minutes generating before sending headers.
+// Node's HTTP client otherwise aborts at its own five-minute headers/body
+// timeout, even when BANTAM's configured whole-exchange deadline is longer.
+// Override those two defaults for this request only; the AbortController below
+// still enforces the model deadline and user cancellation across headers/body.
+// Delegate to the existing dispatcher to retain custom proxies and pooling.
+const MODEL_HTTP_DISPATCHER = {
+  dispatch(options, handler) {
+    return getGlobalDispatcher().dispatch({ ...options, headersTimeout: 0, bodyTimeout: 0 }, handler);
+  },
+};
 
 // Capacity pressure gets its own budget. A generic transient error resolves in
 // milliseconds; capacity relieves over tens of seconds, so the generic
@@ -641,6 +654,7 @@ export class ModelClient {
           headers: request.headers,
           body: request.body,
           signal: ctrl.signal,
+          dispatcher: MODEL_HTTP_DISPATCHER,
         });
       } catch (e) {
         const target = this.apiMode ? this.apiUrl : this.endpoint;

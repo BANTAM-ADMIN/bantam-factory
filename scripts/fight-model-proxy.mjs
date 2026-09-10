@@ -22,7 +22,7 @@ function responseSummary(raw, contentType = '') {
   } else { try { objects = [JSON.parse(raw)]; } catch {} }
   const final = {};
   for (const item of objects) {
-    for (const key of ['usage','timings','tokens_evaluated','tokens_predicted','tokens_cached','truncated','stopped_limit']) {
+    for (const key of ['usage','timings','tokens_evaluated','tokens_predicted','tokens_cached','truncated','stopped_limit','stop_type']) {
       if (item[key] != null) final[key] = item[key];
     }
   }
@@ -51,7 +51,12 @@ export function responseMeasurements(raw, contentType = '') {
 export function responseUsage(raw, contentType = '') {
   const final=responseSummary(raw,contentType), {values,invalid}=measurementsFromSummary(final);
   if(invalid||values.inputTokens==null||values.outputTokens==null)return null;
-  return {...values,truncated:final.truncated??null,stoppedLimit:final.stopped_limit??null,timings:final.timings??null};
+  // Current native llama.cpp reports stop_type instead of the old boolean.
+  // Keep an unreported reason unknown; token totals alone do not prove a stop.
+  const stoppedLimit=final.stop_type==='limit'||final.stopped_limit===true ? true
+    : typeof final.stopped_limit==='boolean' ? final.stopped_limit
+      : ['eos','word'].includes(final.stop_type) ? false : null;
+  return {...values,truncated:final.truncated??null,stoppedLimit,timings:final.timings??null};
 }
 
 export function aggregateExchanges(exchanges) {

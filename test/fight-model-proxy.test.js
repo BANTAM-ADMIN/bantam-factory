@@ -7,6 +7,25 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {responseUsage,responseMeasurements,aggregateExchanges,startModelRecorder} from '../scripts/fight-model-proxy.mjs';
 
+test('native stop_type survives JSON and cumulative SSE usage receipts',()=>{
+  for(const [stop,expected] of [
+    [{stop_type:'limit'},true], [{stop_type:'limit',stopped_limit:false},true],
+    [{stopped_limit:true},true], [{stopped_limit:false},false],
+    [{stop_type:'eos'},false], [{stop_type:'word'},false], [{},null],
+  ]){
+    const counters={tokens_evaluated:100,tokens_predicted:4096,timings:{cache_n:70}};
+    const json=JSON.stringify({...counters,...stop});
+    const sse=`data: ${JSON.stringify(counters)}\n\ndata: ${JSON.stringify(stop)}\n\ndata: [DONE]\n`;
+    for(const [raw,type] of [[json,'application/json'],[sse,'text/event-stream']]){
+      const result=responseUsage(raw,type);
+      assert.equal(result.stoppedLimit,expected,JSON.stringify(stop)+' '+type);
+      assert.equal(result.inputTokens,100);
+      assert.equal(result.outputTokens,4096,'an exact token count alone does not establish a stop reason');
+      assert.equal(result.cacheHitTokens,70);
+    }
+  }
+});
+
 test('wire usage uses final cumulative SSE usage once and cache_n, not populated KV size',()=>{
   const usage=responseUsage('data: {"content":"x"}\n\ndata: {"tokens_evaluated":100,"tokens_predicted":20,"tokens_cached":120,"timings":{"cache_n":70}}\n\ndata: [DONE]\n','text/event-stream');
   assert.equal(usage.inputTokens,100);assert.equal(usage.cacheHitTokens,70);assert.equal(usage.freshInputTokens,30);

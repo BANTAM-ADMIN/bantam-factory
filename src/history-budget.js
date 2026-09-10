@@ -7,6 +7,26 @@
 
 import { clipText as clipObservation } from "./clip.js";
 import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
+import { trustedReviewEvidenceEnd } from "./run-continuation.js";
+
+export function latestTrustedReviewIndex(turns) {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    if (trustedReviewEvidenceEnd(turns[i]) !== null) return i;
+  }
+  return -1;
+}
+
+function pinnedIndices(list, { pinHead = false, pinLatestReview = true } = {}) {
+  const pins = new Set(pinHead && list.length ? [0] : []);
+  const review = pinLatestReview ? latestTrustedReviewIndex(list) : -1;
+  if (review >= 0) pins.add(review);
+  return pins;
+}
+
+function retainedIndices(length, start, pins) {
+  return [...pins].filter(i => i < start).sort((a, b) => a - b)
+    .concat(Array.from({ length: length - start }, (_, i) => start + i));
+}
 
 const SOURCE_HEADER = /(?:^|\n)(?:#\s+)?([A-Za-z0-9_.@+/-]+\.(?:js|mjs|cjs|jsx|ts|tsx|mts|cts|py|go|rs|rb|java|kt|c|cc|cpp|cxx|h|hpp|hh|cs|php|swift|scala|m|mm|sh|sql))\s+\((?:current,\s*)?(\d+)\s+lines(?:,\s*showing\s+(\d+)-(\d+))?\):?\n/gim;
 // Prompt-only provenance: a budgeted view must not permanently erase the source
@@ -63,8 +83,12 @@ export function historyCharBudget({ contextTokens, extensionTrajectory = false, 
 }
 
 export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars = 4000, ...opts } = {}) {
+  return selectBudgetWindow(turns, { charBudget, readObservationMaxChars, ...opts }).window;
+}
+
+function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars = 4000, ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
-  if (!list.length) return [];
+  if (!list.length) return { window: [], start: 0 };
   const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 36000);
   // Pick a window against fully-compacted sizes first, then recompact ONLY the
   // surviving window. Compaction pointers always name an EARLIER turn, so a
@@ -72,14 +96,20 @@ export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars
   // full-list compaction could, telling the model evidence "remains at turn N"
   // after the budget evicted turn N. Window sizes only grow versus the
   // full-list estimate (fewer dedup hits), so slide forward until it fits.
-  const pinHead = Boolean(opts.pinHead);
-  let start = firstKeptIndex(compactHistory(list), limit, { pinHead, readObservationMaxChars });
+  const pins = pinnedIndices(list, opts);
+  let start = firstKeptIndex(compactHistory(list), limit, { pins, readObservationMaxChars });
   for (;;) {
-    const body = list.slice(start);
-    const window = compactHistory(pinHead && start > 0 ? [list[0], ...body] : body);
+    const indices = retainedIndices(list.length, start, pins);
+    const window = compactHistory(indices.map(i => list[i]));
     let total = 0;
     for (const turn of window) total += turnSize(turn, readObservationMaxChars);
-    if (total <= limit || window.length <= (pinHead ? 2 : 1)) return window;
+    if (total <= limit || indices.every(i => pins.has(i) || i === list.length - 1)) {
+      // Leading anchors belong to the window independently of its suffix. In
+      // particular, a second build containing only anchors plus the newest
+      // oversized turn must not move the suffix boundary back to the head.
+      while (start < list.length - 1 && pins.has(start)) start++;
+      return { window, start };
+    }
     start += 1;
   }
 }
@@ -90,7 +120,7 @@ export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars
 // compactor, and evidence objects are never changed. Rebuild callers retain
 // budgetTurns' existing stateless behavior.
 export function createHistoryWindow({ charBudget = 120000, pinHead = true,
-  retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000 } = {}) {
+  pinLatestReview = true, retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000 } = {}) {
   if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
     throw new Error("history retainRatio must be between zero and one");
   }
@@ -128,24 +158,26 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
     origin = identity;
     let start = cutoff === null ? 0 : keys.findIndex(key => key >= cutoff);
     if (start < 0) start = list.length - 1;
-    const retained = pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start);
+    const pins = pinnedIndices(list, { pinHead, pinLatestReview });
+    const selectedIndices = retainedIndices(list.length, start, pins);
+    const retained = selectedIndices.map(i => list[i]);
     let window = compactHistory(retained);
     const beforeChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
     let afterChars = beforeChars, overflow = false;
     if (beforeChars > limit) {
       overflow = true;
-      window = budgetTurns(retained, { charBudget: target, pinHead, readObservationMaxChars });
-      // budgetTurns keeps a contiguous suffix (plus the optional pinned head).
-      // Its views may be new objects, so locate that suffix by count, not object
-      // identity; never resurrect turns excluded by the previous boundary.
-      const tailCount = window.length - (pinHead ? 1 : 0);
-      start = pinHead && tailCount === 0 ? 0 : list.length - Math.max(1, tailCount);
+      const selected = selectBudgetWindow(retained, { charBudget: target, pinHead, pinLatestReview, readObservationMaxChars });
+      window = selected.window;
+      // Keep the contiguous suffix boundary separate from mandatory anchors.
+      // A review can be anywhere in the old history; counting it as tail would
+      // resurrect evicted turns or move the cutoff backwards on every request.
+      start = selectedIndices[selected.start];
       if (hasIds && realCount < list.length && start >= realCount) {
         // Keep the latest actual causal turn as well as its transient steer.
         // The cutoff always names real evidence, never a synthetic position
         // that could later be reused by the next worker turn.
         start = realCount - 1;
-        window = compactHistory(pinHead && start > 0 ? [list[0], ...list.slice(start)] : list.slice(start));
+        window = compactHistory(retainedIndices(list.length, start, pins).map(i => list[i]));
       }
       cutoff = keys[start];
       afterChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
@@ -174,15 +206,15 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
   return historyWindow;
 }
 
-function firstKeptIndex(compacted, limit, { pinHead = false, readObservationMaxChars = 4000 } = {}) {
+function firstKeptIndex(compacted, limit, { pins = new Set(), readObservationMaxChars = 4000 } = {}) {
   // pinHead: never evict turn 0. The first turn is the task's own grounding (the
   // spec read, the repo map) and the least droppable bytes in the run; evicting
   // it both blinds the model and rewrites the prompt right after the system
   // block, which resets the slot cache to the head checkpoint. Price it first so
   // the window behind it is budgeted against what is left.
-  let total = pinHead && compacted.length > 1 ? turnSize(compacted[0], readObservationMaxChars) : 0;
-  const floor = pinHead && compacted.length > 1 ? 1 : 0;
-  for (let i = compacted.length - 1; i >= floor; i -= 1) {
+  let total = [...pins].reduce((size, i) => size + turnSize(compacted[i], readObservationMaxChars), 0);
+  for (let i = compacted.length - 1; i >= 0; i -= 1) {
+    if (pins.has(i)) continue;
     const size = turnSize(compacted[i], readObservationMaxChars);
     // Always retain the newest causal turn, even under a nonsensical zero-byte
     // setting. Beyond that, the configured budget is hard: a six-turn floor
@@ -190,7 +222,7 @@ function firstKeptIndex(compacted, limit, { pinHead = false, readObservationMaxC
     if (i < compacted.length - 1 && total + size > limit) return i + 1;
     total += size;
   }
-  return floor;
+  return 0;
 }
 
 // Prompt history is a view over evidence, not the evidence store itself. An
@@ -236,6 +268,9 @@ export function compactHistory(turns) {
   return list.map((turn, index) => {
     if (index === newestRepetition) return turn;
     if (!turn || typeof turn !== "object" || typeof turn.observation !== "string") return turn;
+    // Operator feedback is a resumable input. Do not replace quoted source or
+    // an identical review with a pointer to an older, evictable observation.
+    if (trustedReviewEvidenceEnd(turn) !== null) return turn;
     const turnNumber = Number.isInteger(turn.i) ? turn.i + 1 : index + 1;
     let observation = turn.observation;
     // Older artifacts predate RepetitionGuard's compact-pointer contract and
@@ -419,9 +454,13 @@ function turnSize(turn, readObservationMaxChars = 4000) {
   // remains inside the configured final observation cap; system/context blocks and
   // previously frozen fragments are also accounted separately by the caller.
   const action = turn.action ?? turn.parsedAction ?? null;
+  const reviewEnd = trustedReviewEvidenceEnd(turn);
+  const observationChars = reviewEnd !== null
+    ? reviewEnd + clipObservation(turn.observation.slice(reviewEnd), 4000).length
+    : clipObservation(turn.observation, action?.a === "read_file" || action?.a === "inspect"
+      ? Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)) : 4000).length;
   return (action ? JSON.stringify(action).length : 0)
-    + clipObservation(turn.observation, action?.a === "read_file" || action?.a === "inspect"
-      ? Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)) : 4000).length
+    + observationChars
     + (typeof turn.promptPrelude === "string" && turn.promptPrelude ? clipObservation(turn.promptPrelude).length + 96 : 0)
     + (Array.isArray(turn.promptAttempts) ? turn.promptAttempts.reduce((size, attempt) => size
       + (typeof attempt?.rawOutput === "string" && typeof attempt?.observation === "string"

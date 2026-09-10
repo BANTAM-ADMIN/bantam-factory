@@ -203,7 +203,7 @@ import { decidePlanAudit, repositoryDocumentContractCue } from "./plan-audit-pol
 import { decideSeamSteer, SEAM_STEER_TIP } from "./seam-steer.js";
 import { scaledReconLimit, scaledProgressNudgeAfter } from "./recon-budget.js";
 import { ReadLedger } from "./read-ledger.js";
-import { budgetTurns, createHistoryWindow, historyCharBudget as deriveHistoryCharBudget } from "./history-budget.js";
+import { budgetTurns, createHistoryWindow, latestTrustedReviewIndex, historyCharBudget as deriveHistoryCharBudget } from "./history-budget.js";
 import { extractLoci, renderLoci, isUnbalanced, renderEditRegion } from "./failure-locus.js";
 import { deliverableCommand, invokesCommand, smokeNudge } from "./smoke-run.js";
 import { checkEditedApi } from "./api-check.js";
@@ -1990,7 +1990,10 @@ async function runAgentCore({
         source:configuredHistoryBudget ? 'operator-history' : configuredContextTokens ? 'operator-context' : 'runtime'});
       historyCharBudget = nextBudget;
     }
-    const candidates = Number.isFinite(historyCap) ? h.slice(-Math.max(1, historyCap)) : h;
+    const start = Number.isFinite(historyCap) ? Math.max(0, h.length - Math.max(1, historyCap)) : 0;
+    const reviewIndex = latestTrustedReviewIndex(h);
+    const candidates = reviewIndex >= 0 && reviewIndex < start
+      ? [h[reviewIndex], ...h.slice(start)] : h.slice(start);
     let retained = historyWindow(candidates);
     // An unchanged note is normally appended only once. Once that turn leaves
     // the history window, equality with lastFoldedGuidance no longer proves

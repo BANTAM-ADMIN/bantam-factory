@@ -132,3 +132,19 @@ export function resolveStartupModelChoice(choices, answer, { enterSelectsRecomme
     choice.name?.toLowerCase() === value
     || choice.model?.toLowerCase?.() === value) ?? null;
 }
+
+/**
+ * Should a bare `bantam` open the model picker?
+ *
+ * A backend that is already answering ends the question. The picker used to
+ * open on every bare run with no remembered connection — even with a healthy
+ * llama.cpp answering on :8085 — and because its local list comes only from the
+ * registry it announced "No local model is running" and offered cloud instead
+ * of the server that was actually up. A remembered backend still opens the
+ * picker when it is NOT healthy, so an expired Codex login stays replaceable.
+ */
+export function startupChoiceNeeded({ canOffer, detectedLocalReady, rememberedConnection, backendHealthy }) {
+  if (!canOffer) return false;
+  if (detectedLocalReady) return false;
+  return !rememberedConnection || !backendHealthy;
+}

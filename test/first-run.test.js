@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import crypto from 'node:crypto';
 import http from 'node:http';
 import {spawnSync} from 'node:child_process';
-import {chooseFirstRun,normalizeServerUrl,discoverModelServers,saveConnection,loadConnection,codexAvailable,confirmCodexConsent} from '../src/first-run.js';
+import {chooseFirstRun,normalizeServerUrl,discoverModelServers,saveConnection,loadConnection,clearConnection,codexAvailable,confirmCodexConsent} from '../src/first-run.js';
 import {setupWizard} from '../src/setup-wizard.js';
 import {stockPlan,stockServerArgs,STOCK_PROFILES,STOCK_REVISION,installStockFiles,registerStockProfiles} from '../src/stock-model.js';
 import {TIEL_REVISION,stockRuntimeFlags} from '../src/stock-model.js';
@@ -97,6 +97,18 @@ test('saved user choice is readable from any workspace and local selection clear
  const h=home(t);saveConnection({kind:'codex',model:'gpt-6-astra',effort:'high'},h);assert.equal(loadConnection(h),null,'unconsented cloud config must not auto-enable');
  saveConnection({kind:'codex',model:'gpt-6-astra',effort:'high',consent:'cloud-context-v1'},h);assert.equal(loadConnection(h).model,'gpt-6-astra');
  saveConnection({kind:'local',name:'davidau-72k-cpu-vision'},h);assert.equal(loadConnection(h).kind,'local');
+});
+test('clearConnection forgets a sticky Codex pin so auto-detection can run again',t=>{
+ // The regression: once Codex was remembered, bare `bantam` stayed cloud-only
+ // with no non-interactive exit, and detectEndpoint() was never reached.
+ const h=home(t);
+ saveConnection({kind:'codex',model:'gpt-6-astra',effort:'medium',consent:'cloud-context-v1'},h);
+ assert.equal(loadConnection(h).kind,'codex');
+ assert.equal(clearConnection(h),path.join(h,'.bantam','connection.json'));
+ assert.equal(loadConnection(h),null,'forgetting the pin restores auto-detection');
+ assert.equal(fs.existsSync(path.join(h,'.bantam','connection.json')),false);
+ clearConnection(h); // absent file is a no-op, not an error
+ assert.equal(loadConnection(h),null);
 });
 test('Codex consent describes context and quota; Enter and refusal never authorize',async()=>{
  for(const answer of ['', 'no','yes']){

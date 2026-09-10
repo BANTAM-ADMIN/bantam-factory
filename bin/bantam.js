@@ -20,7 +20,7 @@ import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { detectCodex } from "../src/logic/codex-detect.js";
-import { loadConnection, saveConnection, confirmCodexConsent } from '../src/first-run.js';
+import { loadConnection, saveConnection, clearConnection, confirmCodexConsent } from '../src/first-run.js';
 import { setupWizard, startManagedStock } from '../src/setup-wizard.js';
 
 // The over-the-ceiling note, once per process. The agent emits grounding_state
@@ -89,6 +89,7 @@ import {
 import {
   resolveStartupModelChoice,
   startupModelChoices,
+  startupChoiceNeeded,
 } from "../src/startup-model-choice.js";
 import { playAnimation, animationNames, loadAnimations, showcaseSequence } from "../src/rooster.js";
 import {
@@ -867,6 +868,33 @@ if (cmd === "doctor" || cmd === "setup") {
     for (const r of roots) walk(r, 3);
     return found;
   };
+  // `--use-local`: forget a remembered backend and hand the startup default
+  // back to endpoint auto-detection. Choosing Codex is deliberately sticky, but
+  // it used to have no non-interactive exit — a remembered connection.json made
+  // every bare `bantam` cloud-only and suppressed detectEndpoint(), so a
+  // llama.cpp server already answering on :8085 was never even probed. This is
+  // the switch that was missing.
+  if (args["use-local"]) {
+    const previous = loadConnection();
+    clearConnection();
+    const detected = await detectEndpoint();
+    const live = await isHealthy(detected);
+    if (previous) {
+      const label = previous.model || previous.name || previous.apiUrl || previous.kind;
+      process.stderr.write(`\nForgot the remembered ${previous.kind} backend (${label}).\n`);
+    } else {
+      process.stderr.write("\nNo remembered backend to forget.\n");
+    }
+    if (live) {
+      process.stderr.write(`✔ Local auto-detect is now the startup default — a model server answers at ${detected}.\n`
+        + "  Run `bantamfactory` in your project.\n");
+    } else {
+      process.stderr.write(`⚠ No model server answered ${detected}.\n`
+        + "  `bantam` will now use whichever llama.cpp is up; start one, or pass --endpoint URL.\n");
+    }
+    process.exit(live ? 0 : 1);
+  }
+
   // `--api-url`: register an existing OpenAI-compatible server (llama.cpp /v1,
   // vLLM, LM Studio, …). Validate it (health + a grammar probe), then persist it
   // so plain `bantam` uses it. This is "enter the API" made durable.
@@ -907,6 +935,15 @@ if (cmd === "doctor" || cmd === "setup") {
     if (!healthy) process.exit(1);
     const saved = saveApiConfig(process.cwd(), { apiUrl, apiKey, model: modelName, dialect: dialect ?? "llamacpp", grammar: grammarOk, deepseek });
     process.stderr.write(`\n✔ Saved to ${saved}\n  → This API is now available via \`:model\`; a reachable local model remains the startup default.\n`);
+    // Say the true startup default out loud. A remembered Codex connection
+    // outranks both this preset and endpoint auto-detection, so claiming the
+    // local model is the default while a cloud pin is set sent operators
+    // looking for a switch that did not exist.
+    const pinned = loadConnection();
+    if (pinned?.kind === "codex") {
+      process.stderr.write(`  ⚠ A remembered Codex backend (${pinned.model}) still takes precedence for a bare \`bantam\`.\n`
+        + "     Run `bantam doctor --use-local` to return the startup default to local auto-detection.\n");
+    }
     process.exit(0);
   }
 
@@ -1140,7 +1177,19 @@ if (args["chat-transport"] === true || envTruthy("BANTAM_CHAT_TRANSPORT")) model
 let model = new ModelClient(modelOptions);
 // Legacy workspace APIs remain presets; first-run user selections are explicit
 // cross-workspace defaults. If the selected backend is unavailable, offer setup.
-if (canOfferStartupChoice(cmd) && (!rememberedConnection || !(await model.health()))) {
+// A healthy auto-detected local server is already a working answer, so it must
+// not trigger onboarding: with no remembered connection the picker used to fire
+// on EVERY bare run — including one where llama.cpp was answering on :8085 — and
+// because its local list comes only from the registry it announced "No local
+// model is running" and offered cloud instead of the server that was up.
+const mayOfferStartupChoice = canOfferStartupChoice(cmd);
+const detectedLocalReady = mayOfferStartupChoice && !usingCodex && !usingApi
+  && typeof modelOptions.endpoint === "string" && (await model.health());
+// Probe the remembered backend only when it could still change the answer —
+// startupChoiceNeeded() is pure, so the health check stays lazy.
+const backendHealthy = mayOfferStartupChoice && !detectedLocalReady && Boolean(rememberedConnection)
+  && (await model.health());
+if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, rememberedConnection, backendHealthy })) {
   let selection = await promptStartupModelChoice(model);
   if(!selection)process.exit(0);
   while (selection) {
@@ -6161,6 +6210,7 @@ bantam addons [install <name>]    list the optional add-ons (vision, speculative
 bantam supervise [film.json] [--json]
                                   read a saved run back and draft findings with evidence (see docs/SUPERVISOR.md)
 bantam doctor --api-url URL [--api-key KEY] [--model NAME] [--api-dialect llamacpp|vllm]  use an existing OpenAI-compatible server (validates + saves it)
+bantam doctor --use-local           forget a remembered Codex/API backend and return the startup default to local auto-detection
 bantam doctor [--launch] [--json]  check setup (Node, model server, GPU, GGUF, registry) and scaffold a start script
 bantam doctor --install-llama [--yes] [--vulkan]  download a prebuilt llama-server (GPU=Vulkan / CPU) — no build
 bantam doctor --provision [--yes] [--quant Q4_K_M] [--gguf-url URL]  download the model (default: the 4-bit) from Hugging Face, resumable

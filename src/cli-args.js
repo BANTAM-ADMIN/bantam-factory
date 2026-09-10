@@ -34,6 +34,9 @@ export const BOOLEAN_FLAGS = new Set([
   "force",
   // opt-in chat transport (gated on byte fidelity; see src/chat-transport.js)
   "chat-transport",
+  // `bantam doctor --use-local` — forget a remembered cloud backend and return
+  // the startup default to endpoint auto-detection.
+  "use-local",
 ]);
 
 // Only save-run today. --skills takes its value by next-token and that works;

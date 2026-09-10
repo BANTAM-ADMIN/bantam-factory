@@ -32,6 +32,15 @@ export function saveConnection(value,home){
  const dest=connectionPath(home);fs.mkdirSync(path.dirname(dest),{recursive:true});
  fs.writeFileSync(dest,JSON.stringify(value,null,2)+'\n',{mode:0o600});fs.chmodSync(dest,0o600);return dest;
 }
+// Forget the remembered backend so the next bare run falls back to endpoint
+// auto-detection. Opting into Codex is deliberately sticky, but before this
+// there was no non-interactive exit: a remembered connection.json made every
+// bare `bantam` cloud-only and suppressed detectEndpoint(), so a llama.cpp
+// server answering on :8085 was never even probed.
+export function clearConnection(home){
+ const dest=connectionPath(home);
+ try{fs.rmSync(dest,{force:true});return dest;}catch{return null;}
+}
 export async function chooseFirstRun({ask,out,discover=discoverModelServers,hasCodex=codexAvailable(),advanced=false}={}){
  out('\nWelcome to BANTAM — choose how to power your factory.\n');
  out('  [1] Use an existing model server (scan this PC or enter IP/port)\n');

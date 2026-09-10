@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { startupModelChoices, resolveStartupModelChoice } from "../src/startup-model-choice.js";
+import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded } from "../src/startup-model-choice.js";
 
 const locals = [
   { name: "bantam-q4-crew", endpoint: "http://x:1", slots: 4, priority: 10,
@@ -135,4 +135,36 @@ test("Enter selects the recommended entry rather than cancelling", () => {
   // An explicit cancel is still possible.
   assert.equal(resolveStartupModelChoice(c, "q", { enterSelectsRecommended: true }), null);
   assert.equal(resolveStartupModelChoice(c, "2", { enterSelectsRecommended: true }).name, "bantam-q4-crewsplit");
+});
+
+test("a healthy auto-detected local server suppresses the picker", () => {
+  // The regression: with no remembered connection the picker opened on every
+  // bare run — even with llama.cpp answering on :8085 — and announced "No local
+  // model is running", pushing the operator toward cloud instead of the server
+  // that was already up.
+  assert.equal(startupChoiceNeeded({
+    canOffer: true, detectedLocalReady: true, rememberedConnection: null, backendHealthy: false,
+  }), false, "a live local server is a working answer, not a question");
+});
+
+test("the picker still opens when nothing is serving", () => {
+  assert.equal(startupChoiceNeeded({
+    canOffer: true, detectedLocalReady: false, rememberedConnection: null, backendHealthy: false,
+  }), true, "no local server and no remembered backend is genuine first-run");
+});
+
+test("a remembered but unhealthy backend stays replaceable", () => {
+  const remembered = { kind: "codex", model: "gpt-6-astra" };
+  assert.equal(startupChoiceNeeded({
+    canOffer: true, detectedLocalReady: false, rememberedConnection: remembered, backendHealthy: false,
+  }), true, "an expired Codex login must be replaceable");
+  assert.equal(startupChoiceNeeded({
+    canOffer: true, detectedLocalReady: false, rememberedConnection: remembered, backendHealthy: true,
+  }), false, "a healthy remembered backend is honored without a prompt");
+});
+
+test("non-interactive runs never open the picker", () => {
+  assert.equal(startupChoiceNeeded({
+    canOffer: false, detectedLocalReady: false, rememberedConnection: null, backendHealthy: false,
+  }), false);
 });

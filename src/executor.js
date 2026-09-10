@@ -859,7 +859,8 @@ export class Executor {
     this.commitPatchedFiles(this.noopEditGuard ? changedFiles : [...files.values()]);
     const paths = [...files.values()].map((file) => [...file.paths][0]).sort();
     this.editObservation("", changedFiles.length ? "applied" : "unchanged", changedFiles.length ? changedFiles.flatMap((file) => [...file.paths]) : paths);
-    return `patched ${resolved.length} edit${resolved.length === 1 ? "" : "s"} across ${files.size} file${files.size === 1 ? "" : "s"}: ${paths.join(", ")}`;
+    return `patched ${resolved.length} edit${resolved.length === 1 ? "" : "s"} across ${files.size} file${files.size === 1 ? "" : "s"}: ${paths.join(", ")}`
+      + changedFiles.map(file => this.dupDefNote([...file.paths][0], file.text, file.output)).filter(Boolean).slice(0, 2).join('');
   }
 
   commitPatchedFiles(files) {
@@ -963,7 +964,7 @@ export class Executor {
     }
     this.writeTextFile(full, content);
     this.editObservation("", before === content ? "unchanged" : "applied", [p]);
-    return `wrote ${content.length} bytes to ${p}`;
+    return `wrote ${content.length} bytes to ${p}` + this.dupDefNote(p, before, content);
   }
 
   writeBatch({ files }) {
@@ -1035,7 +1036,8 @@ export class Executor {
     this.editObservation("", changed.length ? "applied" : "unchanged", (changed.length ? changed : records).map((record) => record.path));
     const paths = committing.map((record) => record.path).sort();
     const bytes = committing.reduce((sum, record) => sum + Buffer.byteLength(record.output), 0);
-    return `wrote batch of ${committing.length} file${committing.length === 1 ? "" : "s"} (${bytes} bytes): ${paths.join(", ")}`;
+    return `wrote batch of ${committing.length} file${committing.length === 1 ? "" : "s"} (${bytes} bytes): ${paths.join(", ")}`
+      + changed.map(file => this.dupDefNote(file.path, file.text, file.output)).filter(Boolean).slice(0, 2).join('');
   }
 
   commitWrittenFiles(files) {

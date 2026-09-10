@@ -7,6 +7,7 @@
 // editable so the agent can repair it incrementally.
 
 import * as acorn from "acorn";
+import { full as walkAst } from "acorn-walk";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -385,9 +386,11 @@ function pythonDefinitionSites(source) {
 /**
  * Detect same-scope duplicate definitions an edit INTRODUCED (count went up and
  * is now >= 2). Returns the most relevant one as { name, kind, lines } or null.
- * Python only for now; returns null for other languages.
+ * Also diagnose edits to a JavaScript class method already shadowed by a
+ * later definition: such an edit parses but cannot change runtime behavior.
  */
 export function introducedDuplicateDefinition({ path: filePath, before, after }) {
+  if (JAVASCRIPT_PATH.test(String(filePath ?? ""))) return shadowedClassMethod(before, after);
   if (!PY_PATH.test(String(filePath ?? ""))) return null;
   const b = pythonDefinitionSites(before);
   const a = pythonDefinitionSites(after);
@@ -403,9 +406,60 @@ export function introducedDuplicateDefinition({ path: filePath, before, after })
   return best;
 }
 
+function classMethodSites(source) {
+  const text = String(source ?? ""), sites = new Map(), ordinals = new Map();
+  // Advisory parsing stays bounded; the transactional syntax gate remains
+  // authoritative, including for unsupported syntax and larger files.
+  if (text.length > 250000) return sites;
+  let ast;
+  for (const sourceType of ['module', 'script']) {
+    try { ast = acorn.parse(text, {ecmaVersion:'latest', sourceType, locations:true, allowHashBang:true}); break; }
+    catch { /* Try the other legal source mode. */ }
+  }
+  if (!ast) return sites;
+  walkAst(ast, node => {
+    if (node.type !== 'ClassDeclaration' && node.type !== 'ClassExpression') return;
+    const label = node.id?.name ?? '(anonymous class)';
+    const ordinal = ordinals.get(label) ?? 0; ordinals.set(label, ordinal + 1);
+    for (const member of node.body.body) {
+      // Accessor pairs, fields, private names and dynamic keys have different
+      // semantics. This finding concerns ordinary same-name methods only.
+      if (member.type !== 'MethodDefinition' || member.kind !== 'method' || member.computed) continue;
+      const name = member.key.type === 'Identifier' ? member.key.name
+        : member.key.type === 'Literal' ? String(member.key.value) : null;
+      if (name === null) continue;
+      const key = JSON.stringify([label, ordinal, Boolean(member.static), name]);
+      if (!sites.has(key)) sites.set(key, []);
+      sites.get(key).push({line:member.loc.start.line, text:text.slice(member.start, member.end),
+        name:`${label}.${member.static ? 'static ' : ''}${name}`});
+    }
+  });
+  return sites;
+}
+
+function shadowedClassMethod(before, after) {
+  if (before === after) return null;
+  const previous = classMethodSites(before), current = classMethodSites(after);
+  for (const [key, methods] of current) {
+    if (methods.length < 2) continue;
+    const old = previous.get(key) ?? [];
+    const shadowedEdit = methods.slice(0, -1).some((method, i) => old[i] && old[i].text !== method.text);
+    if (methods.length <= old.length && !shadowedEdit) continue;
+    return {language:'javascript', name:methods[0].name, lines:methods.map(m => m.line), shadowedEdit};
+  }
+  return null;
+}
+
 /** Human-facing advisory string for a duplicate-definition finding, or "". */
 export function duplicateDefinitionNote(finding, filePath) {
   if (!finding) return "";
+  if (finding.language === 'javascript') {
+    const lines = finding.lines.length > 5 ? [...finding.lines.slice(0, 3), '…', finding.lines.at(-1)] : finding.lines;
+    return `\n[dup-def] ${filePath}: class method ${JSON.stringify(finding.name.slice(0, 120))} has ${finding.lines.length} definitions (lines ${lines.join(', ')}).`
+      + ` JavaScript uses the LAST definition, at line ${finding.lines.at(-1)}; the earlier method bodies are shadowed.`
+      + (finding.shadowedEdit ? ' This edit changed an earlier body, so it cannot change the method called at runtime.' : '')
+      + ' Reconcile the copies while preserving the intended behavior, then test the actual class. This is source feedback, not verification.';
+  }
   const at = finding.lines.join(" and ");
   return `\n[dup-def] This edit left ${filePath} with ${finding.lines.length} definitions of `
     + `\`${finding.name}\` in the same scope (lines ${at}). Python keeps only the last; the earlier `

@@ -142,8 +142,26 @@ function changedSpan(before, after) {
     && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail += 1;
   const start = head + 1;
   const end = b.length - tail;
-  if (end < start) return { start, end: start, inserted: false };
-  return { start, end, inserted: true };
+  const removedEnd = a.length - tail;
+  if (end < start) return { start, end: start, inserted: false, removedEnd };
+  return { start, end, inserted: true, removedEnd };
+}
+
+// A replacement can swallow a boundary from the old file. The proposed text
+// cannot show a closing `});` that it just removed. Keep a small, numbered
+// before-view ahead of the longer staged excerpt so that lost seam is visible.
+function replacedSourceExcerpt(before, span) {
+  if (!span || span.removedEnd < span.start) return "";
+  const lines = String(before).split(/\r?\n/);
+  const count = span.removedEnd - span.start + 1;
+  const numbers = count <= 6
+    ? Array.from({ length: count }, (_, i) => span.start + i)
+    : [span.start, span.start + 1, span.start + 2, null,
+      span.removedEnd - 2, span.removedEnd - 1, span.removedEnd];
+  const body = numbers.map(number => number === null
+    ? `… ${count - 6} original lines omitted …`
+    : `- ${number}\t${lines[number - 1].slice(0, 200)}`);
+  return `\nOriginal source replaced by this proposal:\n${body.join("\n")}`;
 }
 
 // Net delimiter balance over real code — strings, comments and regex literals
@@ -343,7 +361,7 @@ function syntaxRefusal(filePath, error, source, { isNew, before = null, runtimeP
   const staged = stagedExcerpt(lines, span);
 
   return `ERROR: refused — ${transition}. The complete staged result for ${where} failed to parse: ${detail}.`
-    + `${excerpt}${diagnosis}${staged}`
+    + `${excerpt}${diagnosis}${replacedSourceExcerpt(before, span)}${staged}`
     + `\nNo files were changed. Fix the proposed edit, then submit the complete action again.`;
 }
 

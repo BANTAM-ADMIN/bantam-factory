@@ -89,6 +89,50 @@ test("a syntax refusal shows the staged result around the edit", () => {
   assert.match(message, /^ {2}5\t\}$/m, "and the line below it, where the imbalance becomes visible");
 });
 
+test("a refused replacement shows the original closing boundary it would remove", () => {
+  // Recorded long-project failure: the requested range began one line too
+  // early and swallowed a check callback's `});`. The staged view alone
+  // showed the new await in that now-unclosed, non-async callback.
+  const before = [
+    "async function main() {",
+    "  await withGame(async () => {",
+    "    check('prior case', () => {",
+    "      assert.ok(true);",
+    "    });",
+    "    // next case",
+    "    await nextCase();",
+    "  });",
+    "}",
+  ].join("\n");
+  const after = before.replace("    });\n    // next case", "    const result = await inspect();\n    // next case");
+  const result = validateSourceTransition({ path: "test/cases.js", before, after });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Original source replaced by this proposal/);
+  assert.match(result.message, /^- 5\t    \}\);$/m);
+  assert.ok(result.message.indexOf("- 5\t") < result.message.indexOf("The staged result"),
+    "the lost boundary must survive before a long staged excerpt is clipped");
+  assert.match(result.message, /No files were changed/);
+});
+
+test("original-source diagnostics bound long replacements and omit pure insertions", () => {
+  const before = Array.from({ length: 100 }, (_, i) => `const item${i} = ${JSON.stringify('x'.repeat(400))};`).join("\n");
+  const result = validateSourceTransition({ path: "items.js", before, after: "function broken( {" });
+  assert.equal(result.ok, false);
+  const original = result.message.split("Original source replaced by this proposal")[1]?.split("The staged result")[0];
+  assert.ok(original, "the removed source has a bounded view");
+  assert.match(original, /^- 1\tconst item0/m);
+  assert.match(original, /^- 100\tconst item99/m);
+  assert.match(original, /94 original lines omitted/);
+  assert.ok(original.length < 1500, `original excerpt was ${original.length} chars`);
+
+  const inserted = validateSourceTransition({ path: "insert.js", before: "work();\n", after: "if (ready) {\nwork();\n" });
+  assert.equal(inserted.ok, false);
+  assert.doesNotMatch(inserted.message, /Original source replaced/);
+  const created = validateSourceTransition({ path: "new.js", before: null, after: "function broken( {" });
+  assert.equal(created.ok, false);
+  assert.doesNotMatch(created.message, /Original source replaced/);
+});
+
 test("a long insertion shows head and tail, not the whole file", () => {
   const long = [
     "export function a() {",

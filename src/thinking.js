@@ -95,6 +95,20 @@ const STEER_RE = /\[(open_files|paging|reverted|pipe-guard|api-check|regression-
 // past, finishing code and never starting the docs.
 const GREEN_RE = /^#\s*fail\s+0\s*$/m;
 
+// A verifier's output format must not decide whether the worker reconsiders
+// its next milestone. Use the controller receipt for non-TAP runners too.
+// This schedules reasoning only; it supplies no verification/completion credit.
+export function successfulVerificationBoundary(receipt, generation) {
+  return receipt?.schema === 1 && receipt.status === 'pass' && receipt.exitCode === 0
+    && Number.isSafeInteger(generation) && generation >= 0 && receipt.generation === generation
+    && ['shell','automatic','scoped','landing','completion'].includes(receipt.source)
+    && /^[a-f0-9]{64}$/.test(receipt.outputSha256 ?? '')
+    && receipt.statusScope === 'execution'
+    && receipt.counts?.total !== 0 && !(receipt.counts?.failed > 0)
+    && !['invalidated','blocked','interrupted','aborted','timedOut','bufferExceeded','error','signal','uncertainty']
+      .some(key => Boolean(receipt[key]));
+}
+
 // A long specification can produce a stream of valid next-page actions with
 // no decision boundary. This opt-in checkpoint spends thought, not read or
 // completion authority. Any edit, execution, or intervening thought resets it.
@@ -147,6 +161,7 @@ export function shouldThink(mode, ctx = {}) {
   if (lean) return false;                               // lean: no turn-0, no clean-green think
   if (ctx.turnIndex === 0) return true;                 // plan the opening move (trim keeps this)
   if (trim) return false;                               // trim stops here: turn-0 yes, clean-green no
+  if (ctx.verifiedGreen === true) return true;           // actual passing execution, independent of stdout format
   if (ctx.lastObservation && GREEN_RE.test(ctx.lastObservation)) return true;   // phase boundary: what is the next obligation?
   return false;
 }

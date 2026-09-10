@@ -6,11 +6,16 @@ import {isConfiguredAuditCommand} from './verification-command.js';
 
 // These literal display-only pipelines cannot satisfy the existing direct
 // audit receipt. Refuse BEFORE paying for a run that must immediately repeat.
-// Do not rewrite shell programs or interpret setup, quotes, data filters,
-// substitutions, file redirections, or other pipeline shapes.
+// Do not rewrite shell programs or interpret setup, substitutions, file
+// redirections or arbitrary data processing. Quoted grep patterns below are
+// literal display filters only; their contents are never evaluated.
 export function filteredAuditCheckRefusal(command, {pending = null} = {}) {
   if ((pending?.needsFocused !== true && pending?.needsProject !== true) || typeof command !== 'string' || command.length > 8192) return null;
-  const match = command.match(/^([A-Za-z0-9_./ \t=-]+?)(?:[ \t]+2>&1)?[ \t]*\|[ \t]*(?:head|tail)(?:[ \t]+(?:-\d+|-n[ \t]*\d+|--lines=\d+))?[ \t]*$/);
+  const match = command.match(/^([A-Za-z0-9_./ \t=-]+?)(?:[ \t]+2>&1)?[ \t]*\|[ \t]*([^\r\n]+)$/);
+  const filter = match?.[2];
+  const edge = /^(?:head|tail)(?:[ \t]+(?:-\d+|-n[ \t]*\d+|--lines=\d+))?[ \t]*$/;
+  const grep = /^grep[ \t]+(?:-[EF][ \t]+)?(?:"[^"\\$`\r\n]{1,2000}"|'[^'\\\r\n]{1,2000}'|[A-Za-z0-9_.:-]+)(?:[ \t]*\|[ \t]*(?:head|tail)(?:[ \t]+(?:-\d+|-n[ \t]*\d+|--lines=\d+))?)?[ \t]*$/;
+  if (!filter || (!edge.test(filter) && !grep.test(filter))) return null;
   const direct = match?.[1].trim();
   if (!direct || (!isFocusedAuditCommand(direct, pending.configuredCommand)
       && !isConfiguredAuditCommand(direct, pending.configuredCommand))) return null;

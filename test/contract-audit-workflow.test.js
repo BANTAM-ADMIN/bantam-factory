@@ -83,6 +83,7 @@ test("existing standalone-test safety is unchanged unless a focused predicate is
 for (const scenario of [
   {name:'check/delete', command:'node items.verify.mjs && npm test && rm -f items.verify.mjs && npm test', metric:'compoundAuditCleanupRefusals', message:/Requested compound command was not executed/},
   {name:'output-filter', command:'node items.verify.mjs 2>&1 | tail -8', metric:'filteredAuditCheckRefusals', message:/Filtered audit check was not executed/},
+  {name:'grep-output-filter', command:'node items.verify.mjs 2>&1 | grep -E "FAIL|NaN|error" | head -20', metric:'filteredAuditCheckRefusals', message:/Filtered audit check was not executed/},
 ]) test(`two refused ${scenario.name} attempts preserve files and generation, then direct focus and project verification permit DONE`, async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-audit-cleanup-"));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
@@ -161,14 +162,17 @@ for (const scenario of [
 
 
 test('only bounded literal audit output filters receive an exact pre-execution correction',()=>{
-  for(const command of ['node test/smoke.js 2>&1 | tail -8','node test/perf.js | head -n 20','npm test | tail','node test/perf.js | tail --lines=20']) {
+  for(const command of ['node test/smoke.js 2>&1 | tail -8','node test/perf.js | head -n 20','npm test | tail','node test/perf.js | tail --lines=20',
+    'node test/smoke.js 2>&1 | grep -E "FAIL|NaN|error" | head -20', "node test/smoke.js | grep -F 'FAIL|NaN'", 'node test/smoke.js | grep PASS']) {
     const refusal=filteredAuditCheckRefusal(command,OPTIONS);
     assert.equal(refusal?.kind,'filtered-audit-check',command);
     assert.equal(refusal.nextAction.c,command.split('|')[0].trim().replace(/ 2>&1$/,''));
     assert.ok(clipKeepingControllerAnnotation('long output\n'.repeat(2000)+'\n'+refusal.correction).includes(refusal.correction));
     assert.equal(filteredAuditCheckRefusal(command,{pending:null}),null);
   }
-  for(const command of ['cat data.txt | head -8','node test/smoke.js | grep PASS','node test/smoke.js | tail -f','node test/smoke.js | tail result.txt','node test/smoke.js | tail -8 > result.txt','node test/smoke.js | tail -8 && touch marker','cd /workspace && node test/smoke.js | tail -8',"node 'test/space test.js' | tail -8",'node $(echo test/smoke.js) | tail -8','node test/smoke.js || tail -8','node test/smoke.js | tail -8\necho done']) {
+  for(const command of ['cat data.txt | head -8','cat data.txt | grep PASS','node test/smoke.js | tail -f','node test/smoke.js | tail result.txt','node test/smoke.js | tail -8 > result.txt','node test/smoke.js | tail -8 && touch marker','cd /workspace && node test/smoke.js | tail -8',"node 'test/space test.js' | tail -8",'node $(echo test/smoke.js) | tail -8','node test/smoke.js || tail -8','node test/smoke.js | tail -8\necho done',
+    'node test/smoke.js | grep -E "$(touch marker)"', 'node test/smoke.js | grep -E "`touch marker`"', 'node test/smoke.js | grep PASS another-file',
+    'node test/smoke.js | grep PASS > output.txt', 'node test/smoke.js | grep PASS && echo DONE', 'node test/smoke.js | grep -e PASS -e FAIL', 'node test/smoke.js | awk script']) {
     assert.equal(filteredAuditCheckRefusal(command,OPTIONS),null,command);
   }
 });

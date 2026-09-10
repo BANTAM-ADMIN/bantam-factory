@@ -171,7 +171,7 @@ import { assessBulkEdit, createBulkEditState } from "./bulk-edit-gate.js";
 import { degenerateRepairMessage, degenerateTail } from "./logic/degenerate-output.js";
 import { shellSyntaxHint } from "./logic/shell-syntax-guard.js";
 import { blastRadiusNote, dependentsOf } from "./logic/blast-radius.js";
-import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink } from "./thinking.js";
+import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink, successfulVerificationBoundary } from "./thinking.js";
 import { RequiredReadHistory } from './required-read-history.js';
 import { requirementChecklistEnabled } from "./requirement-checklist.js";
 import { loadLibrary, retrieveSkills, formatSkills, distillSkill, saveSkill, promotePlanToSkill } from "./skills.js";
@@ -3023,13 +3023,16 @@ async function runAgentCore({
       let assistantPrefill = bareHistory ? bareTurnPrefill : model.assistantPrefill;
       let turnReasoning = null;
       const synthesisThisAttempt = preEditSynthesisTurn && attempt === 0;
+      const verifiedGreen = successfulVerificationBoundary(turns.at(-1)?.verificationEvidence, workspaceEditGeneration);
       if (!terminalClosureTurn && thinkingAvailable && shouldThink(thinkMode, {
         turnIndex: turns.length,
         lastObservation: prevObs,
         lastWasInvalid: attempt > 0,
         preEditSynthesis: synthesisThisAttempt,
         inspectionCheckpoint: inspectionCheckpointTurn && attempt === 0,
+        verifiedGreen,
       })) {
+        if (verifiedGreen && attempt === 0) metrics.verificationBoundaryThinks = (metrics.verificationBoundaryThinks ?? 0) + 1;
         if (inspectionCheckpointTurn && attempt === 0) {
           metrics.inspectionCheckpoints = (metrics.inspectionCheckpoints ?? 0) + 1;
           onEvent({ type: 'inspection_checkpoint', turn: turns.length, interval: inspectionCheckpointAfter, authority: 'reasoning-only' });
@@ -5742,7 +5745,7 @@ async function runAgentCore({
         || embeddedBaseline
       );
       if (counts && counts.total > 0 && !comparable) {
-        result.observation += `\n[scope] That was a different test command from the one your ${bestPassed}/${bestTotal} baseline came from, so its numbers are not comparable and nothing was judged against them. Run the SAME command as your baseline to compare, or treat this as a local check only.`;
+        result.observation += `\n[scope] That was a different test command from the one your ${bestPassed}/${bestTotal} baseline came from. Its counts describe this additional local check; the baseline stays attached to its own command. This accounting note requests no rerun. Follow the current verification workflow for any remaining required proof.`;
         metrics.scopeMismatchNotices = (metrics.scopeMismatchNotices ?? 0) + 1;
       }
       if (embeddedBaseline) {

@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compactActionReasoning, inspectionCheckpointDue, inspectionCheckpointText, shouldThink } from "../src/thinking.js";
+import { compactActionReasoning, inspectionCheckpointDue, inspectionCheckpointText, shouldThink, successfulVerificationBoundary } from "../src/thinking.js";
+import { verificationEvidence, verificationReceipt } from '../src/verification-evidence.js';
+
+test('non-TAP green uses current execution receipts while respecting off, lean and trim', () => {
+  const receipt=verificationReceipt(verificationEvidence({execution:{command:'npm test',executedCommand:'npm test',exitCode:0,stdout:'45 passed, 0 failed\n'},generation:7,configuredCommand:'npm test'}));
+  assert.equal(successfulVerificationBoundary(receipt,7),true);
+  const ctx={turnIndex:20,lastObservation:'45 passed, 0 failed\n',verifiedGreen:true,env:{}};
+  assert.equal(shouldThink('auto',{...ctx,verifiedGreen:false}),false,'the previous TAP-only trigger missed this format');
+  assert.equal(shouldThink('auto',ctx),true);
+  assert.equal(shouldThink('off',ctx),false);
+  assert.equal(shouldThink('auto',{...ctx,lean:true}),false);
+  assert.equal(shouldThink('auto',{...ctx,trim:true}),false);
+  for(const patch of [{status:'fail'},{source:'model'},{generation:6},{exitCode:1},{timedOut:true},{invalidated:true},{outputSha256:'invalid'},
+    {statusScope:'final-configured-command'},{counts:{total:0,failed:0}},{counts:{total:45,failed:1}}])
+    assert.equal(successfulVerificationBoundary({...receipt,...patch},7),false,JSON.stringify(patch));
+  assert.equal(successfulVerificationBoundary(null,7),false);
+  assert.equal(successfulVerificationBoundary(receipt,8),false);
+});
 
 test("action reasoning capsule retains the decision head and tail within its bound", () => {
   const reasoning = `PLAN:${"a".repeat(900)}\nDECISION:${"z".repeat(900)}`;

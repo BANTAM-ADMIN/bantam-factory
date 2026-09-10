@@ -99,6 +99,7 @@ import {
   saveArtifact,
 } from "../src/artifact.js";
 import { RunCheckpoint, attachModelRequestCheckpoint } from "../src/run-checkpoint.js";
+import { createLiveReview } from "../src/live-review.js";
 import { captureFinalDiff, prepareDiffBaseline } from "../src/diff.js";
 import { buildSessionTask, extractNextStep, isStatusQuestion } from "../src/continuation.js";
 import { beginChatEvidence } from "../src/chat-evidence.js";
@@ -1384,6 +1385,7 @@ if (envTruthy("BANTAM_SHELL_NETWORK")) {
 
 function liveLogger(e) {
   if (e.type === "action") process.stderr.write(`  → ${JSON.stringify(e.action)}\n`);
+  else if (e.type === 'trusted_review') process.stderr.write('  review update received — continuing with the latest findings\n');
   else if (e.type === "invalid") {
     if (e.kind === "output_limit") {
       process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: split the action\n`);
@@ -1945,6 +1947,8 @@ if (cmd === undefined || cmd === "chat") {
   }
   if (args["resume-run"] === true) fail("--resume-run requires an artifact path");
   if (args["review-file"] === true) fail("--review-file requires a file path");
+  if (args['watch-review'] !== undefined && args['watch-review'] !== true) fail('--watch-review is a flag');
+  if (args['watch-review'] && !args['review-file']) fail('--watch-review requires --review-file');
 
   let continuation = null;
   let resumeArtifact = null;   // hoisted: the workspace restore below (after --workspace resolves) needs it
@@ -2070,6 +2074,11 @@ if (cmd === undefined || cmd === "chat") {
   // Continuation owns the detached evidence needed from here on. Release the
   // parsed source record after restoring its files, including excluded turns.
   resumeArtifact = null;
+  const liveReview = args['watch-review'] ? createLiveReview({
+    file:args['review-file'], workspace, task:args.task,
+    initialSha256:continuation?.provenance.review?.sha256,
+    onWarning:message => process.stderr.write(`review update deferred: ${message}\n`),
+  }) : null;
   if (args.lane !== undefined) {
     if (args.lane === true) fail("run --lane requires a lane id");
     if (args["state-home"] === true) fail("run --state-home requires a directory");
@@ -2222,7 +2231,8 @@ if (cmd === undefined || cmd === "chat") {
       task: args.task,
       supportingContext: typeof args["supporting-context-file"] === "string"
         ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
-      drainInjections: workerControl ? () => workerControl.drain() : null,
+      drainInjections: workerControl || liveReview
+        ? () => [...(workerControl?.drain() ?? []), ...(liveReview?.poll() ?? [])] : null,
       inheritedInstructionScope: workerControl?.instructionScope ?? null,
       workspace,
       shellNetwork: args["dangerously-allow-net"] ? true : undefined,
@@ -6071,7 +6081,7 @@ bantam chat                       same as above (explicit)
                                   inspect candidates; no model or controller/source writes
 bantam run --task "..." [--workspace . | --lane ID [--state-home DIR]] [--max-turns 30] [--verify "npm test"] [--verify-workspace-read-only] [--autonomous] [--ground] [--tui] [--plan] [--skills] [--save-run[=path]]
            --max-turns unlimited removes the turn deadline; --save-run preserves resumable checkpoints. Ctrl-C stops the run.
-           [--resume-run artifact.json [--through-turn N]] [--review-file evidence.txt] [--factory [--factory-home DIR]]
+           [--resume-run artifact.json [--through-turn N]] [--review-file evidence.txt [--watch-review]] [--factory [--factory-home DIR]]
 bantam exec [options] "<task text>"   one-shot: run a task, verify, exit (headless, no TUI)
 bantam factory list|show|audit|report ...
                                   inspect durable factory travelers without a model server
@@ -6158,10 +6168,11 @@ Context dial:  [--context-mode rebuild|immutable|extension] [--immutable-history
                The choice is remembered across sessions; every session prints its modes at startup
                and :modes lists them. Reuse needs a single-slot server (bantam swap solo).
 
---resume-run restores recorded dialogue through a zero-based turn; it does not
-restore filesystem bytes, so --workspace must already match that cursor. Use a
-lane fork for an exact historical workspace. --review-file adds one trusted,
-hashed reviewer/runtime observation without changing the task string.
+--resume-run restores recorded dialogue and captured workspace files; existing
+files are preserved. Use a lane fork for an exact historical workspace.
+--review-file adds a hashed reviewer/runtime observation without changing the task.
+Add --watch-review to receive updated reviews between turns without restarting.
+The watched file must be outside the worker workspace; publish updates by atomic rename.
 
 --shell-network permits model-chosen Docker commands and browser previews to use networking
 (also BANTAM_SHELL_NETWORK=1). It keeps Docker filesystem confinement, but enable it only for a

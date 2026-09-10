@@ -17,6 +17,7 @@ import { stringifyChunked } from "@discoveryjs/json-ext";
 
 import { snapshotWorkspace } from "./workspace-snapshot.js";
 import { snapshotJsonValue } from "./json-file.js";
+import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 
 export class RunCheckpoint {
   constructor({ dest, meta = {}, autosaveEvery = 3, initialEvidence = null, workspaceDir = undefined } = {}) {
@@ -53,6 +54,12 @@ export class RunCheckpoint {
   /** Feed it the agent's `onEvent` stream. Only `action`/`observation` matter. */
   note(event) {
     if (!event) return;
+    if (event.type === 'trusted_review' && trustedReviewEvidenceEnd({action:null, observation:event.observation}) !== null) {
+      this._flushPending();
+      this._turns.push({i:this._turns.length, action:null, parsedAction:null, observation:event.observation});
+      this._recordEvent(event);
+      return;
+    }
     if (event.type === 'required_read_history') {
       const target = this._turns.find(turn => turn.i === event.turn);
       if (target) target.requiredReadHistory = serializableCopy(event.history);

@@ -22,7 +22,7 @@ export const BOOLEAN_FLAGS = new Set([
   "no-pregate", "no-skills", "rooster", "backfill", "line-edit",
   "launch", "provision", "yes", "no-autoverify", "install-llama", "vulkan", "setup",
   "no-apply", "deepseek", "codex", "usage", "no-usage", "proactive", "visual-review", "native-bypass-sandbox", "bypass-sandbox",
-  "write-batch",
+  "write-batch", "watch-review",
   "save-run", "allow-unsafe-competitors", "require-new-design",
   "factory", "verify-workspace-read-only",
   // `bantam models add --vision --replace` — value-less, so they must not eat

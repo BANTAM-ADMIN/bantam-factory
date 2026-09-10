@@ -11,6 +11,7 @@ const MATERIAL_EVENTS = new Set([
   "turn_start",
   "action",
   "observation",
+  "trusted_review",
   "invalid",
   "invalid_action",
   "protocol_violation",

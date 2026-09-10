@@ -22,6 +22,7 @@ import { GATE_ENGAGEMENT_METRIC } from "./logic/gate-engagement.js";
 import { ModelClient, modelOutputTokenCap } from "./model.js";
 import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
+import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 import { Executor, runShellProcess, withNodeTestTimeout, START_WINDOW } from "./executor.js";
 import { isGeneratedPath, isTestPath, snapshotTree } from "./scope-guard.js";
 import { verificationOutputDirectories, isDeclaredVerificationOutput } from "./verification-outputs.js";
@@ -2257,8 +2258,11 @@ async function runAgentCore({
         // Kind-aware framing: the attendant's own replies must not read as
         // user text, or the worker re-answers and the single-agent illusion
         // tears (operator design, 2026-08-19).
-        turns.push({ action: null, observation: frameInjection(m) });
-        onEvent({ type: "injection", message: typeof m === "string" ? m : m.text, kind: typeof m === "string" ? "user" : m.kind });
+        const review = m.kind === 'review' && trustedReviewEvidenceEnd({action:null, observation:m.text}) !== null;
+        const turn = { i: turns.length, action: null, observation: review ? m.text : frameInjection(m) };
+        turns.push(turn);
+        if (review) onEvent({type:'trusted_review', turn:turn.i, observation:turn.observation});
+        else onEvent({ type: "injection", message: typeof m === "string" ? m : m.text, kind: typeof m === "string" ? "user" : m.kind });
       }
       if (terminalClosureTurn && (msgs || []).some(Boolean)) break;
     }

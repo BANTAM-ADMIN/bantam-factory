@@ -85,6 +85,54 @@ test("ordinary image inspection keeps pixel facts without a glyph reconstruction
   assert.doesNotMatch(out, /Fonts on this machine|ImageFont|DATA STRUCTURE/);
 });
 
+test("local visual questions reach the image model and scope the returned advisory facts", t => {
+  const root = scratch();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.copyFileSync(path.resolve('creative-suite/assets/dispatch-card.png'), path.join(root, 'combat frame.png'));
+  const calls = [];
+  const tool = viewImageTool(root, 'http://local.invalid', {describe(endpoint, image, options) {
+    calls.push({endpoint, image, options});
+    return 'A chessboard with a brightly illuminated column; no enemy is visible.';
+  }});
+  const question = 'Is an enemy actually visible? Assess its silhouette and lighting. Under 80 words.';
+  const result = tool.answer(`view_image combat frame.png | ${question}`);
+  assert.match(result, /no enemy is visible/);
+  assert.match(result, /Deterministic image facts/);
+  assert.doesNotMatch(result, /Fonts on this machine|ImageFont/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].endpoint, 'http://local.invalid');
+  assert.equal(calls[0].image, path.join(root, 'combat frame.png'));
+  assert.ok(calls[0].options.prompt.endsWith(`Specific question: ${question}`));
+  assert.equal(tool.lastOutcome.status, 'pass');
+  tool.answer('view_image combat frame.png');
+  assert.equal(calls.length, 2);
+  assert.doesNotMatch(calls[1].options.prompt, /Specific question/);
+  assert.match(calls[1].options.prompt, /Describe this image/);
+});
+
+test("both image providers keep question paths and symlink targets inside the workspace", async t => {
+  const root = scratch(), outside = scratch();
+  t.after(() => {fs.rmSync(root, {recursive:true, force:true});fs.rmSync(outside, {recursive:true, force:true});});
+  fs.writeFileSync(path.join(root, 'frame.png'), 'fixture');
+  fs.writeFileSync(path.join(outside, 'private.png'), 'outside fixture');
+  fs.symlinkSync(path.join(outside, 'private.png'), path.join(root, 'escape.png'));
+  fs.symlinkSync(path.join(root, 'frame.png'), path.join(root, 'alias.png'));
+  let calls = 0;
+  const tools = [
+    viewImageTool(root, 'http://local.invalid', {describe(){calls++;return 'A frame.';}}),
+    codexViewImageTool(root, {runtimeFactory:()=>({async describeImage(){calls++;return {content:'A frame.'};},close(){}})}),
+  ];
+  for (const tool of tools) {
+    const before = calls;
+    assert.match(await tool.answer('view_image escape.png | Read its text.'), /outside workspace/);
+    assert.match(await tool.answer(`view_image ${path.join(outside, 'private.png')} | Read its text.`), /outside workspace/);
+    assert.match(await tool.answer('view_image missing.png | Read its text.'), /no image at missing.png/);
+    assert.equal(calls, before, 'invalid paths must never reach either model');
+    assert.match(await tool.answer('view_image alias.png | Describe its layout.'), /A frame/);
+    assert.equal(calls, before + 1, 'an internal image alias remains usable');
+  }
+});
+
 test("Codex image review scopes glyph guidance to the requested task", async t => {
   const root = scratch();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

@@ -34,7 +34,14 @@ function resolveInside(workspace, requested) {
   const abs = path.resolve(root, String(requested).trim());
   const rel = path.relative(root, abs);
   if (rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`path outside workspace: ${requested}`);
-  return { abs, rel: rel || "." };
+  // An in-workspace symlink is not permission to attach an outside file.
+  // Preserve missing-file handling in the caller, and allow internal aliases.
+  const resolved = fs.existsSync(abs) ? fs.realpathSync(abs) : abs;
+  if (fs.existsSync(abs)) {
+    const realRel = path.relative(fs.realpathSync(root), resolved);
+    if (realRel.startsWith("..") || path.isAbsolute(realRel)) throw new Error(`path outside workspace: ${requested}`);
+  }
+  return { abs: resolved, rel: rel || "." };
 }
 
 /**
@@ -283,7 +290,7 @@ export function describeImage(endpoint, absPath, { prompt = DESCRIBE, timeoutSec
 export function viewImageTool(workspace, endpoint, { describe = describeImage } = {}) {
   const tool = {
     name: "view_image",
-    description: "look at an image in the workspace — `view_image <path>` returns what the vision model sees (text, layout, colors, UI). Needs a vision model.",
+    description: "look at a workspace image — `view_image <path>` or `view_image <path> | <specific visual question>`. Ask about the feature or defect you need to inspect. Returns visible text, layout, colors and objects. Needs a vision model.",
     verbs: ["view_image"],
     lastOutcome: null,
     answer(q) {
@@ -292,18 +299,21 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
         let arg = String(q ?? "").trim().replace(/^view_image\b\s*/i, "");
         if (!arg) {
           tool.lastOutcome = failedVisionOutcome("invalid_arguments", "image path is required");
-          return "usage: view_image <path-to-image>";
+          return "usage: view_image <path> [| specific visual question]";
         }
-        if (!IMG_EXT.test(arg)) {
-          tool.lastOutcome = failedVisionOutcome("unsupported_image", `${arg} is not a supported image`);
-          return `"${arg}" is not an image (png/jpg/gif/webp/bmp).`;
+        const separator = arg.indexOf(" | ");
+        const requested = (separator >= 0 ? arg.slice(0, separator) : arg).trim();
+        const question = separator >= 0 ? arg.slice(separator + 3).trim() : "";
+        if (!IMG_EXT.test(requested)) {
+          tool.lastOutcome = failedVisionOutcome("unsupported_image", `${requested} is not a supported image`);
+          return `"${requested}" is not an image (png/jpg/gif/webp/bmp).`;
         }
-        const { abs, rel } = resolveInside(workspace, arg);
+        const { abs, rel } = resolveInside(workspace, requested);
         if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
           tool.lastOutcome = failedVisionOutcome("image_missing", `no image at ${rel}`, true);
           return `no image at ${rel} (check the path).`;
         }
-        const c = describe(endpoint, abs);
+        const c = describe(endpoint, abs, { prompt: question ? `${DESCRIBE}\n\nSpecific question: ${question}` : DESCRIBE });
         if (!c) {
           tool.lastOutcome = failedVisionOutcome(
             "empty_vision_response",
@@ -313,7 +323,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
           return `[view_image] the vision model returned no description for ${rel}.`;
         }
         tool.lastOutcome = { status: "pass", path: rel };
-        return `${rel}:\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { description: c })}`;
+        return `${rel}:\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { question, description: c })}`;
       } catch (e) {
         tool.lastOutcome = {
           status: "error",

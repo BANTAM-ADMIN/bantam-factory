@@ -25,11 +25,12 @@ import { formatContractStateAudit, parseCollectionContractAudit } from "./contra
 import { formatContractAssertionStation } from "./contract-assertion-station.js";
 import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
 import { streamContractGuidance } from "./stream-contract-guidance.js";
-import { RAW_SOURCE_OBSERVATION, compactSourceRanges, recordDeliveredSourceLines, sourcePointerOrigins } from "./history-budget.js";
+import { RAW_SOURCE_OBSERVATION, compactSourceRanges, recordDeliveredSourceLines, sourcePointerOrigins, latestRepeatedReadIndex, sourceReadKey } from "./history-budget.js";
 
 // Same lifetime and keys as the caller's frozen-fragment cache. Never rebuild
 // source knowledge from a raw turn whose already-emitted fragment was clipped.
 const frozenObservationCaches = new WeakMap();
+const refreshedReadCaches = new WeakMap();
 
 // The model's own chat template injects one of these into the system message
 // and BANTAM's /completion path bypasses the template, so a local run has NEVER
@@ -457,6 +458,7 @@ export function buildPrompt({
   historyPrefill = QWEN_ASSISTANT_PREFILL,     // prefix for prior assistant turns (always the stable closed form)
   skillsText = "", planText = "", contractText = "", reanchorText = "", finalReanchorText = "", openFilesText = "", openPaths = [], readPaths = openPaths,
   renderCache = null,
+  refreshedReads = null,
   freezeNewest = false,
   pendingPromptPrelude = "",
   pendingPromptAttempts = [],
@@ -646,6 +648,13 @@ export function buildPrompt({
   const stubbedTurns = new Set();
   const deliveredSourceLines = new Map();
   const deliveredObservations = new Map();
+  // Remember a source refresh from its first delivery, while leaving that
+  // newest turn mutable for controller annotations. Recompacting it on the
+  // next build would rewrite the emitted prefix before it becomes frozen.
+  refreshedReads ??= renderCache ? refreshedReadCaches.get(renderCache) ?? new Set() : new Set();
+  if (renderCache) refreshedReadCaches.set(renderCache, refreshedReads);
+  const repeatedRead = latestRepeatedReadIndex(turns);
+  if (repeatedRead >= 0) refreshedReads.add(sourceReadKey(turns[repeatedRead]));
   let frozenObservations = null;
   if (renderCache) {
     frozenObservations = frozenObservationCaches.get(renderCache);
@@ -697,7 +706,7 @@ export function buildPrompt({
       enabled: slimSuccessfulShellActions,
     });
     const reviewEnd = trustedReviewEvidenceEnd(turn, shellReplay.observation);
-    const sourceObservation = reviewEnd !== null ? shellReplay.observation
+    const sourceObservation = reviewEnd !== null || refreshedReads.has(sourceReadKey(turn)) ? shellReplay.observation
       : compactSourceRanges(shellReplay.observation, deliveredSourceLines, recordedTurn);
     if (turn.action) {
       // Scrub the replayed action too: a prior write_file/replace whose content contains

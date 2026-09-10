@@ -65,11 +65,12 @@ test("final controller-annotation clipping, not the budget estimate, owns source
   assert.ok(delivered.get(0).length <= OBS_MAX);
 });
 
-test("fully delivered equivalent ranges still compact, without pointer-to-pointer origins", () => {
+test("older equivalent ranges compact while the latest explicit repeat returns source", () => {
   const { delivered } = render([read(0, 10, 15), read(1, 10, 15), read(2, 10, 15)]);
   assert.match(delivered.get(0), /10\tconst value10/);
   assert.match(delivered.get(1), /L10-L15 unchanged from turn 1/);
-  assert.match(delivered.get(2), /L10-L15 unchanged from turn 1/);
+  assert.match(delivered.get(2), /10\tconst value10/);
+  assert.doesNotMatch(delivered.get(2), /source range/);
   assert.doesNotMatch(delivered.get(2), /unchanged from turn 2/);
   assert.ok(delivered.get(1).length < delivered.get(0).length);
 });
@@ -164,8 +165,70 @@ test("budget eviction rebases frozen public-test pointers and preserves unrelate
   assert.doesNotMatch(cache.get(5), /32\tconst value32/);
   const appended = render([...window, read(7, 1, 32, "", "test/snapshot.test.js")], { renderCache: cache });
   assert.ok(appended.prompt.startsWith(repaired.prompt), "ordinary append is byte-stable after rebase");
-  assert.match(appended.delivered.get(7), /L1-L32 unchanged from turn 5/);
+  assert.match(appended.delivered.get(7), /32\tconst value32/);
+  assert.doesNotMatch(appended.delivered.get(7), /source range/);
   assert.equal(JSON.stringify(turns), rawBefore, "canonical evidence is untouched");
+});
+
+test('an explicit repeated narrow read refreshes its bytes without rewriting the frozen prefix', () => {
+  const cache = new Map();
+  const origin = read(0, 160, 190, '', 'weapons.js');
+  const narrow = read(1, 170, 181, '', 'weapons.js');
+  const first = render([origin, narrow], { renderCache: cache });
+  assert.match(first.delivered.get(1), /L170-L181 unchanged from turn 1/);
+  const search = { i: 2, action: { a: 'search', q: 'switchWeapon' }, observation: 'weapons.js:170: switchWeapon(n)' };
+  const before = render([origin, narrow, search], { renderCache: cache });
+  const frozenPointer = cache.get(1);
+  const refreshed = read(3, 170, 181, '', 'weapons.js');
+  const after = render([origin, narrow, search, refreshed], { renderCache: cache });
+  assert.ok(after.prompt.startsWith(before.prompt));
+  assert.equal(cache.get(1), frozenPointer);
+  assert.match(after.delivered.get(3), /170\tconst value170/);
+  assert.match(after.delivered.get(3), /181\tconst value181/);
+  assert.doesNotMatch(after.delivered.get(3), /source range/);
+  assert.ok(after.delivered.get(3).length <= OBS_MAX);
+  const tail = { observation: '[guidance]\nRepair the measured failure.' };
+  const withTail = render([origin, narrow, search, refreshed, tail], { renderCache: cache });
+  assert.ok(withTail.prompt.startsWith(after.prompt.slice(0, after.prompt.lastIndexOf('<|im_start|>assistant'))),
+    'a transient controller turn preserves history before the pending assistant prefill');
+  assert.match(cache.get(3), /170\tconst value170/);
+});
+
+test('repeated source refresh consumes budget and preserves only current returned bytes', () => {
+  const original = read(0, 1, 40), current = read(2, 1, 40);
+  current.observation = current.observation.replace('SOURCE_VALUE_001', 'CURRENT_VALUE_001');
+  const turns = [original, { i: 1, action: { a: 'write_file', p: 'module.js', content: 'changed' }, observation: 'wrote module.js' }, current];
+  const raw = JSON.stringify(turns);
+  const kept = budgetTurns(turns, { charBudget: 4000 });
+  assert.deepEqual(kept.map(t => t.i), [1, 2], 'the refreshed body is charged rather than priced as a short pointer');
+  const { delivered } = render(turns);
+  assert.match(delivered.get(2), /CURRENT_VALUE_001/);
+  assert.doesNotMatch(delivered.get(2), /SOURCE_VALUE_001|source range/);
+  assert.equal(JSON.stringify(turns), raw);
+});
+
+test('a delivered refresh stays literal and budgeted when its earlier matching request is evicted', () => {
+  const refreshedReads = new Set();
+  const turns = [read(0, 1, 40), read(1, 10, 20),
+    { i: 2, action: { a: 'write_file', p: 'large.txt', content: 'x'.repeat(20000) }, observation: 'wrote' },
+    read(3, 10, 20)];
+  const kept = budgetTurns(turns, { charBudget: 5000, pinHead: true, refreshedReads });
+  assert.deepEqual(kept.map(t => t.i), [0, 3]);
+  assert.match(kept[1].observation, /10\tconst value10/);
+  const tail = { i: 4, action: { a: 'list_dir', p: '.' }, observation: 'current tree' };
+  const appended = budgetTurns([...kept, tail], { charBudget: 5000, pinHead: true, refreshedReads });
+  const { delivered } = render(appended, { refreshedReads });
+  assert.match(delivered.get(3), /10\tconst value10/);
+  assert.doesNotMatch(delivered.get(3), /source range/);
+});
+
+test('refreshing source does not freeze out controller annotations added before the turn closes', () => {
+  const cache = new Map(), origin = read(0, 10, 20), repeat = read(1, 10, 20);
+  render([origin, repeat], { renderCache: cache });
+  repeat.observation += '\n[guidance]\nCurrent runtime failure: verify the repair.';
+  const { delivered } = render([origin, repeat], { renderCache: cache, preserveSlimmedControlAnnotations: true });
+  assert.match(delivered.get(1), /Current runtime failure/);
+  assert.match(delivered.get(1), /10\tconst value10/);
 });
 
 test("rebasing an origin that clips more source also repairs its surviving frozen dependents", () => {

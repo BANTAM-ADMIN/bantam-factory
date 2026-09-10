@@ -28,6 +28,28 @@ function retainedIndices(length, start, pins) {
     .concat(Array.from({ length: length - start }, (_, i) => start + i));
 }
 
+export function latestRepeatedReadIndex(turns) {
+  const key = turn => {
+    const action = turn?.action ?? turn?.parsedAction;
+    return action?.a === 'read_file' && typeof action.p === 'string'
+      ? JSON.stringify([action.p, action.start ?? 1, action.limit ?? null]) : null;
+  };
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const action = turns[i]?.action ?? turns[i]?.parsedAction;
+    if (!action) continue; // transient controller observations may follow a read
+    const wanted = key(turns[i]);
+    if (!wanted) return -1;
+    return turns.slice(0, i).some(turn => key(turn) === wanted) ? i : -1;
+  }
+  return -1;
+}
+
+export const sourceReadKey = turn => Number.isInteger(turn?.i) ? turn.i : turn;
+function noteReadRefresh(turns, refreshedReads) {
+  const index = latestRepeatedReadIndex(turns);
+  if (index >= 0) refreshedReads.add(sourceReadKey(turns[index]));
+}
+
 const SOURCE_HEADER = /(?:^|\n)(?:#\s+)?([A-Za-z0-9_.@+/-]+\.(?:js|mjs|cjs|jsx|ts|tsx|mts|cts|py|go|rs|rb|java|kt|c|cc|cpp|cxx|h|hpp|hh|cs|php|swift|scala|m|mm|sh|sql))\s+\((?:current,\s*)?(\d+)\s+lines(?:,\s*showing\s+(\d+)-(\d+))?\):?\n/gim;
 // Prompt-only provenance: a budgeted view must not permanently erase the source
 // needed to repair a pointer after the final renderer clips its target. This
@@ -86,7 +108,7 @@ export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars
   return selectBudgetWindow(turns, { charBudget, readObservationMaxChars, ...opts }).window;
 }
 
-function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars = 4000, ...opts } = {}) {
+function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars = 4000, refreshedReads = new Set(), ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
   if (!list.length) return { window: [], start: 0 };
   const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 36000);
@@ -97,10 +119,10 @@ function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars
   // after the budget evicted turn N. Window sizes only grow versus the
   // full-list estimate (fewer dedup hits), so slide forward until it fits.
   const pins = pinnedIndices(list, opts);
-  let start = firstKeptIndex(compactHistory(list), limit, { pins, readObservationMaxChars });
+  let start = firstKeptIndex(compactHistory(list, { refreshedReads }), limit, { pins, readObservationMaxChars });
   for (;;) {
     const indices = retainedIndices(list.length, start, pins);
-    const window = compactHistory(indices.map(i => list[i]));
+    const window = compactHistory(indices.map(i => list[i]), { refreshedReads });
     let total = 0;
     for (const turn of window) total += turnSize(turn, readObservationMaxChars);
     if (total <= limit || indices.every(i => pins.has(i) || i === list.length - 1)) {
@@ -120,7 +142,8 @@ function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars
 // compactor, and evidence objects are never changed. Rebuild callers retain
 // budgetTurns' existing stateless behavior.
 export function createHistoryWindow({ charBudget = 120000, pinHead = true,
-  pinLatestReview = true, retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000 } = {}) {
+  pinLatestReview = true, retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000,
+  refreshedReads = new Set() } = {}) {
   if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
     throw new Error("history retainRatio must be between zero and one");
   }
@@ -159,14 +182,15 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
     let start = cutoff === null ? 0 : keys.findIndex(key => key >= cutoff);
     if (start < 0) start = list.length - 1;
     const pins = pinnedIndices(list, { pinHead, pinLatestReview });
+    noteReadRefresh(list, refreshedReads);
     const selectedIndices = retainedIndices(list.length, start, pins);
     const retained = selectedIndices.map(i => list[i]);
-    let window = compactHistory(retained);
+    let window = compactHistory(retained, { refreshedReads });
     const beforeChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
     let afterChars = beforeChars, overflow = false;
     if (beforeChars > limit) {
       overflow = true;
-      const selected = selectBudgetWindow(retained, { charBudget: target, pinHead, pinLatestReview, readObservationMaxChars });
+      const selected = selectBudgetWindow(retained, { charBudget: target, pinHead, pinLatestReview, readObservationMaxChars, refreshedReads });
       window = selected.window;
       // Keep the contiguous suffix boundary separate from mandatory anchors.
       // A review can be anywhere in the old history; counting it as tail would
@@ -177,7 +201,7 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
         // The cutoff always names real evidence, never a synthetic position
         // that could later be reused by the next worker turn.
         start = realCount - 1;
-        window = compactHistory(retainedIndices(list.length, start, pins).map(i => list[i]));
+        window = compactHistory(retainedIndices(list.length, start, pins).map(i => list[i]), { refreshedReads });
       }
       cutoff = keys[start];
       afterChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
@@ -230,8 +254,9 @@ function firstKeptIndex(compacted, limit, { pins = new Set(), readObservationMax
 // identical line in a DIFFERENT observation is not (two files can share an
 // import or two commands can share an error line with different provenance).
 // The raw artifact/journal remains untouched.
-export function compactHistory(turns) {
+export function compactHistory(turns, { refreshedReads = new Set() } = {}) {
   const list = Array.isArray(turns) ? turns : [];
+  noteReadRefresh(list, refreshedReads);
   const firstSeen = new Map();
   const sourceLines = new Map();
   const shellMetadata = new Map();
@@ -268,6 +293,15 @@ export function compactHistory(turns) {
   return list.map((turn, index) => {
     if (index === newestRepetition) return turn;
     if (!turn || typeof turn !== "object" || typeof turn.observation !== "string") return turn;
+    // A fresh explicit request after the same read is an attempt to recover
+    // its bytes. Returning another pointer caused eight identical reads in
+    // the local game run, even though the old origin technically survived.
+    // Keep the requested read bounded but literal. Remember that decision in
+    // the caller's run-scoped set so later builds price and render the same
+    // bytes; other history still compacts.
+    if (refreshedReads.has(sourceReadKey(turn))) {
+      return historyView(turn, turn[RAW_SOURCE_OBSERVATION] ?? turn.observation);
+    }
     // Operator feedback is a resumable input. Do not replace quoted source or
     // an identical review with a pointer to an older, evictable observation.
     if (trustedReviewEvidenceEnd(turn) !== null) return turn;

@@ -1974,13 +1974,16 @@ async function runAgentCore({
   // never penalised, because repeated tokens are correct in code.
   let degeneratePenalty = 0;
   let decisionWorkingNote = "";
+  // Share delivered read-refresh identities with the estimator so their full
+  // bodies remain priced after the next action makes them historical turns.
+  const refreshedReads = new Set();
   const historyWindow = extensionTrajectory ? createHistoryWindow({
-    charBudget: historyCharBudget, readObservationMaxChars, pinHead: true,
+    charBudget: historyCharBudget, readObservationMaxChars, pinHead: true, refreshedReads,
     onRebase: receipt => {
       if (receipt.overflow) metrics.extensionHistoryRebases = (metrics.extensionHistoryRebases ?? 0) + 1;
       onEvent({ type: "extension_history_rebase", ...receipt });
     },
-  }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars });
+  }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars, refreshedReads });
   const capTurns = h => {
     const nextBudget = currentHistoryBudget();
     if (nextBudget !== historyCharBudget) {
@@ -2175,6 +2178,23 @@ async function runAgentCore({
     }
     onEvent({ type: "external_workspace_change", phase, paths: changed });
     return changed;
+  };
+
+  const noteControllerRestore = paths => {
+    // These writes are ours. Invalidate the old source views immediately and
+    // acknowledge their actual bytes so the next scan cannot mistake a
+    // rollback for a human edit and clear the rollback baseline/counters.
+    for (const p of paths) {
+      readLedger.invalidate(p);
+      specProgressLedger.invalidate(p);
+      requiredReadHistory?.invalidate(p);
+      pagedReads.delete(p);
+      focusByPath.delete(p);
+      mutationFocusByPath.delete(p);
+    }
+    workspaceCoherence.refresh(paths);
+    repetition.noteWorkspaceChanged();
+    outcomeCycles.noteWorkspaceChanged();
   };
 
   // Extension-trajectory fold state: guidance that would render in the (absent)
@@ -3027,7 +3047,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ compactRules, readObservationMaxChars, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -3109,7 +3129,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
           return built;
         },
@@ -5458,13 +5478,16 @@ async function runAgentCore({
           && revertsOfThisSnapshot < 2;
         let landingRestored = 0;
         if (landingRegression) {
+          const restoredPaths = [];
           for (const [p, content] of bestSnapshot) {
             try {
               fs.writeFileSync(exec.resolve(p), content);
               landingRestored++;
+              restoredPaths.push(p);
             } catch { /* best-effort restore; unchanged files remain safe */ }
           }
           if (landingRestored) {
+            noteControllerRestore(restoredPaths);
             if (ground) {
               const refreshed = refreshGrounding(ground, [...bestSnapshot.keys()]);
               metrics.groundingRefreshMs += refreshed.ms ?? 0;
@@ -5727,13 +5750,23 @@ async function runAgentCore({
       }
       if (counts && counts.total > 0 && comparable) {
         const edited = [...new Set(openList)].filter(Boolean);
-        if (counts.passed > bestPassed) {
+        const improved = counts.passed > bestPassed;
+        const equallyGreen = evidence.status === 'pass' && counts.passed === bestPassed
+          && counts.total === bestTotal && bestPassed === bestTotal;
+        if (improved || equallyGreen) {
+          // A stable test count is normal during a long build. Every newly
+          // verified green tree is a newer recovery point, even when the
+          // number of assertions has not grown. Otherwise a later failed edit
+          // can erase many unrelated changes that already passed verification.
+          const snapshot = new Map();
+          for (const p of edited) { try { snapshot.set(p, fs.readFileSync(exec.resolve(p), "utf8")); } catch { /* skip */ } }
+          const snapshotChanged = !bestSnapshot || snapshot.size !== bestSnapshot.size
+            || [...snapshot].some(([p, text]) => bestSnapshot.get(p) !== text);
           bestPassed = counts.passed; bestTotal = counts.total;
           bestCommand = thisCommand ?? bestCommand;
-          bestSnapshot = new Map();
-          revertsOfThisSnapshot = 0;
+          bestSnapshot = snapshot;
+          if (improved || snapshotChanged) revertsOfThisSnapshot = 0;
           editsSinceBestSnapshot = 0;
-          for (const p of edited) { try { bestSnapshot.set(p, fs.readFileSync(exec.resolve(p), "utf8")); } catch { /* skip */ } }
         } else if (editsSinceBestSnapshot === 0) {
           // The model has not edited anything since the snapshot was taken, so
           // a lower count cannot be its doing: the suite is FLAKY. Reverting
@@ -5773,10 +5806,12 @@ async function runAgentCore({
             // Otherwise, restore on a SEVERE regression from a strong base.
             || (bestPassed >= Math.ceil(bestTotal * 0.6) && (bestPassed - counts.passed) >= 3))) {
           let restored = 0;
+          const restoredPaths = [];
           for (const [p, content] of bestSnapshot) {
-            try { fs.writeFileSync(exec.resolve(p), content); restored++; } catch { /* skip */ }
+            try { fs.writeFileSync(exec.resolve(p), content); restored++; restoredPaths.push(p); } catch { /* skip */ }
           }
           if (restored) {
+            noteControllerRestore(restoredPaths);
             workspaceEditGeneration++;
             doneVerificationProof = null;
             environmentVerificationProof = null;

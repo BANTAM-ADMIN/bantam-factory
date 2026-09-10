@@ -23,6 +23,7 @@ import { ModelClient, modelOutputTokenCap } from "./model.js";
 import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
 import { trustedReviewEvidenceEnd } from "./run-continuation.js";
+import { missingSourceRead } from "./source-read-recovery.js";
 import { Executor, runShellProcess, withNodeTestTimeout, START_WINDOW } from "./executor.js";
 import { isGeneratedPath, isTestPath, snapshotTree } from "./scope-guard.js";
 import { verificationOutputDirectories, isDeclaredVerificationOutput } from "./verification-outputs.js";
@@ -1969,6 +1970,7 @@ async function runAgentCore({
   // rewind to the precise moment of a failure and test context adjustments.
   const savePrompts = /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_SAVE_PROMPTS ?? ""));
   let lastPromptForTurn = null;
+  let lastDecisionPrompt = null; // One immutable reference, also when prompt recording is off.
   // Set only after a generation has been SEEN to collapse into a repeated
   // fragment; cleared as soon as a valid action parses. A first attempt is
   // never penalised, because repeated tokens are correct in code.
@@ -3133,7 +3135,8 @@ async function runAgentCore({
       const out = await safeComplete(
         () => {
           const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
-          if (savePrompts) lastPromptForTurn = typeof built === "string" ? built : JSON.stringify(built);
+          lastDecisionPrompt = typeof built === "string" ? built : JSON.stringify(built);
+          if (savePrompts) lastPromptForTurn = lastDecisionPrompt;
           return built;
         },
         {
@@ -3467,6 +3470,17 @@ async function runAgentCore({
         })
       : null;
     let progressGateTermination = null;
+    // The local ASHWORTH run reached this gate after eight searches. It then
+    // requested current source that had left the prompt, and was told to edit
+    // without receiving it. The duplicate/ledger guards already require
+    // residency; give the progress gate the same bounded recovery route.
+    if (progressGate && !readReplayIsContextSafe(action, completeOpenFiles, new Set(openPaths), packetResident)
+        && missingSourceRead(action, {workspace, paths:new Set([...suppliedSpecPaths, ...authoredReadPaths]),
+          prompt:lastDecisionPrompt, maxLines:START_WINDOW,
+          maxChars:Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000))})) {
+      progressGate = null;
+      onEvent({type:'progress_source_recovery', path:action.p, start:action.start ?? 1, limit:action.limit ?? START_WINDOW});
+    }
     if (!activeArtifactGateRejection && !artifactGateTermination && progressGate) {
       if (consecutiveProgressGateRejections >= progressGateMaxRejections) {
         progressGateTermination = formatProgressGateTermination(consecutiveProgressGateRejections, progresslessTurns);

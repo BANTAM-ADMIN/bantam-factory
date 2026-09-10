@@ -164,6 +164,7 @@ import {
   prepareRunContinuation,
   sha256,
 } from "../src/run-continuation.js";
+import { createSelfReview, sameLocalReviewer, selfReviewObservation } from "../src/self-review.js";
 import { restoreWorkspace, snapshotWorkspace } from "../src/workspace-snapshot.js";
 import { parseArgs } from "../src/cli-args.js";
 import { parseQuotaNotice, formatQuotaNotice } from "../src/logic/quota-notice.js";
@@ -1386,6 +1387,9 @@ if (envTruthy("BANTAM_SHELL_NETWORK")) {
 function liveLogger(e) {
   if (e.type === "action") process.stderr.write(`  → ${JSON.stringify(e.action)}\n`);
   else if (e.type === 'trusted_review') process.stderr.write('  review update received — continuing with the latest findings\n');
+  else if (e.type === 'self_review') process.stderr.write(e.phase === 'start'
+    ? `  inspecting: ${e.unit} — builder waiting\n`
+    : `  inspection ${e.cycle}: ${e.error ? 'incomplete — ' + e.error : 'evidence saved; returning to builder'}\n`);
   else if (e.type === "invalid") {
     if (e.kind === "output_limit") {
       process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: split the action\n`);
@@ -2227,8 +2231,28 @@ if (cmd === undefined || cmd === "chat") {
     // pass: true. Reported, never blocked — `bantam run` is a general CLI and
     // "change that test" is a legitimate request.
     graderBefore = args.verify ? graderSnapshot(workspace, { verifyCommand: args.verify }) : null;
+    let localReview = null;
+    if (args["self-review"]) {
+      sameLocalReviewer(model); // reject unsupported transports before starting work
+      localReview = createSelfReview({ workspace, task: args.task, model,
+        directory: args["self-review-home"] ?? null,
+        documents: args["self-review-spec"] ? String(args["self-review-spec"]).split(",") : null,
+        every: args["self-review-every"] === undefined ? 40 : Number(args["self-review-every"]),
+        maxReviewerTurns: args["self-review-turns"] === undefined ? 40 : Number(args["self-review-turns"]),
+        verificationOutputDirs: args["verify-output-dirs"],
+        onEvent: captureEvent });
+    }
+    // A completion review's result must reach the very next worker prompt even
+    // when the regular inspection interval has not elapsed.
+    let pendingInspection = null;
     res = await runAgent({
       task: args.task,
+      inspectionBoundary: localReview ? async options => {
+        const review = options.reason === "periodic" && pendingInspection
+          ? pendingInspection : await localReview.boundary(options);
+        pendingInspection = options.reason === "completion" ? review : null;
+        return review ? { ...review, observation: selfReviewObservation(args.task, review.text) } : null;
+      } : null,
       supportingContext: typeof args["supporting-context-file"] === "string"
         ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
       drainInjections: workerControl || liveReview
@@ -6080,6 +6104,8 @@ bantam chat                       same as above (explicit)
 ./bin/run-dev.sh self-improve --plan
                                   inspect candidates; no model or controller/source writes
 bantam run --task "..." [--workspace . | --lane ID [--state-home DIR]] [--max-turns 30] [--verify "npm test"] [--verify-workspace-read-only] [--autonomous] [--ground] [--tui] [--plan] [--skills] [--save-run[=path]]
+           [--self-review [--self-review-home DIR] [--self-review-every 40] [--self-review-turns 40] [--self-review-spec DESIGN.md]]
+           --self-review alternates a local builder and an independent inspector; evidence stays outside the project.
            --max-turns unlimited removes the turn deadline; --save-run preserves resumable checkpoints. Ctrl-C stops the run.
            [--resume-run artifact.json [--through-turn N]] [--review-file evidence.txt [--watch-review]] [--factory [--factory-home DIR]]
 bantam exec [options] "<task text>"   one-shot: run a task, verify, exit (headless, no TUI)

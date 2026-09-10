@@ -396,6 +396,10 @@ export function implementationResponseObservation(text = "", { pendingVerifier =
   return base;
 }
 
+// Opaque, process-local leases can be borrowed only during an awaited inspection.
+// Nested reviewers keep the worker's endpoint lock; unrelated runs still wait.
+const inspectionLeases = new WeakMap();
+
 export async function runAgent(options = {}) {
   const model = options.model ?? new ModelClient();
   // The local model serves one slot; concurrent runs thrash its KV cache into
@@ -403,7 +407,13 @@ export async function runAgent(options = {}) {
   // (see src/model-lock.js). Codex still carries ModelClient's fallback local
   // endpoint while apiMode is false. Route by the active transport so cloud
   // sessions never probe or acquire that unrelated local server's lock.
-  const lock = await acquireModelLock({
+  const inheritedLease = options.inspectionLease ?? null;
+  const inherited = inheritedLease ? inspectionLeases.get(inheritedLease) : null;
+  if (inheritedLease && (!inherited?.lending || inherited.borrowed || inherited.endpoint !== model.endpoint)) {
+    throw Error("invalid or already borrowed inspection model lease");
+  }
+  if (inherited) inherited.borrowed = true;
+  const lock = inherited ? null : await acquireModelLock({
     endpoint: model.apiMode || model.codex === true || model.codexBacked === true
       ? null : model.endpoint,
     onWait: (info) => options.onEvent?.({
@@ -412,12 +422,26 @@ export async function runAgent(options = {}) {
       waitedMs: info.heldForMs,
     }),
   });
-  const runToken = model.beginAgentRun?.() ?? null;
+  const lease = {};
+  const leaseState = { endpoint: model.endpoint, lending: false, borrowed: false };
+  inspectionLeases.set(lease, leaseState);
+  const boundary = options.inspectionBoundary;
+  const inspectionBoundary = boundary ? async context => {
+    leaseState.lending = true;
+    try { return await boundary({ ...context, inspectionLease: lease }); }
+    finally { leaseState.lending = false; }
+  } : null;
+  let runToken = null;
   try {
-    return await runAgentCore({ ...options, model });
+    runToken = model.beginAgentRun?.() ?? null;
+    return await runAgentCore({ ...options, model, inspectionBoundary });
   } finally {
-    await model.endAgentRun?.(runToken);
-    lock?.release();
+    try { await model.endAgentRun?.(runToken); }
+    finally {
+      lock?.release();
+      inspectionLeases.delete(lease);
+      if (inherited) inherited.borrowed = false;
+    }
   }
 }
 
@@ -745,6 +769,8 @@ async function runAgentCore({
   signal = null,
   shouldAbort = null,
   drainInjections = null,
+  // Awaited between actions and before accepting completion; opt-in only.
+  inspectionBoundary = null,
   // Evaluators can remove volatile paths/timings from model-facing observations while
   // artifacts retain the original. Interactive callers leave this unset.
   observationTransform = null,
@@ -2289,6 +2315,17 @@ async function runAgentCore({
     }
     // Live control: let the user stop, or steer, between turns.
     if (abortRequested()) { markInterrupted("between_turns"); break; }
+    if (inspectionBoundary && !terminalClosureTurn) {
+      const review = await inspectionBoundary({ turn: turns.length, reason: "periodic", signal,
+        changedPaths: turns.slice(-40).flatMap(t => [...editPaths(t.action), ...(t.shellChangedPaths ?? [])]) });
+      if (abortRequested()) { markInterrupted("self_review"); break; }
+      if (review?.observation) {
+        const turn = { i: turns.length, action: null, observation: review.observation };
+        if (trustedReviewEvidenceEnd(turn) === null) throw Error("invalid independent inspection evidence envelope");
+        turns.push(turn);
+        onEvent({ type: "trusted_review", turn: turn.i, observation: turn.observation });
+      }
+    }
     if (drainInjections) {
       const msgs = drainInjections();
       for (const m of (msgs || [])) {
@@ -6675,6 +6712,17 @@ async function runAgentCore({
       metrics.cliCompletionRefusals = (metrics.cliCompletionRefusals ?? 0) + 1;
       onEvent({ type: "cli_completion_refused", generation: workspaceEditGeneration, module: cliContract.module });
     }
+    if (result.done && !result.controllerStop && inspectionBoundary) {
+      const review = await inspectionBoundary({ turn: turns.length, reason: "completion", signal,
+        changedPaths: [...editPaths(action), ...shellChangedPaths] });
+      if (abortRequested()) markInterrupted("self_review");
+      if (review?.allowDone !== true || interrupted) {
+        result.done = false;
+        result.summary = undefined;
+        result.observation += "\n[independent inspection] Completion withheld: current specification coverage is unresolved. The next between-turn review carries the recorded findings.";
+        onEvent({ type: "self_review_completion_withheld", turn: turns.length });
+      }
+    }
     const progress = classifyProgress(action, result.observation, {
       workspaceChanged: shellChangedWorkspace,
       doneAccepted: action.a === "done" && result.done && !result.controllerStop,
@@ -6848,7 +6896,7 @@ async function runAgentCore({
     // different bytes. Preserve the full pre-transform observation separately.
     if (typeof observationTransform === "function") {
       const original = String(result.observation ?? "");
-      const transformed = String(observationTransform(original, { action, workspace }) ?? "");
+      const transformed = String(observationTransform(original, { action, workspace, turn: turns.length }) ?? "");
       if (transformed !== original) {
         rawObservation = original;
         result.observation = transformed;

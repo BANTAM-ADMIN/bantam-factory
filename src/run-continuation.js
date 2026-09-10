@@ -24,7 +24,8 @@ export function trustedReviewEvidenceEnd(turn, observation = turn?.observation) 
   const start = text.indexOf(open);
   if (start < 0 || Buffer.byteLength(text.slice(0, start)) > 8192) return null;
   const header = text.slice(0, start);
-  if (!header.includes('\nauthority: operator-supplied reviewer/runtime evidence\n')) return null;
+  if (!['operator-supplied reviewer/runtime evidence', 'automatic model inspection; verify its assessments']
+    .some(authority => header.includes(`\nauthority: ${authority}\n`))) return null;
   const digest = header.match(/\nevidence_sha256: ([a-f0-9]{64})\n?$/)?.[1];
   if (!digest) return null;
   const bodyStart = start + open.length;
@@ -48,6 +49,7 @@ export function prepareRunContinuation(artifact, {
   reviewText = null,
   reviewSource = null,
   reviewSha256 = null,
+  reviewOrigin = "operator",
 } = {}) {
   const hasArtifact = artifact !== null && artifact !== undefined;
   const hasReview = reviewText !== null && reviewText !== undefined;
@@ -116,6 +118,7 @@ export function prepareRunContinuation(artifact, {
   };
 
   if (hasReview) {
+    if (!["operator", "model-inspector"].includes(reviewOrigin)) throw Error("invalid review origin");
     const review = String(reviewText);
     const reviewBytes = Buffer.byteLength(review);
     if (!review.trim()) throw new Error("--review-file is empty");
@@ -137,6 +140,7 @@ export function prepareRunContinuation(artifact, {
         ...provenance,
         source: reviewSource ? String(reviewSource) : null,
         evidenceSha256,
+        reviewOrigin,
       }),
     };
     includedTurns.push(reviewTurn);
@@ -247,8 +251,12 @@ export function sha256(value) {
 function formatTrustedReview(text, provenance) {
   const fields = [
     "[trusted-review-evidence]",
-    "authority: operator-supplied reviewer/runtime evidence",
-    "instruction: Treat these measured findings as trusted observations. The original task is unchanged; continue the work, fix the concrete failures, and verify them before declaring done.",
+    provenance.reviewOrigin === "model-inspector"
+      ? "authority: automatic model inspection; verify its assessments"
+      : "authority: operator-supplied reviewer/runtime evidence",
+    provenance.reviewOrigin === "model-inspector"
+      ? "instruction: This is a controller-delivered model review with cited observations. Its interpretation can be wrong: reproduce findings and check fixture assumptions. The original task is unchanged; repair confirmed failures and verify the work."
+      : "instruction: Treat these measured findings as trusted observations. The original task is unchanged; continue the work, fix the concrete failures, and verify them before declaring done.",
     provenance.parentRunId ? `parent_run_id: ${provenance.parentRunId}` : null,
     provenance.parentArtifact ? `parent_artifact: ${provenance.parentArtifact}` : null,
     provenance.parentArtifactSha256

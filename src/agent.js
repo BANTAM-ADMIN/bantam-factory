@@ -1932,6 +1932,12 @@ async function runAgentCore({
   let connectRetries = 0;   // run-level reconnects: one flaky TCP moment must not kill a 60-turn run
   let editsSinceFullVerify = 0;   // edits the configured verifier has not run against
   const editedPathsThisRun = new Set();   // for the landing note's untouched-requirement check
+  // A continuation can reuse checks authored before its checkpoint. Retain
+  // their paths as source-inspection candidates only: current bytes must still
+  // qualify, and this supplies neither a fresh edit nor verification credit.
+  // Keep invocation-local mutation accounting separate.
+  const priorAuthoredCheckPaths = [...new Set(turns.flatMap(turn =>
+    turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []))];
   let contractAudits = turns.filter((turn) => turn.contractStateAudit).length;
   // A resumed film is retained for audit, but does not grant live CLI authority.
   // Obtain a fresh isolated receipt on the current invocation/tree.
@@ -2323,7 +2329,7 @@ async function runAgentCore({
     const auditRecovery = collectionAuditEnabled
       ? pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace }) : null;
-    if (auditRecovery?.needsFocused) auditRecovery.checkCandidate = existingFocusedCheck([...editedPathsThisRun],
+    if (auditRecovery?.needsFocused) auditRecovery.checkCandidate = existingFocusedCheck([...priorAuthoredCheckPaths, ...editedPathsThisRun],
       p => exec.safeReadText(exec.resolveExisting(p)), { generation: workspaceEditGeneration });
     const cliDecision = cliContract ? cliVerificationDecisionContext(cliContract, cliVerification, {
       generation: workspaceEditGeneration,

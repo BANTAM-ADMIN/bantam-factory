@@ -36,7 +36,7 @@ test('an actual failed execution without a source hint requests repair instead o
   assert.equal(context.phase, 'focused');
 });
 
-test('a real failed CommonJS check remains repairable and cannot grant completion until fresh checks pass', async t => {
+for (const resumed of [false, true]) test(`a real failed CommonJS check remains repairable${resumed ? ' after resuming' : ''} and requires fresh checks`, async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-cjs-check-'));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   fs.mkdirSync(path.join(workspace, 'test'));
@@ -53,7 +53,7 @@ test('a real failed CommonJS check remains repairable and cannot grant completio
     { a: 'done', summary: 'Implemented and verified the API.' },
   ];
   let index = 0, failureContext, failureAllowed;
-  const result = await runAgent({ workspace, task: 'Implement public collectItems(items). Require an array, including empty, otherwise throw. Return a copy preserving order. Run npm test.',
+  const options = { workspace, task: 'Implement public collectItems(items). Require an array, including empty, otherwise throw. Return a copy preserving order. Run npm test.',
     maxTurns: actions.length, maxInvalidPerTurn: 0, useGrammar: true, interactive: false, grounding: false,
     shellSandbox: 'host', promptTrajectory: 'extension', verificationScript: 'npm test',
     completionAudit: false, stateAudit: 'off', contractStateAudit: 'auto', contractAssertionStation: 'off',
@@ -68,7 +68,9 @@ test('a real failed CommonJS check remains repairable and cannot grant completio
       assert.ok(actions[index], 'bounded worker');
       return { content: JSON.stringify(actions[index++]), tokens: 1 };
     } },
-  });
+  };
+  const partial = resumed ? await runAgent({ ...options, maxTurns: 4 }) : null;
+  const result = await runAgent({ ...options, ...(partial ? { resumeTurns: partial.turns } : {}) });
   assert.match(failureContext, /ran and exited 1/);
   assert.match(failureContext, /Existing authored check.*test\/edge.cjs/);
   assert.match(failureContext, /Repair.*before.*run exactly/);
@@ -79,4 +81,6 @@ test('a real failed CommonJS check remains repairable and cannot grant completio
   assert.equal(result.turns[5].verificationReceipts.entries[1].verificationEvidence.status, 'pass');
   assert.equal(result.reachedDone, true);
   assert.equal(fs.readFileSync(path.join(workspace, 'test/edge.cjs'), 'utf8'), source);
+  if (resumed) assert.deepEqual(result.metrics.editedPaths, ['test/edge.cjs'],
+    'a prior source candidate must not become a new invocation-local edit');
 });

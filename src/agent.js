@@ -62,6 +62,7 @@ import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTest
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
 import { buildPrompt, clipKeepingControllerAnnotation, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
 import { clipReadObservation } from "./read-observation.js";
+import { recordPagingWindow } from "./read-paging.js";
 import { createContextUpdate, createActionContractUpdate } from "./context-updates.js";
 import { requiredOutputPaths } from "./logic/missing-outputs.js";
 import { deliverableNotice } from "./logic/deliverable-watch.js";
@@ -1765,7 +1766,7 @@ async function runAgentCore({
     workspaceCoherence.watch(legacyReadPaths);
     for (const changedPath of legacyReadPaths) pendingExternalChanges.add(changedPath);
   }
-  const pagedReads = new Map();         // path -> windowed reads (sequential-paging detector)
+  const pagedReads = new Map();         // path -> last range and forward/expanding window count
   let staleInspectStreak = 0;           // consecutive mostly-ledger-covered inspect batches (shuffle detector)
   const outcomeCycles = new OutcomeCycleTracker();
   const derivedFailureFingerprints = new Set();
@@ -4428,6 +4429,9 @@ async function runAgentCore({
     // connect it.
     const readExecuted = !gateRejection && !interactiveStop && !duplicate
       && !groundReject && !panelRedirect && !ledgerReplay;
+    for (const changedPath of [...directEditPaths, ...shellChangedPaths]) {
+      pagedReads.delete(normalizeWorkspaceRel(changedPath));
+    }
     // A refusal ("[open_files]/[ledger] Not re-read — you already have it") is
     // honest only while the file stays in the panel. The read did not execute,
     // so nothing below refreshes its recency: refresh it here, or the refused
@@ -4471,21 +4475,22 @@ async function runAgentCore({
     // Sequential paging is the slowest way to find a symbol: v11 scrolled
     // src/agent.js (1,500 lines) in 100-line windows to locate one signature,
     // where the cloud arms grep the identifier and jump. After three windowed
-    // reads of one large file, name the faster tools.
-    if (action.a === "read_file" && typeof action.p === "string" && (action.limit || action.start)
+    // reads that actually advance through one large file, name the faster tools.
+    // Disjoint/backward function lookups are not a sequential scan.
+    if (readExecuted && action.a === "read_file" && typeof action.p === "string" && (action.limit || action.start)
         && !suppliedSpecPaths.has(normalizeWorkspaceRel(action.p))) {
-      const pages = (pagedReads.get(action.p) ?? 0) + 1;
-      pagedReads.set(action.p, pages);
-      const totalLines = /\((\d+) lines,/.exec(String(result.observation ?? ""));
+      const range = deliveredReadRange(action, result.observation);
+      const pages = range && range.total > 400
+        ? recordPagingWindow(pagedReads, normalizeWorkspaceRel(action.p), range, action) : 0;
       // Re-arm on every third window, not once per run: the cellui correction
       // replay paged one 1,008-line file ~10 windows across 60 turns and met
       // this steer exactly once, at turn 17 (chat r0 artifact, 2026-08-17).
-      if (pages >= 3 && pages % 3 === 0 && totalLines && Number(totalLines[1]) > 400) {
+      if (pages >= 3 && pages % 3 === 0) {
         // Replayed against the recorded turn (v11 t21): advisory phrasing
         // flipped the model to `search` 1/3 of the time, imperative 2/3. Words
         // alone don't bind it — so the next turn also loses `read_file` from
         // the grammar, leaving search/query as the way to find the symbol.
-        result.observation += `\n[paging] STOP paging ${action.p} (${totalLines[1]} lines): ${pages} windowed reads and counting. Do not read another window of this file. Your next action must be a "search" for the exact identifier you need (it answers with file:line), or a "query" for the file's symbols — then read only that range.`;
+        result.observation += `\n[paging] STOP paging ${action.p} (${range.total} lines): ${pages} repeated, forward or expanding window requests in this sequence. Do not read another window of this file. Your next action must be a "search" for the exact identifier you need (it answers with file:line), or a "query" for the file's symbols — then read only that range.`;
         nextMaskedVerb = "read_file";
         metrics.pagingSteers = (metrics.pagingSteers ?? 0) + 1;
         onEvent({ type: "paging_steer", path: action.p, reads: pages });
@@ -4513,22 +4518,21 @@ async function runAgentCore({
         if (readLedger.covers(op.p, range.start, range.end)) coveredOps += 1;
         else allCovered = false;
         // Coverage is recorded by recordReadDelivery after prompt clipping.
-        // Windowed sub-ops are pages too. The carve-off retry (chat r0 @
+        // Forward/expanding windowed sub-ops are pages too. The carve-off retry (chat r0 @
         // 2026-08-17T22:29) grew the same five files' windows 80→120→150→200→250
         // entirely inside inspect batches; pagedReads keyed on bare read_file
         // actions never saw a single page, so nine growing re-reads drew no
-        // steer. Same counter, same threshold, one firing per batch.
+        // steer. Same range-aware counter, same threshold, one firing per batch.
         if ((op.limit || op.start) && Number(range.total) > 400
             && !suppliedSpecPaths.has(normalizeWorkspaceRel(op.p))) {
-          const pages = (pagedReads.get(op.p) ?? 0) + 1;
-          pagedReads.set(op.p, pages);
+          const pages = recordPagingWindow(pagedReads, normalizeWorkspaceRel(op.p), range, op);
           if (pages >= 3 && pages % 3 === 0 && !inspectPagingSteer) {
             inspectPagingSteer = { path: op.p, pages, total: range.total };
           }
         }
       }
       if (inspectPagingSteer) {
-        result.observation += `\n[paging] STOP paging ${inspectPagingSteer.path} (${inspectPagingSteer.total} lines): ${inspectPagingSteer.pages} windowed reads and counting, now through inspect batches. Do not read another window of this file. Your next action must be a "search" for the exact identifier you need (it answers with file:line), or a "query" for the file's symbols — then read only that range.`;
+        result.observation += `\n[paging] STOP paging ${inspectPagingSteer.path} (${inspectPagingSteer.total} lines): ${inspectPagingSteer.pages} repeated, forward or expanding window requests in this sequence, through inspect batches. Do not read another window of this file. Your next action must be a "search" for the exact identifier you need (it answers with file:line), or a "query" for the file's symbols — then read only that range.`;
         nextMaskedVerb = "inspect";
         metrics.pagingSteers = (metrics.pagingSteers ?? 0) + 1;
         onEvent({ type: "paging_steer", path: inspectPagingSteer.path, reads: inspectPagingSteer.pages, via: "inspect" });

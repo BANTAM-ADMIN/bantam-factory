@@ -165,6 +165,24 @@ function scripted(outputs, order) {
     async complete(prompt) { order.push('worker'); this.prompts.push(String(prompt)); return { content: JSON.stringify(outputs.shift()), tokens: 1, stoppedEos: true, timings: {} }; } };
 }
 
+test('an inspector can record fresh screenshot output without invalidating its executed evidence', async t => {
+  const { workspace, directory } = setup(t);
+  fs.writeFileSync(path.join(workspace, 'package.json'), '{"type":"module"}');
+  const verdict = report(); verdict.units[0].evidence[0].turn = 1;
+  const model = scripted([
+    { a: 'write_file', p: '.inspection/behavior.test.mjs', content: "import fs from 'node:fs'; import assert from 'node:assert/strict'; import {answer} from '../main.js'; assert.equal(answer, 42); fs.writeFileSync('.inspection/shot.png', 'new screenshot'); console.log('independent check passed');" },
+    { a: 'shell', c: 'node .inspection/behavior.test.mjs' },
+    { a: 'respond', text: JSON.stringify(verdict) },
+  ], []);
+  const result = await runInspection({ workspace, directory, task: 'Inspect the required behavior.', units: [unit],
+    model, shellSandbox: 'host', maxTurns: 6 });
+  assert.equal(result.report.units[0].status, 'verified');
+  assert.equal(model.prompts.length, 3, 'author one check, execute it and report; no redundant rerun');
+  assert.doesNotMatch(model.prompts[2], /This command also changed source files/);
+  assert.ok(fs.existsSync(path.join(directory, 'snapshot/.inspection/shot.png')));
+  assert.ok(!fs.existsSync(path.join(workspace, '.inspection')));
+});
+
 test('worker waits for inspection and cannot finish through unresolved review', async t => {
   const { workspace } = setup(t), order = [], task = 'Explain the value.';
   const model = scripted([{ a: 'respond', text: 'It is 42.' }, { a: 'respond', text: 'It is 42, independently checked.' }], order);

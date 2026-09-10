@@ -177,3 +177,39 @@ test("checkpoint resume preserves historical workflow and recomputes the current
   assert.equal(resumed.result.reachedDone, true, resumed.result.turns.at(-1)?.observation);
   assert.equal(resumed.result.turns.at(-1).doneAccepted, true);
 });
+
+test("a later implementation milestone keeps old proof stale without ordering unrelated checks between edits", async t => {
+  const workspace = fixture(t);
+  const summaryCheck = "import assert from 'node:assert/strict'; import {summary} from './src/summary.js'; assert.deepEqual(summary([2, 5]), {count:2, total:7}); assert.deepEqual(summary([]), {count:0, total:0});\n";
+  const {result, prompts, requests} = await run(workspace, [
+    {a:'write_file', p:'src/items.js', content:GOOD},
+    {a:'shell', c:'npm test'}, {a:'shell', c:FOCUSED_COMMAND},
+    {a:'write_file', p:'src/sum.js', content:'export const sum = items => items.reduce((a,b) => a+b, 0);\n'},
+    {a:'write_file', p:'src/summary.js', content:"import {sum} from './sum.js'; export const summary = items => ({count:items.length, total:sum(items)});\n"},
+    {a:'write_file', p:'check-summary.mjs', content:summaryCheck},
+    DONE,
+    {a:'shell', c:'node check-summary.mjs'}, DONE,
+  ], {task:TASK + ' Also implement src/summary.js summary(items), returning count and numeric total.'});
+  for (const i of [4,5,6]) {
+    const text = currentWorkflow(prompts[i]);
+    if (i < 6) {
+      assert.match(text, /Continue any unfinished implementation milestone/);
+      assert.match(text, /focused assertion for the behavior changed/);
+      assert.match(text, /Do not rerun an unrelated check after each edit/);
+    } else assert.match(text, /Next: run exactly "node check-summary.mjs" directly/, 'a newly authored check supplies a specific current launcher');
+    assert.doesNotMatch(text, /Next: rerun "node check-api.mjs"/);
+    assert.ok(!requests[i].jsonSchema.properties.a.enum.includes('done'));
+    for (const verb of ['write_file','replace','read_file','shell']) assert.ok(requests[i].jsonSchema.properties.a.enum.includes(verb));
+    assert.ok(prompts[i].startsWith(prompts[i-1]), 'guidance appends without rewriting the cached prefix');
+  }
+  for (const i of [3,4,5]) assert.equal(result.turns[i].shellExecution ?? null, null, 'no check is executed between milestone edits');
+  assert.equal(result.turns[6].doneAccepted, false, 'earlier receipts cannot verify the new tree');
+  const receipts=result.turns[7].verificationReceipts.entries;
+  assert.equal(receipts[0].shellExecution.executedCommand, 'node check-summary.mjs');
+  assert.equal(receipts[1].verificationEvidence.executedCommand, 'npm test');
+  assert.equal(receipts[1].verificationEvidence.status, 'pass');
+  assert.equal(receipts[1].verificationEvidence.generation, receipts[0].shellExecution.generation);
+  assert.equal(result.reachedDone, true);
+  assert.equal(result.turns[8].doneAccepted, true);
+  assert.equal(fs.readFileSync(path.join(workspace,'check-summary.mjs'),'utf8'), summaryCheck);
+});

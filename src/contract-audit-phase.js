@@ -90,7 +90,7 @@ export function contractAuditDecisionContext(pending, witness = null) {
     text = `CONTRACT AUDIT PHASE: completion is not yet available; generation ${generation} needs fresh focused execution, then the configured project check.`;
     if (command) text += ` Earlier successful check ${command} belongs to generation ${stale.generation}, NOT this tree.`;
     if (removed.length) text += ` Removed files: ${removed.map(p => literal(p)).join(", ")}. Recreate the assertion check or use a direct inline assertion against the public API; do not rerun a missing file.`;
-    else if (command) text += ` Next: rerun ${command} directly against the current tree. If it fails, repair the demonstrated defect and rerun it.`;
+    else if (command) text += ` Continue any unfinished implementation milestone. At its verification boundary, run a focused assertion for the behavior changed, then the configured project check. Reuse ${command} if it covers that behavior; its earlier success alone does not make it the next required action. Do not rerun an unrelated check after each edit.`;
     else text += " Next: run an existing focused assertion directly, or make one minimal witness against the public API/CLI and contract. Accepted launchers include node check-contract.mjs (its actual path), node --test test/edge.test.js, or an inline node:assert assertion. A final 2>&1 stderr merge is allowed; chains, output filters and status masks are not.";
     text += " Start with one discriminating fixture/assertion and execute it before expanding coverage. Rereading unchanged implementation and print-only probes do not discharge this step. The review is a hypothesis, not an expected value. Keep passing checks; do not clean them away.";
   } else if (pending.needsProject === true) {

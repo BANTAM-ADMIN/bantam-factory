@@ -1994,6 +1994,11 @@ function dockerShellRunner(workspace, image, command, {
   const containerWorkspace = fixtureScratch ? "/probe" : workspace;
   const scratch = fixtureScratch ? ["-v", `${fixtureScratch}:/tmp:rw`]
     : scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env);
+  const mounts = [
+    ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly, containerWorkspace),
+    ...readOnlyHostFileMounts(readOnlyHostFiles),
+  ];
+  if (fixtureScratch) prepareFixtureMountpoints(fixtureScratch, mounts);
   return {
     file: "docker",
     args: [
@@ -2028,8 +2033,7 @@ function dockerShellRunner(workspace, image, command, {
       "-e", "GOCACHE=/tmp/go-cache",
       ...Object.entries(envOverrides).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
       ...rust.env,
-      ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly, containerWorkspace),
-      ...readOnlyHostFileMounts(readOnlyHostFiles),
+      ...mounts,
       "-w", containerWorkspace,
       image,
       ...(pipefail
@@ -2041,6 +2045,39 @@ function dockerShellRunner(workspace, image, command, {
     cleanupName: name,
     scratchDirectory: scratch[0] === "-v" ? scratch[1].slice(0, -":/tmp:rw".length) : null,
   };
+}
+
+function prepareFixtureMountpoints(scratch, mounts) {
+  // /probe keeps the workspace out of /tmp, but a toolchain may still live
+  // there. Docker otherwise creates its nested mountpoints as root inside our
+  // writable scratch bind, making cleanup fail and hiding the probe receipt.
+  // Reserve only the empty mountpoints, owned by us, before each stage. A prior
+  // stage cannot redirect this preparation (or Docker's mount) through a link.
+  for (let i = 0; i < mounts.length; i += 2) {
+    const [source, target] = mounts[i + 1].split(":");
+    if (!target.startsWith('/tmp/')) continue;
+    const relative = path.relative('/tmp', target);
+    if (!relative || relative.startsWith('../') || path.isAbsolute(relative)) {
+      throw new Error('invalid fixture mountpoint');
+    }
+    const parts = relative.split(path.sep);
+    let current = scratch;
+    for (const [index, part] of parts.entries()) {
+      current = path.join(current, part);
+      const directory = index < parts.length - 1 || fs.statSync(source).isDirectory();
+      try {
+        if (directory) fs.mkdirSync(current, { mode: 0o700 });
+        else fs.closeSync(fs.openSync(current, 'wx', 0o600));
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+      }
+      const stat = fs.lstatSync(current);
+      if (stat.isSymbolicLink()) throw new Error('fixture mountpoint cannot use a symlink');
+      if (directory ? !stat.isDirectory() : !stat.isFile()) {
+        throw new Error('fixture mountpoint has the wrong file type');
+      }
+    }
+  }
 }
 
 function envEnabled(value) {

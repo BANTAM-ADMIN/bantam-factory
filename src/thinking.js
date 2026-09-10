@@ -89,7 +89,7 @@ const DOCUMENT_REVIEW_RE = /Document review context:/;
 // verb, reverted an edit, rewrote a command). A correction means the plan was
 // wrong, not just the action — reason before the next one instead of firing
 // off the next reflex.
-const STEER_RE = /\[(open_files|paging|reverted|pipe-guard|api-check|regression-guard|repetition|test-runner|progress-awareness|trusted-review-evidence|implementation-response)\]/;
+const STEER_RE = /\[(open_files|paging|reverted|pipe-guard|api-check|regression-guard|repetition|test-runner|progress-awareness|progress-record|trusted-review-evidence|implementation-response)\]/;
 // A phase boundary: the suite just came back green. This is where a multi-part
 // task turns to its NEXT obligation — the moment the self-hosting runs sailed
 // past, finishing code and never starting the docs.

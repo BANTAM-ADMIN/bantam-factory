@@ -172,6 +172,7 @@ import { degenerateRepairMessage, degenerateTail } from "./logic/degenerate-outp
 import { shellSyntaxHint } from "./logic/shell-syntax-guard.js";
 import { blastRadiusNote, dependentsOf } from "./logic/blast-radius.js";
 import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink, successfulVerificationBoundary } from "./thinking.js";
+import { progressRecordFeedback } from "./progress-record.js";
 import { RequiredReadHistory } from './required-read-history.js';
 import { requirementChecklistEnabled } from "./requirement-checklist.js";
 import { loadLibrary, retrieveSkills, formatSkills, distillSkill, saveSkill, promotePlanToSkill } from "./skills.js";
@@ -4043,6 +4044,22 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
+    for (const p of directEditPaths.filter(p => /^(?:\.\/)?(?:PROGRESS|TODO)\.md$/i.test(p))) {
+      try {
+        const filename = exec.resolveExisting(p);
+        const stat = fs.statSync(filename);
+        if (!stat.isFile() || stat.size > 65536) continue;
+        const feedback = progressRecordFeedback(p, exec.safeReadText(filename), candidate => {
+          try { exec.resolveExisting(candidate); return true; }
+          catch (error) { return error.code === 'ENOENT' ? false : undefined; }
+        });
+        if (feedback) {
+          result.observation += `\n${feedback.text}`;
+          metrics.progressRecordWarnings = (metrics.progressRecordWarnings ?? 0) + 1;
+          onEvent({type:'progress_record_warning', path:p, missing:feedback.missing, authority:'filesystem-feedback-only'});
+        }
+      } catch { /* Deleted, unreadable or oversized records supply no finding. */ }
+    }
     for (const document of [...directEditPaths, ...shellChangedPaths].filter(isDocumentArtifactPath)) {
       authoredDocumentArtifacts.add(document);
     }

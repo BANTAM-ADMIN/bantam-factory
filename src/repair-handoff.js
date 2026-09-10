@@ -124,7 +124,13 @@ export function repairHandoffContext(turns, { generation, workspace, readSource 
     // Once checked successfully, this particular repair proposal is settled.
     // Later unrelated edits do not resurrect it; current-tree completion proof
     // is still enforced independently by the verification gates.
-    const later = turns.slice(i).flatMap((t,j) => executions(t,i+j));
+    // A worker may attach an old failure to a READ after the matching check
+    // already passed on this generation. Starting at the proposal omitted
+    // that pass and contradicted the current verification ledger. Include the
+    // linked execution history; the generation filter below still excludes
+    // passes that predate a proposed edit, and the latest failure still wins.
+    const evidenceStart = Math.min(i, ...(expected.repairs ?? [expected]).map(item => item.evidenceTurn));
+    const later = turns.slice(evidenceStart).flatMap((t,j) => executions(t,evidenceStart+j));
     const pending = (expected.repairs ?? [expected]).filter(item => {
       const last = later.filter(e => e.cwd === workspace && e.generation >= item.generation && e.generation <= generation
         && matchesCheck(e,item.proposal.nextCheck)).at(-1);

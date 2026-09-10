@@ -12,6 +12,27 @@ const proposal = { evidenceSha256: 'a'.repeat(64), fixture: 'abc with insertions
 const action = { a: 'write_file', p: 'source.mjs', content: 'export const fixed = true;', repair: [proposal] };
 function repaired() { return { action, editApplied: true, repairHandoff: createRepairHandoff(action, [failed], options) }; }
 
+test('a read proposal cannot resurrect an old failure after its current-generation check already passed', () => {
+  const readSource = () => 'export const fixed = true;';
+  const readAction = { a: 'read_file', p: 'source.mjs', repair: [proposal] };
+  const pass = { shellExecution: { ...failed.shellExecution, generation: 2, exitCode: 0 } };
+  const history = [failed, pass];
+  const read = { action: readAction, observation: 'source.mjs (1 lines, showing 1-1):\n1\texport const fixed = true;',
+    repairHandoff: createRepairHandoff(readAction, history, { ...options, editApplied: false, readApplied: true, readSource }) };
+  assert.ok(read.repairHandoff, 'retain the worker proposal in the audit trail');
+  assert.equal(read.repairHandoff.verified, false);
+  assert.equal(repairHandoffContext([...history, read], { ...options, readSource }), '',
+    'a pass before the read proposal is still an actual current-generation pass');
+  assert.match(repairHandoffContext([...history, read, { shellExecution: { ...failed.shellExecution, generation: 2 } }],
+    { ...options, readSource }), /most recently exited 1/, 'a subsequent real failure remains active');
+  const olderPass = { shellExecution: { ...pass.shellExecution, generation: 1 } };
+  const staleHistory = [failed, olderPass];
+  const staleRead = { ...read, repairHandoff: createRepairHandoff(readAction, staleHistory,
+    { ...options, editApplied: false, readApplied: true, readSource }) };
+  assert.match(repairHandoffContext([...staleHistory, staleRead], { ...options, readSource }),
+    /no matching current successful execution/, 'a pass from before the current source generation cannot settle the new proposal');
+});
+
 test('an actual successful AND chain settles a matching repair proposal without fabricating per-check receipts', () => {
   const turns = [failed, repaired()];
   const command = 'node check-other.mjs && node check.mjs';

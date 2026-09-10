@@ -256,6 +256,10 @@ export function renderFailingTests(output, { max = 6, root = null, suspects = nu
   return `${exhaustionNote}${loadNote}Failing tests:\n${rows.join("\n")}${more}\n`;
 }
 
+// A comparison in a custom check name ("FAIL luminance > 0 - luminance=0")
+// is not a Vitest file/test separator. Require a filename with an extension.
+const VITEST_FAILURE = /^[ \t]*FAIL[ \t]+(\S+\.[a-z0-9_-]+)[ \t]+>[ \t]+(.+?)[ \t]*$/im;
+
 export function parseTestFailures(output) {
   const text = String(output ?? "");
   // perl Test::More before the generic TAP branch: raw perl output has `not ok` lines too, but its
@@ -265,11 +269,20 @@ export function parseTestFailures(output) {
   if (/^\s*not ok \d+ - /m.test(text)) return parseNodeFailures(text);
   if (/^FAILED\s+\S+::/m.test(text) || /={3,}\s*FAILURES\s*={3,}/.test(text)) return parsePytestFailures(text);
   if (/^\s*--- FAIL: /m.test(text)) return parseGoFailures(text);
-  if (/^\s*FAIL\s+\S+\s+>\s+/m.test(text)) return parseVitestFailures(text);
+  if (VITEST_FAILURE.test(text)) return parseVitestFailures(text);
   if (/^\s*●\s+\S/m.test(text) && /^\s*(?:Expected|Received)[:\s]/m.test(text)) return parseJestFailures(text);
   if (/^test \S+ \.\.\. FAILED$/m.test(text)) return parseCargoFailures(text);
   if (/^\(fail\) /m.test(text)) return parseBunFailures(text);
-  return parseNodeFailures(text);
+  const nodeFailures = parseNodeFailures(text);
+  if (nodeFailures.length) return nodeFailures;
+  // Small project runners often print "FAIL name - assertion message". Only
+  // accept that format alongside a failing runner summary; keep the message
+  // verbatim and leave unknown locations/expected values unknown.
+  if (!(parseTestCounts(text)?.failed > 0)) return [];
+  return [...text.matchAll(/^[ \t]*FAIL[ \t]+(.+?)[ \t]+-[ \t]+(.+?)[ \t]*$/gm)].map(m => ({
+    name: m[1], message: m[2], file: null, line: null,
+    actual: null, expected: null, diff: [],
+  }));
 }
 
 // bun test: an inline "error: expect(received).toBe(expected)" with jest-style Expected:/Received:
@@ -335,12 +348,12 @@ function parseVitestFailures(text) {
   const fails = [];
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^\s*FAIL\s+(\S+)\s+>\s+(.+?)\s*$/);
+    const m = lines[i].match(VITEST_FAILURE);
     if (!m) continue;
     const file = m[1];
     let line = null, actual = null, expected = null;
     for (let j = i + 1; j < lines.length && j < i + 30; j++) {
-      if (/^\s*FAIL\s+\S+\s+>\s+/.test(lines[j])) break;
+      if (VITEST_FAILURE.test(lines[j])) break;
       const ae = lines[j].match(/expected (.+?) to (?:be|equal|deeply equal|strictly equal) (.+?)(?:\s*\/\/.*)?$/);
       if (ae && actual === null) { actual = ae[1].trim(); expected = ae[2].trim(); }
       const de = lines[j].match(/^\s*- (.+)$/);   // "- Expected" block line

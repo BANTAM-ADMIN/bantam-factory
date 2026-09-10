@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 
-import { formatFailingTestFocus, parseTestFailures, renderFailingTests } from "../src/logic/test-focus.js";
+import { formatFailingTestFocus, parseTestFailures, parseTestCounts, renderFailingTests } from "../src/logic/test-focus.js";
+
+test('named runner summaries retain counts without treating source locations or prose as results', () => {
+  assert.deepEqual(parseTestCounts('UV check: 17 passed, 0 failed'), {passed:17, failed:0, total:17});
+  assert.deepEqual(parseTestCounts('UV check: 0 passed, 0 failed'), {passed:0, failed:0, total:0});
+  for (const output of ['test/uv-check.js:17:3 failed to parse', 'UV check: 17 failed to parse',
+    'The UV check: 17 passed, 0 failed yesterday', 'Review: UV check: 17 passed, 0 failed']) {
+    assert.equal(parseTestCounts(output), null, output);
+  }
+});
 
 test("custom runner comparisons retain their name and assertion instead of inventing a Vitest location", () => {
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", `

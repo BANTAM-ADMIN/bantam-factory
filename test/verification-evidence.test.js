@@ -10,6 +10,19 @@ import { createTestProvenance } from "../src/test-provenance.js";
 import { runAgent } from "../src/agent.js";
 
 const output = "# tests 4\n# pass 4\n# fail 0\n";
+
+test('named check summaries with zero executed cases cannot produce a passing receipt', () => {
+  for (const label of ['UV check', 'Atlas checks', 'rig tests', 'Lifecycle suite']) {
+    const record = verificationEvidence({execution:{command:'node test/uv-check.js',
+      code:0, stdout:`${label}: 0 passed, 0 failed\n`, stderr:''}, configuredCommand:'npm test', generation:2});
+    assert.equal(record.status, 'unverified', label);
+    assert.equal(record.counts, null);
+  }
+  const failed = verificationEvidence({execution:{command:'node test/uv-check.js',
+    code:0, stdout:'UV check: 16 passed, 1 failed\n', stderr:''}, generation:2});
+  assert.equal(failed.status, 'fail', 'reported failures survive an erroneous exit zero');
+  assert.deepEqual(failed.counts, {passed:16, failed:1, total:17});
+});
 const evidence = (overrides = {}, options = {}) => verificationEvidence({
   execution: { command: "npm test", exitCode: 0, stdout: output, stderr: "", ...overrides },
   generation: 3, configuredCommand: "npm test", ...options,

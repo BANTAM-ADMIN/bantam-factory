@@ -49,7 +49,9 @@ export function verificationEvidence({ execution, command, configuredCommand = n
   if (finalConfiguredScope) statusRisk = null;
   const unavailable = invalidated || execution.blocked || execution.error
     || execution.bufferExceeded || interrupted || timedOut || !Number.isInteger(exitCode)
-    || statusRisk || (exitCode === 0 && parsedCounts?.total === 0 && isTestCommand(actualCommand));
+    // A direct custom check (e.g. node test/uv-check.js) may be classified as
+    // a deliverable launcher. Its explicit zero-test summary is still no proof.
+    || statusRisk || (exitCode === 0 && parsedCounts?.total === 0);
   const reportedFailures = parsedCounts?.failed > 0
     || /^#\s+fail\s+[1-9]\d*\s*$/m.test(rawOutput)
     || summaryLines.some((line) => parseTestCounts(line)?.failed > 0);

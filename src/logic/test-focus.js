@@ -56,6 +56,9 @@ export function parseTestCounts(output) {
   for (const line of t.split(/\r?\n/).reverse()) {
     const summary = line.trim()
       .replace(/^=+[ \t]*|[ \t]*=+$/g, "")
+      // Custom suites can label their final line ("UV check: 0 passed, 0 failed").
+      // Keep the full summary grammar below: a location or prose tail is not a count.
+      .replace(/^(?:[a-z0-9][a-z0-9_. -]{0,63}[ \t]+)?(?:checks?|tests?|suite):[ \t]+/i, "")
       .replace(/^(?:Tests:?|test result:[ \t]*(?:ok|FAILED)\.)[ \t]+/i, "")
       .replace(/;[ \t]*finished in[ \t]+[\d.]+s[ \t]*$/i, "")
       .replace(/[ \t]+in[ \t]+[\d.]+s(?:[ \t]+\([\d:]+\))?[ \t]*$/i, "")

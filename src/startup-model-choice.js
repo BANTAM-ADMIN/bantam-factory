@@ -148,3 +148,28 @@ export function startupChoiceNeeded({ canOffer, detectedLocalReady, rememberedCo
   if (detectedLocalReady) return false;
   return !rememberedConnection || !backendHealthy;
 }
+
+/**
+ * Put the live auto-detected local server into a model menu.
+ *
+ * Startup can attach BANTAM to a llama.cpp server that was never registered, so
+ * the in-session `:model` list has to show it too. Without this it read the
+ * registry alone and listed only Codex/API presets — the local model actually
+ * answering had no entry, and there was no way back to it once Codex was picked.
+ * A registered endpoint is never duplicated, and the detected entry is marked
+ * `detected` so switching only re-points the client instead of restarting an
+ * operator-managed server.
+ */
+export function withDetectedLocal(models, detected) {
+  const list = Array.isArray(models) ? models : [];
+  if (!detected?.endpoint) return list;
+  const norm = (endpoint) => String(endpoint ?? "").replace(/\/$/, "");
+  if (list.some((m) => norm(m?.endpoint) === norm(detected.endpoint))) return list;
+  return [{
+    name: "local",
+    label: detected.label ?? detected.model ?? detected.endpoint,
+    endpoint: detected.endpoint,
+    running: true,
+    detected: true,
+  }, ...list];
+}

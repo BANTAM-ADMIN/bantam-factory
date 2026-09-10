@@ -90,6 +90,7 @@ import {
   resolveStartupModelChoice,
   startupModelChoices,
   startupChoiceNeeded,
+  withDetectedLocal,
 } from "../src/startup-model-choice.js";
 import { playAnimation, animationNames, loadAnimations, showcaseSequence } from "../src/rooster.js";
 import {
@@ -4541,7 +4542,19 @@ async function repl() {
   // `:model` — one list and switch command for local models and API presets.
   async function handleModelCommand(arg, { apiOnly = false } = {}) {
     const guided = !String(arg ?? "").trim() && !apiOnly && tty;
-    const models = apiOnly ? [] : await modelStatus();
+    let models = apiOnly ? [] : await modelStatus();
+    // A hand-started llama.cpp can serve the session without ever being
+    // registered — that is exactly what startup auto-detection does — so the
+    // switcher has to show it too. Reading the registry alone listed only
+    // Codex/API presets, leaving the local model that was actually answering
+    // with no entry and no way back to it.
+    if (!apiOnly) {
+      const currentLocal = !model.apiMode && !model.codex && typeof model.endpoint === "string"
+        ? model.endpoint : null;
+      const candidate = currentLocal || await detectEndpoint().catch(() => null);
+      const id = candidate ? await fetchModelId(candidate, 2500).catch(() => null) : null;
+      if (id) models = withDetectedLocal(models, { label: id, endpoint: candidate });
+    }
     const presets = cliModelOptions.__presets || {};
     const presetNames = Object.keys(presets);
     let codexModels = [];
@@ -4646,6 +4659,15 @@ async function repl() {
     }
     if (requestedEffort) {
       console.log("  Reasoning levels apply only to Codex models.");
+      return;
+    }
+    // A detected server is already up and operator-managed: only re-point the
+    // client. switchToModel() may stop and restart, which is exactly what must
+    // not happen to a server BANTAM did not start.
+    if (target.detected) {
+      model.switchTo(target.endpoint, { profile: target.profile });
+      saveModelPreference({ kind: "local", name: target.name });
+      console.log(`  Now using ${target.label} @ ${target.endpoint}.`);
       return;
     }
     const ok = await switchToModel(model, target, { out: (s) => process.stdout.write(s) });

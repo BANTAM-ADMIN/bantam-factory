@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded } from "../src/startup-model-choice.js";
+import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded, withDetectedLocal } from "../src/startup-model-choice.js";
 
 const locals = [
   { name: "bantam-q4-crew", endpoint: "http://x:1", slots: 4, priority: 10,
@@ -167,4 +167,25 @@ test("non-interactive runs never open the picker", () => {
   assert.equal(startupChoiceNeeded({
     canOffer: false, detectedLocalReady: false, rememberedConnection: null, backendHealthy: false,
   }), false);
+});
+
+test("the :model list gains the live auto-detected local server", () => {
+  // The reported bug: the session was serving from an unregistered llama.cpp on
+  // :8085, but `:model` read the registry alone and listed only Codex models.
+  const listed = withDetectedLocal([], { label: "Qwen3.8-27B-BANTAM-Q4_K_P.gguf", endpoint: "http://localhost:8085" });
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].name, "local");
+  assert.equal(listed[0].endpoint, "http://localhost:8085");
+  assert.equal(listed[0].running, true);
+  assert.equal(listed[0].detected, true, "a detected server must not be restarted on switch");
+});
+
+test("the detected entry sits in front of registered models and never duplicates one", () => {
+  const registered = { name: "bantam-q4", endpoint: "http://localhost:18086", slots: 1, running: true };
+  const listed = withDetectedLocal([registered], { label: "x", endpoint: "http://localhost:8085" });
+  assert.equal(listed[0].detected, true, "the live detected server is reachable by number 1");
+  assert.equal(listed[1], registered);
+  // Same endpoint (trailing slash ignored): the registry entry wins, no clone.
+  const deduped = withDetectedLocal([registered], { label: "x", endpoint: "http://localhost:18086/" });
+  assert.deepEqual(deduped, [registered]);
 });

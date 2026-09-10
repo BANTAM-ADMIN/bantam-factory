@@ -213,3 +213,37 @@ test("a later implementation milestone keeps old proof stale without ordering un
   assert.equal(result.turns[8].doneAccepted, true);
   assert.equal(fs.readFileSync(path.join(workspace,'check-summary.mjs'),'utf8'), summaryCheck);
 });
+
+test("repeated green focused checks execute on each newly edited tree and retain real project receipts", async t => {
+  const workspace = fixture(t);
+  const actions = [{a:'write_file', p:'src/items.js', content:GOOD}, {a:'shell', c:'npm test'}];
+  const checks = [];
+  for (let i = 0; i < 9; i++) {
+    if (i) actions.push({a:'write_file', p:'src/items.js', content:GOOD + `export const revision = ${i};\n`});
+    checks.push(actions.length);
+    actions.push({a:'shell', c:FOCUSED_COMMAND});
+  }
+  actions.push(DONE);
+  const {result} = await run(workspace, actions, {dedupeShell:true});
+  let previousGeneration = -1;
+  for (const i of checks) {
+    const turn = result.turns[i], receipts = turn.verificationReceipts?.entries;
+    assert.equal(turn.shellExecution?.executedCommand, FOCUSED_COMMAND, `check ${i} must really execute`);
+    assert.ok(turn.shellExecution.generation > previousGeneration);
+    previousGeneration = turn.shellExecution.generation;
+    assert.equal(receipts?.[0].shellExecution.executedCommand, FOCUSED_COMMAND);
+    assert.equal(receipts[0].verificationEvidence.status, 'pass');
+    for (const entry of receipts.slice(1)) {
+      assert.equal(entry.verificationEvidence.executedCommand, 'npm test');
+      assert.equal(entry.verificationEvidence.status, 'pass');
+      assert.equal(entry.verificationEvidence.generation, previousGeneration);
+    }
+    assert.doesNotMatch(turn.observation, /\[no-progress\]|previous execution: turn -1/);
+  }
+  const finalReceipts = result.turns.at(-2).verificationReceipts.entries;
+  assert.equal(finalReceipts[0].shellExecution.executedCommand, FOCUSED_COMMAND);
+  assert.equal(finalReceipts[1].verificationEvidence.executedCommand, 'npm test');
+  assert.equal(finalReceipts[1].verificationEvidence.status, 'pass');
+  assert.equal(finalReceipts[1].verificationEvidence.generation, previousGeneration);
+  assert.equal(result.reachedDone, true);
+});

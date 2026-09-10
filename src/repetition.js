@@ -149,6 +149,12 @@ export class RepetitionGuard {
     this._seenOps.clear();
     this._attempts.clear();
     this._failStreak = { sig: null, count: 0, steeredAt: 0 };
+    // The same PASS after a source edit is fresh regression evidence, even
+    // when the test prints identical output. Preserve the cross-edit breaker
+    // for failed/unknown outcomes; successful checks do not establish a loop.
+    if (this._resultStreak.executionBackedPass === true) {
+      this._resultStreak = { sig: null, count: 0, steeredAt: 0 };
+    }
   }
 
   record(action, observation, { turn = 0, shellWorkspaceUnchanged = false, result } = {}) {
@@ -195,8 +201,8 @@ export class RepetitionGuard {
       if (isDeliverableRun(action.c)) {
         const rsig = this._resultSig(processObservation);
         this._resultStreak = this._resultStreak.sig === rsig && this._resultStreak.outcome === outcome
-          ? { ...this._resultStreak, count: this._resultStreak.count + 1 }
-          : { sig: rsig, count: 1, steeredAt: 0, outcome };
+          ? { ...this._resultStreak, count: this._resultStreak.count + 1, executionBackedPass: typed && outcome === "pass" }
+          : { sig: rsig, count: 1, steeredAt: 0, outcome, executionBackedPass: typed && outcome === "pass" };
       }
     }
     if (!this.enabled || !this._isReplayable(action, { shellWorkspaceUnchanged })) return;

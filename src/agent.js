@@ -3605,7 +3605,8 @@ async function runAgentCore({
       && !turns.slice(Math.max(auditRecovery.turn, auditRecovery.invalidatedAfterTurn ?? auditRecovery.turn,
         auditRecovery.needsProject && isConfiguredAuditCommand(action.c, verificationScript)
           ? (auditRecovery.focusedTurn ?? auditRecovery.turn) : auditRecovery.turn) + 1).some(turn =>
-        turn.shellExecution && (sameAuditCommand(turn.shellExecution.command, action.c)
+        turn.shellExecution && turn.shellExecution.generation === workspaceEditGeneration
+          && (sameAuditCommand(turn.shellExecution.command, action.c)
           || sameAuditCommand(turn.shellExecution.executedCommand, action.c)));
     const duplicate = !gateRejection && !interactiveStop && !groundReject && !auditCheckRepeat && !auditCleanupRefusal && !auditOutputFilterRefusal && !auditWitnessRefusal && !nodeCheckRefusal
       && requestedDocumentReviews.length === 0
@@ -3705,7 +3706,9 @@ async function runAgentCore({
       // only route to the outstanding execution.
       const auditShellRecovery = action.a === "shell" && auditRecovery;
       result = { observation: auditShellRecovery
-        ? `[repetition] This identical command was not executed again (previous execution: turn ${duplicate.duplicateOfTurn}). No new receipt was created.\n${contractAuditRecoveryNote(auditRecovery)}`
+        ? (duplicate.duplicateOfTurn >= 0
+          ? `[repetition] This identical command was not executed again (previous execution: turn ${duplicate.duplicateOfTurn}). No new receipt was created.`
+          : duplicate.observation) + `\n${contractAuditRecoveryNote(auditRecovery)}`
         : duplicate.observation };
       metrics.duplicateActionRejections = repetition.duplicateActionRejections;
       metrics.duplicateShellRejections = repetition.duplicateShellRejections;

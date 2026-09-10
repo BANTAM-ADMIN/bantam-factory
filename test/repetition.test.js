@@ -108,8 +108,8 @@ test("blocked, deduplicated, spawn-failed and mismatched receipts do not accumul
   assert.equal(guard.brokenRecordSteers, 0);
 });
 
-test("same-result streak language distinguishes pass, failure and unknown", () => {
-  for (const status of ["pass", "fail", "unverified"]) {
+test("same-result streak language distinguishes failure and unknown across edits", () => {
+  for (const status of ["fail", "unverified"]) {
     const guard = new RepetitionGuard();
     const action = status === "unverified" ? DRIFT : TEST;
     for (let i = 0; i < 6; i++) {
@@ -121,6 +121,18 @@ test("same-result streak language distinguishes pass, failure and unknown", () =
     assert.doesNotMatch(steer.observation, /never passed|failed identically|editing between runs/);
     assert.match(steer.observation, status === "pass" ? /checks passed/ : status === "fail" ? /checks failed/ : /UNVERIFIED, not failed/);
   }
+});
+
+test("identical passing output remains executable after each workspace edit", () => {
+  const guard = new RepetitionGuard({ dedupeShell: true });
+  for (let turn = 1; turn <= 10; turn++) {
+    assert.equal(guard.check(TEST), null, "the changed source has no current result yet");
+    guard.record(TEST, "tests 1\npass 1\nfail 0", { turn, shellWorkspaceUnchanged: true,
+      result: typedResult(TEST, "pass") });
+    assert.ok(guard.check(TEST), "unchanged-source exact repeats remain suppressed");
+    guard.noteWorkspaceChanged();
+  }
+  assert.equal(guard.noProgressSteers, 0);
 });
 
 test("an unrelated landing PASS cannot qualify the masked shell that preceded it", () => {

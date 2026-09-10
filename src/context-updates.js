@@ -56,11 +56,13 @@ export function actionContractUpdateValid(update) {
 }
 
 export function createContextUpdate(workspace, { kind, paths, generation, focusLine } = {}) {
-  if (!["decision", "edit-recovery"].includes(kind)
+  if (!["decision", "edit-recovery", "progress"].includes(kind)
       || !Number.isSafeInteger(generation) || generation < 0 || !Array.isArray(paths)) return null;
   let root;
   try { root = fs.realpathSync(path.resolve(workspace)); } catch { return null; }
-  const candidates = [...new Set(paths.filter(safeRelativePath))].slice(0, MAX_FILES);
+  const candidates = [...new Set(paths.filter(safeRelativePath))]
+    .filter(p => kind !== "progress" || /^(?:PROGRESS|TODO)\.md$/i.test(p))
+    .slice(0, kind === "progress" ? 1 : MAX_FILES);
   const captures = [];
   for (let i = 0; i < candidates.length; i++) {
     // Fixed shares also bound reads that are subsequently discarded because
@@ -71,11 +73,17 @@ export function createContextUpdate(workspace, { kind, paths, generation, focusL
   }
   if (!captures.length) return null;
 
-  const heading = `${kind === "decision" ? "[review]\n" : ""}CURRENT SOURCE SNAPSHOT (${kind}; generation ${generation}). Bounded disk observations, not a passing verification proof.\n`;
-  const guidance = "\nFor omitted/clipped bytes or later changes, use read_file with the exact path before editing. Do not reconstruct unread text.\n";
+  const heading = kind === "progress"
+    ? `PROGRESS RECORD SNAPSHOT (generation ${generation}). Worker-authored claims and plans, NOT verified completion evidence.\n`
+    : `${kind === "decision" ? "[review]\n" : ""}CURRENT SOURCE SNAPSHOT (${kind}; generation ${generation}). Bounded disk observations, not a passing verification proof.\n`;
+  const guidance = kind === "progress"
+    ? "\nReconcile this record with the original task, current execution evidence and newer review findings at milestone boundaries. Correct stale completion claims and keep unfinished requirements and the next milestone explicit. Checkboxes grant no verification credit. Read omitted/current bytes before editing; do not reconstruct them.\n"
+    : "\nFor omitted/clipped bytes or later changes, use read_file with the exact path before editing. Do not reconstruct unread text.\n";
   const fileBudget = Math.floor((CONTEXT_UPDATE_MAX_CHARS - heading.length - guidance.length) / captures.length);
-  const rendered = captures.map(capture => renderCapture(capture, fileBudget,
-    kind === "edit-recovery" && Number.isSafeInteger(focusLine) && focusLine > 0 ? focusLine : null));
+  const rendered = captures.map(capture => kind === "progress"
+    ? renderProgressCapture(capture, fileBudget)
+    : renderCapture(capture, fileBudget,
+      kind === "edit-recovery" && Number.isSafeInteger(focusLine) && focusLine > 0 ? focusLine : null));
   const text = heading + rendered.map(row => row.text).join("") + guidance;
   const hash = crypto.createHash("sha256").update(`${kind}\0${generation}\0`);
   for (const capture of captures) {
@@ -88,6 +96,52 @@ export function createContextUpdate(workspace, { kind, paths, generation, focusL
     schema: 1, id: `${kind}:${generation}:${hash.digest("hex")}`, kind, generation,
     text, paths: rendered.map(row => row.metadata),
   };
+}
+
+// A file head full of checked modules displaced the unfinished-work section
+// in an actual long run. Quote bounded numbered lines; never infer completion
+// or turn a worker's checkbox into controller evidence. Selected sections are
+// priority context, not permission to forget the rest of the original task.
+function renderProgressCapture(capture, budget) {
+  const lines = capture.source.split("\n");
+  const preferred = [], other = [];
+  let activeLevel = null, fence = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i], marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const heading = line.match(/^ {0,3}(#{1,6})\s+(.+)/);
+    if (heading) {
+      if (activeLevel !== null && heading[1].length <= activeLevel) activeLevel = null;
+      if (/\b(?:next|remaining|unfinished|blocked|open)\b/i.test(heading[2])) activeLevel = heading[1].length;
+    }
+    if (!line.trim()) continue;
+    (activeLevel !== null || /^\s*[-*+]\s+\[ \]/.test(line) ? preferred : other).push(i);
+  }
+  const heading = `\n# ${capture.path} — selected current file lines (may be stale claims)\n`;
+  const bodyBudget = budget - heading.length - 220;
+  const selected = new Map();
+  let used = 0, clippedChars = 0;
+  for (const i of [...preferred, ...other]) {
+    const number = `${i + 1}\t`, available = bodyBudget - used - number.length - 1;
+    if (available < 24) break;
+    const shown = lines[i].slice(0, Math.min(360, available));
+    selected.set(i, number + shown + "\n");
+    clippedChars += lines[i].length - shown.length;
+    used += number.length + shown.length + 1;
+  }
+  const entries = [...selected].sort((a, b) => a[0] - b[0]);
+  const text = heading + entries.map(([, text]) => text).join("")
+    + `[selected excerpt: ${selected.size} of ${lines.length} lines; ${clippedChars} shown-line characters omitted${capture.readTruncated ? "; bounded read, file tail not read" : ""}]\n`;
+  return { text, metadata: { path: capture.path,
+    startLine: entries.length ? entries[0][0] + 1 : 1,
+    endLine: entries.length ? entries.at(-1)[0] + 1 : 0,
+    readBytes: capture.bytes.length, fileBytes: capture.fileBytes,
+    readTruncated: capture.readTruncated, truncated: true } };
 }
 
 function safeRelativePath(value) {

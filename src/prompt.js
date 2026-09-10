@@ -125,7 +125,7 @@ function contextUpdatePathValid(value) {
 export function contextUpdatePromptText(update, template = CHATML_TEMPLATE) {
   if (!update || typeof update !== "object" || Array.isArray(update)
       || update.schema !== 1
-      || !["decision", "edit-recovery", "action-contract"].includes(update.kind)
+      || !["decision", "edit-recovery", "action-contract", "progress"].includes(update.kind)
       || typeof update.id !== "string" || !CONTEXT_UPDATE_ID_RE.test(update.id)
       || !Number.isSafeInteger(update.generation) || update.generation < 0
       || typeof update.text !== "string" || !update.text.trim()

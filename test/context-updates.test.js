@@ -61,6 +61,27 @@ test("current source updates are typed, deterministic, and bound to disk bytes",
   assert.notEqual(a.id, createContextUpdate(root, request(["a.js"])).id);
 });
 
+test("progress excerpts retain unfinished sections behind a long checked inventory without certifying claims", t => {
+  const root = fixture(t);
+  const source = '# Project\n## Status: complete (worker claim)\n'
+    + Array.from({ length: 90 }, (_, i) => `- [x] src/module${i}.js — worker says complete`).join('\n')
+    + '\n## Remaining work\n- [ ] Implement actual audio\n## Next milestone\n1. Repair train doors\n'
+    + '```md\n- [ ] FENCED_EXAMPLE_NOT_A_TASK\n```\n';
+  fs.writeFileSync(path.join(root, 'PROGRESS.md'), source);
+  const update = createContextUpdate(root, { kind: 'progress', generation: 7, paths: ['PROGRESS.md'] });
+  assert.ok(update.text.length <= CONTEXT_UPDATE_MAX_CHARS);
+  assert.match(update.text, /Implement actual audio/);
+  assert.match(update.text, /Repair train doors/);
+  assert.match(update.text, /Worker-authored claims and plans, NOT verified completion evidence/);
+  assert.match(update.text, /Correct stale completion claims/);
+  assert.match(update.text, /selected excerpt/);
+  assert.doesNotMatch(update.text, /FENCED_EXAMPLE_NOT_A_TASK/);
+  assert.equal(update.paths[0].truncated, true);
+  assert.equal(createContextUpdate(root, { kind: 'progress', generation: 7, paths: ['src/PROGRESS.md', 'DESIGN.md'] }), null);
+  fs.symlinkSync(path.join(root, 'PROGRESS.md'), path.join(root, 'TODO.md'));
+  assert.equal(createContextUpdate(root, { kind: 'progress', generation: 7, paths: ['TODO.md'] }), null);
+});
+
 test("traversal, absolute paths, symlink files/parents, missing and nonregular paths are refused", t => {
   const root = fixture(t), outside = fixture(t);
   fs.writeFileSync(path.join(outside, "secret"), "MUST NOT APPEAR");

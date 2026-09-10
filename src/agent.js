@@ -1984,6 +1984,7 @@ async function runAgentCore({
   // never penalised, because repeated tokens are correct in code.
   let degeneratePenalty = 0;
   let decisionWorkingNote = "";
+  let decisionProgressRecord = null;
   // Share delivered read-refresh identities with the estimator so their full
   // bodies remain priced after the next action makes them historical turns.
   const refreshedReads = new Set();
@@ -2021,6 +2022,33 @@ async function runAgentCore({
         onEvent({ type: "working_checkpoint_restored", turn: last.i, chars: decisionWorkingNote.length });
         onEvent({ type: "observation_annotated", turn: turns.length - 1, observation: last.observation });
         retained = historyWindow(candidates);
+      }
+    }
+    // A durable progress file is useful only if the model can still see it
+    // after its write/read turn leaves context. Restore current authored plan
+    // excerpts once per retained window, never every turn or as proof. Short
+    // tasks and unrelated repository TODO files do not opt into this recall.
+    if (extensionTrajectory && turns.length && (maxTurns === Infinity || inspectionCheckpointAfter > 0)) {
+      const paths = [...authoredReadPaths].filter(p => /^(?:PROGRESS|TODO)\.md$/i.test(p))
+        .sort((a, b) => Number(/^TODO/i.test(a)) - Number(/^TODO/i.test(b)));
+      let update = paths.length ? createContextUpdate(workspace, { kind: "progress", paths,
+        generation: decisionProgressRecord?.generation ?? workspaceEditGeneration }) : null;
+      if (update && decisionProgressRecord && update.id !== decisionProgressRecord.id) {
+        update = createContextUpdate(workspace, { kind: "progress", paths, generation: workspaceEditGeneration });
+      }
+      decisionProgressRecord = update;
+      if (update && !retained.some(turn => turn.contextUpdates?.some(entry => entry.id === update.id))) {
+        const last = turns.at(-1);
+        const existing = (last.contextUpdates ?? []).filter(entry => contextUpdatePromptText(entry, promptTemplate));
+        if (candidates.includes(last) && existing.length < 2) {
+          last.contextUpdates = [...existing, update];
+          turnRenderCache.delete(last.i);
+          onEvent({ type: "progress_record_restored", turn: last.i, id: update.id,
+            paths: update.paths, authority: "worker-claims-not-verification" });
+          onEvent({ type: "observation_annotated", turn: turns.length - 1,
+            observation: last.observation, contextUpdates: last.contextUpdates });
+          retained = historyWindow(candidates);
+        }
       }
     }
     return retained;

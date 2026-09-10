@@ -62,6 +62,10 @@ test("each appended decision keeps the exact stale check; READY retires it witho
   assert.match(currentWorkflow(ready), /NO optional cleanup step remaining/);
   assert.match(currentWorkflow(ready), /emit DONE now on this unchanged tree/);
   assert.match(currentWorkflow(ready), /Other completion gates still apply/);
+  assert.match(currentWorkflow(ready), /These receipts cover the executed checks, not all requested work/);
+  assert.ok(currentWorkflow(ready).indexOf('Continue the next unfinished milestone')
+    < currentWorkflow(ready).indexOf('emit DONE now'),
+    'remaining work must be resolved before the conditional completion instruction');
   assert.doesNotMatch(currentWorkflow(ready), /Removed files:|needs fresh focused execution/);
   assert.match(ready.slice(0, ready.lastIndexOf(MARKER)), /Removed files: "check-api\.mjs"/);
 });

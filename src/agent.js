@@ -6101,7 +6101,7 @@ async function runAgentCore({
         const focusedLabel = typeof focusedCommand === "string"
           ? ` Focused command${focusedCommand.length > 180 ? " (excerpt)" : ""}: ${JSON.stringify(focusedCommand.slice(0, 180))}.` : "";
         result.observation += `\n[auto-verify] The focused and configured project receipts are now complete on generation ${workspaceEditGeneration}.${focusedLabel}`
-          + " No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. If the task is complete, request DONE now on this unchanged tree. Repair a real unfinished requirement if needed, then reverify. Any workspace edit or deletion invalidates these receipts.";
+          + " These receipts cover the executed checks, not all requested work. Continue the next unfinished milestone from the task, progress record or latest review, then verify that work. No optional cleanup remains. Keep the passing check as regression coverage; it is not disposable scratch. Only if every requested requirement is complete and verified, request DONE now on this unchanged tree. Any workspace edit or deletion invalidates these receipts.";
       }
     }
     // All same-turn controller checks have now updated the sentinel. Do not

@@ -81,7 +81,7 @@ export function contractAuditDecisionContext(pending, witness = null) {
     phase = "ready";
     text = `VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation ${generation}).`
       + (literal(witness.command) ? ` Focused command: ${literal(witness.command)}.` : "")
-      + " There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. If the requested work is complete, emit DONE now on this unchanged tree. Other completion gates still apply. If a real requirement is unfinished, repair it and reverify; do not manufacture edits or delete checks to tidy up.";
+      + " These receipts cover the executed checks, not all requested work. Continue the next unfinished milestone from the task, progress record or latest review; passing a scoped check does not finish the project. There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. Only if every requested requirement is complete and verified, emit DONE now on this unchanged tree. Other completion gates still apply. Necessary implementation remains allowed and needs fresh verification; do not manufacture edits or delete checks to tidy up.";
   } else if (pending.needsFocused === true) {
     phase = "focused";
     const workOrder = focusedWorkOrder(pending);

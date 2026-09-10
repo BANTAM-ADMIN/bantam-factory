@@ -527,7 +527,7 @@ function summarizeCodexPromptDelivery(calls) {
 
 function serializableCopy(value) {
   if (value === undefined) return null;
-  try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
+  try { return snapshotJsonValue(value) ?? null; } catch { return null; }
 }
 
 function sha256(value) {

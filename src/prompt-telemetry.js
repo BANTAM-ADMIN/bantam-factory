@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { snapshotJsonValue } from "./json-file.js";
 
 // Prompts arrive here as opaque strings, so the chat family is detected from
 // the bytes rather than threaded through every caller. Gemma 4 spells its turns
@@ -200,7 +201,7 @@ function sha256(value) {
 }
 
 function serializableCopy(value) {
-  try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
+  try { return snapshotJsonValue(value) ?? null; } catch { return null; }
 }
 
 /**

@@ -2067,6 +2067,9 @@ if (cmd === undefined || cmd === "chat") {
       );
     }
   }
+  // Continuation owns the detached evidence needed from here on. Release the
+  // parsed source record after restoring its files, including excluded turns.
+  resumeArtifact = null;
   if (args.lane !== undefined) {
     if (args.lane === true) fail("run --lane requires a lane id");
     if (args["state-home"] === true) fail("run --state-home requires a directory");

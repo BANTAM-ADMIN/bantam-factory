@@ -30,7 +30,7 @@ export async function readJsonFile(filePath, {withHash = false, highWaterMark = 
 export function snapshotJsonValue(input) {
   const ancestors = new Set();
   function copy(value, key) {
-    if (value !== null && (typeof value === 'object' || typeof value === 'bigint')
+    if (value !== null && (typeof value === 'object' || typeof value === 'function' || typeof value === 'bigint')
       && typeof value.toJSON === 'function') value = value.toJSON(key);
     if (types.isNumberObject(value)) value = Number(value);
     else if (types.isStringObject(value)) value = String(value);

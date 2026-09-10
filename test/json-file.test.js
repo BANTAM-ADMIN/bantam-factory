@@ -22,6 +22,8 @@ test('JSON snapshots retain native coercion, omissions, shared values and safe p
   const cycle={};cycle.self=cycle;assert.throws(()=>snapshotJsonValue(cycle),/circular/);
   assert.throws(()=>snapshotJsonValue({value:1n}),/BigInt/);
   assert.equal(snapshotJsonValue({toJSON(){return undefined;}}),undefined);
+  const callable=()=>{};callable.toJSON=key=>({key,text:shared.text});
+  assert.deepEqual(snapshotJsonValue({callable}),JSON.parse(JSON.stringify({callable})));
 });
 
 test('atomic JSON reads split UTF-8 and escapes across chunks and hash the original bytes',async t=>{

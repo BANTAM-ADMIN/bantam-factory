@@ -16,6 +16,7 @@ import path from "node:path";
 import { stringifyChunked } from "@discoveryjs/json-ext";
 
 import { snapshotWorkspace } from "./workspace-snapshot.js";
+import { snapshotJsonValue } from "./json-file.js";
 
 export class RunCheckpoint {
   constructor({ dest, meta = {}, autosaveEvery = 3, initialEvidence = null, workspaceDir = undefined } = {}) {
@@ -265,7 +266,7 @@ export class RunCheckpoint {
         partial: true,
         truncatedBy,
         turns: this.turns(),
-        turnCount: this.turns().length,
+        turnCount: this._turns.length + (this._pending ? 1 : 0),
         rejectedOutputs: this._rejectedOutputs,
         modelCalls: this.modelCalls(),
         events: this.events(),
@@ -330,7 +331,7 @@ export function attachModelRequestCheckpoint(model, checkpoint) {
 
 function serializableCopy(value) {
   if (value === undefined) return null;
-  try { return JSON.parse(JSON.stringify(value)); } catch { return null; }
+  try { return snapshotJsonValue(value) ?? null; } catch { return null; }
 }
 
 function evidenceRows(value) {

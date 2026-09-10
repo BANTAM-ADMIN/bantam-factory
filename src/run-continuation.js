@@ -7,6 +7,7 @@
 // observation, never appended to or substituted for the original task.
 
 import crypto from "node:crypto";
+import { snapshotJsonValue } from "./json-file.js";
 
 export const MAX_TRUSTED_REVIEW_BYTES = 64 * 1024;
 
@@ -294,5 +295,7 @@ function parseTurnIndex(value) {
 }
 
 function jsonCopy(value) {
-  return JSON.parse(JSON.stringify(value));
+  const copy = snapshotJsonValue(value);
+  if (copy === undefined) throw new SyntaxError("Cannot copy a non-JSON value");
+  return copy;
 }

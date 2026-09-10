@@ -7,6 +7,7 @@
 // model, but callers can select another profile as we benchmark more models.
 
 import crypto from "node:crypto";
+import { snapshotJsonValue } from "./json-file.js";
 import { resolveProfile } from "./profiles.js";
 import { ChatSessionPlanner } from "./chat-sessions.js";
 import { grammarFieldFor, buildOpenAiBody, buildChatCompletionsBody, buildDeepSeekBody, extractCompletionText, extractStreamDelta, isStreamDone } from "./openai-transport.js";
@@ -907,7 +908,7 @@ export class ModelClient {
   requestLog({ from = 0, to = Infinity } = {}) {
     return this.requestRecords
       .filter((record) => record.index >= from && record.index < to)
-      .map((record) => JSON.parse(JSON.stringify(record)));
+      .map((record) => serializableCopy(record));
   }
 
   async health() {
@@ -1167,7 +1168,9 @@ function sha256(value) {
 }
 
 function serializableCopy(value) {
-  return JSON.parse(JSON.stringify(value));
+  const copy = snapshotJsonValue(value);
+  if (copy === undefined) throw new SyntaxError("Cannot copy a non-JSON value");
+  return copy;
 }
 
 const REDACTED_AUTHORIZATION = "Bearer [redacted]";

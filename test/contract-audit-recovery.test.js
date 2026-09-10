@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pendingContractAudit, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "../src/contract-audit-recovery.js";
+import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, VERIFICATION_RECEIPTS_SCHEMA } from "../src/contract-audit-recovery.js";
 import { verificationEvidence, verificationReceipt, shellExecutionReceipt } from "../src/verification-evidence.js";
 import { buildAssertionProbe } from "../src/contract-assertion-spec.js";
 import { canonicalEncode } from "../src/factory/fact-fabric.js";
@@ -662,6 +662,41 @@ function orderedTurn(rows, turn = 1) {
   };
 }
 const measuredProject = (changes = {}) => measuredCheck("npm test", "landing", changes);
+
+test("extra passing checks retain a complete pair on the unchanged tree, including serialized resume", () => {
+  for (const ordered of [true, false]) {
+    const rows = [audit, measuredCheck('node test/smoke.js'), measuredProject(),
+      measuredCheck('node test/perf.js'), measuredCheck('node test/shots.js')];
+    const turns = rows.map((row, i) => ordered && i ? orderedTurn([row], i) : row);
+    const before = JSON.stringify(turns);
+    assert.equal(pendingContractAudit(turns, orderedOptions), null);
+    assert.deepEqual(currentFocusedAuditWitness(turns, orderedOptions), {
+      command: 'node test/smoke.js', turn: 1, generation: 1,
+    }, 'protect the focused check that actually preceded the accepted project execution');
+    assert.equal(pendingContractAudit(JSON.parse(before), orderedOptions), null);
+    assert.equal(JSON.stringify(turns), before, 'evaluation does not rewrite receipts');
+    assert.ok(pendingContractAudit(turns, {...orderedOptions, generation: 2}));
+    assert.ok(pendingContractAudit([...turns, audit], orderedOptions));
+  }
+  const together = orderedTurn([measuredCheck(), measuredProject(), measuredCheck('node test/perf.js')]);
+  assert.equal(pendingContractAudit([audit, together], orderedOptions), null);
+});
+
+test("a later failed, opaque, interrupted or stale check still invalidates the completed pair", () => {
+  const prefix = [audit, orderedTurn([measuredCheck(), measuredProject()])];
+  for (const changes of [
+    {exitCode: 1}, {timedOut: true}, {aborted: true}, {stdout: '# tests 0\n# pass 0\n# fail 0\n'},
+  ]) {
+    const bad = orderedTurn([measuredCheck(undefined, 'shell', changes)], 2);
+    assert.ok(pendingContractAudit([...prefix, bad], orderedOptions), JSON.stringify(changes));
+  }
+  const opaque = orderedTurn([measuredCheck('node test/perf.js | tail -5')], 2);
+  assert.ok(pendingContractAudit([...prefix, opaque], orderedOptions));
+  const failed = orderedTurn([measuredCheck(undefined, 'shell', {exitCode: 1})], 2);
+  const recoveredFocus = orderedTurn([measuredCheck()], 3);
+  assert.equal(pendingContractAudit([...prefix, failed, recoveredFocus], orderedOptions).needsProject, true);
+  assert.equal(pendingContractAudit([...prefix, failed, recoveredFocus, orderedTurn([measuredProject()], 4)], orderedOptions), null);
+});
 
 test("ordered actual focused and landing executions on one turn discharge without losing the shell proof", () => {
   const row = orderedTurn([measuredCheck(), measuredProject()]);

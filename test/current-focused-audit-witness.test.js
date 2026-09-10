@@ -42,12 +42,13 @@ test('no audit, unqualified audit, same-turn proof or a new audit supplies no cu
   assert.equal(witness(settled(),{...options,generation:null}),null);
 });
 
-test('configured project proof must follow the latest focus; an unconfigured project is not invented',()=>{
+test('configured proof follows its focus; extra passing checks retain the completed pair until another pair replaces it',()=>{
   assert.equal(witness([audit(),ordered([execution()])]),null);
   assert.equal(witness([audit(),ordered([project(),execution()])]),null);
   assert.deepEqual(witness([audit(),ordered([project(),execution()]),ordered([project()],2)]),
     {command:'node check-api.mjs',turn:1,generation:4});
-  assert.equal(witness([...settled(),ordered([execution('node check-next.mjs')],2)]),null);
+  assert.deepEqual(witness([...settled(),ordered([execution('node check-next.mjs')],2)]),
+    {command:'node check-api.mjs',turn:1,generation:4});
   assert.deepEqual(witness([...settled(),ordered([execution('node check-next.mjs'),project()],2)]),
     {command:'node check-next.mjs',turn:2,generation:4});
   assert.deepEqual(witness([audit(),ordered([execution()])],{...options,configuredCommand:null}),

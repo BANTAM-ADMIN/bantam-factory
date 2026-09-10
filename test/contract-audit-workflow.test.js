@@ -95,6 +95,7 @@ for (const scenario of [
   fs.writeFileSync(path.join(workspace, "src/items.js"), "export function collectItems() { throw Error('TODO'); }\n");
   const good = "export function collectItems(token, items) { if (!Array.isArray(items)) throw Error('items'); if (typeof token !== 'string' || !token.length) throw Error('token'); return [...items]; }\n";
   const check = "import assert from 'node:assert/strict'; import { collectItems } from './src/items.js'; assert.throws(() => collectItems('', []), Error); assert.deepEqual(collectItems('valid', []), []);\n";
+  fs.writeFileSync(path.join(workspace, 'items.extra.verify.mjs'), "import assert from 'node:assert/strict'; import { collectItems } from './src/items.js'; assert.throws(() => collectItems('valid', null), Error);\n");
   const compound = scenario.command;
   const actions = [
     { a: "write_file", p: "src/items.js", content: good },
@@ -102,6 +103,7 @@ for (const scenario of [
     { a: "shell", c: "npm test" },
     { a: "shell", c: compound }, { a: "shell", c: compound },
     { a: "shell", c: "node items.verify.mjs" },
+    { a: "shell", c: "node items.extra.verify.mjs" },
     { a: "done", summary: "Implemented and checked the API." },
   ];
   const processes = [], prompts = [], events = [];
@@ -127,7 +129,7 @@ for (const scenario of [
     onEvent(event) { events.push(event); },
   });
   assert.equal(result.reachedDone, true, JSON.stringify(result.turns.map(turn => ({ a: turn.action, obs: turn.observation?.slice(-900) }))));
-  assert.equal(result.turns.length, 7);
+  assert.equal(result.turns.length, 8);
   assert.equal(auditCalls, 1);
   assert.equal(result.metrics[scenario.metric], 2);
   assert.equal(events.filter(event => event.type === "verification_workflow_refusal").length, 2);
@@ -145,7 +147,12 @@ for (const scenario of [
   assert.equal(focused.verificationReceipts.entries.length, 2, "actual focused execution precedes the existing automatic configured verifier");
   assert.equal(focused.verificationReceipts.entries[1].verificationEvidence.command, "npm test");
   assert.equal(focused.verificationReceipts.entries[1].verificationEvidence.status, "pass");
-  assert.equal(result.turns[6].doneAccepted, true);
+  assert.equal(result.turns[6].shellExecution.command, 'node items.extra.verify.mjs');
+  assert.equal(result.turns[6].verificationReceipts.entries.length, 1,
+    'an additional passing check must not launch the configured suite again');
+  assert.equal(result.turns[6].shellExecution.generation, focused.shellExecution.generation);
+  assert.match(prompts[7], /VERIFICATION READY:/);
+  assert.equal(result.turns[7].doneAccepted, true);
   assert.equal(fs.readFileSync(path.join(workspace, "items.verify.mjs"), "utf8"), check);
   assert.equal(fs.readFileSync(path.join(workspace, "src/items.js"), "utf8"), good);
   assert.equal(fs.readFileSync(path.join(workspace, "package.json"), "utf8"), packageText);

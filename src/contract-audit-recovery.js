@@ -444,10 +444,19 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
   const configured = String(configuredCommand ?? "").trim();
   let focusedTurn = null, projectTurn = null, focusedOrder = null, projectOrder = null, order = 0;
   let focusedWitness = null, projectWitnessValid = false, invalidatedAfterTurn = null;
+  // Additional passing checks on this same generation do not revoke an
+  // already ordered, execution-backed pair. Failures, unknown receipts and
+  // generation changes still clear credit before reaching this predicate.
+  let completedPair = null;
+  const rememberPair = () => {
+    completedPair = focusedTurn !== null && projectTurn !== null
+      && projectOrder > focusedOrder && projectWitnessValid ? {witness: focusedWitness} : null;
+  };
   const clear = (index = auditIndex) => {
     if (focusedTurn !== null || projectTurn !== null) invalidatedAfterTurn = index;
     focusedTurn = projectTurn = focusedOrder = projectOrder = null;
     focusedWitness = null; projectWitnessValid = false;
+    completedPair = null;
   };
   for (let index = auditIndex; index < turns.length; index++) {
     const turn = turns[index];
@@ -461,6 +470,8 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
         if (validStationProject(station.projectVerification, generation, configured, verificationWorkspaceReadOnly)) {
           projectTurn = index;
           projectOrder = order++;
+          projectWitnessValid = true;
+          rememberPair();
         }
       }
       // The ordinary action/proof on this turn precedes the station. Only the
@@ -486,6 +497,7 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
               || (controller && typeof verificationWorkspaceReadOnly === "boolean"
                 && proof.workspaceReadOnly !== verificationWorkspaceReadOnly)) { clear(index); continue; }
           projectTurn = index; projectOrder = at; projectWitnessValid = true;
+          rememberPair();
         }
       }
       continue;
@@ -524,10 +536,12 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
         && (!controller || (sameCommand(proof.command, configured) && sameConfiguredExecution(proof.executedCommand, configured)))
         && (!controller || typeof verificationWorkspaceReadOnly !== "boolean"
           || proof.workspaceReadOnly === verificationWorkspaceReadOnly);
+      rememberPair();
     }
   }
   const projectAfterFocused = projectTurn !== null && focusedTurn !== null
     && projectOrder > focusedOrder;
+  if (completedPair) return {pending: null, witness: completedPair.witness};
   if (focusedTurn !== null && (!configured || projectAfterFocused)) {
     return { pending: null, witness: focusedWitness && (!configured || projectWitnessValid) ? focusedWitness : null };
   }

@@ -76,6 +76,58 @@ function stoppedLimitOf(data) {
   return nativeStoppedLimit(data) || openAiStoppedLimit(data);
 }
 
+/**
+ * Timings for a response the server did not measure itself.
+ *
+ * llama.cpp returns a `timings` block with every completion, and nearly every
+ * throughput gauge in BANTAM reads it: the model cards, run-timing's
+ * prefill/decode split, prefix-stability, the supervisor's analyzers. An
+ * OpenAI-compatible server (vLLM, LM Studio, …) returns none of it, so on that
+ * lane all of those silently read ZERO. BANTAM could not report the speed of its
+ * own generation — which is exactly how a server delivering 140 tok/s feels slow
+ * with nothing on screen to contradict it.
+ *
+ * Measured from the client side instead. When the response streamed, the first
+ * token marks the prefill/decode boundary and both halves are real. When it did
+ * not, only the whole exchange is knowable, so prefill stays null and the rate
+ * is end-to-end — flagged in `measured`, never passed off as decode speed.
+ */
+export function measuredTimings({ promptN = 0, genN = 0, startedAt = null, firstTokenAt = null, finishedAt = null } = {}) {
+  if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt)) return {};
+  const streamed = Number.isFinite(firstTokenAt) && firstTokenAt >= startedAt;
+  const prefillMs = streamed ? Math.max(0, firstTokenAt - startedAt) : null;
+  const predictedMs = streamed ? Math.max(0, finishedAt - firstTokenAt) : Math.max(0, finishedAt - startedAt);
+  const timings = {
+    prompt_n: promptN,
+    predicted_n: genN,
+    predicted_ms: predictedMs,
+    measured: streamed ? "client-stream" : "client-total",
+  };
+  if (prefillMs !== null) timings.prompt_ms = prefillMs;
+  if (genN > 0 && predictedMs > 0) timings.predicted_per_second = genN / (predictedMs / 1000);
+  return timings;
+}
+
+/** A server-reported timings block, or null when the server sent none. */
+function serverTimings(value) {
+  return value && typeof value === "object" && Object.keys(value).length ? value : null;
+}
+
+// Monotonic and sub-millisecond. Date.now() has 1 ms resolution, and a short
+// grammar-constrained ACTION can finish inside a single tick — which measured
+// as 0 ms and produced no rate at all, on exactly the calls BANTAM makes most.
+const nowMs = () => performance.now();
+
+/** Human-readable decode speed from a timings block, or null. */
+export function timingsTokensPerSecond(timings) {
+  if (!timings || typeof timings !== "object") return null;
+  const rate = Number(timings.predicted_per_second);
+  if (Number.isFinite(rate) && rate > 0) return rate;
+  const n = Number(timings.predicted_n);
+  const ms = Number(timings.predicted_ms);
+  return n > 0 && ms > 0 ? n / (ms / 1000) : null;
+}
+
 // The app-server does not take nPredict on turn/start. Its worker still has a
 // generic local profile, but that profile's sampling cap is not a Codex limit.
 // Only advertise (or infer truncation from) a cap this transport actually sends.
@@ -248,6 +300,9 @@ export class ModelClient {
     this.onRequestRecord = typeof opts.onRequestRecord === "function" ? opts.onRequestRecord : null;
     this.onUsage = typeof opts.onUsage === "function" ? opts.onUsage : null;
     this.lastUsage = null;
+    // Speed of the most recent response, in the same shape llama.cpp sends, so
+    // `:usage`, `cards` and run-timing can speak for every transport.
+    this.lastTimings = null;
     this.usageTotals = emptyModelUsage();
     this.usageHistory = [];
     this.externalUsageHistory = [];
@@ -351,6 +406,21 @@ export class ModelClient {
     return this.apiContextWindow ?? null;
   }
 
+  /**
+   * Decode speed of the most recent response, or null when it cannot be
+   * measured. The number to watch when a server feels slow: it is BANTAM's own
+   * observation of the response it just received, not a vendor figure.
+   */
+  get observedTokensPerSecond() {
+    return timingsTokensPerSecond(this.lastTimings);
+  }
+
+  /** Prefill latency (ms) of the most recent response, or null. */
+  get observedPrefillMs() {
+    const ms = Number(this.lastTimings?.prompt_ms);
+    return Number.isFinite(ms) && ms >= 0 ? ms : null;
+  }
+
   get codexToolIdentity() {
     // codexapi accepts model:effort; native vision tools accept them separately.
     const match = this.codexBacked && this.modelName?.match(/^(.*):(low|medium|high|xhigh|max|ultra)$/);
@@ -392,7 +462,11 @@ export class ModelClient {
   // prefill and generation speed per context bucket — at zero token cost.
   // Best-effort by design: telemetry must never break a completion.
   _recordCardSample(result) {
-    if (this.codex || this.apiMode || this.deepseek) return;
+    if (this.codex || this.deepseek) return;
+    // An OpenAI-compatible lane used to be excluded here because it reported no
+    // timings, so its card was never taught anything. measuredTimings() now
+    // supplies a real rate, and a card that silently learns nothing is how a
+    // 140 tok/s server stays invisible.
     const t = result?.timings;
     if (!t || typeof t.predicted_per_second !== "number") return;
     try {
@@ -656,6 +730,9 @@ export class ModelClient {
 
   async _completeOnce(request, opts = {}, exchange = {}) {
     const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
+    // Wall-clock origin for the client-side timings fallback. Set before any
+    // network work so a server that reports nothing still yields a real rate.
+    const requestStartedAt = nowMs();
 
     const externalSignal = opts.signal ?? null;
     if (externalSignal?.aborted) throw interruptedError();
@@ -747,13 +824,14 @@ export class ModelClient {
         throw err;
       }
       if (onProgress) {
-        const streamed = await this._readStream(res, onProgress);
+        const streamed = await this._readStream(res, onProgress, requestStartedAt);
         if (request.chatSession) streamed.result.content = normalizeCodexStructuredContent(
           streamed.result.content, request.actionSchema ?? JSON.parse(request.body).response_format?.json_schema?.schema);
         exchange.response = responseRecord(res, streamed.rawBody, streamed.result);
         return streamed.result;
       }
       const { data, rawBody } = await readJsonResponse(res);
+      const responseFinishedAt = nowMs();
       const result = {
         // The chat endpoint continues a trailing assistant message and echoes it
         // back at the head of `content`; /completion never does. Strip it, or the
@@ -768,7 +846,13 @@ export class ModelClient {
         // prompt on a 48k slot, every generation cut after a few hundred tokens.
         truncated: Boolean(data.truncated),
         promptTokens: Number(data.tokens_evaluated ?? data.usage?.prompt_tokens ?? 0) || 0,
-        timings: data.timings ?? {},
+        timings: serverTimings(data.timings) ?? measuredTimings({
+          promptN: Number(data.usage?.prompt_tokens ?? data.tokens_evaluated ?? 0) || 0,
+          genN: Number(data.usage?.completion_tokens ?? data.tokens_predicted ?? 0) || 0,
+          startedAt: requestStartedAt,
+          firstTokenAt: null, // non-streaming: the prefill/decode boundary is unobservable
+          finishedAt: responseFinishedAt,
+        }),
         usage: usageFromResponse(data, {
           provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
           model: data.model || this.modelName,
@@ -800,7 +884,7 @@ export class ModelClient {
   // Accumulate a llama.cpp SSE stream ("data: {json}\n\n" events; the final event carries
   // stop=true with tokens_predicted/timings). onProgress is throttled to ~2 calls/sec with the
   // content accumulated SO FAR, so the caller can show what is being generated as it grows.
-  async _readStream(res, onProgress) {
+  async _readStream(res, onProgress, startedAt = nowMs()) {
     const decoder = new TextDecoder();
     let buffered = "";
     let raw = "";
@@ -809,6 +893,9 @@ export class ModelClient {
     let final = null;
     let usageEvent = null;
     let lastReport = 0;
+    // The first token is the prefill/decode boundary, and on a lane whose server
+    // reports no timings it is the only place that boundary can be observed.
+    let firstTokenAt = null;
     for await (const part of res.body) {
       const text = decoder.decode(part, { stream: true });
       raw += text;
@@ -827,7 +914,9 @@ export class ModelClient {
           const message = typeof evt.error === "string" ? evt.error : (evt.error.message ?? JSON.stringify(evt.error));
           throw Object.assign(new Error(`model stream error: ${message}`), { code: "stream_error" });
         }
-        content += extractStreamDelta(evt);
+        const delta = extractStreamDelta(evt);
+        if (delta && firstTokenAt === null) firstTokenAt = nowMs();
+        content += delta;
         chunks++;
         if (evt.usage) usageEvent = evt;
         if (isStreamDone(evt)) final = evt;
@@ -862,7 +951,11 @@ export class ModelClient {
             tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
             stoppedEos: Boolean(data.stopped_eos),
             stoppedLimit: stoppedLimitOf(data),
-            timings: data.timings ?? {},
+            timings: serverTimings(data.timings) ?? measuredTimings({
+              promptN: Number(data.usage?.prompt_tokens ?? data.tokens_evaluated ?? 0) || 0,
+              genN: Number(data.usage?.completion_tokens ?? data.tokens_predicted ?? 0) || 0,
+              startedAt, firstTokenAt, finishedAt: nowMs(),
+            }),
             usage: usageFromResponse(data, {
               provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
               model: data.model || this.modelName,
@@ -885,7 +978,13 @@ export class ModelClient {
         stoppedLimit: stoppedLimitOf(final),
         truncated: Boolean(final?.truncated),
         promptTokens: streamedPromptTokens(),
-        timings: final?.timings ?? {},
+        // Server timings when it measured itself (llama.cpp); otherwise the
+        // client-side measurement, so speed is observable on every lane.
+        timings: serverTimings(final?.timings) ?? measuredTimings({
+          promptN: streamedPromptTokens(),
+          genN: streamedTokenCount(),
+          startedAt, firstTokenAt, finishedAt: nowMs(),
+        }),
         usage: usageFromResponse(usageSource, {
           provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
           model: usageSource.model || final?.model || this.modelName,
@@ -895,6 +994,9 @@ export class ModelClient {
   }
 
   _recordUsage(result) {
+    // Retain the measured speed even when the server reports no usage, so the
+    // session can always answer "how fast was that last response?".
+    this.lastTimings = serializableCopy(result?.timings ?? null);
     const entry = result?.usage;
     if (!entry) return;
     this.lastUsage = serializableCopy(entry);

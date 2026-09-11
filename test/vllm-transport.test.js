@@ -16,7 +16,7 @@
 //     native llama.cpp booleans are simply absent.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ModelClient } from "../src/model.js";
+import { ModelClient, measuredTimings, timingsTokensPerSecond } from "../src/model.js";
 import { grammarFieldFor, buildOpenAiBody, STRUCTURED_OUTPUTS_FIELD } from "../src/openai-transport.js";
 import { discoverOpenAiServers, discoverModelServers } from "../src/first-run.js";
 import { startupChoiceNeeded } from "../src/startup-model-choice.js";
@@ -151,4 +151,62 @@ test("streaming tokens come from the usage frame, not the SSE frame count", asyn
   assert.equal(result.stoppedLimit, false, "finish_reason stop is a finish, not a limit");
   assert.equal(result.usage.outputTokens, 9);
   assert.equal(result.usage.cacheHitTokens, 32);
+});
+
+test("measured timings split prefill from decode when the response streamed", () => {
+  const t = measuredTimings({ promptN: 1200, genN: 80, startedAt: 1000, firstTokenAt: 1400, finishedAt: 1800 });
+  assert.equal(t.measured, "client-stream");
+  assert.equal(t.prompt_n, 1200);
+  assert.equal(t.predicted_n, 80);
+  assert.equal(t.prompt_ms, 400, "first token is the prefill/decode boundary");
+  assert.equal(t.predicted_ms, 400);
+  assert.equal(t.predicted_per_second, 200, "80 tokens over 0.4s of decode");
+});
+
+test("measured timings admit when only the whole exchange was knowable", () => {
+  const t = measuredTimings({ promptN: 500, genN: 40, startedAt: 0, firstTokenAt: null, finishedAt: 2000 });
+  assert.equal(t.measured, "client-total");
+  assert.equal(t.prompt_ms, undefined, "prefill is unobservable without a first-token boundary");
+  assert.equal(t.predicted_ms, 2000);
+  assert.equal(t.predicted_per_second, 20);
+});
+
+test("measured timings never invent a rate they cannot measure", () => {
+  assert.deepEqual(measuredTimings({}), {}, "no clock, no claim");
+  assert.equal(measuredTimings({ genN: 0, startedAt: 0, finishedAt: 100 }).predicted_per_second, undefined);
+  assert.equal(timingsTokensPerSecond({}), null);
+  assert.equal(timingsTokensPerSecond({ predicted_n: 50, predicted_ms: 500 }), 100, "rate is derived when absent");
+});
+
+test("a streaming response yields an observed rate the session can report", async (t) => {
+  const client = new ModelClient({ profile: "qwen", apiUrl: "http://fixture.invalid/v1", model: "m", apiDialect: "vllm" });
+  assert.equal(client.observedTokensPerSecond, null, "nothing measured before a response");
+  const frame = (o) => `data: ${JSON.stringify(o)}`;
+  const sse = [
+    frame({ choices: [{ text: '{"a":"done",', index: 0 }] }),
+    frame({ choices: [{ text: '"summary":"x"}', index: 0, finish_reason: "stop" }] }),
+    frame({ choices: [], usage: { prompt_tokens: 900, completion_tokens: 60, total_tokens: 960 } }),
+    "data: [DONE]",
+    "",
+  ].join("\n\n");
+  t.mock.method(globalThis, "fetch", async () => new Response(sse, {
+    status: 200, headers: { "content-type": "text/event-stream" },
+  }));
+  const result = await client.complete("<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n\n", { nPredict: 64, onProgress: () => {} });
+  assert.equal(result.timings.measured, "client-stream", "vLLM sent no timings, so BANTAM measured its own");
+  assert.ok(client.observedTokensPerSecond > 0, "the session can now answer how fast that was");
+  assert.ok(Number.isFinite(client.observedPrefillMs), "and how long it waited for the first token");
+});
+
+test("a server that reports its own timings is still authoritative", async (t) => {
+  const client = new ModelClient({ profile: "qwen", apiUrl: null, endpoint: "http://fixture.invalid" });
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({
+    content: "done", stop: true, tokens_predicted: 7, tokens_evaluated: 12,
+    timings: { prompt_n: 12, predicted_n: 7, prompt_ms: 30, predicted_ms: 70, predicted_per_second: 100 },
+  }), { status: 200, headers: { "content-type": "application/json" } }));
+  // complete() so the full path runs, including _recordUsage().
+  const result = await client.complete("x", {});
+  assert.equal(result.timings.measured, undefined, "llama.cpp timings are passed through untouched");
+  assert.equal(result.timings.predicted_per_second, 100);
+  assert.equal(client.observedTokensPerSecond, 100);
 });

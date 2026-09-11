@@ -1583,7 +1583,24 @@ let usageDisplayEnabled = args.usage === true
     : false);
 model.onUsage = ({ entry, totals }) => {
   if (!usageDisplayEnabled) return;
-  process.stderr.write(`  usage  ${formatUsage(entry)}\n`);
+  // Say how fast that response actually was, from BANTAM's own measurement of
+  // it. Without this the only speed signal on a server that reports no timings
+  // was the operator's impression — a 140 tok/s answer can read as "slow" when
+  // nothing on screen numbers it.
+  const tps = model.observedTokensPerSecond;
+  const ttft = model.observedPrefillMs;
+  const t = model.lastTimings;
+  const totalMs = Number.isFinite(ttft) && Number.isFinite(t?.predicted_ms) ? ttft + t.predicted_ms : null;
+  // A short action is 10-20 tokens, so its tok/s is dominated by fixed
+  // per-request cost (admission + prefill + first decode step). Show the total
+  // time beside the rate, or a healthy 0.5s turn reads as a broken 20 tok/s.
+  const speed = tps === null
+    ? ""
+    : ` · ${tps.toFixed(tps >= 100 ? 0 : 1)} tok/s`
+      + (totalMs === null ? "" : ` · ${(totalMs / 1000).toFixed(2)}s total`)
+      + (ttft === null ? "" : ` (${(ttft / 1000).toFixed(2)}s to first token)`)
+      + (t?.measured === "client-total" ? " [end-to-end]" : "");
+  process.stderr.write(`  usage  ${formatUsage(entry)}${speed}\n`);
   process.stderr.write(`         ${formatUsage(totals, { cumulative: true })}\n`);
 };
 

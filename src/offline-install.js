@@ -28,6 +28,18 @@ const MANAGER_DESTINATIONS = Object.freeze({
   gem: "RubyGems' configured install/cache directories",
 });
 
+// Managers that write into the CONTAINER IMAGE's filesystem. The sandbox is
+// `docker run --rm --read-only` and the host /usr is bind-mounted over the
+// image's, so these can neither persist nor become visible: the tool has to
+// come from the host instead.
+const SYSTEM_PACKAGE_MANAGERS = new Set(["apt", "apk"]);
+// Managers whose default action lands in the workspace (node_modules) or in the
+// persistent sandbox HOME (/tmp), so an operator-approved install survives later
+// commands. A `-g`/`--global` install targets the read-only mounted interpreter
+// instead, so it is classified separately.
+const GLOBAL_INSTALL_MANAGERS = new Set(["npm", "yarn", "pnpm"]);
+const GLOBAL_INSTALL_FLAGS = new Set(["-g", "--global", "--location=global"]);
+
 const SYSTEM_SCRIPT_EXECUTABLES = new Set([
   "bash", "bun", "cargo", "cd", "cmake", "cp", "deno", "echo", "false", "go", "make",
   "mkdir", "mv", "node", "perl", "printf", "pwd", "python", "python3", "rm", "ruby", "sh",
@@ -112,6 +124,7 @@ export function classifyOfflineInstall(command) {
     const match = classifyWords(unwrapped.words, unwrapped.assignments);
     if (!match || match.offline) continue;
 
+    const scope = installScope(match.ecosystem, unwrapped.words);
     const classification = {
       kind: "offline-package-install",
       blocked: true,
@@ -122,6 +135,11 @@ export function classifyOfflineInstall(command) {
       command: source,
       segment: rawSegment.trim(),
       destination: MANAGER_DESTINATIONS[match.ecosystem],
+      // Where the install would land, and whether it can survive the command.
+      // The sandbox runs `docker run --rm --read-only`, so only workspace/HOME
+      // writes persist; this is what the operator prompt and guidance key off.
+      scope,
+      persistent: scope === "project",
       reason: "default-docker-no-network",
     };
     return { ...classification, message: formatOfflineInstallMessage(classification) };
@@ -264,15 +282,39 @@ export function formatOfflineInstallMessage(classification) {
   const execFallback = operation === "exec"
     ? "If the tool is already a project dependency, run its binary directly instead — `./node_modules/.bin/<tool> ...` (list what exists with `ls node_modules/.bin`), or `npm exec --offline --no-install -- <tool> ...`. That needs no network and is usually all this situation requires."
     : null;
+  const systemScope = classification?.scope === "system";
+  const persistent = classification?.persistent === true;
   return [
     `[offline-install] Blocked ${manager} ${operation}: no command was run.`,
     ...(execFallback ? [execFallback] : []),
     "Bantam's default Docker shell has networking disabled, so it cannot reach package registries or system mirrors.",
-    `This manager normally writes to ${destination}. Node dependencies should live in the target project's node_modules; Python dependencies should use a project-local .venv.`,
-    "Preinstall the dependencies from a normal terminal outside Bantam, then retry in the sandbox.",
+    ...(systemScope
+      ? [
+          "This manager writes into the container image, which Bantam shadows with the host's read-only /usr and discards after every command (`docker run --rm --read-only`): an in-container apt/apk install can neither persist nor become visible.",
+          "To give the sandbox a system tool, make it available on the HOST where the sandbox already mounts read-only — a normal install under /usr or /usr/local, or an extra root (for example the Chrome .deb at /opt/google/chrome) via BANTAM_SHELL_MOUNT_RO=/opt/google/chrome. Snap-only installs stay unreachable; use a non-snap build.",
+          "A browser the project drives itself is different: install the project dependency (Playwright/Puppeteer) and let its own downloader fetch the browser into HOME, which is persistent sandbox scratch. Approve network for that install instead of installing a system package.",
+        ]
+      : [
+          `This manager normally writes to ${destination}${persistent ? ", which sits inside the writable workspace or the persistent sandbox HOME, so an approved install survives later commands" : ""}. Node dependencies belong in the target project's node_modules; Python dependencies belong in a project-local .venv (a bare 'pip install' targets the read-only mounted interpreter, so create the venv first).`,
+        ]),
+    "Run the install from a normal terminal outside Bantam, or let Bantam ask the operator and approve it: answer the prompt interactively, or start with --allow-installs (or BANTAM_ALLOW_INSTALLS=1) to approve network for classified installs without prompting.",
     "Alternatively, restart Bantam with --shell-network (or BANTAM_SHELL_NETWORK=1) only if you trust the model and workspace. This keeps Docker filesystem confinement but permits model-chosen commands to send workspace data over the network.",
     "Do not switch to BANTAM_SHELL_SANDBOX=host merely to install packages: host mode has no filesystem confinement and can access anything your user account can.",
   ].join("\n");
+}
+
+/**
+ * Where would this install land, and can it survive the command?
+ *   project -> workspace node_modules/.venv or the persistent sandbox HOME (persists)
+ *   global  -> the read-only mounted interpreter/tool prefix (does not persist)
+ *   system  -> the container image rootfs (does not persist; the image is discarded)
+ */
+function installScope(ecosystem, words) {
+  if (SYSTEM_PACKAGE_MANAGERS.has(ecosystem)) return "system";
+  if (GLOBAL_INSTALL_MANAGERS.has(ecosystem) && words.some((word) => GLOBAL_INSTALL_FLAGS.has(word))) {
+    return "global";
+  }
+  return "project";
 }
 
 function classifyWords(words, assignments) {

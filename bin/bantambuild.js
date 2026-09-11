@@ -76,6 +76,8 @@ const args = parseArgs(cliArgs);
 const savedApi = loadApiConfig();
 const cmd = args._[0];
 if (args["shell-network"] === true) process.env.BANTAM_SHELL_NETWORK = "1";
+// Narrower than --shell-network: pre-approve network ONLY for classified installs.
+if (args["allow-installs"] === true) process.env.BANTAM_ALLOW_INSTALLS = "1";
 
 // State inspection, channel promotion, and lane rewind are local storage
 // operations. They must work while the model server is down and must never

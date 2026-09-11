@@ -73,7 +73,11 @@ Use [build, inspect, apply](FACTORY-GETTING-STARTED.md).
 - **Work inside the project.** Put input files and images in the workspace so
   BANTAM FACTORY can reach them. Image understanding also needs a vision-capable model.
 - **Network access asks first.** Docker shell commands start with networking off;
-  interactive sessions can request access when needed.
+  interactive sessions can request access when needed. A registry install
+  (`npm`/`pip`/`uv`/…) asks the same way, and `--allow-installs` pre-approves
+  installs for a headless run. System packages (`apt`/`apk`) cannot persist in
+  the sandbox: install those tools on the host, or expose an extra host root with
+  `BANTAM_SHELL_MOUNT_RO` (for example `/opt/google/chrome` for a browser test).
 - **Keep run records private.** They can contain project code and prompts.
   [Fight cards](BRING-YOUR-OWN-COMPARISONS.md) have a separate public export.
 
@@ -82,7 +86,8 @@ Use [build, inspect, apply](FACTORY-GETTING-STARTED.md).
 Run `bantamfactory doctor` to check the server and Docker setup.
 Use `bantamfactory setup` to change the connection, or `bantamfactory --help`
 for command options. Your project's language tools and dependencies must also
-be installed.
+be installed on the host — the sandbox mounts them read-only rather than
+installing them itself.
 
 The supported beta path is Linux or WSL2. Native Windows is unsupported;
 macOS is untested. The default Docker sandbox depends on Linux host tools.

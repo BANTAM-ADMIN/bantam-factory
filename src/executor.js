@@ -74,6 +74,11 @@ import { runProbe } from "./probe.js";
 // with BANTAM_SHELL_SANDBOX=host.
 export const DEFAULT_SANDBOX_IMAGE = "alpine:3";
 
+// Returned when an operator was actually asked and said no to a classified
+// install. Terminal, like the standing block, so a declined install cannot
+// become an install/retry loop.
+const INSTALL_DECLINED_NOTE = "[net-access] The operator was asked to allow network for this install and DECLINED. Do not retry it or variants of it; if the dependency is already on disk, use that, otherwise state the missing dependency in your summary.";
+
 export class Executor {
   constructor(workspace, opts = {}) {
     this.workspace = path.resolve(workspace);
@@ -110,6 +115,18 @@ export class Executor {
     // "allow-once" runs just this command with network, "allow-session" flips
     // shellNetwork on for the rest of the run, anything else declines.
     this.onNetRequest = opts.onNetRequest ?? null;
+    // Package-install policy for the offline Docker sandbox (operator ask,
+    // 2026-09-11). "ask" (default) consults onNetRequest when one is wired;
+    // "allow" pre-approves each classified install, which is --allow-installs /
+    // BANTAM_ALLOW_INSTALLS=1 and needs no TTY; "deny" keeps the fail-fast block.
+    // This is deliberately narrower than shellNetwork: it grants network ONLY to
+    // a command the classifier already identified as a package install.
+    const installPolicy = opts.installPolicy
+      ?? (envEnabled(process.env.BANTAM_ALLOW_INSTALLS) ? "allow" : "ask");
+    if (!["ask", "allow", "deny"].includes(installPolicy)) {
+      throw new Error(`Unknown installPolicy: ${installPolicy}; expected ask, allow or deny.`);
+    }
+    this.installPolicy = installPolicy;
     this.onShellOutput = opts.onShellOutput ?? null;
     // The sandbox image only has to EXIST: the container is a bare rootfs and the
     // toolchain (python3, node, git, …) is bind-mounted read-only from the host by
@@ -1246,10 +1263,38 @@ export class Executor {
         // exactly what happened to the TILDE fix run: it edited the scrim
         // CSS, ran `npx tsc`, and the run ended with the hint in the receipt
         // (chat r0 @ 2026-08-17T23:52). Return it as a plain observation and
-        // let the model act on it. Install blocks and missing-local-tool
-        // blocks stay terminal: only the operator can change those facts.
+        // let the model act on it. A missing-local-tool block stays terminal:
+        // running the tool cannot conjure its binary, and the install that
+        // would is classified and handled below.
         if (offline && offline.operation === "exec") return { observation: offline.message };
-        return { observation: blocked.message, blocked };
+        // A real install is recoverable by the OPERATOR. The same hook that
+        // grants network for a classified fetch can grant it for this install:
+        // approving runs the command with network (allow-once) or turns it on
+        // for the session (allow-session). --allow-installs pre-approves each
+        // one for headless runs. A decline, an explicit deny policy, and a
+        // headless run with no hook all keep the fail-fast terminal block.
+        if (offline && this.installPolicy !== "deny") {
+          let decision = "deny";
+          let prompted = false;
+          if (this.installPolicy === "allow") {
+            decision = "allow-once";
+          } else if (this.onNetRequest) {
+            prompted = true;
+            try {
+              decision = await this.onNetRequest({ command: c, kind: "install", classification: offline });
+            } catch { /* a broken UI declines */ }
+          }
+          if (decision === "allow-session") this.shellNetwork = true;
+          else if (decision === "allow-once") netGrantOnce = true;
+          else {
+            return {
+              observation: prompted ? `${offline.message}\n${INSTALL_DECLINED_NOTE}` : offline.message,
+              blocked,
+            };
+          }
+        } else {
+          return { observation: blocked.message, blocked };
+        }
       }
     }
 
@@ -2005,7 +2050,7 @@ function dockerShellRunner(workspace, image, command, {
   const scratch = fixtureScratch ? ["-v", `${fixtureScratch}:/tmp:rw`]
     : scratchMountArgs(workspace, workspaceReadOnly ? { BANTAM_SCRATCH_TMPFS: "1" } : process.env);
   const mounts = [
-    ...dockerMountArgs(workspace, rust.mounts, readOnlyWorkspacePaths, workspaceReadOnly, containerWorkspace),
+    ...dockerMountArgs(workspace, [...rust.mounts, ...operatorReadOnlyMounts()], readOnlyWorkspacePaths, workspaceReadOnly, containerWorkspace),
     ...readOnlyHostFileMounts(readOnlyHostFiles),
   ];
   if (fixtureScratch) prepareFixtureMountpoints(fixtureScratch, mounts);
@@ -2227,13 +2272,56 @@ function dockerMountArgs(
 
 function hostToolRoots() {
   const roots = new Set();
-  for (const name of ["node", "npm", "python3", "python", "pytest", "go", "cargo", "rustc"]) {
+  // Not only language runtimes. A project's own browser test needs a browser the
+  // base image does not carry, and an in-image install is invisible because the
+  // host /usr is bind-mounted over it. A browser installed on the host outside a
+  // system root (the Chrome .deb resolves to /opt/google/chrome) gets mounted
+  // read-only here, so the test can run in-sandbox with no network and no host
+  // shell access. Snap-only installs resolve to /usr/bin/snap and are correctly
+  // skipped by the isSystemRoot check below.
+  for (const name of [
+    "node", "npm", "python3", "python", "pytest", "go", "cargo", "rustc",
+    "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome", "firefox",
+  ]) {
     const exe = findOnPath(name);
     if (!exe) continue;
     const root = executableRoot(exe);
     if (!isSystemRoot(root) && !isUnsafeMountRoot(root)) roots.add(root);
   }
   return [...roots];
+}
+
+// Operator escape hatch for a host tool the sandbox cannot install itself:
+// BANTAM_SHELL_MOUNT_RO=/opt/mytool:/snap exposes those HOST directories
+// read-only at the same path in the container. Colon-separated absolute paths.
+// The same private-home refusal that guards tool roots applies, and
+// BANTAM_MOUNT_HOME_TOOLS=1 is the documented way to accept that exposure.
+export function operatorReadOnlyMounts(value = process.env.BANTAM_SHELL_MOUNT_RO, {
+  home = os.homedir(),
+  passthrough = process.env.BANTAM_MOUNT_HOME_TOOLS,
+} = {}) {
+  if (value === undefined || value === null || String(value).trim() === "") return [];
+  const roots = [];
+  for (const raw of String(value).split(/[:,]/)) {
+    const entry = raw.trim();
+    if (!entry) continue;
+    if (!path.isAbsolute(entry) || entry.includes("\0")) {
+      throw new Error(`BANTAM_SHELL_MOUNT_RO entries must be absolute paths: ${entry}`);
+    }
+    if (!fs.existsSync(entry)) {
+      throw new Error(`BANTAM_SHELL_MOUNT_RO path does not exist: ${entry}`);
+    }
+    const real = fs.realpathSync(entry);
+    if (real === "/") throw new Error("BANTAM_SHELL_MOUNT_RO cannot mount the filesystem root");
+    if (isUnsafeMountRoot(real, { home, passthrough })) {
+      throw new Error(`BANTAM_SHELL_MOUNT_RO refuses a private home path: ${real}`);
+    }
+    roots.push(real);
+  }
+  // Nested [flag, value] pairs match rustSandboxExtras and let dockerMountArgs
+  // dedupe by destination, so an operator root that overlaps /usr never becomes
+  // a duplicate mount point (Docker rejects those).
+  return [...new Set(roots)].map((root) => ["-v", `${root}:${root}:ro`]);
 }
 
 // A rustup-managed toolchain lives under HIDDEN home dirs the general mount rule rightly refuses

@@ -210,6 +210,9 @@ if (cmd === 'cards') {
   } catch(error) { console.error(`Fight cards: ${error.message}`); process.exit(2); }
 }
 if (args["shell-network"] === true) process.env.BANTAM_SHELL_NETWORK = "1";
+// Narrower than --shell-network: pre-approve network ONLY for commands the
+// install classifier identifies, so a headless run can still install deps.
+if (args["allow-installs"] === true) process.env.BANTAM_ALLOW_INSTALLS = "1";
 // First-class trajectory choice (operator, 2026-08-18): rebuild stays the
 // quality default (the 08-12 preregistered ruling — stale panels poison
 // post-bounce repairs); --context-mode extension opts a session into the
@@ -3711,7 +3714,7 @@ async function execCommand() {
   const supportedOptions = new Set([
     "help", "json", "workspace", "verify", "max-turns", "endpoint",
     "profile", "temperature", "act-temperature", "top-p", "top-k", "think",
-    "ground", "no-ground", "shell-network", "api-url", "api-key", "api-dialect",
+    "ground", "no-ground", "shell-network", "allow-installs", "api-url", "api-key", "api-dialect",
     "model", "deepseek", "codex", "codex-effort", "write-batch", "context-mode",
   ]);
   const unknown = Object.keys(args).find((key) => key !== "_" && !supportedOptions.has(key));
@@ -5499,9 +5502,13 @@ async function repl() {
           // outright (no prompts); otherwise a classified internet fetch pauses
           // the run and asks the OPERATOR: once / always / no (default no).
           shellNetwork: args["dangerously-allow-net"] ? true : undefined,
-          onNetRequest: args["dangerously-allow-net"] ? null : async ({ command }) => {
+          onNetRequest: args["dangerously-allow-net"] ? null : async ({ command, kind, classification }) => {
             const shown = String(command).replace(/\s+/g, " ").slice(0, 140);
-            process.stderr.write(`\n  ${paint("33", "⏸ net access request")} the model wants to run:\n      ${shown}\n`);
+            const wants = kind === "install" ? "install packages" : "fetch from the network";
+            process.stderr.write(`\n  ${paint("33", "⏸ network access request")} the model wants to ${wants}:\n      ${shown}\n`);
+            if (kind === "install" && classification?.persistent === false) {
+              process.stderr.write(`  ${paint("2", "note: this install targets the discarded, read-only container image and will NOT persist. For a system tool, put it on the host and expose it with BANTAM_SHELL_MOUNT_RO.")}\n`);
+            }
             const answer = await new Promise((res2) => rl.question(`  allow network for this? [y]es once / [a]lways this session / [N]o: `, res2));
             const t = String(answer ?? "").trim().toLowerCase();
             if (t === "a" || t === "always") return "allow-session";
@@ -5792,7 +5799,7 @@ async function selfImproveCommand({ modelClient, forcePlan = false } = {}) {
     "workspace", "candidate", "verify", "max-turns", "plan", "dry-run",
     "no-apply", "help", "endpoint", "profile", "temperature",
     "act-temperature", "top-p", "top-k", "api-url", "api-key", "model",
-    "api-dialect", "no-rooster", "rooster", "shell-network", "codex",
+    "api-dialect", "no-rooster", "rooster", "shell-network", "allow-installs", "codex",
     "codex-effort",
   ]);
   const unknown = Object.keys(args).find((name) => name !== "_" && !allowedOptions.has(name));
@@ -6277,7 +6284,7 @@ function writeReplayMineOutput(value) {
 }
 
 function usage() {
-  return `bantam [--workspace .] [--verify "npm test"] [--shell-network] [--context-mode rebuild|extension]
+  return `bantam [--workspace .] [--verify "npm test"] [--shell-network] [--allow-installs] [--context-mode rebuild|extension]
                                   interactive mode (type requests; works on the selected dir)
 bantam chat                       same as above (explicit)
 ./bin/run-dev.sh self-improve [--candidate ID] [--verify "npm test"] [--max-turns 120] [--no-apply]
@@ -6385,6 +6392,13 @@ The watched file must be outside the worker workspace; publish updates by atomic
 (also BANTAM_SHELL_NETWORK=1). It keeps Docker filesystem confinement, but enable it only for a
 trusted model and workspace because commands/page code can send mounted workspace data over the
 network. Offline Docker and offline preview remain the default.
+
+--allow-installs is the narrow alternative: it pre-approves network ONLY for commands the install
+classifier recognizes (npm/pip/apk/... installs), so a headless run can populate node_modules or a
+.venv without handing the model general network access. Without it, an interactive run asks the
+operator before an install runs, and a headless run blocks it. System packages (apt/apk) land in the
+discarded container image either way; to give the sandbox a host tool the image cannot provide, point
+BANTAM_SHELL_MOUNT_RO at its host directory (e.g. /opt/google/chrome).
 
 The rooster (mood labels + a crow when work lands) is on by default. Turn it off with --no-rooster
 or BANTAM_NO_ROOSTER=1, toggle it live with :rooster in the REPL, and run \`bantam strut\` to play the

@@ -160,6 +160,7 @@ import { readPinnedExperimentBinding } from "../src/pinned-experiment-binding.js
 import { classifyInteractiveResult, verificationDetailLines, demonstrationOf, editedPathsOf } from "../src/interactive-verdict.js";
 import { emitAboveInput, redrawInput } from "../src/interactive-display.js";
 import { routeInputLine, parseNetworkApproval } from "../src/repl-input.js";
+import { bufferingFilterIn, liveStatusSuffix, stallExplanation } from "../src/repl-progress.js";
 import { isStateCommand, resolveStateHome, runStateCommand } from "../src/state-cli.js";
 import { LaneRunBridge } from "../src/lane-run.js";
 import {
@@ -4089,6 +4090,10 @@ function makeInteractiveLogger(emit, activity = {}) {
         liveShellChars = 0;
         liveShellOutputSeen = false;
         liveShellTruncated = false;
+        // Progress the live prompt line reports: how much output this command
+        // has produced, and when it last produced any.
+        activity.outputChars = 0;
+        activity.outputAt = null;
       }
       // `done`/`respond` carry the final reply, which the REPL prints itself.
       const line = (a.a === "done" || a.a === "respond") ? null : describeAction(a);
@@ -4105,6 +4110,10 @@ function makeInteractiveLogger(emit, activity = {}) {
       const shown = clean.slice(0, Math.max(0, remaining));
       liveShellChars += shown.length;
       liveShellOutputSeen = liveShellOutputSeen || Boolean(shown);
+      if (shown) {
+        activity.outputChars = (activity.outputChars || 0) + shown.length;
+        activity.outputAt = Date.now();
+      }
       const prefix = e.stream === "stderr" ? "stderr │ " : "│ ";
       for (const l of wrapForTerminal(shown)) out(`    ${dim(prefix + l)}`);
       if (shown.length < clean.length || liveShellChars >= LIVE_SHELL_CHAR_LIMIT) {
@@ -4237,7 +4246,20 @@ async function repl() {
   const runningPrompt = () => {
     const spinner = SPIN_FRAMES[spinFrame++ % SPIN_FRAMES.length];
     const word = spinFrame % 8 < 4 ? paint("1", workingWord()) : paint("2", workingWord()); // pulse bold/dim
-    return `${paint(`1;${C.comb}`, "bantam")} ${paint(C.beak, spinner)} ${word} ${paint(C.plume, "❯")} `;
+    // The live line carries what the heartbeat cannot: how long, and whether the
+    // command is producing output at all. It repaints in place, so it costs no
+    // scrollback. (A `| tail` command is silent by construction — say so.)
+    const running = activity.label === "running";
+    const now = Date.now();
+    const elapsedMs = lastRunStartedAt ? now - lastRunStartedAt : 0;
+    const outputAt = running ? activity.outputAt : null;
+    const suffix = liveStatusSuffix({
+      elapsedMs,
+      outputChars: running ? (activity.outputChars || 0) : 0,
+      sinceOutputMs: running ? (outputAt ? now - outputAt : elapsedMs) : null,
+      buffered: running && bufferingFilterIn(activity.detail || ""),
+    });
+    return `${paint(`1;${C.comb}`, "bantam")} ${paint(C.beak, spinner)} ${word}${paint("2", suffix)} ${paint(C.plume, "❯")} `;
   };
 
   let running = false;       // a request is currently executing
@@ -5401,11 +5423,42 @@ async function repl() {
     let usageBeforeRun = null;
     let requestMode = null;
     const t0 = Date.now();
+    let lastStallNote = null;
+    let lastReminderAt = Date.now();
     const hb = tty ? setInterval(() => {
       // The approval prompt owns the screen while it waits: a heartbeat line
       // would scroll it away and read as "still working, no decision needed".
       if (operatorQuestion) return;
-      if (Date.now() - lastOutputAt > 5000) emit(paint("2", `  · ${activityLabel(activity)} (${Math.round((Date.now() - t0) / 1000)}s)`));
+      const now = Date.now();
+      const elapsedMs = now - t0;
+      // The live prompt line already shows elapsed and output volume, so the
+      // transcript only earns a line when it says something NEW: the first time
+      // a command goes quiet (and why), then a plain marker once a minute so a
+      // long silent stretch is still visible after the prompt line scrolls off.
+      const running = activity.label === "running";
+      const outputAt = running ? activity.outputAt : null;
+      const sinceOutputMs = running ? (outputAt ? now - outputAt : elapsedMs) : null;
+      const note = running
+        ? stallExplanation({
+            command: activity.detail || "",
+            sinceOutputMs,
+            outputChars: activity.outputChars || 0,
+            elapsedMs,
+          })
+        : null;
+      if (note) {
+        if (note !== lastStallNote) {
+          lastStallNote = note;
+          lastReminderAt = now;
+          emit(paint("2", `  · ${activityLabel(activity)} — ${note}`));
+        }
+        return;
+      }
+      lastStallNote = null;
+      if (now - lastReminderAt >= 60000 && now - lastOutputAt > 5000) {
+        lastReminderAt = now;
+        emit(paint("2", `  · ${activityLabel(activity)} (${Math.round(elapsedMs / 1000)}s)`));
+      }
     }, 5000) : null;
     // The pulsing working-prompt: repaint the prompt line (input buffer preserved) a few times a
     // second so the session visibly breathes between output lines.

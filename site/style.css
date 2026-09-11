@@ -1,5 +1,74 @@
 /* BANTAM FACTORY showcase — paper page, dark terminals, gold accent. */
 
+/* Fix: questions should show full text, not collapse/truncate */
+.chat-question,
+.user-message,
+.question-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-height: none;
+  overflow: visible;
+}
+
+/* Fix: input bar scrollbar should not extend beyond input area */
+.chat-input,
+.message-input,
+#chat-input,
+textarea.chat-input {
+  resize: vertical;
+  min-height: 40px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c6cabc transparent;
+}
+
+.chat-input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-input::-webkit-scrollbar-thumb {
+  background: #c6cabc;
+  border-radius: 3px;
+}
+
+/* General style improvements */
+body {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.hero h1 {
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 1.1;
+}
+
+.story h2 {
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.2;
+}
+
+/* Better button styling */
+.copy {
+  transition: background 0.2s ease;
+}
+
+/* Smoother scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus indicators */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
 @font-face { font-family: "Barlow Condensed"; font-weight: 800; font-style: normal; font-display: swap; src: url(fonts/barlow-condensed-800.woff2) format("woff2"); }
 @font-face { font-family: Manrope; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/manrope-400.woff2) format("woff2"); }
 @font-face { font-family: Manrope; font-weight: 700; font-style: normal; font-display: swap; src: url(fonts/manrope-700.woff2) format("woff2"); }

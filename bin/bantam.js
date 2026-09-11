@@ -4313,8 +4313,24 @@ async function repl() {
   const activity = { label: null, detail: null };
   const logger = makeInteractiveLogger(emit, activity);
 
-  rl.on("line", (line) => {
-    const s = line.trim();
+  // Paste detection: buffer lines that arrive in rapid succession (within 150ms)
+  // so a multi-line paste is treated as one request, not many separate ones.
+  let pasteBuffer = [];
+  let pasteTimer = null;
+  const PASTE_WINDOW_MS = 500;
+  function flushPasteBuffer() {
+    pasteTimer = null;
+    if (pasteBuffer.length === 0) return;
+    const combined = pasteBuffer.join("\n").trim();
+    pasteBuffer = [];
+    if (!combined) return;
+    handleInputLine(combined);
+  }
+  function schedulePasteFlush() {
+    if (pasteTimer) clearTimeout(pasteTimer);
+    pasteTimer = setTimeout(flushPasteBuffer, PASTE_WINDOW_MS);
+  }
+  function handleInputLine(s) {
     if (running && tty) {                     // typed mid-run on a terminal -> steer
       if (s) {
         // "how's it coming?" — the operator's status poke, in 100+ of their
@@ -4367,6 +4383,19 @@ async function repl() {
       const r = resolveRequest; resolveRequest = null; r(s);
     }
     else if (s || lastProposedNext) pending.push(s);   // buffered pipe input; empty lines count only with a pending next
+  }
+  rl.on("line", (line) => {
+    const s = line.trim();
+    if (!s) { schedulePasteFlush(); return; }
+    // Detect paste: if we're already in a paste window, buffer this line
+    if (pasteTimer || pasteBuffer.length > 0) {
+      pasteBuffer.push(s);
+      schedulePasteFlush();
+      return;
+    }
+    // First line — start a paste window in case more lines follow
+    pasteBuffer.push(s);
+    schedulePasteFlush();
   });
   rl.on("SIGINT", () => {
     if (running) {

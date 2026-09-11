@@ -225,6 +225,14 @@ export class ModelClient {
     // generation can take several minutes; short client timeouts silently abort large writes.
     // Default 600s covers the max generation with headroom; a truly hung server still aborts.
     this.timeoutMs = opts.timeoutMs ?? (Number(process.env.BANTAM_MODEL_TIMEOUT_MS) || 600000);
+    // A liveness probe answers a yes/no question, so it must never be able to
+    // park a caller. This one used to pass NO signal, leaving undici's own
+    // five-minute headers timeout as the only bound: a vLLM server saturated
+    // mid-generation (or a half-dead proxy) accepts the connection and then does
+    // not answer, and `repl()`'s startup gate sat on it with a blank terminal,
+    // no error, and Ctrl-C as the only exit. Bounded, a hung probe is simply
+    // "not reachable", which every one of the ~17 callers already handles.
+    this.healthTimeoutMs = Number(opts.healthTimeoutMs ?? process.env.BANTAM_HEALTH_TIMEOUT_MS) || 10000;
     // Transient model errors (aborts under load, 5xx, dropped sockets) must not
     // kill a run — retry a few times with backoff before surfacing the error.
     this.retries = opts.retries ?? 2;
@@ -1015,7 +1023,7 @@ export class ModelClient {
     const url = this.apiMode ? `${this.apiUrl}/models` : `${this.endpoint}/health`;
     const headers = this.apiMode && this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined;
     try {
-      const res = await fetch(url, { method: "GET", headers });
+      const res = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(this.healthTimeoutMs) });
       if (res.ok) {
         if (this.apiMode) {
           // Learn the window the server actually advertises. vLLM reports

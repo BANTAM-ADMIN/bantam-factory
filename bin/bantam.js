@@ -1469,7 +1469,11 @@ if (usingApi && !model.deepseek && model.chatDialect && !envTruthy("BANTAM_SKIP_
 } else if (usingApi && !model.deepseek && savedApi?.grammar !== true && !envTruthy("BANTAM_SKIP_GRAMMAR_CHECK")) {
   let honored = false;
   try {
-    const probe = await model.complete("Reply with anything.\nAnswer:", { grammar: 'root ::= "OKBANTAM"', nPredict: 6 });
+    // Probe in the shape real action turns use. A bare prompt lets a
+    // reasoning-parser server open its own <think> block, which suspends the
+    // structured-output constraint — so a server that DOES honor GBNF gets
+    // reported as ignoring it, in the loudest warning BANTAM prints.
+    const probe = await model.complete(model.probePrompt("Reply with anything."), { grammar: 'root ::= "OKBANTAM"', nPredict: 6 });
     honored = String(probe.content).trim() === "OKBANTAM";
   } catch { honored = false; }
   if (!honored) {

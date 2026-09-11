@@ -2,21 +2,43 @@
 import fs from 'node:fs';import path from 'node:path';
 import {bantamConfigDirectory} from './config-directory.js';
 import {execFileSync} from 'node:child_process';
-export const COMMON_MODEL_PORTS=[8085,8080,8000,1234,5000,18086,11434];
+// Loopback ports scanned for an already-running OpenAI-compatible server.
+// 18020 is the BANTAM host's vLLM port (Qwen3.8-27B on an RTX 3090); it was
+// missing, so a server the operator was already running was invisible to every
+// discovery path — the wizard offered to install a model instead of using it.
+export const COMMON_MODEL_PORTS=[8085,8080,8000,1234,5000,18086,18020,11434];
 export function normalizeServerUrl(input){
  const text=String(input??'').trim();if(!text)throw Error('Enter a server address');
  const u=new URL(/^[a-z]+:\/\//i.test(text)?text:'http://'+text);
  if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash)throw Error('Use an HTTP(S) URL without embedded credentials, query or fragment');
  return u.href.replace(/\/$/,'').replace(/\/v1$/,'')+'/v1';
 }
-export async function discoverModelServers({fetchImpl=fetch,ports=COMMON_MODEL_PORTS}={}){
+/**
+ * Running loopback OpenAI-compatible servers, with what each one is.
+ *
+ * The model card is the server's own self-description, so the dialect costs no
+ * extra request: vLLM labels every card `owned_by: "vllm"` and reports its real
+ * window as `max_model_len`, while llama.cpp does neither. `dialect` is what
+ * grammarFieldFor() turns into the right grammar encoding — getting this wrong
+ * is silent, because a server accepts the field name it does not read.
+ */
+export async function discoverOpenAiServers({fetchImpl=fetch,ports=COMMON_MODEL_PORTS}={}){
  const results=await Promise.all(ports.map(async port=>{
   const apiUrl=`http://127.0.0.1:${port}/v1`;
   try{const r=await fetchImpl(apiUrl+'/models',{signal:AbortSignal.timeout(800),redirect:'error'});if(!r.ok)return null;
-   const b=await r.json();const models=b?.data?.filter(m=>typeof m?.id==='string').map(m=>m.id);
-   return models?.length?{apiUrl,models}:null;
+   const b=await r.json();const cards=(b?.data??[]).filter(m=>typeof m?.id==='string');
+   if(!cards.length)return null;
+   const window=Math.max(0,...cards.map(m=>Number(m?.max_model_len)||0));
+   return {apiUrl,models:cards.map(m=>m.id),
+    dialect:cards.some(m=>m?.owned_by==='vllm')?'vllm':'llamacpp',
+    ...(window>0?{contextTokens:window}:{})};
   }catch{return null;}
  }));return results.filter(Boolean);
+}
+export async function discoverModelServers({fetchImpl=fetch,ports=COMMON_MODEL_PORTS}={}){
+ // Projection only: callers that just need "which URL, which model ids" keep
+ // the exact shape they have always received.
+ return (await discoverOpenAiServers({fetchImpl,ports})).map(({apiUrl,models})=>({apiUrl,models}));
 }
 export function codexAvailable({run=execFileSync,command='codex'}={}){
  try{run(command,['--version'],{timeout:3000,stdio:'ignore'});return true;}catch{return false;}

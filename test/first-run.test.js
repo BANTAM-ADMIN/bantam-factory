@@ -87,11 +87,11 @@ test('API compatibility needs consent and successful evidence before saving',asy
  const h=home(t);let inference=0;
  const args={home:h,out:()=>{},hidden:async()=>'',choose:async()=>({kind:'connect-api',apiUrl:'http://127.0.0.1:1234/v1'}),
   fetchImpl:async()=>({ok:true,json:async()=>({data:[{id:'exact-model'}]})}),
-  Client:class{constructor(c){assert.equal(c.model,'exact-model');}async complete(){inference++;return {content:'OKBANTAM'};}}};
+  Client:class{constructor(c){assert.equal(c.model,'exact-model');}probePrompt(t){return t;}async complete(){inference++;return {content:'OKBANTAM'};}}};
  let answers=['1',''];assert.equal(await setupWizard({...args,ask:async()=>answers.shift()}),null);assert.equal(inference,0);assert.equal(loadConnection(h),null);
  answers=['1','yes'];const r=await setupWizard({...args,ask:async()=>answers.shift()});assert.equal(r.kind,'api');assert.equal(inference,1);assert.equal(loadConnection(h).model,'exact-model');
  assert.equal(fs.statSync(path.join(h,'.bantam','connection.json')).mode&511,0o600);
- const h2=home(t);answers=['1','yes'];await assert.rejects(setupWizard({...args,home:h2,ask:async()=>answers.shift(),Client:class{async complete(){return {content:'not constrained'};}}}),/Compatibility/);assert.equal(loadConnection(h2),null);
+ const h2=home(t);answers=['1','yes'];await assert.rejects(setupWizard({...args,home:h2,ask:async()=>answers.shift(),Client:class{probePrompt(t){return t;}async complete(){return {content:'not constrained'};}}}),/Compatibility/);assert.equal(loadConnection(h2),null);
 });
 test('saved user choice is readable from any workspace and local selection clears cloud preference',t=>{
  const h=home(t);saveConnection({kind:'codex',model:'gpt-6-astra',effort:'high'},h);assert.equal(loadConnection(h),null,'unconsented cloud config must not auto-enable');

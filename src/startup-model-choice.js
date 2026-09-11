@@ -143,9 +143,11 @@ export function resolveStartupModelChoice(choices, answer, { enterSelectsRecomme
  * of the server that was actually up. A remembered backend still opens the
  * picker when it is NOT healthy, so an expired Codex login stays replaceable.
  */
-export function startupChoiceNeeded({ canOffer, detectedLocalReady, rememberedConnection, backendHealthy }) {
+export function startupChoiceNeeded({ canOffer, detectedLocalReady, detectedApiReady, rememberedConnection, backendHealthy }) {
   if (!canOffer) return false;
-  if (detectedLocalReady) return false;
+  // An OpenAI-compatible server that startup auto-attached to (vLLM, LM Studio,
+  // …) is exactly as good an answer as a local llama.cpp: both are serving.
+  if (detectedLocalReady || detectedApiReady) return false;
   return !rememberedConnection || !backendHealthy;
 }
 

@@ -20,7 +20,7 @@ import { ModelClient, detectEndpoint } from "../src/model.js";
 import { DEFAULT_SANDBOX_IMAGE } from "../src/executor.js";
 import { renderFirstScreen, columnBudget, elideMiddle, visibleWidth } from "../src/logic/first-screen.js";
 import { detectCodex } from "../src/logic/codex-detect.js";
-import { loadConnection, saveConnection, clearConnection, confirmCodexConsent } from '../src/first-run.js';
+import { loadConnection, saveConnection, clearConnection, confirmCodexConsent, discoverOpenAiServers } from '../src/first-run.js';
 import { setupWizard, startManagedStock } from '../src/setup-wizard.js';
 
 // The over-the-ceiling note, once per process. The agent emits grounding_state
@@ -923,7 +923,10 @@ if (cmd === "doctor" || cmd === "setup") {
         : "  ⚠ chat dialect: schema probe did not return {\"ok\":true} — actions are validated locally and malformed ones become repair turns\n");
     } else if (healthy) {
       try {
-        const out = await client.complete("Reply with anything.\nAnswer:", { grammar: 'root ::= "OKBANTAM"', nPredict: 6 });
+        // Probe in the SAME shape a real action turn uses. A bare prompt lets a
+        // reasoning-parser server open a <think> block, which suspends its
+        // structured-output constraint and fakes a grammar failure.
+        const out = await client.complete(client.probePrompt("Reply with anything."), { grammar: 'root ::= "OKBANTAM"', nPredict: 6 });
         grammarOk = String(out.content).trim() === "OKBANTAM";
       } catch { grammarOk = false; }
       process.stderr.write(grammarOk
@@ -1170,7 +1173,45 @@ let usingApi = !usingCodex && modelOptions.apiUrl !== null
   && Boolean(modelOptions.apiUrl || process.env.BANTAM_API_URL);
 // No explicit endpoint? Pick whichever llama.cpp server is actually up (e.g. 27B on :8085 vs 35B on
 // :18086). Explicit --endpoint / BANTAM_ENDPOINT skips detection; an OpenAI --api-url skips it too.
-if (!modelOptions.endpoint && !usingApi && !usingCodex) modelOptions.endpoint = await detectEndpoint();
+//
+// When NO llama.cpp answers, fall back to an OpenAI-compatible server that IS up (vLLM, LM Studio, …)
+// and attach in apiMode. This is a FALLBACK, never an override: a healthy native server still wins
+// exactly as before. Previously this branch committed to a dead endpoint and the first turn died with
+// a fetch error, so finding a live OpenAI server only ever turns a hard failure into a working run.
+//
+// vLLM answers GET /health, which detectEndpoint() reads as "llama.cpp is up" — but it has no POST
+// /completion, so claiming it as a native endpoint would 404 on turn one. Liveness must be checked
+// BEFORE the endpoint is claimed, and the dialect comes from the server's own /v1/models card
+// (`owned_by: "vllm"`), because feeding a server the wrong grammar field is accepted and ignored.
+let autoDetectedApi = null;
+if (!modelOptions.endpoint && !usingApi && !usingCodex) {
+  const candidate = await detectEndpoint();
+  let nativeReady = false;
+  try {
+    nativeReady = await new ModelClient({ ...modelOptions, endpoint: candidate }).health();
+  } catch { /* an unreachable candidate is simply not native-ready */ }
+  if (nativeReady) {
+    modelOptions.endpoint = candidate;
+  } else {
+    const [hit] = await discoverOpenAiServers();
+    if (hit) {
+      modelOptions = {
+        ...modelOptions,
+        codex: false,
+        apiUrl: hit.apiUrl,
+        model: args.model ?? hit.models[0],
+        apiDialect: args["api-dialect"] ?? hit.dialect,
+        apiContextWindow: hit.contextTokens,
+        deepseek: false,
+        endpoint: undefined,
+      };
+      usingApi = true;
+      autoDetectedApi = hit;
+    } else {
+      modelOptions.endpoint = candidate;
+    }
+  }
+}
 // --chat-transport arms the opt-in chat-messages transport. It self-tests on the
 // first real prompt and turns itself OFF unless the server re-renders BANTAM's
 // turns byte-for-byte — see src/chat-transport.js.
@@ -1186,11 +1227,20 @@ let model = new ModelClient(modelOptions);
 const mayOfferStartupChoice = canOfferStartupChoice(cmd);
 const detectedLocalReady = mayOfferStartupChoice && !usingCodex && !usingApi
   && typeof modelOptions.endpoint === "string" && (await model.health());
+// An auto-attached OpenAI-compatible server is a working answer too, so it must
+// suppress the picker for the same reason a live llama.cpp does. Say so out loud:
+// silently re-pointing a bare `bantam` at a different backend is not a thing an
+// operator should have to discover from the startup model line.
+const detectedApiReady = mayOfferStartupChoice && Boolean(autoDetectedApi) && (await model.health());
+if (detectedApiReady) {
+  process.stderr.write(`model: ${model.modelName} @ ${autoDetectedApi.apiUrl}`
+    + ` (auto-detected ${autoDetectedApi.dialect} server; no llama.cpp answered)\n`);
+}
 // Probe the remembered backend only when it could still change the answer —
 // startupChoiceNeeded() is pure, so the health check stays lazy.
-const backendHealthy = mayOfferStartupChoice && !detectedLocalReady && Boolean(rememberedConnection)
+const backendHealthy = mayOfferStartupChoice && !detectedLocalReady && !detectedApiReady && Boolean(rememberedConnection)
   && (await model.health());
-if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, rememberedConnection, backendHealthy })) {
+if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, detectedApiReady, rememberedConnection, backendHealthy })) {
   let selection = await promptStartupModelChoice(model);
   if(!selection)process.exit(0);
   while (selection) {
@@ -4508,7 +4558,7 @@ async function repl() {
       key: model.apiKey,
       deepseek: model.deepseek,
       deepseekThinking: model.deepseekThinking,
-      dialect: model.grammarField === "guided_grammar" ? "vllm" : "llamacpp",
+      dialect: model.apiDialect ?? "llamacpp",
     };
     model.switchToApi({
       url: preset.url,
@@ -4555,7 +4605,16 @@ async function repl() {
       const id = candidate ? await fetchModelId(candidate, 2500).catch(() => null) : null;
       if (id) models = withDetectedLocal(models, { label: id, endpoint: candidate });
     }
-    const presets = cliModelOptions.__presets || {};
+    const presets = { ...(cliModelOptions.__presets || {}) };
+    // An auto-detected OpenAI-compatible server is serving this session without
+    // appearing in any preset file, so `:model` has to list it. Otherwise
+    // switching to Codex once strands the operator with no way back to the server
+    // that was up — the same dead end the detected-local entry above prevents.
+    const normApiUrl = (u) => String(u ?? "").replace(/\/$/, "");
+    if (autoDetectedApi && !Object.hasOwn(presets, "detected")
+      && !Object.values(presets).some((p) => normApiUrl(p?.url) === autoDetectedApi.apiUrl)) {
+      presets.detected = { url: autoDetectedApi.apiUrl, model: model.modelName, dialect: autoDetectedApi.dialect };
+    }
     const presetNames = Object.keys(presets);
     let codexModels = [];
     if (!apiOnly) {
@@ -4717,7 +4776,7 @@ async function repl() {
       model: model.modelName,
       key: model.apiKey,
       deepseek: model.deepseek,
-      dialect: model.grammarField === "guided_grammar" ? "vllm" : "llamacpp",
+      dialect: model.apiDialect ?? "llamacpp",
     };
     model.switchToCodex({ model: entry.model, effort });
     if (await model.health()) {

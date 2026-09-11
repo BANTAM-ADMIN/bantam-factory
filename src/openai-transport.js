@@ -6,17 +6,34 @@
 //
 // Pure — unit-tested without a server.
 
-/** The request-body field a server reads a GBNF grammar from, by dialect. */
+/**
+ * Where a server reads a GBNF grammar from, by dialect.
+ *
+ * llama.cpp's /v1 carries it in a top-level `grammar`. vLLM removed the legacy
+ * `guided_*` parameters this used to send: read straight off a running vLLM
+ * 0.28.0's own GET /openapi.json, `CompletionRequest` exposes
+ * `structured_outputs` (whose schema has a `grammar` field) while
+ * `GuidedDecodingParams` is gone entirely. vLLM accepts unknown request fields
+ * instead of rejecting them, so `guided_grammar` still answers HTTP 200 and
+ * constrains NOTHING — the silent-ignore failure that the doctor probe exists to
+ * catch, arriving through a door that no longer exists.
+ *
+ * `"structured_outputs"` therefore does not name a field to assign: it names a
+ * NESTED object, so buildOpenAiBody places the grammar one level down.
+ */
 export function grammarFieldFor(dialect) {
-  if (dialect === "vllm") return "guided_grammar";
+  if (dialect === "vllm") return STRUCTURED_OUTPUTS_FIELD;
   return "grammar"; // llama.cpp / DeepSeek default
 }
+
+/** vLLM's structured-output envelope: { grammar | json | regex | choice }. */
+export const STRUCTURED_OUTPUTS_FIELD = "structured_outputs";
 
 /**
  * Build the `/v1/completions` request body from BANTAM's raw prompt + sampling.
  * `sampling` carries { temperature, topP, topK, nPredict, stop, seed }.
  */
-export function buildOpenAiBody({ prompt, grammar = null, sampling = {}, model = "local", grammarField = "grammar", stream = false, deepseek = false }) {
+export function buildOpenAiBody({ prompt, grammar = null, sampling = {}, model = "local", grammarField = "grammar", stream = false, deepseek = false, includeUsage = false }) {
   const body = {
     model,
     prompt,
@@ -32,8 +49,25 @@ export function buildOpenAiBody({ prompt, grammar = null, sampling = {}, model =
   // first attempt: penalising repetition degrades code, where repeated tokens
   // are correct.
   if (sampling.presencePenalty) body.presence_penalty = sampling.presencePenalty;
-  if (stream) body.stream = true;
-  if (grammar) body[grammarField] = grammar;
+  if (stream) {
+    body.stream = true;
+    // Opt-in per dialect. A streaming OpenAI server otherwise sends NO usage at
+    // all, and SSE frames are not tokens (a live vLLM probe packed 5 tokens into
+    // 2 frames), so BANTAM's token accounting would read a frame count. Only the
+    // vllm dialect asks: an unknown field is ignored by permissive servers but
+    // rejected by strict ones, and llama.cpp's native counters already arrive on
+    // the final event.
+    if (includeUsage) body.stream_options = { include_usage: true };
+  }
+  // One grammar, two shapes: llama.cpp wants a top-level `grammar`, vLLM wants
+  // `structured_outputs.grammar`. See grammarFieldFor().
+  if (grammar) {
+    if (grammarField === STRUCTURED_OUTPUTS_FIELD) {
+      body[STRUCTURED_OUTPUTS_FIELD] = { ...(body[STRUCTURED_OUTPUTS_FIELD] ?? {}), grammar };
+    } else {
+      body[grammarField] = grammar;
+    }
+  }
   if (deepseek) body.extra_body = { thinking: { type: "disabled" } };
   // Drop undefined keys so the body is clean for stricter servers.
   for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k];

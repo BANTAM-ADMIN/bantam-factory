@@ -53,7 +53,10 @@ export async function setupWizard({ask,out,hidden,advanced=false,profile=null,ye
   if(!/^y(es)?$/i.test((await ask('Allow this server and send a tiny compatibility test (no project data yet)? [y/N] ')).trim()))return null;
   const c=new Client({apiUrl:selection.apiUrl,apiKey:key||null,model,apiDialect:dialect});
   const schema={type:'object',properties:{ok:{type:'boolean',const:true}},required:['ok'],additionalProperties:false};
-  const result=await c.complete(dialect==='chat'?'Return JSON {"ok":true}.':'Reply OKBANTAM.',{
+  // Probe in the same shape real action turns use: a reasoning-parser server
+  // suspends its structured-output constraint inside a <think> block, so a bare
+  // prompt would fail this test on a server that is actually enforcing.
+  const result=await c.complete(dialect==='chat'?'Return JSON {"ok":true}.':c.probePrompt('Reply OKBANTAM.'),{
    grammar: dialect==='chat'?'root ::= "{\\\"ok\\\":true}"':'root ::= "OKBANTAM"',
    ...(dialect==='chat'?{jsonSchema:schema}:{}),nPredict:64,retries:0,signal:AbortSignal.timeout(30000)});
   let valid=false;try{valid=dialect==='chat'?JSON.stringify(JSON.parse(result.content))==='{"ok":true}':result.content.trim()==='OKBANTAM';}catch{}

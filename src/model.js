@@ -60,6 +60,22 @@ function nativeStoppedLimit(data) {
   return Boolean(data?.stopped_limit) || data?.stop_type === "limit";
 }
 
+// An OpenAI-compatible server (vLLM, llama.cpp /v1, LM Studio, …) reports an
+// output-limit stop as choices[0].finish_reason === "length"; the native
+// llama.cpp booleans are simply absent. Reading only the native field made every
+// truncated OpenAI-compatible completion look COMPLETE — and the stations that
+// refuse a truncated proposal (contract-assertion-station, contract-cli-station,
+// stream-obligation-station) would then trust a cut-off answer. "stop" means EOS
+// or a configured stop string, which is a finish, not a limit.
+function openAiStoppedLimit(data) {
+  return data?.choices?.[0]?.finish_reason === "length";
+}
+
+/** Output-limit reached, on either transport's vocabulary. */
+function stoppedLimitOf(data) {
+  return nativeStoppedLimit(data) || openAiStoppedLimit(data);
+}
+
 // The app-server does not take nPredict on turn/start. Its worker still has a
 // generic local profile, but that profile's sampling cap is not a Codex limit.
 // Only advertise (or infer truncation from) a cap this transport actually sends.
@@ -102,7 +118,16 @@ export class ModelClient {
       || (opts.deepseek === true ? process.env.DEEPSEEK_API_KEY : null)
       || null;
     this.modelName = opts.model || process.env.BANTAM_MODEL || "local";
-    this.grammarField = grammarFieldFor(opts.apiDialect || process.env.BANTAM_API_DIALECT);
+    // Keep the dialect NAME beside the request field it maps to. Callers that
+    // snapshot a backend for rollback (`:model`) used to reverse-engineer the
+    // dialect from the grammar field name, so renaming the encoding silently
+    // rewrote a remembered vLLM server as llama.cpp.
+    this.apiDialect = String(opts.apiDialect ?? process.env.BANTAM_API_DIALECT ?? "").trim().toLowerCase() || null;
+    this.grammarField = grammarFieldFor(this.apiDialect);
+    // Usable context window reported by an OpenAI-compatible server. Seeded by
+    // startup discovery (which already read /v1/models) and refreshed by health().
+    this.apiContextWindow = Number.isSafeInteger(opts.apiContextWindow) && opts.apiContextWindow > 0
+      ? opts.apiContextWindow : null;
     this.profileName = this.profile.name;
     this.temperature = opts.temperature ?? sampling.temperature;
     // Action generation can use a cooler sampler than free-form thinking. A
@@ -244,6 +269,30 @@ export class ModelClient {
     return verdict;
   }
 
+  /**
+   * A one-line user turn rendered in THIS client's own prompt shape, ending on
+   * its assistant prefill. Capability probes must be shaped like real traffic.
+   *
+   * On a vLLM server started with a reasoning parser (this deployment runs
+   * `--reasoning-parser qwen3`) the structured-output constraint is SUSPENDED
+   * while the model is inside its reasoning block —
+   * StructuredOutputsConfig(enable_in_reasoning=False). A bare "Reply OKBANTAM."
+   * prompt lets the model open its own <think> block, so the grammar never
+   * engages within the probe's token budget and a perfectly working server is
+   * reported as ignoring GBNF. BANTAM's own prefill already ends with a CLOSED
+   * empty think block, which is exactly the state that arms the constraint, so
+   * probing through it measures what the harness will actually do.
+   *
+   * Verified live 2026-09-11 against vLLM 0.28.0: `root ::= "OKBANTAM"` on a
+   * bare prompt free-generated ("Hello! How can I help"), the same grammar on
+   * this shape returned exactly "OKBANTAM". No per-request override exists —
+   * `thinking_token_budget: 0` and `chat_template_kwargs.enable_thinking: false`
+   * both changed nothing on /v1/completions.
+   */
+  probePrompt(text) {
+    return `${this.template.open("user")}${text}${this.template.close}${this.assistantPrefill}`;
+  }
+
   async complete(prompt, opts = {}) {
     const requestOptions = { ...opts };
     if (requestOptions.signal?.aborted) throw interruptedError();
@@ -288,7 +337,10 @@ export class ModelClient {
   // Learn the usable window from the actual selected runtime's receipt rather
   // than guessing from a model name or applying the local-model history cap.
   get contextWindowTokens() {
-    return this.codex ? this.codexRuntime?.contextWindowFor?.(this.modelName) ?? null : null;
+    if (this.codex) return this.codexRuntime?.contextWindowFor?.(this.modelName) ?? null;
+    // An OpenAI-compatible server states its own window on /v1/models; health()
+    // records it there, and startup discovery can supply it without a probe.
+    return this.apiContextWindow ?? null;
   }
 
   get codexToolIdentity() {
@@ -519,6 +571,7 @@ export class ModelClient {
           prompt, grammar: opts.grammar ?? null, model: this.modelName, grammarField: this.grammarField,
           stream: Boolean(onProgress),
           sampling,
+          includeUsage: this.apiDialect === "vllm",
         });
       }
       if (this.apiKey) headers = { ...headers, Authorization: `Bearer ${this.apiKey}` };
@@ -700,7 +753,7 @@ export class ModelClient {
         content: stripChatPrefill(extractCompletionText(data), request.chatTransport ? request.chatPrefill : ""),
         tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
         stoppedEos: Boolean(data.stopped_eos),
-        stoppedLimit: nativeStoppedLimit(data),
+        stoppedLimit: stoppedLimitOf(data),
         // llama.cpp sets `truncated` when the PROMPT overran the slot's context
         // and was cut to fit. That is silent — no error, no stopped_limit — and
         // it is exactly the failure that sat invisible under tune-mjcf: a 47.8k
@@ -773,9 +826,20 @@ export class ModelClient {
         const now = Date.now();
         if (now - lastReport > 300) {
           lastReport = now;
-          try { onProgress({ tokens: final?.tokens_predicted ?? chunks, content }); } catch { /* progress is advisory */ }
+          try { onProgress({ tokens: streamedTokenCount(), content }); } catch { /* progress is advisory */ }
         }
       }
+    }
+    // An OpenAI-compatible server reports SSE frames, not tokens: vLLM packed 5
+    // tokens into 2 frames in a live probe, so a frame count UNDERCOUNTS and the
+    // agent's output-limit fallback (tokens >= cap) could never fire. When the
+    // server was asked for stream usage (see buildOpenAiBody includeUsage), the
+    // authoritative count rides the final usage frame instead.
+    function streamedTokenCount() {
+      return final?.tokens_predicted ?? usageEvent?.usage?.completion_tokens ?? chunks;
+    }
+    function streamedPromptTokens() {
+      return Number(final?.tokens_evaluated ?? usageEvent?.usage?.prompt_tokens ?? 0) || 0;
     }
     // A server (or proxy) that ignored stream:true answers with one plain JSON body — no SSE
     // events at all. Fall back to parsing it like the non-streaming path instead of returning
@@ -789,7 +853,7 @@ export class ModelClient {
             content: extractCompletionText(data),
             tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
             stoppedEos: Boolean(data.stopped_eos),
-            stoppedLimit: nativeStoppedLimit(data),
+            stoppedLimit: stoppedLimitOf(data),
             timings: data.timings ?? {},
             usage: usageFromResponse(data, {
               provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
@@ -802,17 +866,17 @@ export class ModelClient {
     // Final report is UNTHROTTLED: the 500ms gate can swallow the closing
     // bytes between the last report and stream end, and a live-text consumer
     // would render a truncated answer (caught by the 2026-08-19 smoke).
-    try { onProgress({ tokens: final?.tokens_predicted ?? chunks, content, done: true }); } catch { /* progress is advisory */ }
+    try { onProgress({ tokens: streamedTokenCount(), content, done: true }); } catch { /* progress is advisory */ }
     const usageSource = usageEvent || final || {};
     return {
       rawBody: raw,
       result: {
         content,
-        tokens: final?.tokens_predicted ?? chunks,
+        tokens: streamedTokenCount(),
         stoppedEos: Boolean(final?.stopped_eos),
-        stoppedLimit: nativeStoppedLimit(final),
+        stoppedLimit: stoppedLimitOf(final),
         truncated: Boolean(final?.truncated),
-        promptTokens: Number(final?.tokens_evaluated ?? usageSource?.prompt_tokens ?? 0) || 0,
+        promptTokens: streamedPromptTokens(),
         timings: final?.timings ?? {},
         usage: usageFromResponse(usageSource, {
           provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),
@@ -952,7 +1016,24 @@ export class ModelClient {
     const headers = this.apiMode && this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined;
     try {
       const res = await fetch(url, { method: "GET", headers });
-      if (res.ok) await this.detectChatSessions();
+      if (res.ok) {
+        if (this.apiMode) {
+          // Learn the window the server actually advertises. vLLM reports
+          // `max_model_len` per model card (this deployment: 106496) and BANTAM
+          // read it nowhere, so `contextWindowTokens` stayed null and the history
+          // budget fell back to a 36k/120k-char constant — spending a third of a
+          // window that was already paid for in VRAM. Best effort: a server that
+          // omits the field simply teaches nothing and the constant still applies.
+          try {
+            const listing = await res.json();
+            const windows = (listing?.data ?? [])
+              .map((m) => Number(m?.max_model_len))
+              .filter((n) => Number.isFinite(n) && n > 0);
+            if (windows.length) this.apiContextWindow = Math.max(...windows);
+          } catch { /* not a model listing we can read */ }
+        }
+        await this.detectChatSessions();
+      }
       return res.ok;
     } catch {
       return false;
@@ -993,6 +1074,9 @@ export class ModelClient {
     this.endpoint = String(endpoint).replace(/\/$/, "");
     this.apiUrl = null;
     this.apiMode = false;
+    // The window belonged to the server we just left; a stale one would size the
+    // prompt for a machine we are no longer talking to.
+    this.apiContextWindow = null;
     return this.endpoint;
   }
 
@@ -1002,6 +1086,7 @@ export class ModelClient {
     this.codex = false;
     this.apiUrl = String(url).replace(/\/$/, "");
     this.apiMode = true;
+    this.apiContextWindow = null;
     this.modelName = model || "local";
     this.apiKey = key;
     this.deepseek = deepseek === true;
@@ -1015,6 +1100,7 @@ export class ModelClient {
       this._applyProfile(resolveProfile({ profile: "generic" }));
     }
     this.grammarField = grammarFieldFor(dialect);
+    this.apiDialect = String(dialect ?? "").trim().toLowerCase() || null;
     return this.apiUrl;
   }
 

@@ -210,3 +210,34 @@ test("a server that reports its own timings is still authoritative", async (t) =
   assert.equal(result.timings.predicted_per_second, 100);
   assert.equal(client.observedTokensPerSecond, 100);
 });
+
+test("generation speed stops at the last token, not at stream teardown", async (t) => {
+  // A stream whose usage frame lands 300ms after the final token. Charging that
+  // gap to decode time is what makes a fast server report a slow one.
+  const client = new ModelClient({ profile: "qwen", apiUrl: "http://fixture.invalid/v1", model: "m", apiDialect: "vllm" });
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(c) {
+      const frame = (o) => enc.encode(`data: ${JSON.stringify(o)}\n\n`);
+      c.enqueue(frame({ choices: [{ text: '{"a":"done",', index: 0 }] }));
+      await sleep(40);
+      c.enqueue(frame({ choices: [{ text: '"summary":"x"}', index: 0, finish_reason: "stop" }] }));
+      await sleep(300); // teardown / usage frame lag
+      c.enqueue(frame({ choices: [], usage: { prompt_tokens: 700, completion_tokens: 60, total_tokens: 760 } }));
+      c.enqueue(enc.encode("data: [DONE]\n\n"));
+      c.close();
+    },
+  });
+  t.mock.method(globalThis, "fetch", async () => new Response(stream, {
+    status: 200, headers: { "content-type": "text/event-stream" },
+  }));
+  const t0 = performance.now();
+  const result = await client.complete("<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n\n", { nPredict: 64, onProgress: () => {} });
+  const totalMs = performance.now() - t0;
+  assert.ok(totalMs >= 300, `the exchange really did take ~340ms (${Math.round(totalMs)}ms)`);
+  assert.ok(result.timings.predicted_ms < 200,
+    `generation time excludes the 300ms teardown gap (measured ${Math.round(result.timings.predicted_ms)}ms)`);
+  assert.ok(result.timings.predicted_per_second > 100,
+    `60 tokens in under 200ms is the rate BANTAM should report (${Math.round(result.timings.predicted_per_second)} tok/s)`);
+});

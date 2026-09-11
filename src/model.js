@@ -91,6 +91,12 @@ function stoppedLimitOf(data) {
  * token marks the prefill/decode boundary and both halves are real. When it did
  * not, only the whole exchange is knowable, so prefill stays null and the rate
  * is end-to-end — flagged in `measured`, never passed off as decode speed.
+ *
+ * `predicted_per_second` is GENERATION speed and nothing else: generation tokens
+ * over the interval from the first token arriving to the last one arriving.
+ * Prefill, queueing, and the stream's teardown are excluded — they are reported
+ * separately as `prompt_ms`, and folding them into the rate is what makes a
+ * fast server look slow.
  */
 export function measuredTimings({ promptN = 0, genN = 0, startedAt = null, firstTokenAt = null, finishedAt = null } = {}) {
   if (!Number.isFinite(startedAt) || !Number.isFinite(finishedAt)) return {};
@@ -896,6 +902,10 @@ export class ModelClient {
     // The first token is the prefill/decode boundary, and on a lane whose server
     // reports no timings it is the only place that boundary can be observed.
     let firstTokenAt = null;
+    // When the last token ARRIVED — not when the stream closed. The gap between
+    // those is the usage frame plus teardown, which on a 12-token action is a
+    // real fraction of the response and must not be charged to generation time.
+    let lastTokenAt = null;
     for await (const part of res.body) {
       const text = decoder.decode(part, { stream: true });
       raw += text;
@@ -915,7 +925,11 @@ export class ModelClient {
           throw Object.assign(new Error(`model stream error: ${message}`), { code: "stream_error" });
         }
         const delta = extractStreamDelta(evt);
-        if (delta && firstTokenAt === null) firstTokenAt = nowMs();
+        if (delta) {
+          const at = nowMs();
+          if (firstTokenAt === null) firstTokenAt = at;
+          lastTokenAt = at;
+        }
         content += delta;
         chunks++;
         if (evt.usage) usageEvent = evt;
@@ -983,7 +997,10 @@ export class ModelClient {
         timings: serverTimings(final?.timings) ?? measuredTimings({
           promptN: streamedPromptTokens(),
           genN: streamedTokenCount(),
-          startedAt, firstTokenAt, finishedAt: nowMs(),
+          startedAt, firstTokenAt,
+          // Generation speed is first token -> last token, by definition of the
+          // thing being measured.
+          finishedAt: lastTokenAt ?? nowMs(),
         }),
         usage: usageFromResponse(usageSource, {
           provider: this.deepseek ? "deepseek" : (this.apiMode ? "api" : "local"),

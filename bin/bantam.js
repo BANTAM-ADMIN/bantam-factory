@@ -159,6 +159,7 @@ import {
 import { readPinnedExperimentBinding } from "../src/pinned-experiment-binding.js";
 import { classifyInteractiveResult, verificationDetailLines, demonstrationOf, editedPathsOf } from "../src/interactive-verdict.js";
 import { emitAboveInput, redrawInput } from "../src/interactive-display.js";
+import { routeInputLine, parseNetworkApproval } from "../src/repl-input.js";
 import { isStateCommand, resolveStateHome, runStateCommand } from "../src/state-cli.js";
 import { LaneRunBridge } from "../src/lane-run.js";
 import {
@@ -4243,6 +4244,7 @@ async function repl() {
   let aborted = false;       // user hit Ctrl-C during a run
   let activeRunController = null;
   let injections = [];       // messages typed mid-run, to steer the next turn
+  let operatorQuestion = null; // { resolve } while an approval prompt owns the next line
   let attendantRun = null;   // event accumulator for the live second voice
   let attendantBusy = false; // single-flight: one instant reply at a time
   let attendantSlots = null; // cached server slot count (probed once per session)
@@ -4333,6 +4335,22 @@ async function repl() {
     if (pasteTimer) clearTimeout(pasteTimer);
     pasteTimer = setTimeout(flushPasteBuffer, PASTE_WINDOW_MS);
   }
+  // A prompt that owns the next entered line. `rl.question` cannot be used while
+  // a run is in flight: the REPL's own "line" handler turns input into a mid-run
+  // steer, and the 250 ms working-prompt repaint paints over readline's query —
+  // the net effect was an approval nobody could answer. Instead the question is
+  // emitted through the live-input path, the heartbeat and spinner pause while
+  // it waits, and the next line answers it (bare Enter = the bracketed default).
+  function askOperator(question) {
+    if (pasteTimer) { clearTimeout(pasteTimer); pasteTimer = null; }
+    pasteBuffer = [];
+    // Whatever was half-typed as a mid-run steer is NOT this prompt's answer:
+    // answering "y" onto it ("also check Xy") would parse as a decline. Discard
+    // the line buffer with Ctrl-U so the answer starts clean.
+    if (rl.terminal) { try { rl.write(null, { ctrl: true, name: "u" }); } catch { /* older readline */ } }
+    emit(question);
+    return new Promise((resolve) => { operatorQuestion = { resolve }; });
+  }
   function handleInputLine(s) {
     if (running && tty) {                     // typed mid-run on a terminal -> steer
       if (s) {
@@ -4388,8 +4406,16 @@ async function repl() {
     else if (s || lastProposedNext) pending.push(s);   // buffered pipe input; empty lines count only with a pending next
   }
   rl.on("line", (line) => {
-    const s = line.trim();
-    if (!s) { schedulePasteFlush(); return; }
+    const routed = routeInputLine(line, { awaitingAnswer: Boolean(operatorQuestion) });
+    // An approval prompt owns this line — including an empty Enter, which is the
+    // bracketed default. It must never fall through to the steering path.
+    if (routed.kind === "answer") {
+      const q = operatorQuestion; operatorQuestion = null;
+      q.resolve(routed.value);
+      return;
+    }
+    const s = routed.value;
+    if (routed.kind === "empty") { schedulePasteFlush(); return; }
     // Detect paste: if we're already in a paste window, buffer this line
     if (pasteTimer || pasteBuffer.length > 0) {
       pasteBuffer.push(s);
@@ -4401,6 +4427,9 @@ async function repl() {
     schedulePasteFlush();
   });
   rl.on("SIGINT", () => {
+    // Ctrl-C at an approval prompt declines it, so the paused run can end
+    // instead of hanging on a promise nothing will settle.
+    if (operatorQuestion) { const q = operatorQuestion; operatorQuestion = null; q.resolve("deny"); }
     if (running) {
       if (!aborted) emit(paint("33", "  ⏸ stopping the current operation…"));
       aborted = true;
@@ -4408,7 +4437,11 @@ async function repl() {
     }
     else { closed = true; if (resolveRequest) { const r = resolveRequest; resolveRequest = null; r(null); } else rl.close(); }
   });
-  rl.on("close", () => { closed = true; if (resolveRequest) { const r = resolveRequest; resolveRequest = null; r(null); } });
+  rl.on("close", () => {
+    closed = true;
+    if (operatorQuestion) { const q = operatorQuestion; operatorQuestion = null; q.resolve("deny"); }
+    if (resolveRequest) { const r = resolveRequest; resolveRequest = null; r(null); }
+  });
 
   console.log(renderBanner({
     profileName: model.codex ? `codex/${model.modelName}` : (model.apiMode ? model.modelName : model.profileName),
@@ -5355,11 +5388,15 @@ async function repl() {
     let requestMode = null;
     const t0 = Date.now();
     const hb = tty ? setInterval(() => {
+      // The approval prompt owns the screen while it waits: a heartbeat line
+      // would scroll it away and read as "still working, no decision needed".
+      if (operatorQuestion) return;
       if (Date.now() - lastOutputAt > 5000) emit(paint("2", `  · ${activityLabel(activity)} (${Math.round((Date.now() - t0) / 1000)}s)`));
     }, 5000) : null;
     // The pulsing working-prompt: repaint the prompt line (input buffer preserved) a few times a
     // second so the session visibly breathes between output lines.
     const spin = tty ? setInterval(() => {
+      if (operatorQuestion) return; // never paint over the question
       redrawInput(rl, runningPrompt());
     }, 250) : null;
     let res = null, trioOutcome = null, teamOutcome = null, selfImproveResult = null, err = null;
@@ -5505,15 +5542,22 @@ async function repl() {
           onNetRequest: args["dangerously-allow-net"] ? null : async ({ command, kind, classification }) => {
             const shown = String(command).replace(/\s+/g, " ").slice(0, 140);
             const wants = kind === "install" ? "install packages" : "fetch from the network";
-            process.stderr.write(`\n  ${paint("33", "⏸ network access request")} the model wants to ${wants}:\n      ${shown}\n`);
+            const lines = [
+              "",
+              `  ${paint("33", "⏸ network access request")} the model wants to ${wants}:`,
+              `      ${shown}`,
+            ];
             if (kind === "install" && classification?.persistent === false) {
-              process.stderr.write(`  ${paint("2", "note: this install targets the discarded, read-only container image and will NOT persist. For a system tool, put it on the host and expose it with BANTAM_SHELL_MOUNT_RO.")}\n`);
+              lines.push(`  ${paint("2", "note: this install targets the discarded, read-only container image and will NOT persist. For a system tool, put it on the host and expose it with BANTAM_SHELL_MOUNT_RO.")}`);
             }
-            const answer = await new Promise((res2) => rl.question(`  allow network for this? [y]es once / [a]lways this session / [N]o: `, res2));
-            const t = String(answer ?? "").trim().toLowerCase();
-            if (t === "a" || t === "always") return "allow-session";
-            if (t === "y" || t === "yes") return "allow-once";
-            return "deny";
+            if (kind === "install") {
+              lines.push(`  ${paint("2", "tip: start Bantam with --allow-installs to approve installs without prompting.")}`);
+            }
+            lines.push(`  ${paint("2", "the run is paused on your answer (bare Enter = No).")}`);
+            const answer = await askOperator(
+              `${lines.join("\n")}\n  allow network for this? [y]es once / [a]lways this session / [N]o: `,
+            );
+            return parseNetworkApproval(answer);
           },
           // A chat request is one exchange with a person waiting, not a headless
           // build: 200 turns read as "no deadline" and the cellui correction

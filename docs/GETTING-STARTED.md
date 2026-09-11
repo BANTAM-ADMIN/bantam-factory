@@ -74,10 +74,12 @@ Use [build, inspect, apply](FACTORY-GETTING-STARTED.md).
   BANTAM FACTORY can reach them. Image understanding also needs a vision-capable model.
 - **Network access asks first.** Docker shell commands start with networking off;
   interactive sessions can request access when needed. A registry install
-  (`npm`/`pip`/`uv`/…) asks the same way, and `--allow-installs` pre-approves
-  installs for a headless run. System packages (`apt`/`apk`) cannot persist in
-  the sandbox: install those tools on the host, or expose an extra host root with
-  `BANTAM_SHELL_MOUNT_RO` (for example `/opt/google/chrome` for a browser test).
+  (`npm`/`pip`/`uv`/…) or a project tool's browser download
+  (`playwright install`/`puppeteer browsers install`) asks the same way, and
+  `--allow-installs` pre-approves installs for a headless run. System packages
+  (`apt`/`apk`) cannot persist in the sandbox: install those tools on the host,
+  or expose an extra host root with `BANTAM_SHELL_MOUNT_RO` (for example
+  `/opt/google/chrome` for a browser test).
 - **Keep run records private.** They can contain project code and prompts.
   [Fight cards](BRING-YOUR-OWN-COMPARISONS.md) have a separate public export.
 

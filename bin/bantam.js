@@ -4342,16 +4342,30 @@ async function repl() {
   // emitted through the live-input path, the heartbeat and spinner pause while
   // it waits, and the next line answers it (bare Enter = the bracketed default).
   function askOperator(question) {
+    // A second prompt while one is still pending would orphan the first promise
+    // and leave that run waiting forever. Decline the older one explicitly.
+    if (operatorQuestion) { const older = operatorQuestion; operatorQuestion = null; older.resolve("deny"); }
     if (pasteTimer) { clearTimeout(pasteTimer); pasteTimer = null; }
     pasteBuffer = [];
     // Whatever was half-typed as a mid-run steer is NOT this prompt's answer:
     // answering "y" onto it ("also check Xy") would parse as a decline. Discard
-    // the line buffer with Ctrl-U so the answer starts clean.
+    // the line buffer with Ctrl-U so the answer starts clean. Ctrl-U runs before
+    // the flag is set so any event it emits cannot answer the question.
     if (rl.terminal) { try { rl.write(null, { ctrl: true, name: "u" }); } catch { /* older readline */ } }
-    emit(question);
-    return new Promise((resolve) => { operatorQuestion = { resolve }; });
+    return new Promise((resolve) => {
+      operatorQuestion = { resolve };
+      emit(question);
+    });
   }
   function handleInputLine(s) {
+    // Belt and braces: a line that reaches the paste/flush path while a prompt
+    // is pending is still an answer. routeInputLine already catches the direct
+    // path; this covers a flush that was scheduled before the prompt appeared.
+    if (operatorQuestion) {
+      const q = operatorQuestion; operatorQuestion = null;
+      q.resolve(String(s ?? "").trim());
+      return;
+    }
     if (running && tty) {                     // typed mid-run on a terminal -> steer
       if (s) {
         // "how's it coming?" — the operator's status poke, in 100+ of their
@@ -5550,6 +5564,9 @@ async function repl() {
             if (kind === "install" && classification?.persistent === false) {
               lines.push(`  ${paint("2", "note: this install targets the discarded, read-only container image and will NOT persist. For a system tool, put it on the host and expose it with BANTAM_SHELL_MOUNT_RO.")}`);
             }
+            if (kind === "install" && classification?.scope === "browser") {
+              lines.push(`  ${paint("2", "note: this downloads a browser into the persistent sandbox HOME (can be a few hundred MB); approved once, it is reused by later test runs.")}`);
+            }
             if (kind === "install") {
               lines.push(`  ${paint("2", "tip: start Bantam with --allow-installs to approve installs without prompting.")}`);
             }
@@ -5557,7 +5574,12 @@ async function repl() {
             const answer = await askOperator(
               `${lines.join("\n")}\n  allow network for this? [y]es once / [a]lways this session / [N]o: `,
             );
-            return parseNetworkApproval(answer);
+            const decision = parseNetworkApproval(answer);
+            // Say what the answer was taken to mean. If this line does not
+            // appear, the input never reached the prompt and was treated as a
+            // mid-run steer instead.
+            emit(paint("2", `  → ${decision === "allow-session" ? "allowed for this session" : decision === "allow-once" ? "allowed once" : "declined"}`));
+            return decision;
           },
           // A chat request is one exchange with a person waiting, not a headless
           // build: 200 turns read as "no deadline" and the cellui correction

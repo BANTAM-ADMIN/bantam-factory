@@ -26,7 +26,16 @@ const MANAGER_DESTINATIONS = Object.freeze({
   cargo: "Cargo's configured install/cache directories",
   go: "the Go module cache or GOBIN",
   gem: "RubyGems' configured install/cache directories",
+  browser: "the browser cache under HOME (~/.cache/ms-playwright, ~/.cache/puppeteer)",
 });
+
+// Project-local tools whose `install` subcommand downloads a browser over the
+// network. They are not package managers, so the registry managers above never
+// matched them: `./node_modules/.bin/playwright install chromium` ran with the
+// network off, died on EAI_AGAIN at cdn.playwright.dev, and never asked the
+// operator — while `npx playwright install` got the exec-style "run the local
+// binary" hint that led straight to that dead end (operator log, 2026-09-11).
+const BROWSER_DOWNLOADERS = new Set(["playwright", "playwright-core", "puppeteer", "browsers", "cypress"]);
 
 // Managers that write into the CONTAINER IMAGE's filesystem. The sandbox is
 // `docker run --rm --read-only` and the host /usr is bind-mounted over the
@@ -139,7 +148,7 @@ export function classifyOfflineInstall(command) {
       // The sandbox runs `docker run --rm --read-only`, so only workspace/HOME
       // writes persist; this is what the operator prompt and guidance key off.
       scope,
-      persistent: scope === "project",
+      persistent: scope === "project" || scope === "browser",
       reason: "default-docker-no-network",
     };
     return { ...classification, message: formatOfflineInstallMessage(classification) };
@@ -283,6 +292,7 @@ export function formatOfflineInstallMessage(classification) {
     ? "If the tool is already a project dependency, run its binary directly instead — `./node_modules/.bin/<tool> ...` (list what exists with `ls node_modules/.bin`), or `npm exec --offline --no-install -- <tool> ...`. That needs no network and is usually all this situation requires."
     : null;
   const systemScope = classification?.scope === "system";
+  const browserScope = classification?.scope === "browser";
   const persistent = classification?.persistent === true;
   return [
     `[offline-install] Blocked ${manager} ${operation}: no command was run.`,
@@ -294,9 +304,14 @@ export function formatOfflineInstallMessage(classification) {
           "To give the sandbox a system tool, make it available on the HOST where the sandbox already mounts read-only — a normal install under /usr or /usr/local, or an extra root (for example the Chrome .deb at /opt/google/chrome) via BANTAM_SHELL_MOUNT_RO=/opt/google/chrome. Snap-only installs stay unreachable; use a non-snap build.",
           "A browser the project drives itself is different: install the project dependency (Playwright/Puppeteer) and let its own downloader fetch the browser into HOME, which is persistent sandbox scratch. Approve network for that install instead of installing a system package.",
         ]
-      : [
-          `This manager normally writes to ${destination}${persistent ? ", which sits inside the writable workspace or the persistent sandbox HOME, so an approved install survives later commands" : ""}. Node dependencies belong in the target project's node_modules; Python dependencies belong in a project-local .venv (a bare 'pip install' targets the read-only mounted interpreter, so create the venv first).`,
-        ]),
+      : browserScope
+        ? [
+            `This downloads a browser to ${destination}. That path is the persistent sandbox HOME, so an approved download survives later commands and the browser is fetched once rather than per test run.`,
+            "After the download, a project-driven browser test can launch it, or point Playwright/Puppeteer at the mounted host browser (`google-chrome`) instead of downloading one at all.",
+          ]
+        : [
+            `This manager normally writes to ${destination}${persistent ? ", which sits inside the writable workspace or the persistent sandbox HOME, so an approved install survives later commands" : ""}. Node dependencies belong in the target project's node_modules; Python dependencies belong in a project-local .venv (a bare 'pip install' targets the read-only mounted interpreter, so create the venv first).`,
+          ]),
     "Run the install from a normal terminal outside Bantam, or let Bantam ask the operator and approve it: answer the prompt interactively, or start with --allow-installs (or BANTAM_ALLOW_INSTALLS=1) to approve network for classified installs without prompting.",
     "Alternatively, restart Bantam with --shell-network (or BANTAM_SHELL_NETWORK=1) only if you trust the model and workspace. This keeps Docker filesystem confinement but permits model-chosen commands to send workspace data over the network.",
     "Do not switch to BANTAM_SHELL_SANDBOX=host merely to install packages: host mode has no filesystem confinement and can access anything your user account can.",
@@ -306,11 +321,13 @@ export function formatOfflineInstallMessage(classification) {
 /**
  * Where would this install land, and can it survive the command?
  *   project -> workspace node_modules/.venv or the persistent sandbox HOME (persists)
+ *   browser -> the persistent sandbox HOME's browser cache (persists)
  *   global  -> the read-only mounted interpreter/tool prefix (does not persist)
  *   system  -> the container image rootfs (does not persist; the image is discarded)
  */
 function installScope(ecosystem, words) {
   if (SYSTEM_PACKAGE_MANAGERS.has(ecosystem)) return "system";
+  if (ecosystem === "browser") return "browser";
   if (GLOBAL_INSTALL_MANAGERS.has(ecosystem) && words.some((word) => GLOBAL_INSTALL_FLAGS.has(word))) {
     return "global";
   }
@@ -377,9 +394,44 @@ function classifyWords(words, assignments) {
         new Set(["install", "fetch", "update"]), {
           offlineFlags: ["--local"],
         });
+    case "playwright":
+    case "playwright-core":
+    case "puppeteer":
+    case "browsers":
+    case "cypress":
+      return classifyBrowserTool(executable, args);
     default:
       return null;
   }
+}
+
+// `playwright install [browser…]`, `puppeteer browsers install <browser>`,
+// `@puppeteer/browsers install <browser>`, `cypress install`. These fetch a
+// browser from a CDN, so they need network exactly like a registry install.
+function classifyBrowserTool(executable, args) {
+  if (!BROWSER_DOWNLOADERS.has(executable)) return null;
+  const parsed = firstSubcommand(args);
+  if (!parsed) return null;
+  if (parsed.operation === "install") return result("browser", executable, "install", args, []);
+  // `puppeteer browsers install …` / `@puppeteer/browsers install …`
+  if (parsed.operation === "browsers" || parsed.operation === "browser") {
+    const nested = firstSubcommand(args.slice(parsed.index + 1));
+    if (nested?.operation === "install") return result("browser", executable, "browsers install", args, []);
+  }
+  return null;
+}
+
+// `npx playwright install …` and `npm exec playwright install …` are the same
+// download as the direct binary: classify the downloader, not a generic exec.
+function browserToolInArgs(args) {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("-")) continue;
+    const name = executableName(args[i]);
+    if (!BROWSER_DOWNLOADERS.has(name)) return null;
+    const match = classifyBrowserTool(name, args.slice(i + 1));
+    return match ? { match, name } : null;
+  }
+  return null;
 }
 
 function classifyNpm(executable, args) {
@@ -389,11 +441,17 @@ function classifyNpm(executable, args) {
   if (installs.has(parsed.operation)) return result("npm", executable, parsed.operation, args);
   if (parsed.operation !== "exec") return null;
   if (onlyInformationalArgs(args.slice(parsed.index + 1))) return null;
+  const downloader = browserToolInArgs(args.slice(parsed.index + 1));
+  if (downloader) return downloader.match;
   return result("npm", executable, "exec", args, ["--offline", "--no-install"]);
 }
 
 function classifyNpx(executable, args) {
   if (!args.length || onlyInformationalArgs(args)) return null;
+  // A browser download is the exception to the exec rule: the tool is local but
+  // what it fetches is not, so it must go through the operator like an install.
+  const downloader = browserToolInArgs(args);
+  if (downloader) return downloader.match;
   // npx/npm exec may use an already-installed binary, but if it is absent they
   // consult the registry. Static preflight cannot prove the binary is local,
   // so require the caller to make that intent explicit.

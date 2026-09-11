@@ -169,3 +169,55 @@ test("classification records where the install lands and whether it persists", (
   const venv = classifyOfflineInstall("uv sync");
   assert.equal(venv.scope, "project");
 });
+
+test("a project tool's browser download is a network install, not an exec", () => {
+  // The exact shape that ran offline and died on EAI_AGAIN at cdn.playwright.dev.
+  for (const cmd of [
+    "./node_modules/.bin/playwright install chromium",
+    "npx playwright install chromium",
+    "npm exec playwright install chromium",
+    "playwright install chromium",
+    "npx puppeteer browsers install chrome",
+    "cypress install",
+  ]) {
+    const c = classifyOfflineInstall(cmd);
+    assert.ok(c?.blocked, `${cmd} needs the operator's network decision`);
+    assert.notEqual(c.operation, "exec", `${cmd} must not be treated as a local-binary exec`);
+    assert.doesNotMatch(c.message, /node_modules\/\.bin/, "the exec fallback would send it straight back to the offline command");
+  }
+});
+
+test("browser downloads are classified by scope and persist in the sandbox HOME", () => {
+  const c = classifyOfflineInstall("./node_modules/.bin/playwright install chromium");
+  assert.equal(c.ecosystem, "browser");
+  assert.equal(c.scope, "browser");
+  assert.equal(c.persistent, true);
+  assert.match(c.message, /persistent sandbox HOME/);
+});
+
+test("the operator prompt fires for a playwright download, and approval runs it with network", async (t) => {
+  const ws = makeWs(); t.after(() => fs.rmSync(ws, { recursive: true, force: true }));
+  let asked = 0;
+  const { ex, seen } = executor(ws, {
+    onNetRequest: async ({ kind, classification }) => {
+      asked++;
+      assert.equal(kind, "install");
+      assert.equal(classification.ecosystem, "browser");
+      return "allow-once";
+    },
+  });
+  const r = await ex.execute({ a: "shell", c: "./node_modules/.bin/playwright install chromium" });
+  assert.equal(asked, 1, "the download prompted instead of running offline");
+  assert.equal(seen.calls, 1);
+  assert.equal(seen.network, true);
+  assert.equal(r.blocked, undefined);
+});
+
+test("without approval a browser download is blocked before it can fail on DNS", async (t) => {
+  const ws = makeWs(); t.after(() => fs.rmSync(ws, { recursive: true, force: true }));
+  const { ex, seen } = executor(ws);
+  const r = await ex.execute({ a: "shell", c: "npx playwright install chromium" });
+  assert.ok(r.blocked);
+  assert.equal(seen.calls, 0, "no EAI_AGAIN: nothing spawned");
+});
+

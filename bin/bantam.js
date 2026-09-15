@@ -5343,6 +5343,25 @@ async function repl() {
       continue;
     }
 
+    // `:network [on|off]` — allow shell commands to reach the network. Off by
+    // default (the sandbox has no network); on lets the model fetch, install,
+    // and preview. Persists like the other toggles.
+    if (/^:network\b/i.test(request)) {
+      const arg = request.replace(/^:network\b\s*/i, "").trim().toLowerCase();
+      if (arg === "on" || arg === "off") {
+        process.env.BANTAM_SHELL_NETWORK = arg === "on" ? "1" : "0";
+        const saved = saveUserSetting("shellNetwork", arg === "on");
+        console.log(paint(arg === "on" ? "33" : "2",
+          `  network: ${arg === "on" ? "ON" : "off"} — shell commands can ${arg === "on" ? "reach the network (fetch, install, preview)" : "not reach the network"}${saved ? " (remembered)" : ""}`));
+        console.log(paint("2", "  takes effect on your next request."));
+      } else {
+        const on = process.env.BANTAM_SHELL_NETWORK === "1";
+        console.log(paint("2", `  network: ${on ? "ON" : "off"} — shell commands can ${on ? "reach the network" : "not reach the network"}`));
+        console.log(paint("2", "  :network on   ·   :network off"));
+      }
+      continue;
+    }
+
     // `:eyes [auto|local|codex]` — which model reads an image. Not cosmetic: the
     // local projector misreads machine-rendered images most of the time.
     if (/^:eyes\b/i.test(request)) {

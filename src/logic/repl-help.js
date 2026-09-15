@@ -33,6 +33,7 @@ export function renderReplHelp({ cols = 80, heading = (s) => s, command = (s) =>
       [':stream [on|off]', 'Show responses as they arrive.'],
       [':deepresearch [on|off]', 'Research gaps before answering.'],
       [':context [mode]', 'rebuild / immutable / extension'],
+      [':network [on|off]', 'Allow shell commands to reach the network.'],
       [':rooster [on|off]', 'Toggle rooster animations and sound.'],
       [':api-model [name]', 'Alias for API model presets.'],
     ]),

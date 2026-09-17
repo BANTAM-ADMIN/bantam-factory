@@ -27,6 +27,7 @@ export function renderReplHelp({ cols = 80, heading = (s) => s, command = (s) =>
       [':probe [question]', 'Check consistency across local answers.'],
     ]),
     ...section('Settings', [
+      [':sandbox [on|off]', 'Toggle shell sandbox (docker vs host).'],
       [':modes', 'Show all optional modes and their status.'],
       [':team [on|off|status]', 'Scouts assist a Terra primary.'],
       [':trio [on|off|status]', 'Run local, Sol and Terra in parallel.'],

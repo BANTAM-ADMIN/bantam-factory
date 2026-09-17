@@ -68,7 +68,7 @@ export function verificationEvidence({ execution, command, configuredCommand = n
     statusScope: finalConfiguredScope ? (configured ? "final-configured-command" : "final-test-command") : "execution",
     statusCommand: finalConfiguredScope || execution.executedCommand || actualCommand,
     ...(statusRisk ? { uncertainty: `outer shell success may mask an inner runner failure: ${statusRisk}` } : {}),
-    status: unavailable ? "unverified" : exitCode === 0 && !reportedFailures ? "pass" : "fail",
+    status: unavailable ? "unverified" : (exitCode === 0 && !reportedFailures) ? "pass" : "fail",
     counts: unavailable || ambiguousCounts ? null : parsedCounts,
     countsScope: ambiguousCounts ? "multiple-summaries" : finalConfiguredScope ? "compound-output-single-summary" : "single-execution",
     failingTests: failures.slice(0, 32).map((failure) => failure.name),

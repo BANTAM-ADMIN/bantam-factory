@@ -316,6 +316,7 @@ export async function runFixture({
         // has a much tighter context budget for the map and footers to compete in.
         grounding: groundingEnabled(process.env.BANTAM_GROUND, { codex: Boolean(model?.codex), sourceFiles: countSourceFiles(workspace) }),
         postVerifyIntegrity: () => checkWorkspace(snapshot, workspace, spec),
+        verifyCommand: spec.verify,
         // Never enable the direct edit gate alone: the measured 2026-07-26
         // range-parser control rerouted a refused test write into a truncated
         // shell heredoc. The paired shell transaction closes that escape path,

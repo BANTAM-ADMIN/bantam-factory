@@ -110,7 +110,7 @@ test("fixture cleanup leaves archived generated evidence readable and renderable
   fs.writeFileSync(path.join(fixture, "task.json"), JSON.stringify({
     name: "attachment-lifecycle-proof",
     task: "Create the requested generated evidence files, verify them, and finish.",
-    verify: "node -e \"const f=require('fs'); f.accessSync('assets/generated/proof.json'); f.accessSync('assets/generated/review.html')\"",
+    verify: "node -e \"const f=require('fs'); f.accessSync('assets/generated/proof.json'); f.accessSync('assets/generated/review.html'); console.log('evidence ready')\"",
     maxTurns: 8,
     editable: ["assets/generated"],
   }));
@@ -118,7 +118,7 @@ test("fixture cleanup leaves archived generated evidence readable and renderable
   const outputs = [
     { a: "write_file", p: "assets/generated/proof.json", content: "{\"proof\":true}\n" },
     { a: "write_file", p: "assets/generated/review.html", content: "<!doctype html><title>Archived review</title><main><h1>Archived evidence survives cleanup</h1></main>" },
-    { a: "shell", c: "node -e \"const f=require('fs'); f.accessSync('assets/generated/proof.json'); f.accessSync('assets/generated/review.html'); console.log('evidence ready')\"" },
+    { a: "shell", c: "node -e \"const f=require('fs'); f.accessSync('assets/generated/proof.json'); f.accessSync('assets/generated/review.html')\"" },
     { a: "done", summary: "Generated evidence created and verified." },
   ];
   let call = 0;

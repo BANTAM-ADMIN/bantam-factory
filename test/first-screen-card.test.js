@@ -78,7 +78,7 @@ test("an 80-column terminal gets the card, not the fallback — long path and mo
   const longModel = "Qwen3.8-27B-BANTAM-Finetune-Instruct-Q4_K_M-2026-08-25";
   const host = "localhost:8085";
   const model = elideMiddle(longModel, Math.max(12, budget - host.length - 2)) + "  " + host;
-  const l = ["BANTAM  v1.3.0", "a scrappy little terminal agent", "",
+  const l = ["BANTAM  v1.4.0", "a scrappy little terminal agent", "",
     "model    " + model, "dir      " + elideMiddle(longDir, budget),
     "verify   none   context  rebuild", "sandbox  docker · alpine:3 · offline", "",
     "type a request · :help · Ctrl-C stops · exit", ":modes to see what else is switched on", ""];

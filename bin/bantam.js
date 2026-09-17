@@ -4967,6 +4967,15 @@ async function repl() {
       }
       nextRequest(); return;
     }
+    if (/^:sandbox\b/i.test(request)) {
+      const arg = request.replace(/^:sandbox\b\s*/i, "").trim().toLowerCase();
+      if (arg === "on") { process.env.BANTAM_SHELL_SANDBOX = "docker"; }
+      else if (arg === "off") { process.env.BANTAM_SHELL_SANDBOX = "host"; }
+      else if (arg) { console.log("  Usage: :sandbox [on|off]"); continue; }
+      const mode = process.env.BANTAM_SHELL_SANDBOX ?? "docker";
+      console.log(`  🐣 sandbox: ${mode === "docker" ? "ON — shell runs in a Docker container" : "OFF — shell runs directly on the host"}${arg ? " (applies to new requests)" : ""}`);
+      continue;
+    }
     if (/^:stream\b/i.test(request)) {
       const arg = request.replace(/^:stream\b\s*/i, "").trim().toLowerCase();
       if (arg === "on") { streamMode = true; saveUserSetting("stream", true); }

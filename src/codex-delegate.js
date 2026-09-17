@@ -26,6 +26,9 @@ const MODELS = Object.freeze({
   terra: "gpt-5.6-terra",
   "gpt-5.6-sol": "gpt-5.6-sol",
   "gpt-5.6-terra": "gpt-5.6-terra",
+  luna: "gpt-reserve",
+  "codex-luna": "gpt-reserve",
+  "gpt-reserve": "gpt-reserve",
 });
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 
@@ -492,7 +495,7 @@ function requireArtifact(value) {
 function normalizeModel(value) {
   const key = String(value ?? "").trim().toLowerCase();
   const model = MODELS[key];
-  if (!model) throw new Error(`unsupported delegate model: ${value}; use sol, terra, or astra`);
+  if (!model) throw new Error(`unsupported delegate model: ${value}; use sol, terra, luna, or astra`);
   return model;
 }
 

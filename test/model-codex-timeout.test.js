@@ -56,3 +56,45 @@ test("ModelClient never multiplies a non-retryable Codex timeout", async (t) => 
   assert.equal(attempts, 1);
   assert.equal(client.requestLog().at(-1).attempts.length, 1);
 });
+
+test("Codex quota failure falls back to reserve for one run, then resets primary", async (t) => {
+  const client = new ModelClient({
+    codex: true,
+    model: "gpt-5.6-terra",
+    codexEffort: "medium",
+    retries: 0,
+  });
+  const seen = [];
+  client.codexRuntime = {
+    active: false,
+    beginRun() { this.active = true; return Symbol("run"); },
+    endRun() { this.active = false; return true; },
+    switchRunModel(model, effort) { seen.push({ switched: model, effort }); },
+    async complete(prompt, options) {
+      seen.push({ requested: options.model });
+      if (options.model === "gpt-5.6-terra") {
+        throw Object.assign(new Error("You've hit your usage limit"), {
+          code: "quota_exhausted", provider: "codex", retryable: false,
+        });
+      }
+      return { content: '{"a":"done","summary":"Reserved completion."}', tokens: 1 };
+    },
+    close() {},
+  };
+  t.after(() => client.close());
+
+  const firstToken = client.beginAgentRun();
+  const result = await client.complete("make the change", { jsonSchema: actionJsonSchema() });
+  assert.match(result.content, /Reserved completion/);
+  assert.deepEqual(seen, [
+    { requested: "gpt-5.6-terra" },
+    { switched: "gpt-reserve", effort: "medium" },
+    { requested: "gpt-reserve" },
+  ]);
+  assert.equal(client.codexReserveActive, true);
+  assert.equal(client.endAgentRun(firstToken), true);
+
+  client.beginAgentRun();
+  assert.equal(client.codexReserveActive, false);
+  assert.equal(client.modelName, "gpt-5.6-terra");
+});

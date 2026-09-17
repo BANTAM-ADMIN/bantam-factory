@@ -15,6 +15,7 @@ import { grammarFieldFor, buildOpenAiBody, buildChatCompletionsBody, buildDeepSe
 import { addModelUsage, emptyModelUsage, usageFromResponse } from "./model-usage.js";
 import { CodexAppServer, normalizeCodexStructuredContent } from "./codex-transport.js";
 import { activeProfile, recordSample } from "./logic/model-cards.js";
+import { formatLunaReserveNotice, lunaReserveModel, shouldOfferLunaReserve } from "./logic/luna-reserve.js";
 import { buildChatBody, chatTransportFidelity, decomposeRenderedPrompt } from "./chat-transport.js";
 
 const FALLBACK_ENDPOINT = "http://localhost:8085";
@@ -143,6 +144,19 @@ export function modelOutputTokenCap(model) {
   return Number.isFinite(cap) && cap > 0 ? cap : null;
 }
 
+function requestForCodexModel(request, model, effort) {
+  const body = JSON.parse(request.body);
+  body.model = model;
+  body.effort = effort;
+  const serialized = JSON.stringify(body);
+  return {
+    ...request,
+    url: `codex-app-server://local/${model}`,
+    body: serialized,
+    bodySha256: sha256(serialized),
+  };
+}
+
 export class ModelClient {
   constructor(opts = {}) {
     const explicitProfile = opts.profile ?? process.env.BANTAM_PROFILE;
@@ -239,6 +253,8 @@ export class ModelClient {
     }
     this.codexRuntime = null;
     this.codexRunToken = null;
+    this.codexPrimaryModel = this.modelName;
+    this.codexReserveActive = false;
     // BANTAM asks for one small JSON action per completion. DeepSeek V4 native
     // thinking can consume the entire output allowance before emitting that
     // action, so routine harness turns default to its fast non-thinking mode.
@@ -500,6 +516,7 @@ export class ModelClient {
     // so retrying duplicates no upstream work and giving up throws away the whole run.
     let capacityGrants = 0;
     let silentActionRecoveries = 0;
+    let reserveFallbacks = 0;
     let lastErr;
     for (let i = 0; i < attempts; i++) {
       const attempt = {
@@ -541,6 +558,23 @@ export class ModelClient {
         if (e.code === "capacity" && capacityGrants < CAPACITY_RETRY_BUDGET && !requestOptions.signal?.aborted) {
           capacityGrants += 1;
           attempts += 1;
+        }
+        const canUseLunaReserve = this.codex
+          && reserveFallbacks === 0
+          && !this.codexReserveActive
+          && this.modelName !== lunaReserveModel().model
+          && shouldOfferLunaReserve(e)
+          && !requestOptions.signal?.aborted;
+        if (canUseLunaReserve) {
+          const reserve = lunaReserveModel();
+          reserveFallbacks++;
+          this.codexReserveActive = true;
+          this.modelName = reserve.model;
+          this.codexRuntime?.switchRunModel?.(reserve.model, reserve.effort);
+          request = requestForCodexModel(request, reserve.model, reserve.effort);
+          attempts += 1;
+          if (process.stderr.isTTY) process.stderr.write(`${formatLunaReserveNotice(this.codexPrimaryModel)}\n`);
+          continue;
         }
         // One fresh connection can recover a silent text-only Codex action.
         // Consume the normal retry budget; preserve both attempts and the
@@ -1242,6 +1276,8 @@ export class ModelClient {
     this.deepseek = false;
     this.modelName = model;
     this.codexEffort = effort;
+    this.codexPrimaryModel = model;
+    this.codexReserveActive = false;
     return `codex-app-server://${model}`;
   }
 
@@ -1265,6 +1301,13 @@ export class ModelClient {
   }
 
   beginAgentRun() {
+    // Reserve fallback is scoped to one run. A new run probes the ordinary
+    // model again instead of silently remaining on the emergency route.
+    if (this.codexReserveActive) {
+      this.codexReserveActive = false;
+      this.modelName = this.codexPrimaryModel;
+      this.codexRuntime?.switchRunModel?.(this.modelName, this.codexEffort);
+    }
     this.chatSessions?.beginRun();
     if (!this.codex || this.codexThreadMode !== "run") return null;
     // Establish the boundary before the first lazy completion so no request can

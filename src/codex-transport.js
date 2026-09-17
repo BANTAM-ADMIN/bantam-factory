@@ -182,6 +182,16 @@ export class CodexAppServer {
     return true;
   }
 
+  // Preserve the caller's active run while discarding the old model-bound
+  // thread. Reserve routing is selected only after a quota failure, so the
+  // next completion must start a fresh thread with the reserve model.
+  switchRunModel(model, effort = this.effort) {
+    if (this.turns.size) throw new Error("cannot switch Codex models during an active turn");
+    this._clearRunThreadBinding();
+    this.model = model;
+    this.effort = effort;
+  }
+
   async health() {
     try {
       await this.start();

@@ -90,7 +90,13 @@ export class BantamTUI {
     switch (e.type) {
       case "plan_made": this.plan = e.plan; break;
       case "plan_revised": this.plan = e.plan; this.replanned = true; this.push(paint(c.gold, "  🔄 revised the plan")); break;
-      case "thinking": this.m.think++; this.push(paint(c.think, `  ~ ${san(e.text.split("\n").find((l) => l.trim()) || "").slice(0, 240)}`)); break;
+      case "thinking": {
+        this.m.think++;
+        for (const line of san(String(e.text || "")).split("\n")) {
+          if (line.trim()) this.push(paint(c.think, `  ~ ${line.trim()}`));
+        }
+        break;
+      }
       case "skills_used": for (const s of e.skills) if (!this.skillsUsed.includes(s)) { this.skillsUsed.push(s); this.push(paint(c.dim, `  · recalling skill: ${s}`)); } break;
       case "skill_learned": this.skillLearned = e.skill; this.push(paint(c.gold, `  + learned skill: ${e.skill}`)); break;
       case "pregate_fail": this.m.pregate++; this.push(paint(c.fail, `  ! pre-gate: ${e.path} — syntax error, fed back`)); break;

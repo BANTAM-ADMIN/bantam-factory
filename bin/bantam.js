@@ -1512,8 +1512,8 @@ function liveLogger(e) {
     const first = scrubbed.split("\n")[0].slice(0, 100);
     process.stderr.write(`    ${first}\n`);
   } else if (e.type === "thinking") {
-    const first = e.text.split("\n").find((l) => l.trim()) || e.text;
-    process.stderr.write(`  🤔 ${first.slice(0, 100)}${first.length > 100 ? "…" : ""}\n`);
+    const text = String(e.text || "").split("\n").map((l) => l.trim()).filter(Boolean).join(" ");
+    if (text) process.stderr.write(`  🤔 ${text}\n`);
   } else if (e.type === "grounding_progress") {
     // Live single-line bar: on a big repository the index build blocked the
     // first request invisibly and chat felt unresponsive (2026-08-18).
@@ -4149,11 +4149,10 @@ function makeInteractiveLogger(emit, activity = {}) {
         if (wrapped.length > cap) out(`    ${dim(`… (+${wrapped.length - cap} more line${wrapped.length - cap === 1 ? "" : "s"})`)}`);
       }
     } else if (e.type === "thinking") {
-      // a glimpse of the model's reasoning — wrapped, not cut mid-word
+      // Show the complete reasoning block, wrapped for the terminal.
       const text = String(e.text || "").split("\n").map((l) => l.trim()).filter(Boolean).join(" ");
       if (text) {
-        const glimpse = text.length > 280 ? text.slice(0, 280).replace(/\s+\S*$/, "") + " …" : text;
-        const wrapped = wrapForTerminal(glimpse);
+        const wrapped = wrapForTerminal(text);
         out(`  ${dim("· " + (wrapped[0] || ""))}`);
         for (const l of wrapped.slice(1)) out(`    ${dim(l)}`);
       }

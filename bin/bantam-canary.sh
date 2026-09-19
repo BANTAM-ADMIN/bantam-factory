@@ -25,9 +25,9 @@ T0=$(date +%s)
 timeout $((BAND_MAX + 120)) node bin/bantam.js run --task "$(cat "$B/bench/canary/task.txt")" \
   --workspace "$WS" --autonomous --save-run="$WS/run.json" > "$WS/out.log" 2>&1
 RC=$?; WALL=$(( $(date +%s) - T0 ))
-cp "$B/bench/canary/holdout/holdout.test.mjs" "$WS/test/.holdout.test.mjs"
+cp "$B/bench/canary/holdout/holdout.test.mjs" "$WS/test/bantam-holdout.test.mjs"
 OUT=$(cd "$WS" && env -u NODE_TEST_CONTEXT -u NODE_OPTIONS npm test --silent 2>&1)
-rm -f "$WS/test/.holdout.test.mjs"
+rm -f "$WS/test/bantam-holdout.test.mjs"
 PASS=$(echo "$OUT" | grep -oP '^# pass \K\d+' | head -1)
 FAIL=$(echo "$OUT" | grep -oP '^# fail \K\d+' | head -1)
 BUILD=$(git -C "$B" rev-parse --short HEAD 2>/dev/null || echo unknown)

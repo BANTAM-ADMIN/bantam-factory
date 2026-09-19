@@ -37,12 +37,13 @@ test("holdout kind: sealed test installs (with data), runs, and cleans up", (t) 
     "holdout/h.test.mjs": 'import test from "node:test"; import assert from "node:assert/strict"; import fs from "node:fs";\nimport { v } from "../src/m.mjs";\ntest("sealed", () => { const d = JSON.parse(fs.readFileSync(new URL("./holdout.data.json", import.meta.url), "utf8")); assert.equal(v, d.expect); });',
     "holdout/h.json": JSON.stringify({ expect: 7 }),
   });
-  const good = mk({ "package.json": '{"type":"module","scripts":{"test":"node --test test/"}}', "src/m.mjs": "export const v = 7;", "test/.keep": "" });
-  const bad = mk({ "package.json": '{"type":"module","scripts":{"test":"node --test test/"}}', "src/m.mjs": "export const v = 8;", "test/.keep": "" });
+  const good = mk({ "package.json": '{"type":"module","scripts":{"test":"node --test"}}', "src/m.mjs": "export const v = 7;", "test/.keep": "" });
+  const bad = mk({ "package.json": '{"type":"module","scripts":{"test":"node --test"}}', "src/m.mjs": "export const v = 8;", "test/.keep": "" });
   t.after(() => { for (const d of [kit, good, bad]) fs.rmSync(d, { recursive: true, force: true }); });
   assert.equal(run(kit, good).verdict, "EXACT");
   assert.equal(run(kit, bad).verdict, "MISS");
-  assert.ok(!fs.existsSync(path.join(good, "test/.holdout.mjs")), "holdout cleaned up");
+  assert.deepEqual(fs.readdirSync(path.join(good, "test")), [".keep"], "holdout and data cleaned up");
+  assert.deepEqual(fs.readdirSync(path.join(bad, "test")), [".keep"], "failed holdout and data cleaned up");
 });
 
 test("reference-bytes kind: any arg mismatch is a MISS naming the arg", (t) => {

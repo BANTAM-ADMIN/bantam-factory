@@ -52,7 +52,7 @@ test("one bounce only; non-contract tasks and enumeration-free contracts are sil
 test("wired: done bounces through the real dispatcher until the tokens are tested", async (t) => {
   const { runAgent } = await import("../src/agent.js");
   const d = ws({
-    "package.json": JSON.stringify({ type: "module", scripts: { test: "node --test test/" } }),
+    "package.json": JSON.stringify({ type: "module", scripts: { test: "node --test" } }),
     "src/query.js": "// ops:\n//   >= <= != > < =\nexport const ok = 1;\n",
     "test/q.test.js": 'import test from "node:test"; import assert from "node:assert/strict";\ntest("ops = > < >= work", () => { assert.ok([">=", "=", ">", "<"].every(Boolean)); });\n',
   });

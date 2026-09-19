@@ -188,7 +188,9 @@ test("fake green", () => assert.equal(1, 1));
     },
     {
       a: "shell",
-      c: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(shellScript)}`,
+      // Resolve Node inside the sandbox; a host NVM path does not exist there.
+      // A quoted heredoc preserves the script's nested strings and regexes.
+      c: `node <<'BANTAM_SCOPE_SCRIPT'\n${shellScript}\nBANTAM_SCOPE_SCRIPT`,
     },
     { a: "shell", c: "npm test" },
     { a: "done", summary: "Implemented and verified." },

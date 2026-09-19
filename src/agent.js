@@ -3093,7 +3093,7 @@ async function runAgentCore({
 
       // Optional thinking phase: at critical moments, reason in an open <think>
       // block first, then seal it and generate the grammar-constrained action.
-      let assistantPrefill = bareHistory ? bareTurnPrefill : model.assistantPrefill;
+      let assistantPrefill = bareHistory && !model.sealActionPrefill ? bareTurnPrefill : model.assistantPrefill;
       let turnReasoning = null;
       const synthesisThisAttempt = preEditSynthesisTurn && attempt === 0;
       const verifiedGreen = successfulVerificationBoundary(turns.at(-1)?.verificationEvidence, workspaceEditGeneration);

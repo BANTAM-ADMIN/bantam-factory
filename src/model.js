@@ -124,6 +124,7 @@ function serverTimings(value) {
 // grammar-constrained ACTION can finish inside a single tick — which measured
 // as 0 ms and produced no rate at all, on exactly the calls BANTAM makes most.
 const nowMs = () => performance.now();
+const ORION_26B_A4B = /\borion[-_ ]26b[-_ ]a4b\b/i;
 
 /** Human-readable decode speed from a timings block, or null. */
 export function timingsTokensPerSecond(timings) {
@@ -282,6 +283,8 @@ export class ModelClient {
     // assembly and the thinking rail follow a profile switch automatically.
     this.template = this.profile.template;
     this.thinkMarkers = this.profile.think;
+    this.sealActionPrefill = !this.codex && !this.apiMode && this.profileName === "gemma"
+      && ORION_26B_A4B.test(String(opts.modelId ?? ""));
     // Fields the caller pinned explicitly are never re-derived by a later
     // profile switch (see _applyProfile).
     this.pinned = new Set(
@@ -1225,7 +1228,7 @@ export class ModelClient {
    * A registry entry may name the profile its model needs (`"profile": "gemma"`); an explicit
    * `--profile` on the command line still outranks it.
    */
-  switchTo(endpoint, { profile = null } = {}) {
+  switchTo(endpoint, { profile = null, modelId = null } = {}) {
     this.codexRuntime?.close();
     this.codexRuntime = null;
     this.codex = false;
@@ -1235,13 +1238,36 @@ export class ModelClient {
     this.endpoint = String(endpoint).replace(/\/$/, "");
     this.apiUrl = null;
     this.apiMode = false;
+    this.localRegistryProfile = profile;
+    this.sealActionPrefill = false;
+    this.applyDetectedLocalProfile(modelId);
     // The window belonged to the server we just left; a stale one would size the
     // prompt for a machine we are no longer talking to.
     this.apiContextWindow = null;
     return this.endpoint;
   }
 
+  // Orion's native completion endpoint needs Gemma turn/channel delimiters.
+  // Startup used to discover its name for display while retaining Qwen's
+  // prompt and </think> stop, letting answers spill into the thinking stream.
+  // Keep this compatibility correction scoped to the tested Orion 26B-A4B;
+  // existing Gemma dense and Qwen configurations retain their behavior.
+  applyDetectedLocalProfile(modelId) {
+    if (this.codex || this.apiMode || !ORION_26B_A4B.test(String(modelId ?? ""))) return false;
+    if (this.profileExplicit || this.localRegistryProfile) {
+      if (this.profileName !== "gemma") return false;
+    } else {
+      this._applyProfile(resolveProfile({ profile: "gemma" }));
+    }
+    // Bare history is correct, but a bare CURRENT turn lets Orion attempt a
+    // thought channel under the action grammar. Exact-prompt replay produced
+    // repetitive/broken shell actions; sealing that channel restored valid JSON.
+    this.sealActionPrefill = true;
+    return true;
+  }
+
   switchToApi({ url, model, key = null, deepseek = false, dialect } = {}) {
+    this.sealActionPrefill = false;
     this.codexRuntime?.close();
     this.codexRuntime = null;
     this.codex = false;
@@ -1266,6 +1292,7 @@ export class ModelClient {
   }
 
   switchToCodex({ model = "gpt-5.6-sol", effort = "high" } = {}) {
+    this.sealActionPrefill = false;
     this.codexRuntime?.close();
     this.codexRuntime = null;
     this.codex = true;

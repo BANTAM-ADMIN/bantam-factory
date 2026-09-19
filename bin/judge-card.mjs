@@ -36,7 +36,9 @@ for (const check of manifest.checks) {
       legs.suiteGreen = r.green; legs.tests = r.tests; ok = ok && r.green;
     } else if (check.kind === "holdout") {
       const src = path.join(kitDir, check.test);
-      const dst = path.join(ws, "test", `.holdout${path.extname(check.test)}`);
+      // Node's automatic test discovery skips dotfiles. Use a unique test
+      // filename so the sealed check runs without overwriting a public test.
+      const dst = path.join(ws, "test", `bantam-holdout-${crypto.randomUUID()}.test${path.extname(check.test)}`);
       fs.mkdirSync(path.dirname(dst), { recursive: true });
       fs.copyFileSync(src, dst);
       if (check.data) fs.copyFileSync(path.join(kitDir, check.data), path.join(ws, check.dataAs ?? "test/holdout.data.json"));

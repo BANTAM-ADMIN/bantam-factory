@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { runAgent } from "../src/agent.js";
 import { QWEN_ASSISTANT_PREFILL } from "../src/profiles.js";
+import { ModelClient } from "../src/model.js";
 
 // The extension trajectory's immutable history replays an empty closed
 // <think></think> block on every historical assistant turn. Measured on
@@ -64,6 +65,31 @@ const RUN_OPTS = {
   shellSandbox: "host",
   promptTrajectory: "extension",
 };
+
+test("Orion seals current action turns while keeping prior turns bare; dense Gemma is unchanged", async (t) => {
+  const workspace = makeWorkspace(t);
+  for (const modelId of ["Orion-26B-A4B-v1.1", "gemma-31b"]) {
+    const client = new ModelClient({ apiUrl: null, profile: "gemma" });
+    t.after(() => client.close());
+    client.applyDetectedLocalProfile(modelId);
+    const model = scriptedPromptModel([...SCRIPT]);
+    for (const key of ["assistantPrefill", "historyPrefill", "template", "thinkMarkers", "sealActionPrefill", "stop"]) {
+      model[key] = client[key];
+    }
+    await runAgent({ ...RUN_OPTS, workspace, model, thinkMode: "off" });
+    assert.equal(model.prompts.length, 3);
+    for (const prompt of model.prompts) {
+      if (modelId.startsWith("Orion")) {
+        assert.ok(prompt.endsWith(client.assistantPrefill));
+        assert.equal(prompt.match(/<\|channel>thought/g)?.length, 1);
+      } else {
+        assert.ok(prompt.endsWith("<|turn>model\n"));
+        assert.ok(!prompt.includes("<|channel>thought"));
+      }
+    }
+    assert.ok(model.prompts.at(-1).includes('<|turn>model\n{"a":"read_file"'));
+  }
+});
 
 test("bare history: extension prompts carry no empty think blocks and keep the byte-extension invariant", async (t) => {
   const workspace = makeWorkspace(t);

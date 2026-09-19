@@ -1,6 +1,6 @@
 {
   "name": "bantam",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "description": "A bantamweight local-model coding agent. Grammar-constrained, verifiable actions.",

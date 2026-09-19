@@ -29,7 +29,7 @@ jobs:
       - run: docker pull alpine:3
       # Several files launch real Chromium processes. Bound file concurrency
       # so shared runners can capture screenshots within the tool's deadlines.
-      - run: node --test --test-concurrency=2 test/
+      - run: node --test --test-concurrency=2 test/*.test.js
 
   canary:
     # A live-model pulse check: one sealed task through the whole factory.

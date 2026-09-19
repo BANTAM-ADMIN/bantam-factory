@@ -1,8 +1,8 @@
 {
-  "tag_name": "v1.4.0",
+  "tag_name": "v1.5.0",
   "target_commitish": "main",
-  "name": "Bantam Factory 1.4.0",
-  "body": "## What's new\n\n- **Version bump** — package.json updated to 1.4.0.\n\n## Breaking changes\n\nNone.\n\n## Upgrade\n\n```bash\ngit pull\n```",
+  "name": "Bantam Factory 1.5.0",
+  "body": "## What's new\n\n- **Orion 26B-A4B support:** BANTAM now applies the Gemma profile when the local server identifies itself as Orion 26B-A4B, including during local model selection.\n- **Correct reasoning and action boundaries:** Orion uses its Gemma channel terminators and a closed thought block before action generation. This fixes reproduced channel-token leakage and repetitive or broken action output while preserving bare conversation history.\n- **Compatibility:** Existing Gemma 31B and Qwen paths retain their behavior. Explicit profile choices and pinned prompt settings remain respected.\n- **Terminal version:** The startup splash and package metadata now show 1.5.0, including the patch version in the large banner.\n- **Test reliability:** Corrected Node test discovery in CI and fixtures, ensured sealed holdout tests are discovered and cleaned up, and fixed a sandbox test that referenced a host-only Node path.\n- **Integration notes:** `orion-26ba4b.md` documents the failures, exact-prompt comparisons, implementation, and live validation.\n\n## Validation\n\n- Full local regression suite: **4,705 passed, 0 failed, 251 skipped** (4,956 tests total).\n- Color splash, plain-text splash, and large banner verified at **1.5.0**.\n- Live tests against `Orion-26B-A4B-v1.1` on llama.cpp: clean streamed greetings and a four-turn file repair with zero rejected outputs or leaked channel markers.\n- Exact failing-prompt replay: the closed thought block produced correct assertion commands for all three tested seeds.\n- Other Gemma/Qwen compatibility is covered by regression tests; those models were not replaced or reloaded for this release.\n\n## Upgrade\n\n```bash\ngit checkout main\ngit pull --ff-only\n```\n\nRestart BANTAM FACTORY to load the changes. The model server does not need restarting.\n",
   "draft": false,
   "prerelease": false
 }

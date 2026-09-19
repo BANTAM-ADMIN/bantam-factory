@@ -219,3 +219,55 @@ test("prompt telemetry sections a Gemma prompt the same way it sections ChatML",
   assert.ok(g.openFiles.chars > 0);
   assert.ok(g.actionHistory.chars > 0);
 });
+
+test("detected Orion 26B-A4B selects its channel framing before the first turn", (t) => {
+  const client = new ModelClient({ apiUrl: null });
+  t.after(() => client.close());
+  const sampling = [client.temperature, client.actTemperature, client.topK, client.topP];
+  assert.equal(client.applyDetectedLocalProfile("Orion-26B-A4B-v1.1"), true);
+  assert.equal(client.sealActionPrefill, true);
+  assert.equal(client.template, GEMMA_TEMPLATE);
+  assert.equal(client.assistantPrefill, GEMMA_ASSISTANT_PREFILL);
+  assert.equal(client.historyPrefill, GEMMA_HISTORY_PREFILL);
+  assert.deepEqual(client.stop, ["<turn|>"]);
+  assert.deepEqual(deriveThinkPrefills(client.assistantPrefill, client.thinkMarkers).stop, ["<channel|>"]);
+  assert.deepEqual([client.temperature, client.actTemperature, client.topK, client.topP], sampling);
+  client.switchTo("http://localhost:8085");
+  assert.equal(client.profileName, "qwen", "leaving Orion restores the existing local default");
+  assert.equal(client.sealActionPrefill, false);
+  client.switchTo("http://localhost:8085", { modelId: "Orion-26B-A4B-v1.1" });
+  assert.equal(client.profileName, "gemma", "returning to a detected Orion restores its framing");
+});
+
+test("Orion discovery leaves other identities and explicit configuration untouched", (t) => {
+  for (const modelId of [null, "", "gemma-31b", "Qwen3.8-27B", "Orion-31B", "Orion-26B-A4Bigger"]) {
+    const client = new ModelClient({ apiUrl: null });
+    t.after(() => client.close());
+    assert.equal(client.applyDetectedLocalProfile(modelId), false);
+    assert.equal(client.sealActionPrefill, false);
+    assert.equal(client.template, CHATML_TEMPLATE);
+    assert.deepEqual(client.stop, ["<|im_end|>"]);
+  }
+  for (const options of [{ profile: "qwen" }, { apiUrl: "http://localhost:8085/v1" }, { codex: true }]) {
+    const client = new ModelClient({ apiUrl: null, ...options });
+    t.after(() => client.close());
+    const before = client.profile;
+    assert.equal(client.applyDetectedLocalProfile("Orion-26B-A4B-v1.1"), false);
+    assert.equal(client.profile, before);
+  }
+  const registered = new ModelClient({ apiUrl: null });
+  t.after(() => registered.close());
+  registered.switchTo("http://localhost:8085", { profile: "qwen", modelId: "Orion-26B-A4B-v1.1" });
+  assert.equal(registered.profileName, "qwen", "registry profile takes precedence too");
+  const pinned = new ModelClient({ apiUrl: null, stop: ["CUSTOM"], nPredict: 99 });
+  t.after(() => pinned.close());
+  pinned.applyDetectedLocalProfile("Orion-26B-A4B-v1.1");
+  assert.deepEqual(pinned.stop, ["CUSTOM"]);
+  assert.equal(pinned.nPredict, 99);
+  const explicitGemma = new ModelClient({ apiUrl: null, profile: "gemma" });
+  t.after(() => explicitGemma.close());
+  explicitGemma.applyDetectedLocalProfile("Orion-26B-A4B-v1.1");
+  assert.equal(explicitGemma.sealActionPrefill, true);
+  explicitGemma.switchToApi({ url: "http://localhost:8085/v1", model: "other" });
+  assert.equal(explicitGemma.sealActionPrefill, false);
+});

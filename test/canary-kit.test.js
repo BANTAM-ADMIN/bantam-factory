@@ -28,7 +28,7 @@ test("the intended one-line fix goes green, holdout included", (t) => {
   fs.cpSync(path.join(KIT, "materials"), ws, { recursive: true });
   const p = path.join(ws, "src", "window.js");
   fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace("if (sum < best) best = sum;", "if (sum > best) best = sum;"));
-  fs.copyFileSync(path.join(KIT, "holdout", "holdout.test.mjs"), path.join(ws, "test", ".holdout.test.mjs"));
+  fs.copyFileSync(path.join(KIT, "holdout", "holdout.test.mjs"), path.join(ws, "test", "holdout.test.mjs"));
   const r = suite(ws);
   assert.equal(r.fail, "0");
   assert.ok(Number(r.pass) >= 3, "visible + holdout all green");

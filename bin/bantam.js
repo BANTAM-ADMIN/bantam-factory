@@ -374,8 +374,8 @@ function ansiBannerArt() {
     // by being the only one a user ever sees. Left-pad to the original width
     // so the centring under the wordmark holds.
     if (!PKG_VERSION) return art;
-    const want = `VERSION ${PKG_VERSION.split(".").slice(0, 2).join(".")}`;
-    return art.replace(/VERSION \d+\.\d+/, (m) => (want.length < m.length ? " ".repeat(m.length - want.length) + want : want));
+    const want = `VERSION ${PKG_VERSION}`;
+    return art.replace(/VERSION \d+\.\d+(?:\.\d+)?/, (m) => (want.length < m.length ? " ".repeat(m.length - want.length) + want : want));
   } catch { return null; }
 }
 
@@ -443,7 +443,7 @@ function renderBanner({ profileName, workspace, verify, tty, servedModel = null,
     paint(C.paper, "   \\__/") + paint(C.plume, "/"),
     paint(C.dim, "    ^ ^"),
   ];
-  const right = ["", paint(`1;${C.plume}`, "bantam"), paint(C.dim, "grammar-constrained · local · verified"), ""];
+  const right = ["", paint(`1;${C.plume}`, "bantam") + (PKG_VERSION ? paint(C.dim, `  v${PKG_VERSION}`) : ""), paint(C.dim, "grammar-constrained · local · verified"), ""];
   const out = [""];
   for (let i = 0; i < 4; i++) {
     const pad = Math.max(0, 13 - stripAnsi(rooster[i]).length);
@@ -1368,9 +1368,10 @@ if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, d
 }
 // Ask the server which model is actually loaded, so switching servers (27B <-> 35B) is reflected in
 // the startup line, the TUI label, and the run artifact — not a hardcoded name.
-const activeModelId = usingCodex || usingApi
+let activeModelId = usingCodex || usingApi
   ? model.modelName
   : await fetchModelId(model.endpoint, 2500).catch(() => null);
+model.applyDetectedLocalProfile(activeModelId);
 // Always announce — ESPECIALLY with an explicit --endpoint, where what's actually serving is the
 // question. A swapped GGUF on the same port makes eval numbers incomparable across sessions; this
 // line (plus the eval summary header) is what makes that visible.
@@ -4845,14 +4846,17 @@ async function repl() {
     // client. switchToModel() may stop and restart, which is exactly what must
     // not happen to a server BANTAM did not start.
     if (target.detected) {
-      model.switchTo(target.endpoint, { profile: target.profile });
+      model.switchTo(target.endpoint, { profile: target.profile, modelId: target.label });
       saveModelPreference({ kind: "local", name: target.name });
       console.log(`  Now using ${target.label} @ ${target.endpoint}.`);
       return;
     }
     const ok = await switchToModel(model, target, { out: (s) => process.stdout.write(s) });
     if (!ok) console.log("  Switch failed (couldn't start the server).");
-    else saveModelPreference({ kind: "local", name: target.name });
+    else {
+      model.applyDetectedLocalProfile(await fetchModelId(model.endpoint, 2500).catch(() => null));
+      saveModelPreference({ kind: "local", name: target.name });
+    }
   }
 
   async function chooseCodexEffort(entry, { guided = false, requested } = {}) {

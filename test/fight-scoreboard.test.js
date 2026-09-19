@@ -264,7 +264,7 @@ test("judgeFight judges a Node package by its own suite, not only pytest (card 1
   const fightDir = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-judge-node-"));
   const materials = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-judge-node-m-"));
   t.after(() => { fs.rmSync(fightDir, { recursive: true, force: true }); fs.rmSync(materials, { recursive: true, force: true }); });
-  const pkg = JSON.stringify({ name: "x", type: "module", scripts: { test: "node --test test/" } });
+  const pkg = JSON.stringify({ name: "x", type: "module", scripts: { test: "node --test" } });
   fs.mkdirSync(path.join(materials, "test"), { recursive: true });
   fs.writeFileSync(path.join(materials, "package.json"), pkg);
   fs.writeFileSync(path.join(materials, "test", "a.test.js"), 'import test from "node:test"; import assert from "node:assert/strict"; import { f } from "../src/f.js"; test("f", () => assert.equal(f(), 2));\n');

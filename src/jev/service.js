@@ -64,22 +64,32 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     return execCell;
   }
 
+  // Take the worker's GPU lease (src/model.js then holds new local calls) and
+  // wait for llama.cpp to idle-sleep. False when there is no local worker.
+  async function takeGpu(state) {
+    const endpoint = workerEndpoint();
+    if (!endpoint) return false;
+    if (imageLeases().some((l) => l.endpoint === endpointKey(endpoint))) throw new JevBusy("the GPU is reserved for an image job; try again when it finishes");
+    lease = acquireImageLease({ url: `jev:${config.endpoint}`, gpu: { resourceKey: `jev:${endpointKey(endpoint)}` } }, { kind: "jev", endpoint: endpointKey(endpoint), state });
+    const runtime = new ImageGpuRuntime({ mode: "llamacpp", endpoint: endpointKey(endpoint) }, { gpu: { sleepTimeoutMs: config.gpu.sleepTimeoutMs }, pollMs: 250 }, { fetchImpl });
+    // The runtime bounds the wait by gpu.sleepTimeoutMs itself; an outer timeout
+    // signal would replace its "start llama.cpp with --sleep-idle-seconds" advice.
+    await runtime.sleep(new AbortController().signal);
+    return true;
+  }
+
   // Swap in: take the worker's GPU lease, let llama.cpp idle-sleep, wake DiffusionGemma.
   async function swapIn() {
     if (lease) return;
-    const endpoint = workerEndpoint();
-    if (!endpoint) return;
-    if (imageLeases().some((l) => l.endpoint === endpointKey(endpoint))) throw new JevBusy("the GPU is reserved for an image job; try again when it finishes");
-    lease = acquireImageLease({ url: `jev:${config.endpoint}`, gpu: { resourceKey: `jev:${endpointKey(endpoint)}` } }, { kind: "jev", endpoint: endpointKey(endpoint), state: "swapping-in" });
     try {
-      const runtime = new ImageGpuRuntime({ mode: "llamacpp", endpoint: endpointKey(endpoint) }, { gpu: { sleepTimeoutMs: config.gpu.sleepTimeoutMs }, pollMs: 250 }, { fetchImpl });
-      await runtime.sleep(AbortSignal.timeout(config.gpu.sleepTimeoutMs));
+      if (!(await takeGpu("swapping-in"))) return;
       await engine.ensureAwake();
       lease.update({ state: "jev-awake" });
       stats.swapsIn++;
-      log({ event: "jev_swap_in", endpoint });
+      log({ event: "jev_swap_in", endpoint: workerEndpoint() });
     } catch (error) {
       releaseLease();
+      if (error instanceof JevBusy) throw error;
       throw new JevUnavailable(`could not take the GPU from the local worker: ${error.message}`);
     }
   }
@@ -185,12 +195,28 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     if (host !== "127.0.0.1" && host !== "localhost" && !config.api.token) {
       throw new Error("serving Jev beyond localhost needs an API token (run `bantamfactory jev token`)");
     }
-    await engine.start({ onProgress });
-    if (policy() === "swap" && !primed) {
-      onProgress("priming sleep mode once (the first sleep copies the weights to host memory; later swaps take about a second)");
-      await engine.sleep();
-      primed = true;
-    }
+    if (policy() === "swap") {
+      // A cold start or a wake needs the GPU the local worker is holding: wait
+      // for it to sleep first, or vLLM cannot allocate and exits while loading.
+      let took = false;
+      if (!lease) {
+        onProgress("waiting for the local model to go idle and release the GPU");
+        try { took = await takeGpu("starting"); }
+        catch (error) {
+          releaseLease();
+          if (error instanceof JevBusy) throw error;
+          throw new JevUnavailable(`could not take the GPU from the local worker: ${error.message}`);
+        }
+      }
+      try {
+        await engine.start({ onProgress });
+        if (!primed) onProgress("priming sleep mode once (the first sleep copies the weights to host memory; later swaps take about a second)");
+        await engine.sleep();
+        primed = true;
+      } finally {
+        if (took) releaseLease();
+      }
+    } else await engine.start({ onProgress });
     if (policy() !== "swap") await ensureDecider();
     stats.startedAt = new Date(now()).toISOString();
     if (serve && !server) {

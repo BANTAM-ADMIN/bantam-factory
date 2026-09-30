@@ -31,6 +31,8 @@ while (Date.now() < until) {
   await sleep(40);
 }
 
-fs.writeFileSync(runFile, JSON.stringify({ disposition: "completed", summary: "fake worker summary", turnCount: 2,
-  verification: { status: mode === "fail" ? "fail" : "pass" } }));
+// The shape `bantam run --save-run` writes (the parts the jobs toolset reads).
+fs.writeFileSync(runFile, JSON.stringify({ kind: "bantam-run", metrics: { turns: 2 },
+  result: { reachedDone: mode !== "undone", summary: "fake worker summary", status: mode === "fail" ? "fail" : "pass",
+    blocked: mode === "undone" ? "needs the operator's canon notes" : null } }));
 process.exit(mode === "fail" ? 1 : 0);

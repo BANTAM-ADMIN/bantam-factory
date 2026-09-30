@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { writeJsonAtomic } from "../../atomic-file.js";
 import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from "../../foreman-worker-control.js";
+import { parseCodexJsonl } from "../../codex-delegate.js";
 import { runProcess } from "../../process-runner.js";
 import { listWorkspaceFiles, WorkspaceStore } from "../../workspace-store.js";
 import { planWorkspaceTransaction, WorkspaceTransaction } from "../../workspace-transaction.js";
@@ -260,7 +261,7 @@ export function createJobsToolset({
     readProgress(job);
     job.exitCode = exit.code;
     job.finishedAt = new Date().toISOString();
-    try { job.outcome = pickOutcome(JSON.parse(fs.readFileSync(p.runFile, "utf8"))); } catch { job.outcome = null; }
+    job.outcome = readOutcome(job, p);
     if (exit.error) job.error = `could not start the worker: ${exit.error.message}`;
     const candidate = store.capture(p.ws, { parent: job.baselineCommit, message: `mcp job ${job.id} candidate`, excludePaths: exclusions(p.ws) });
     job.candidateCommit = candidate.commit;
@@ -276,6 +277,10 @@ export function createJobsToolset({
     }
     if (entry.cancelled) job.state = stopping ? "interrupted" : "cancelled";
     else if (entry.timedOut) { job.state = "failed"; job.error = `timed out after ${Math.round(job.timeoutMs / 60_000)} min`; }
+    else if (exit.code === 0 && job.outcome?.reachedDone === false) {
+      job.state = "failed";
+      job.error = `the worker stopped without finishing${job.outcome.blocked ? ` (blocked: ${excerpt(job.outcome.blocked, 300)})` : " (turn limit?)"}`;
+    }
     else if (exit.code === 0 && (!job.verify || job.verification?.pass)) job.state = "succeeded";
     else {
       job.state = "failed";
@@ -301,14 +306,19 @@ export function createJobsToolset({
     pump(job.lane);
   }
 
-  function pickOutcome(run) {
-    const v = run?.verification;
-    return {
-      disposition: run?.disposition ?? null,
-      summary: typeof run?.summary === "string" ? run.summary : run?.summary?.text ?? null,
-      verification: v ? { status: v.status ?? (v.pass === true ? "pass" : v.pass === false ? "fail" : null) } : null,
-      turns: run?.turnCount ?? null,
-    };
+  // What the worker says about its own run (its claim; job.verification is ours).
+  function readOutcome(job, p) {
+    try {
+      if (job.worker === "codex-native") {
+        const parsed = parseCodexJsonl(fs.readFileSync(p.log, "utf8"));
+        return { reachedDone: null, summary: parsed.finalMessage || null, workerVerification: null, blocked: null, turns: parsed.usage.turns };
+      }
+      const run = JSON.parse(fs.readFileSync(p.runFile, "utf8"));
+      const r = run.result ?? {};
+      const blocked = r.blocked == null ? null : typeof r.blocked === "string" ? r.blocked : JSON.stringify(r.blocked);
+      return { reachedDone: typeof r.reachedDone === "boolean" ? r.reachedDone : null, summary: typeof r.summary === "string" ? r.summary : null,
+        workerVerification: r.status ?? null, blocked, turns: run.metrics?.turns ?? null };
+    } catch { return null; }
   }
 
   function steer(caller, id, text) {

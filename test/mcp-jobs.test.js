@@ -95,7 +95,7 @@ describe("jobs", () => {
     const result = await call("job_result", { job: "j1", diff: true });
     assert.deepEqual(result.changes, [{ path: "new-note.md", kind: "added" }, { path: "story.txt", kind: "modified" }]);
     assert.equal(result.verification.status, "pass");
-    assert.equal(result.outcome.summary, "fake worker summary");
+    assert.deepEqual(result.outcome, { reachedDone: true, summary: "fake worker summary", workerVerification: "pass", blocked: null, turns: 2 });
     assert.match(result.diff, /\+\+\+ b\/story\.txt/);
     assert.match(result.diff, /\+edited by worker/);
     const inbox = room.inbox("claude").messages;
@@ -113,6 +113,10 @@ describe("jobs", () => {
     const second = await finished(call, "j2");
     assert.equal(second.state, "failed");
     assert.equal(second.error, "worker exited 1");
+    await call("job_start", { worker: "local", task: "mode:undone", workspace: ws });
+    const third = await finished(call, "j3");
+    assert.equal(third.state, "failed");
+    assert.equal(third.error, "the worker stopped without finishing (blocked: needs the operator's canon notes)");
     assert.match(room.inbox("claude").messages.map((m) => m.text).join("\n"), /Job j2 \(codex\) failed .*Reason: worker exited 1/);
   });
 

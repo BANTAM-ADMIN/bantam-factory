@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
+
+import { imageLeases } from "../src/image-gpu.js";
 
 import { askRequest } from "../src/jev/commands.js";
 import { loadJevConfig } from "../src/jev/config.js";
@@ -22,6 +27,32 @@ function fakeEngine(state = "awake") {
     async stop() { calls.push("stop"); engine.state = "stopped"; return this.status(); },
   };
   return engine;
+}
+
+// A fake llama.cpp worker: awake for `awakePolls` /props reads, then asleep.
+function fakeLlama({ awakePolls }) {
+  const llama = {
+    endpoint: "http://127.0.0.1:59998",
+    polls: 0,
+    fetch: async (url) => {
+      assert.match(String(url), /^http:\/\/127\.0\.0\.1:59998\/props$/);
+      const sleeping = llama.polls++ >= awakePolls;
+      return new Response(JSON.stringify({ total_slots: 1, is_sleeping: sleeping }), { status: 200 });
+    },
+  };
+  return llama;
+}
+
+// GPU leases live under os.tmpdir(); keep the test's own away from real ones.
+async function withLeaseDir(fn) {
+  const saved = process.env.TMPDIR;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "jev-lease-"));
+  process.env.TMPDIR = root;
+  try { return await fn(path.join(root, `bantam-image-gpu-${process.getuid?.() ?? "user"}`)); }
+  finally {
+    if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
 describe("jev GPU policy", () => {
@@ -50,11 +81,39 @@ describe("jev GPU policy", () => {
 
   it("on() under swap primes sleep mode once, and refuses a LAN address without a token", async () => {
     const engine = fakeEngine("stopped");
-    const service = createJevService({ config: configWith("swap"), worker: { endpoint: "http://127.0.0.1:8085" }, engine });
-    const status = await service.on({ serve: false });
+    const llama = fakeLlama({ awakePolls: 0 });
+    const service = createJevService({ config: configWith("swap"), worker: { endpoint: llama.endpoint }, engine, fetchImpl: llama.fetch });
+    const status = await withLeaseDir(() => service.on({ serve: false }));
     assert.deepEqual(engine.calls, ["start", "sleep"], "start, then the one slow first sleep up front");
     assert.equal(status.policy, "swap");
     await assert.rejects(createJevService({ config: configWith("alongside"), engine: fakeEngine() }).on({ host: "0.0.0.0", serve: true }), /needs an API token/);
+  });
+
+  it("on() under swap waits for the local model to sleep before starting DiffusionGemma, then releases the GPU", async () => {
+    const llama = fakeLlama({ awakePolls: 3 });
+    const engine = fakeEngine("stopped");
+    const start = engine.start;
+    let pollsBeforeStart = null;
+    engine.start = async function () { pollsBeforeStart = llama.polls; return start.call(this); };
+    const service = createJevService({ config: configWith("swap"), worker: { endpoint: llama.endpoint }, engine, fetchImpl: llama.fetch });
+    await withLeaseDir(async (dir) => {
+      await service.on({ serve: false });
+      assert.equal(pollsBeforeStart, 4, "three awake polls, then asleep, then the start");
+      assert.deepEqual(imageLeases(dir), [], "the local worker gets the GPU back after priming");
+    });
+    assert.deepEqual((await service.status()).gpuLease, { held: false });
+  });
+
+  it("on() under swap refuses, without starting anything, when the local model never sleeps", async () => {
+    const llama = fakeLlama({ awakePolls: Infinity });
+    const engine = fakeEngine("stopped");
+    const config = loadJevConfig({ gpu: { policy: "swap", sleepTimeoutMs: 300 } }, noFile);
+    const service = createJevService({ config, worker: { endpoint: llama.endpoint }, engine, fetchImpl: llama.fetch });
+    await withLeaseDir(async (dir) => {
+      await assert.rejects(service.on({ serve: false }), (error) => error instanceof JevUnavailable && /could not take the GPU from the local worker: llama\.cpp did not sleep/.test(error.message));
+      assert.deepEqual(imageLeases(dir), []);
+    });
+    assert.deepEqual(engine.calls, []);
   });
 
   it("off() stops the engine unless asked to keep it", async () => {

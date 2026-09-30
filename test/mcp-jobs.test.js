@@ -288,6 +288,35 @@ describe("jobs: review regressions", () => {
   });
 });
 
+describe("follow-up jobs (from_job)", () => {
+  it("continues from an earlier result and applies the whole chain against the original live snapshot", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "x", workspace: ws });
+    await finished(call, "j1");
+    const follow = await call("job_start", { worker: "codex", task: "x", from_job: "j1", verify: "test $(grep -c 'edited by worker' story.txt) -eq 2" });
+    assert.equal(follow.from, "j1");
+    assert.equal((await finished(call, "j2")).state, "succeeded");
+    const result = await call("job_result", { job: "j2", diff: true });
+    assert.deepEqual(result.changes.map((c) => c.path), ["new-note.md", "story.txt"]);
+    assert.match(result.diff, /\+edited by worker\n\+edited by worker/);
+    await call("job_apply", { job: "j2" });
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\nedited by worker\nedited by worker\n");
+  });
+
+  it("refuses follow-ups from unfinished jobs, other folders, or with a new exclude list", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "wait:1500", workspace: ws });
+    await assert.rejects(call("job_start", { worker: "local", task: "x", from_job: "j1" }), /j1 has no result to continue from \(it is running\)/);
+    await finished(call, "j1");
+    await assert.rejects(call("job_start", { worker: "local", task: "x", from_job: "j1", workspace: sourceWorkspace() }), /same folder/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", from_job: "j1", exclude: ["a"] }), /keeps its source job's exclude list/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x" }), /workspace is required/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", from_job: "j9" }), /no job j9/);
+  });
+});
+
 describe("jobs in Jev mode", () => {
   it("runs local jobs as BANTAM with a Codex stand-in, and keeps them off Jev's GPU count", async () => {
     const seen = [];

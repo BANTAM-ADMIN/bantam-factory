@@ -208,27 +208,38 @@ export function createJobsToolset({
   function startJob(caller, a) {
     if (stopping) throw new ToolError("the server is stopping");
     const spec = WORKERS[a.worker];
-    const workspace = path.resolve(a.workspace);
-    if (!path.isAbsolute(a.workspace)) throw new ToolError("workspace must be an absolute path");
+    // from_job: continue from an earlier job's result. The new job keeps that
+    // job's snapshot of the live folder as its baseline, so job_apply still
+    // checks the live files against what they were when the chain began.
+    const source = a.from_job ? requireJob(a.from_job) : null;
+    if (source) {
+      if (!FINAL.has(source.state) || !source.candidateCommit) throw new ToolError(`${source.id} has no result to continue from (it is ${source.state})`);
+      if (a.workspace && path.resolve(a.workspace) !== source.workspace) throw new ToolError(`${source.id} worked on ${source.workspace}; a follow-up works on the same folder (omit workspace)`);
+      if (a.exclude) throw new ToolError("a follow-up job keeps its source job's exclude list");
+    } else if (!a.workspace) throw new ToolError("workspace is required (or from_job to continue an earlier job)");
+    const workspace = source ? source.workspace : path.resolve(a.workspace);
+    if (!source && !path.isAbsolute(a.workspace)) throw new ToolError("workspace must be an absolute path");
     if (!fs.statSync(workspace, { throwIfNoEntry: false })?.isDirectory()) throw new ToolError(`workspace is not a directory: ${workspace}`);
     const runtime = path.resolve(ctx.runtimeDir), crew = path.dirname(runtime);
     if (workspace === crew || workspace.startsWith(crew + path.sep)) throw new ToolError("workspace cannot be inside the room's .crew directory");
-    const exclude = (a.exclude ?? []).map((rel) => {
+    const exclude = source ? source.exclude : (a.exclude ?? []).map((rel) => {
       if (path.isAbsolute(rel) || rel.split(/[\\/]/).includes("..")) throw new ToolError(`exclude paths are relative to the workspace: ${rel}`);
       return rel;
     });
     if (a.worker === "local" && (a.effort || a.model)) throw new ToolError("model and effort apply to Codex workers only; the local worker uses the served local model");
     if (a.room_task && !ctx.room.tasks.has(a.room_task)) throw new ToolError(`no task ${a.room_task}`);
-    const files = checkSize(workspace, exclude);
+    const files = source ? source.files : checkSize(workspace, exclude);
     const id = nextId();
     const p = paths(id);
     let baseline;
     try {
       fs.mkdirSync(p.dir, { recursive: true, mode: 0o700 });
       fs.mkdirSync(p.control, { mode: 0o700 });
-      baseline = store.capture(workspace, { message: `mcp job ${id} baseline`, excludePaths: [...exclusions(workspace, exclude), runtime] });
+      baseline = source
+        ? { commit: source.baselineCommit }
+        : store.capture(workspace, { message: `mcp job ${id} baseline`, excludePaths: [...exclusions(workspace, exclude), runtime] });
       store.materialize(baseline.commit, p.baseline);
-      store.materialize(baseline.commit, p.ws);
+      store.materialize(source ? source.candidateCommit : baseline.commit, p.ws);
       if (spec.steerable) createWorkerControl(p.control, p.ws);
     } catch (error) {
       fs.rmSync(p.dir, { recursive: true, force: true });
@@ -239,6 +250,7 @@ export function createJobsToolset({
       task: a.task, workspace, verify: a.verify ?? null, model: a.model ?? null, effort: a.effort ?? null,
       maxTurns: a.max_turns ?? 60, timeoutMs: (a.timeout_min ?? 120) * 60_000, exclude, roomTask: a.room_task ?? null,
       standIn: a.worker === "local" && standInModel ? standInModel : null,
+      fromJob: source?.id ?? null,
       createdBy: caller, createdAt: new Date().toISOString(), state: "queued", files,
       baselineCommit: baseline.commit, candidateCommit: null, startedAt: null, finishedAt: null, exitCode: null,
       outcome: null, verification: null, changes: [], progress: null, steering: [], apply: null, error: null,
@@ -248,7 +260,7 @@ export function createJobsToolset({
     queues[spec.lane].push(id);
     log(job, `${job.worker}: ${job.task.split("\n")[0].slice(0, 80)}`);
     pump(spec.lane);
-    return { job: id, state: job.state, worker: label(job), files, position: job.state === "queued" ? queues[spec.lane].indexOf(id) + 1 : 0,
+    return { job: id, state: job.state, worker: label(job), files, ...(source ? { from: source.id } : {}), position: job.state === "queued" ? queues[spec.lane].indexOf(id) + 1 : 0,
       note: `You will get a room message when ${id} finishes; call room_wait to block for it.` };
   }
 
@@ -536,11 +548,12 @@ export function createJobsToolset({
         name: "job_start",
         description: "Start a BANTAM worker on an isolated copy of a workspace folder. Workers: local (BANTAM on the local model; steerable), codex (BANTAM driven by Codex; steerable), codex-native (Codex's own agent; strongest, not steerable). Returns at once; you get a room message when it finishes (use room_wait). Nothing touches the live folder until job_apply. Point it at a focused folder, not a whole disk tree.",
         inputSchema: {
-          type: "object", additionalProperties: false, required: ["worker", "task", "workspace"],
+          type: "object", additionalProperties: false, required: ["worker", "task"],
           properties: {
             worker: { type: "string", enum: Object.keys(WORKERS) },
             task: { type: "string", minLength: 1, maxLength: 32_000, description: "The complete assignment: goal, constraints, what done means." },
-            workspace: { type: "string", description: "Absolute path of the folder to work on (copied; the original is untouched)." },
+            workspace: { type: "string", description: "Absolute path of the folder to work on (copied; the original is untouched). Omit with from_job." },
+            from_job: { type: "string", description: "Continue from this finished job's result instead of the live folder (same folder; apply the last job of the chain)." },
             verify: { type: "string", maxLength: 2000, description: "Shell command that must pass for success (run on a fresh copy of the result), e.g. \"python -m pytest tests/test_x.py\"." },
             model: { type: "string", maxLength: 80, description: "Codex model for codex/codex-native workers." },
             effort: { type: "string", enum: EFFORTS, description: "Codex reasoning effort." },

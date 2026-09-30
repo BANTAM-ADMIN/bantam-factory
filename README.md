@@ -126,6 +126,7 @@ In a session:
 :jev ask Which planet is largest? | Mars | Jupiter | Venus | Earth
   Jupiter (confidence 0.464; Jupiter 0.779, Earth 0.103, Mars 0.093)  · 46 ms
 :jev tool on         let the working agent call Jev mid-task (the decide action)
+:jev token           show or create an API key for your clients (optional on this machine)
 ```
 
 - **Runs alongside your worker.** With Codex or an API model, both run at once. With a

@@ -187,7 +187,7 @@ another file. Setup writes the file; you can also edit it by hand.
 | `endpoint`, `servedModel` | `http://127.0.0.1:8001`, `dgemma` | The vLLM server and model name the decider reads from. |
 | `create` | set by setup | Image, model path and vLLM arguments. Used only when the managed container has to be created. |
 | `api.host`, `api.port` | `127.0.0.1`, `8090` | Where the Jev API listens. **Any host other than localhost needs `api.token`.** |
-| `api.token` | none | Bearer token for `/v1/*` (see §4.5). |
+| `api.token` | none | Bearer token for `/v1/*`. Set it with `bantamfactory jev token` (§4.5). The file is saved readable only by you. |
 | `api.maxQuestions`, `api.maxBodyBytes` | 256, 64 MiB | Request limits, as in OpenJev. |
 | `gpu.policy` | `auto` | `auto`, `alongside`, `swap` or `off` (§5). |
 | `gpu.burstMs` | 30000 | Swap policy: how long DiffusionGemma keeps the GPU after the last question. |
@@ -214,7 +214,11 @@ another file. Setup writes the file; you can also edit it by hand.
 | `:jev policy <p>` | `auto`, `alongside`, `swap` or `off`. Saved to your config. |
 | `:jev ask <question>` | A yes/no question. Add `\| option \| option …` for a choice. |
 | `:jev tool on\|off` | Lets your working agent use the `decide` action (§3.4). |
+| `:jev token [new\|clear]` | Shows the API key, creating one if there is none; `new` replaces it; `clear` removes it (§4.5). |
 | `:jev setup` | Re-runs setup. |
+
+`:jev on` prints a short panel: what Jev mode is, the API address, the key (if you set one), a
+curl request to paste, and what to try next. `bantamfactory jev serve` prints the same panel.
 
 `:help` lists `:jev` under *Everyday*.
 
@@ -239,6 +243,7 @@ A real session (Codex was the worker):
 | `bantamfactory jev serve [--port P] [--host H] [--token T] [--policy P] [--worker URL] [--stop-engine]` | Serves the API in the foreground until Ctrl-C. `--worker` names a local llama.cpp worker to share the GPU with (swap policy). On Ctrl-C the engine stays loaded unless you pass `--stop-engine`. |
 | `bantamfactory jev start \| stop \| sleep \| wake \| status` | Engine control. |
 | `bantamfactory jev policy <p>` | Saves the GPU policy. |
+| `bantamfactory jev token [new\|clear]` | Shows, creates, replaces or removes the API key (§4.5). |
 | `bantamfactory jev ask <question> [\| option …]` | One question: about 0.6 s including Node startup. |
 
 ### 3.3 The API with Jev clients
@@ -395,6 +400,19 @@ checks: tests, verifiers, done-gates.
   hex characters), and `server-timing: model;dur=…, server;dur=…, total;dur=…`.
 - **Auth** covers `/v1/*` (Bearer token); `/health` stays open.
 - **LAN serving:** `bantamfactory jev serve --host 0.0.0.0` refuses to start without a token.
+
+**Setting a key.** On this machine alone you don't need one. To require one:
+
+```bash
+bantamfactory jev token          # prints the key, creating one if there is none
+bantamfactory jev token new      # replace it; the old key stops working
+bantamfactory jev token clear    # remove it
+```
+
+The key is saved in `~/.bantam/jev.json` (readable only by you). A running Jev API, whether
+`serve` or `:jev on`, switches to a new key within a second, so there is no restart. An API
+open to the network never drops its key. Clients send `Authorization: Bearer <key>`; in
+TypeSafe's SDK it is the API key. `serve --token T` sets a key for that run only.
 
 ### 4.6 Extensions (opt-in; plain Jev clients never see them)
 

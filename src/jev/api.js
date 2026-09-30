@@ -140,12 +140,16 @@ export function createJevApi({ decide, status = async () => ({}), gauges = [], t
   }
   const usageError = (message) => ({ detail: { error_type: "api_usage_error", message } });
 
+  // `token` is a value or a function, so a new token applies without a restart.
+  const currentToken = () => (typeof token === "function" ? token() : token);
+
   function checkAuth(req) {
-    if (!token) return null;
+    const expected = currentToken();
+    if (!expected) return null;
     const auth = req.headers.authorization ?? "";
     if (!auth) return [403, { detail: { error_type: "authentication_error", message: "Must supply an API key! Check your request and try again." } }];
     const given = Buffer.from(auth.replace(/^Bearer /, "").trim());
-    const want = Buffer.from(token);
+    const want = Buffer.from(expected);
     if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
       return [401, { detail: { error_type: "authentication_error", message: "Cannot authenticate with the server. Please check your API key and try again." } }];
     }

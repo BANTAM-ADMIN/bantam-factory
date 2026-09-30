@@ -56,6 +56,12 @@ export function jevConfigPath() {
   return process.env.BANTAM_JEV_CONFIG || path.join(os.homedir(), ".bantam", "jev.json");
 }
 
+/** The config file's path for messages, with the home directory as `~`. */
+export function jevConfigLabel(file = jevConfigPath()) {
+  const home = os.homedir();
+  return file.startsWith(`${home}/`) ? `~${file.slice(home.length)}` : file;
+}
+
 function merge(base, extra) {
   const out = { ...base };
   for (const [key, value] of Object.entries(extra ?? {})) {
@@ -88,6 +94,8 @@ export function saveJevConfig(patch, { file = jevConfigPath() } = {}) {
   try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* start fresh */ }
   const next = merge(current, patch);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
+  // It can hold the API token, so only its owner may read it.
+  fs.writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
   return next;
 }

@@ -183,7 +183,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
    */
   async function on({ serve = true, host = config.api.host, port = config.api.port, onProgress = () => {} } = {}) {
     if (host !== "127.0.0.1" && host !== "localhost" && !config.api.token) {
-      throw new Error("serving Jev beyond localhost needs an API token (set api.token in .bantam/jev.json)");
+      throw new Error("serving Jev beyond localhost needs an API token (run `bantamfactory jev token`)");
     }
     await engine.start({ onProgress });
     if (policy() === "swap" && !primed) {
@@ -195,7 +195,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     stats.startedAt = new Date(now()).toISOString();
     if (serve && !server) {
       server = await startJevHttpServer({
-        decide, status, gauges: JEV_GAUGES, token: config.api.token,
+        decide, status, gauges: JEV_GAUGES, token: () => config.api.token,
         maxQuestions: config.api.maxQuestions, maxBodyBytes: config.api.maxBodyBytes,
         log: (entry) => log({ event: "jev_request", ...entry }),
       }, { host, port });

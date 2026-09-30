@@ -1,6 +1,10 @@
 // `:jev` in a BANTAM Factory session and `bantamfactory jev …` on the command line.
 // See docs/JEV-MODE.md for the full guide.
-import { loadJevConfig, saveJevConfig } from "./config.js";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { jevConfigLabel, jevConfigPath, loadJevConfig, saveJevConfig } from "./config.js";
 import { createJevService, effectivePolicy } from "./service.js";
 
 const POLICIES = ["auto", "alongside", "swap", "off"];
@@ -11,7 +15,8 @@ export const JEV_USAGE = [
   "  :jev off                stop serving and stop DiffusionGemma (:jev off keep = keep it loaded)",
   "  :jev status             engine, GPU policy, API address, requests served",
   "  :jev sleep | wake       move DiffusionGemma out of / back into VRAM",
-  "  :jev policy <p>         auto | alongside | swap | off (saved to .bantam/jev.json)",
+  "  :jev policy <p>         auto | alongside | swap | off (saved to ~/.bantam/jev.json)",
+  "  :jev token [new|clear]  show the API key (creating one if needed), replace it, or remove it",
   "  :jev ask <question>     a quick yes/no question; add  | option | option  for a choice",
   "  :jev tool on | off      let the working agent ask Jev mid-task (the decide action)",
 ].join("\n");
@@ -34,6 +39,100 @@ function describeStatus(s) {
   ];
   if (s.requests) lines.push(`  Served: ${s.requests} requests, ${s.questions} questions, p50 ${s.p50Ms} ms${s.errors ? `, ${s.errors} errors` : ""}${s.swaps.in ? `, ${s.swaps.in} GPU swaps` : ""}`);
   return lines.join("\n");
+}
+
+const GUIDE = fileURLToPath(new URL("../../docs/JEV-MODE.md", import.meta.url));
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const EXAMPLE_BODY = '{"model":"bantam-jev","state":"The build broke after the API began returning null.","questions":{"bug":{"type":"noul","instructions":"Is this a code bug?"}}}';
+
+/**
+ * The panel printed when Jev mode turns on: what it is, where the API is,
+ * the key, a request to paste, and what to do next. `surface` is "session"
+ * (`:jev on`) or "cli" (`bantamfactory jev serve`).
+ */
+export function jevWelcome(status, config, { surface = "session" } = {}) {
+  const url = status.api?.url ?? `http://${config.api.host}:${config.api.port}`;
+  const token = config.api.token;
+  const local = LOCAL_HOSTS.has(config.api.host);
+  const tokenCmd = surface === "session" ? ":jev token" : "bantamfactory jev token";
+  const key = token
+    ? [`  Key     ${token}`, `          send it as  Authorization: Bearer <key>  (${tokenCmd} new replaces it)`]
+    : [`  Key     none needed: ${local ? "only this machine can connect" : "open to the network"}; ${tokenCmd} creates one`];
+  const lines = [
+    "",
+    "  ── Jev mode is on ─────────────────────────────────────────────",
+    "  A local, Jev-compatible decision engine. DiffusionGemma on your GPU answers",
+    "  typed questions (yes/no, choice, score) with calibrated probabilities,",
+    "  usually in tens of milliseconds.",
+    "",
+    `  API     ${url}/v1/systemone   (TypeSafe SDK, OpenJev clients, curl)`,
+    "  Models  bantam-jev (thinks when unsure) · bantam-jev-fast (never thinks, fastest)",
+    ...key,
+    `  Engine  ${status.engine} · GPU policy ${status.policy}${status.configuredPolicy === "auto" ? " (auto)" : ""}`,
+  ];
+  if (status.policy === "swap") {
+    lines.push("          shares the GPU with your local model: the first question after a pause swaps in (about 6 s)");
+  }
+  lines.push(
+    "",
+    "  Try it:",
+    `    curl -s ${url}/v1/systemone -H 'content-type: application/json' \\`,
+    ...(token ? [`      -H 'authorization: Bearer ${token}' \\`] : []),
+    `      -d '${EXAMPLE_BODY}'`,
+    "",
+    surface === "session"
+      ? "  Here    :jev ask <question> [| option | option] · :jev tool on (the agent may ask) · :jev status · :jev off"
+      : "  Also    bantamfactory jev ask <question> [| option | option] · Ctrl-C stops serving (the model stays loaded)",
+    `  Guide   ${GUIDE}`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+/**
+ * `:jev token` / `bantamfactory jev token [new|clear]`. Shows the API key,
+ * creating one if there is none; `new` replaces it; `clear` removes it. The
+ * change is saved and applies at once, even to an API that is serving.
+ */
+export function tokenCommand(sub, { config, out, serving = false, surface = "session" }) {
+  const where = jevConfigLabel();
+  if (sub === "clear") {
+    if (serving && !LOCAL_HOSTS.has(config.api.host)) { out(`  The API is open to the network on ${config.api.host}; it needs a token. Turn Jev off first.`); return 2; }
+    saveJevConfig({ api: { token: null } });
+    config.api.token = null;
+    out(`  API key removed (${where}). A running Jev API stops asking for one within a second.`);
+    return 0;
+  }
+  if (sub && sub !== "new" && sub !== "show") { out(`  Usage: ${surface === "session" ? ":jev" : "bantamfactory jev"} token [new|clear]`); return 2; }
+  const created = sub === "new" || !config.api.token;
+  if (created) {
+    config.api.token = crypto.randomBytes(24).toString("hex");
+    saveJevConfig({ api: { token: config.api.token } });
+  }
+  out([
+    `  API key${created ? (sub === "new" ? " (new; the old one stops working now)" : " (new)") : ""}: ${config.api.token}`,
+    `  Saved in ${where} (readable only by you). A running Jev API switches to it within a second.`,
+    "  Clients send it as:  Authorization: Bearer <key>",
+    "  In TypeSafe's SDK it is the API key. /health stays open without it.",
+  ].join("\n"));
+  return 0;
+}
+
+/**
+ * While serving, follow the key saved in the config file, so a
+ * `bantamfactory jev token` run in another terminal applies within a second.
+ * Returns the function that stops following.
+ */
+export function followSavedToken(config, { file = jevConfigPath(), intervalMs = 1000 } = {}) {
+  const reload = () => {
+    let saved;
+    try { saved = loadJevConfig({}, { file }).api.token; } catch { return; } // mid-write or invalid: keep the current key
+    // An API open to the network never drops its key.
+    if (!saved && !LOCAL_HOSTS.has(config.api.host)) return;
+    config.api.token = saved;
+  };
+  fs.watchFile(file, { interval: intervalMs }, reload);
+  return () => fs.unwatchFile(file, reload);
 }
 
 /** Parse `:jev ask` text into a Jev request: yes/no, or a choice with `| a | b`. */
@@ -94,16 +193,22 @@ export async function handleJevCommand(arg, { model = null, out = console.log, a
         out(`  Starting Jev mode (GPU policy: ${effectivePolicy(config, model)})…`);
         const s = await service.on({ port, onProgress: (line) => out(`    ${line}`) });
         session.active = true;
-        out(describeStatus(s));
-        out(`  Try:  curl -s ${s.api?.url}/v1/systemone -H 'content-type: application/json' \\\n          -d '{"model":"bantam-jev","state":"The build failed","questions":{"broken":{"type":"noul"}}}'`);
+        session.unfollow?.();
+        session.unfollow = followSavedToken(config);
+        out(jevWelcome(s, config, { surface: "session" }));
         return;
       }
       case "off": {
         const keepEngine = rest[0] === "keep";
         session.active = false;
+        session.unfollow?.();
+        session.unfollow = null;
         out(describeStatus(await service.off({ keepEngine })));
         return;
       }
+      case "token":
+        tokenCommand(rest[0], { config, out, serving: Boolean(session.active) });
+        return;
       case "sleep": await service.sleep(); out("  DiffusionGemma is asleep (weights in host memory)."); return;
       case "wake": await service.wake(); out("  DiffusionGemma is awake."); return;
       case "policy": {
@@ -111,7 +216,7 @@ export async function handleJevCommand(arg, { model = null, out = console.log, a
         if (!POLICIES.includes(policy)) { out(`  Usage: :jev policy ${POLICIES.join("|")} (now: ${config.gpu.policy})`); return; }
         config.gpu.policy = policy;
         saveJevConfig({ gpu: { policy } });
-        out(`  GPU policy: ${policy} (applies now: ${effectivePolicy(config, model)}); saved to .bantam/jev.json`);
+        out(`  GPU policy: ${policy} (applies now: ${effectivePolicy(config, model)}); saved to ${jevConfigLabel()}`);
         return;
       }
       case "ask": {
@@ -211,11 +316,15 @@ async function runJevCliUnsafe(argv, { out, ask }) {
       await service.off({ keepEngine: true });
       return 0;
     }
+    case "token": return tokenCommand(rest[0], { config, out, surface: "cli" });
     case "serve": {
       const s = await service.on({ onProgress: (l) => out(`  ${l}`) });
-      out(describeStatus(s));
+      out(jevWelcome(s, config, { surface: "cli" }));
       out("  Serving until Ctrl-C.");
+      // A --token given here wins over the file for this run.
+      const unfollow = flag("token") ? () => {} : followSavedToken(config);
       await new Promise((resolve) => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
+      unfollow();
       out("\n  Stopping…");
       await service.off({ keepEngine: !has("stop-engine") });
       return 0;
@@ -227,6 +336,7 @@ async function runJevCliUnsafe(argv, { out, ask }) {
         "  bantamfactory jev start | stop | sleep | wake | status",
         "  bantamfactory jev policy auto|alongside|swap|off",
         "  bantamfactory jev ask <question> [| option | option]",
+        "  bantamfactory jev token [new|clear]",
       ].join("\n"));
       return sub === "help" ? 0 : 2;
   }

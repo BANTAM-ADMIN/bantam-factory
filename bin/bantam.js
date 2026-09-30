@@ -672,7 +672,7 @@ if (cmd === "chat-transport") {
   process.exit(v.ok ? 0 : 1);
 }
 if (cmd === "jev") {
-  // `bantam jev …` — Jev mode: serve DiffusionGemma System One behind a
+  // `bantamfactory jev …` — Jev mode: serve DiffusionGemma System One behind a
   // Jev-compatible API, and control its engine. See docs/JEV-MODE.md.
   const { runJevCli } = await import("../src/jev/commands.js");
   process.exit(await runJevCli(process.argv.slice(process.argv.indexOf("jev") + 1)));

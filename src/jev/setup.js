@@ -1,5 +1,5 @@
 // Jev mode setup: use a DiffusionGemma server the user already runs, or install
-// one (with consent). `bantam jev setup` and the first `:jev on` call this.
+// one (with consent). `bantamfactory jev setup` and the first `:jev on` call this.
 //
 //   external  verify the endpoint serves DiffusionGemma with structured reads
 //             (vLLM with PR #57250), then save it; BANTAM never starts or stops it.
@@ -212,7 +212,7 @@ export async function setupWizard({ ask, out = console.log, endpoint = null, ins
   if (prerequisites.problems.length) {
     out("  This machine cannot run a local Jev engine yet:");
     for (const problem of prerequisites.problems) out(`    ✖ ${problem}`);
-    out("  You can still use a DiffusionGemma server running elsewhere: bantam jev setup --endpoint <url>");
+    out("  You can still use a DiffusionGemma server running elsewhere: bantamfactory jev setup --endpoint <url>");
     return null;
   }
   const plan = await installPlan({ prerequisites, image, modelDir, runImpl });
@@ -223,6 +223,6 @@ export async function setupWizard({ ask, out = console.log, endpoint = null, ins
     if (agreed !== "y" && agreed !== "yes") { out("  Nothing was downloaded or changed."); return null; }
   }
   await runInstall(plan, { onProgress: (line) => out(`    ${line}`), runImpl });
-  out("  Installed. Start it with :jev on (or bantam jev serve).");
+  out("  Installed. Start it with :jev on (or bantamfactory jev serve).");
   return loadJevConfig();
 }

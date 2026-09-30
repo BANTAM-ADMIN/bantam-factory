@@ -113,9 +113,9 @@ usually in **tens of milliseconds**, and speaks **Jev's wire API**. TypeSafe's S
 clients, and the Decision Index kit work unchanged.
 
 ```bash
-bantam jev setup                        # use your DiffusionGemma vLLM server, or install one (asks first)
-bantam jev serve                        # Jev API on http://127.0.0.1:8090
-bantam jev ask "Is 91 a prime number?"
+bantamfactory jev setup    # use your DiffusionGemma vLLM server, or install one (asks first)
+bantamfactory jev serve    # Jev API on http://127.0.0.1:8090
+bantamfactory jev ask "Is 91 a prime number?"
 #   no (P(yes) = 0.094)
 ```
 

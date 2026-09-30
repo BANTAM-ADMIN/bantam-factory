@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * SUPERSEDED by Jev mode (`bantam jev serve`, `:jev on`; see docs/JEV-MODE.md), which
+ * SUPERSEDED by Jev mode (`bantamfactory jev serve`, `:jev on`; see docs/JEV-MODE.md), which
  * serves the full Jev wire contract (errors, auth, headers, model list) with the
  * adopted configuration. Kept for the Decision Index lab runs, which used
  * these flags.

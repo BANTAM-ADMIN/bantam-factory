@@ -21,7 +21,7 @@ BANTAM FACTORY can now run **DiffusionGemma 26B-A4B** as a Jev-compatible decisi
   - With Codex or an API model, both run at once.
   - With a local llama.cpp worker, the shared GPU lease sleeps and wakes each model automatically, with a burst window.
 - **Commands:**
-  - `bantam jev setup | status | start | stop | sleep | wake | policy | ask | serve`;
+  - `bantamfactory jev setup | status | start | stop | sleep | wake | policy | ask | serve`;
   - in a session, `:jev on | off | status | ask | sleep | wake | policy | tool`.
 - **The `decide` tool:** after `:jev tool on`, the working agent can ask Jev mid-task through a new `decide` action. It is off by default and masked out of the grammar.
 - **Setup for any machine:**
@@ -52,7 +52,7 @@ BANTAM FACTORY can now run **DiffusionGemma 26B-A4B** as a Jev-compatible decisi
   - 18 real API exchanges covering every status code;
   - the TypeSafe SDK quickstart unchanged;
   - the Decision Index kit, 40/40 dev rows over HTTP;
-  - `bantam jev ask` in about 0.6 s.
+  - `bantamfactory jev ask` in about 0.6 s.
 - **Swap with a local Qwen worker:**
   - first Jev answer in 6.7 s, including the swap;
   - later answers in 34–60 ms;
@@ -68,4 +68,4 @@ git checkout main
 git pull --ff-only
 ```
 
-Restart BANTAM FACTORY to load the changes. Jev mode is off until you run `bantam jev setup` or `:jev on`.
+Restart BANTAM FACTORY to load the changes. Jev mode is off until you run `bantamfactory jev setup` or `:jev on`.

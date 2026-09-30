@@ -1,5 +1,5 @@
 // Jev mode configuration, per user in ~/.bantam/jev.json (or the file named by
-// BANTAM_JEV_CONFIG). `bantam jev setup` / the first `:jev on` writes it:
+// BANTAM_JEV_CONFIG). `bantamfactory jev setup` / the first `:jev on` writes it:
 //
 //   external engine (a DiffusionGemma vLLM you run yourself):
 //     { "engine": { "mode": "external" }, "endpoint": "http://gpu-box:8001", "servedModel": "dgemma" }
@@ -28,7 +28,7 @@ export function vllmServeArgs({ port = 8001, maxModelLen = 16384, gpuUtil = 0.88
 }
 
 export const DEFAULT_JEV_CONFIG = Object.freeze({
-  // "unconfigured" until `bantam jev setup` (or the first `:jev on`) chooses
+  // "unconfigured" until `bantamfactory jev setup` (or the first `:jev on`) chooses
   // "external" (your own DiffusionGemma vLLM) or "managed" (BANTAM runs it).
   engine: { mode: "unconfigured" },
   // The managed container and the endpoint the decider reads from.

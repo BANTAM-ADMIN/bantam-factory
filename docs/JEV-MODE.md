@@ -16,7 +16,7 @@ You can use it four ways:
 | Way | What it is for |
 |---|---|
 | **The Jev API** (`/v1/systemone`) | Any Jev or OpenJev client: TypeSafe's SDK, curl, the Decision Index kit. |
-| **`:jev ask` / `bantam jev ask`** | Rapid-fire questions from the prompt. |
+| **`:jev ask` / `bantamfactory jev ask`** | Rapid-fire questions from the prompt. |
 | **The `decide` tool** | Your working agent asks Jev mid-task. |
 | **Extensions** | Evidence, abstention, batches and streaming, beyond what Jev offers. |
 
@@ -29,15 +29,17 @@ Everything shown in §8 is a real capture from this machine: RTX 4090, Diffusion
 
 ```bash
 # First time on a machine: point BANTAM at your DiffusionGemma server, or install one
-bantam jev setup
+bantamfactory jev setup
 
 # Serve the Jev API on http://127.0.0.1:8090 until Ctrl-C
-bantam jev serve
+bantamfactory jev serve
 
 # Or ask from the command line
-bantam jev ask "Is 91 a prime number?"
+bantamfactory jev ask "Is 91 a prime number?"
 #   no (P(yes) = 0.094)
 ```
+
+`bantam jev …` works too: `bantamfactory` is the same program.
 
 Inside a BANTAM Factory session:
 
@@ -67,12 +69,12 @@ Jev mode needs **DiffusionGemma 26B-A4B served by vLLM with structured reads**. 
 vLLM with PR #57250, commit `1b3b88e`, the build OpenJev pins. A structured read is what
 lets BANTAM read every answer's probability in one pass instead of generating text.
 
-`bantam jev setup`, or the first `:jev on` on an unconfigured machine, offers two choices.
+`bantamfactory jev setup`, or the first `:jev on` on an unconfigured machine, offers two choices.
 
 ### 2.1 Use a DiffusionGemma server you already run
 
 ```bash
-bantam jev setup --endpoint http://gpu-box:8001
+bantamfactory jev setup --endpoint http://gpu-box:8001
 ```
 
 BANTAM checks the server **before** saving anything:
@@ -90,15 +92,15 @@ BANTAM checks the server **before** saving anything:
 What each outcome looked like here:
 
 ```
-$ bantam jev setup --endpoint http://127.0.0.1:8001
+$ bantamfactory jev setup --endpoint http://127.0.0.1:8001
   Checking http://127.0.0.1:8001 …
   ✔ structured reads work (answer mass 0.901); sleep mode available (GPU swapping works)
   Saved to ~/.bantam/jev.json. BANTAM will use this server and never start or stop it.
 
-$ bantam jev setup --endpoint http://127.0.0.1:8085      # a llama.cpp Qwen server
+$ bantamfactory jev setup --endpoint http://127.0.0.1:8085      # a llama.cpp Qwen server
   ✖ this is not a vLLM server (no /version); Jev mode needs DiffusionGemma served by vLLM with PR #57250 (commit 1b3b88e)
 
-$ bantam jev setup --endpoint http://127.0.0.1:8999      # nothing listening
+$ bantamfactory jev setup --endpoint http://127.0.0.1:8999      # nothing listening
   ✖ not reachable: fetch failed
 ```
 
@@ -108,7 +110,7 @@ use the swap policy) but **never starts or stops it**.
 ### 2.2 Let BANTAM install one (asks first)
 
 ```bash
-bantam jev setup --install        # add --yes for scripted installs
+bantamfactory jev setup --install        # add --yes for scripted installs
 ```
 
 **1. Prerequisites.** BANTAM checks these first and lists every problem it finds:
@@ -229,15 +231,15 @@ A real session (Codex was the worker):
   Python (confidence 0.503; Python 0.841, JavaScript 0.094, Rust 0.065)  · 46 ms
 ```
 
-### 3.2 From the command line: `bantam jev`
+### 3.2 From the command line: `bantamfactory jev`
 
 | Command | What it does |
 |---|---|
-| `bantam jev setup [--endpoint URL \| --install [--image I] [--model-dir D]] [--yes]` | §2 |
-| `bantam jev serve [--port P] [--host H] [--token T] [--policy P] [--worker URL] [--stop-engine]` | Serves the API in the foreground until Ctrl-C. `--worker` names a local llama.cpp worker to share the GPU with (swap policy). On Ctrl-C the engine stays loaded unless you pass `--stop-engine`. |
-| `bantam jev start \| stop \| sleep \| wake \| status` | Engine control. |
-| `bantam jev policy <p>` | Saves the GPU policy. |
-| `bantam jev ask <question> [\| option …]` | One question: about 0.6 s including Node startup. |
+| `bantamfactory jev setup [--endpoint URL \| --install [--image I] [--model-dir D]] [--yes]` | §2 |
+| `bantamfactory jev serve [--port P] [--host H] [--token T] [--policy P] [--worker URL] [--stop-engine]` | Serves the API in the foreground until Ctrl-C. `--worker` names a local llama.cpp worker to share the GPU with (swap policy). On Ctrl-C the engine stays loaded unless you pass `--stop-engine`. |
+| `bantamfactory jev start \| stop \| sleep \| wake \| status` | Engine control. |
+| `bantamfactory jev policy <p>` | Saves the GPU policy. |
+| `bantamfactory jev ask <question> [\| option …]` | One question: about 0.6 s including Node startup. |
 
 ### 3.3 The API with Jev clients
 
@@ -278,7 +280,7 @@ unknown model -> TypeSafeBadRequestError | ... 400 Unknown model: not-a-model (r
 ```
 
 **The Decision Index kit's HTTP engine** ran 40 dev rows from 8 benchmarks through
-`bantam jev serve`: **40/40 ok, 22 s**.
+`bantamfactory jev serve`: **40/40 ok, 22 s**.
 
 ```bash
 python -m decision_index run --engine http --option base_url=http://127.0.0.1:8090 \
@@ -392,7 +394,7 @@ checks: tests, verifiers, done-gates.
 - **Headers on every response:** `x-typesafe-request-id` and `x-request-id` (`req_` + 32
   hex characters), and `server-timing: model;dur=…, server;dur=…, total;dur=…`.
 - **Auth** covers `/v1/*` (Bearer token); `/health` stays open.
-- **LAN serving:** `bantam jev serve --host 0.0.0.0` refuses to start without a token.
+- **LAN serving:** `bantamfactory jev serve --host 0.0.0.0` refuses to start without a token.
 
 ### 4.6 Extensions (opt-in; plain Jev clients never see them)
 
@@ -524,7 +526,7 @@ median**. For comparison, the best other DiffusionGemma entry scores 49.5 and Je
 | A question with thinking | about 1–3.5 s |
 | Code-execution gauge | **21 ms** (no model read) |
 | Single-option question | about 1 ms (no model read) |
-| `bantam jev ask` (whole command, Node startup included) | about 0.6 s |
+| `bantamfactory jev ask` (whole command, Node startup included) | about 0.6 s |
 | Engine start from stopped (weights in the OS page cache) | 59 s (145 s fully cold) |
 | First sleep after a start / later sleeps / wake | 85.9 s / 0.7 s / 1.0 s |
 | Swap in with a local worker (idle-sleep 5 s) / swap out | about 6–7 s / under 1 s |
@@ -641,7 +643,7 @@ The rest of this guide's captures:
 
 | Symptom | Cause and fix |
 |---|---|
-| "Jev mode is not set up yet" | Run `bantam jev setup`, or `:jev on` in a session. |
+| "Jev mode is not set up yet" | Run `bantamfactory jev setup`, or `:jev on` in a session. |
 | Setup: "this is not a vLLM server" | The address points at something else, such as llama.cpp. Jev mode needs DiffusionGemma on vLLM. |
 | Setup: "structured reads are not working" | The vLLM build lacks PR #57250. Use OpenJev's image, or vLLM at or after commit `1b3b88e`. |
 | Setup: "Docker has no NVIDIA runtime" | Install the NVIDIA Container Toolkit and restart Docker. |
@@ -681,7 +683,7 @@ The rest of this guide's captures:
 | `api.js` | The Jev HTTP API and extensions |
 | `profiles.js` | Model ids |
 | `service.js` | The decider, GPU policies, the lease, stats |
-| `commands.js` | `:jev`, `bantam jev`, the `decide` tool |
+| `commands.js` | `:jev`, `bantamfactory jev`, the `decide` tool |
 
 **The decision engine:** `src/factory/system-one.js` and the gauges in `src/factory/`.
 

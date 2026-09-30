@@ -12,7 +12,7 @@
 //   managed       BANTAM runs the container: all of the above.
 //   external      a DiffusionGemma vLLM the user runs: BANTAM only talks to it
 //                 (sleep/wake if the server supports them), never starts or stops it.
-//   unconfigured  nothing yet; every action points to `bantam jev setup`.
+//   unconfigured  nothing yet; every action points to `bantamfactory jev setup`.
 import { execFile } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -26,7 +26,7 @@ function dockerCli(args, { timeoutMs = 120_000 } = {}) {
 }
 
 export class JevNotConfigured extends Error {
-  constructor() { super("Jev mode is not set up yet. Run `bantam jev setup` (or :jev on in a session) to use your own DiffusionGemma server or install one."); }
+  constructor() { super("Jev mode is not set up yet. Run `bantamfactory jev setup` (or :jev on in a session) to use your own DiffusionGemma server or install one."); }
 }
 
 export function createJevEngine(config, { docker = dockerCli, fetchImpl = fetch, wait = delay, now = () => Date.now() } = {}) {
@@ -83,7 +83,7 @@ export function createJevEngine(config, { docker = dockerCli, fetchImpl = fetch,
     requireSetup();
     let current = await status();
     if (mode === "external") {
-      if (current.state === "unreachable") throw new Error(`your DiffusionGemma server at ${root} is not reachable; start it, or change the endpoint with \`bantam jev setup\``);
+      if (current.state === "unreachable") throw new Error(`your DiffusionGemma server at ${root} is not reachable; start it, or change the endpoint with \`bantamfactory jev setup\``);
       if (current.state === "asleep") await wake();
       return status();
     }

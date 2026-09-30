@@ -1,4 +1,4 @@
-// `:jev` in a BANTAM Factory session and `bantam jev …` on the command line.
+// `:jev` in a BANTAM Factory session and `bantamfactory jev …` on the command line.
 // See docs/JEV-MODE.md for the full guide.
 import { loadJevConfig, saveJevConfig } from "./config.js";
 import { createJevService, effectivePolicy } from "./service.js";
@@ -60,7 +60,7 @@ export async function handleJevCommand(arg, { model = null, out = console.log, a
   const [sub = "status", ...rest] = String(arg).trim().split(/\s+/).filter(Boolean);
   let { service, config } = current(model);
   const runSetup = async () => {
-    if (!ask) { out("  Run `bantam jev setup` in a terminal to set up Jev mode."); return false; }
+    if (!ask) { out("  Run `bantamfactory jev setup` in a terminal to set up Jev mode."); return false; }
     const { setupWizard } = await import("./setup.js");
     const configured = await setupWizard({ ask, out });
     if (!configured) return false;
@@ -158,7 +158,7 @@ export function jevDecideTool() {
   };
 }
 
-/** `bantam jev <sub>` on the command line. Returns an exit code. */
+/** `bantamfactory jev <sub>` on the command line. Returns an exit code. */
 export async function runJevCli(argv, { out = console.log, ask = null } = {}) {
   try { return await runJevCliUnsafe(argv, { out, ask }); }
   catch (error) { out(`  Jev: ${error.message}`); return 1; }
@@ -197,14 +197,14 @@ async function runJevCliUnsafe(argv, { out, ask }) {
     case "wake": await service.wake(); out("  DiffusionGemma is awake."); return 0;
     case "policy": {
       const policy = rest[0];
-      if (!POLICIES.includes(policy)) { out(`  Usage: bantam jev policy ${POLICIES.join("|")}`); return 2; }
+      if (!POLICIES.includes(policy)) { out(`  Usage: bantamfactory jev policy ${POLICIES.join("|")}`); return 2; }
       saveJevConfig({ gpu: { policy } });
       out(`  GPU policy saved: ${policy}`);
       return 0;
     }
     case "ask": {
       const request = askRequest(rest.filter((r) => !r.startsWith("--")).join(" "));
-      if (!request) { out("  Usage: bantam jev ask <question> [| option | option]"); return 2; }
+      if (!request) { out("  Usage: bantamfactory jev ask <question> [| option | option]"); return 2; }
       await service.on({ serve: false });
       const decided = await service.decide({ profile: (await import("./profiles.js")).resolveProfile("bantam-jev"), state: request.state, questions: request.questions, seed: 7 });
       out(`  ${describeAnswer(decided.answers.answer)}`);
@@ -222,11 +222,11 @@ async function runJevCliUnsafe(argv, { out, ask }) {
     }
     default:
       out([
-        "  bantam jev setup [--endpoint URL | --install [--image I] [--model-dir D]] [--yes]",
-        "  bantam jev serve [--port 8090] [--host 127.0.0.1] [--token T] [--policy P] [--worker URL] [--stop-engine]",
-        "  bantam jev start | stop | sleep | wake | status",
-        "  bantam jev policy auto|alongside|swap|off",
-        "  bantam jev ask <question> [| option | option]",
+        "  bantamfactory jev setup [--endpoint URL | --install [--image I] [--model-dir D]] [--yes]",
+        "  bantamfactory jev serve [--port 8090] [--host 127.0.0.1] [--token T] [--policy P] [--worker URL] [--stop-engine]",
+        "  bantamfactory jev start | stop | sleep | wake | status",
+        "  bantamfactory jev policy auto|alongside|swap|off",
+        "  bantamfactory jev ask <question> [| option | option]",
       ].join("\n"));
       return sub === "help" ? 0 : 2;
   }

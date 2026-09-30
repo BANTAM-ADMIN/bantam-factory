@@ -113,7 +113,7 @@ describe("jev engine lifecycle", () => {
     const fake = fakeHost();
     const engine = createJevEngine(loadJevConfig({}, noFile), { docker: fake.docker, fetchImpl: fake.fetchImpl });
     assert.equal((await engine.status()).state, "unconfigured");
-    await assert.rejects(engine.start(), /bantam jev setup/);
-    await assert.rejects(engine.wake(), /bantam jev setup/);
+    await assert.rejects(engine.start(), /bantamfactory jev setup/);
+    await assert.rejects(engine.wake(), /bantamfactory jev setup/);
   });
 });

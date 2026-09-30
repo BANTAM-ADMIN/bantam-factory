@@ -28,6 +28,9 @@ export function createRoomToolset() {
           openTasks: room().listTasks().tasks.filter((t) => t.state !== "done"),
           unreadForYou: room().unread(caller).length,
           toolsets: ctx.toolsets,
+          mode: ctx.mode === "jev"
+            ? "jev: DiffusionGemma is loaded and awake (jev_decide, jev_generate are fast); local jobs run BANTAM with a Codex stand-in for the local model"
+            : "llama: local jobs run BANTAM on the local llama.cpp model; Jev starts on demand and trades the GPU with it",
         }),
       },
       {

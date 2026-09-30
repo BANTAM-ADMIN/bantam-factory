@@ -288,6 +288,26 @@ describe("jobs: review regressions", () => {
   });
 });
 
+describe("jobs in Jev mode", () => {
+  it("runs local jobs as BANTAM with a Codex stand-in, and keeps them off Jev's GPU count", async () => {
+    const seen = [];
+    const { call, room, toolset } = setup({ options: { standInModel: "gpt-6.1-sol", commandFor: (job, p) => { seen.push(job); return fakeCommand(job, p); } } });
+    const ws = sourceWorkspace();
+    const started = await call("job_start", { worker: "local", task: "wait:300", workspace: ws });
+    assert.equal(started.worker, "local → gpt-6.1-sol stand-in");
+    assert.equal(seen[0].standIn, "gpt-6.1-sol");
+    assert.equal((await call("job_status", { job: "j1" })).worker, "local → gpt-6.1-sol stand-in");
+    await finished(call, "j1");
+    assert.match(room.inbox("claude").messages[0].text, /^Job j1 \(local → gpt-6\.1-sol stand-in\) succeeded/);
+    void toolset;
+  });
+  it("builds the stand-in's command as Codex-backed BANTAM on that model", () => {
+    const c = workerCommand({ worker: "codex", model: "gpt-5.6-luna", task: "T", ws: "/r/ws", control: "/r/ctl", runFile: "/r/run.json", bantamBin: "/b/bantam.js" });
+    assert.deepEqual(c.args.slice(-3), ["--codex", "--model", "gpt-5.6-luna"]);
+    assert.ok(c.args.includes("--supervisor-control"), "still steerable");
+  });
+});
+
 describe("job_apply", () => {
   async function succeededJob(extra = {}) {
     const env = setup();

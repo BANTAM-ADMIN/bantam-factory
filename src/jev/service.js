@@ -44,7 +44,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
   let burstTimer = null;
   let server = null;
   let primed = false;
-  const stats = { requests: 0, questions: 0, errors: 0, ms: [], swapsIn: 0, swapsOut: 0, startedAt: null };
+  const stats = { requests: 0, questions: 0, generations: 0, errors: 0, ms: [], swapsIn: 0, swapsOut: 0, startedAt: null };
 
   const policy = () => effectivePolicy(config, worker);
   const workerEndpoint = () => (worker ? localModelEndpoint(worker) : null);
@@ -137,26 +137,16 @@ export function createJevService({ config, worker = null, engine = createJevEngi
    * to the local worker at once instead of holding it for a burst window: the
    * agent's very next step needs its model.
    */
-  function decide({ profile, state, questions, seed, thought, releaseAfter = false }) {
+  // Serialized use of the engine, with the GPU policy applied first and the
+  // GPU handed back (or its burst window armed) afterwards.
+  function onGpu(work, { releaseAfter = false } = {}) {
     if (waiting >= 64) return Promise.reject(new JevBusy("too many Jev requests are queued"));
     waiting++;
     const run = async () => {
       waiting--;
-      const t0 = now();
       try {
         await readyForRequest();
-        const { reader: r, pool: p } = await ensureDecider();
-        const decided = await decideJevAdaptive({
-          ...profile.options,
-          reader: r, pool: p, state, questions, seed,
-          execCell: profile.execGauge ? cell() : null,
-          borrowedThought: thought ?? null,
-        });
-        stats.requests++;
-        stats.questions += Object.keys(questions).length;
-        stats.ms.push(now() - t0);
-        if (stats.ms.length > 1000) stats.ms.shift();
-        return { answers: decided.answers, evidence: decided.evidence, usage: { inputTokens: decided.usage.inputTokens, outputTokens: 0 } };
+        return await work();
       } catch (error) {
         stats.errors++;
         if (error instanceof JevBusy || error instanceof JevUnavailable) throw error;
@@ -174,6 +164,34 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     return next;
   }
 
+  function decide({ profile, state, questions, seed, thought, releaseAfter = false }) {
+    return onGpu(async () => {
+      const t0 = now();
+      const { reader: r, pool: p } = await ensureDecider();
+      const decided = await decideJevAdaptive({
+        ...profile.options,
+        reader: r, pool: p, state, questions, seed,
+        execCell: profile.execGauge ? cell() : null,
+        borrowedThought: thought ?? null,
+      });
+      stats.requests++;
+      stats.questions += Object.keys(questions).length;
+      stats.ms.push(now() - t0);
+      if (stats.ms.length > 1000) stats.ms.shift();
+      return { answers: decided.answers, evidence: decided.evidence, usage: { inputTokens: decided.usage.inputTokens, outputTokens: 0 } };
+    }, { releaseAfter });
+  }
+
+  /** Plain text from DiffusionGemma (thinking off), under the same GPU rules as decide. */
+  function generate({ system = "You are a helpful, concise assistant.", user, maxTokens = 512, releaseAfter = false }) {
+    return onGpu(async () => {
+      reader ??= createStructuredReader({ baseUrl: config.endpoint, model: config.servedModel, fetchImpl });
+      const out = await reader.complete({ system, user, maxTokens });
+      stats.generations++;
+      return out;
+    }, { releaseAfter });
+  }
+
   async function status() {
     const engineStatus = await engine.status();
     const sorted = [...stats.ms].sort((a, b) => a - b);
@@ -187,6 +205,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
       api: server ? { url: `http://${config.api.host}:${server.address().port}`, auth: Boolean(config.api.token) } : null,
       requests: stats.requests,
       questions: stats.questions,
+      generations: stats.generations,
       errors: stats.errors,
       p50Ms: sorted.length ? sorted[Math.floor(sorted.length / 2)] : null,
       swaps: { in: stats.swapsIn, out: stats.swapsOut },
@@ -259,5 +278,5 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     return status();
   }
 
-  return Object.freeze({ on, off, status, decide, sleep: () => engine.sleep(), wake: () => engine.ensureAwake(), setWorker: (w) => { worker = w; }, get server() { return server; } });
+  return Object.freeze({ on, off, status, decide, generate, sleep: () => engine.sleep(), wake: () => engine.ensureAwake(), setWorker: (w) => { worker = w; }, get server() { return server; } });
 }

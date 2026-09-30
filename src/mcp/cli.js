@@ -7,8 +7,13 @@ import { MESSAGE_KINDS } from "./room.js";
 
 export const MCP_USAGE = `bantam mcp — BANTAM as an MCP server for Claude Code (docs/MCP.md)
 
-  bantam mcp serve  [--room DIR] [--port ${DEFAULT_PORT}] [--toolsets ${DEFAULT_TOOLSETS.join(",")}]
-                    [--local-endpoint http://127.0.0.1:8085]
+  bantam mcp serve  [--room DIR] [--mode llama|jev] [--port ${DEFAULT_PORT}] [--toolsets ${DEFAULT_TOOLSETS.join(",")}]
+                    [--local-endpoint http://127.0.0.1:8085] [--stand-in-model gpt-5.6-luna]
+
+  --mode llama  (default) local jobs run BANTAM on the llama.cpp model; Jev starts on demand
+                and trades the GPU with it.
+  --mode jev    DiffusionGemma starts with the server and stays awake; local jobs run BANTAM
+                with a Codex model standing in for the local one (--stand-in-model).
   bantam mcp config [--room DIR] [--agent claude]   print the claude mcp add command
   bantam mcp say    [--room DIR] [--to claude] [--kind note] <text…>
   bantam mcp log    [--room DIR] [--follow] [--all]
@@ -72,16 +77,24 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       const port = flags.port === undefined ? DEFAULT_PORT : Number(flags.port);
       if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("--port must be a port number");
       const toolsets = (flags.toolsets ?? DEFAULT_TOOLSETS.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+      const mode = flags.mode ?? "llama";
+      if (!["llama", "jev"].includes(mode)) throw new Error("--mode must be llama or jev");
       const localEndpoint = flags["local-endpoint"] ?? process.env.BANTAM_ENDPOINT ?? "http://127.0.0.1:8085";
+      const standInModel = mode === "jev" ? (flags["stand-in-model"] ?? "gpt-5.6-luna") : null;
       const log = (entry) => {
         if (entry.event === "tool_crash" || entry.event === "rpc_crash") out(`  ! ${entry.event}: ${entry.error}`);
         else if (entry.event === "toolset_skipped") out(`  ! toolset ${entry.toolset} is off: ${entry.error}`);
         else if (entry.event === "room_log_recovered") out(`  ! the room log's last line was torn by a crash and has been dropped`);
         else if (entry.event === "job") out(`  job ${entry.job} ${entry.state}${entry.detail ? `: ${entry.detail}` : ""}`);
+        else if (entry.event === "jev_ready") out("  Jev: DiffusionGemma is awake");
+        else if (entry.event === "jev_start_failed") out(`  ! Jev could not start: ${entry.error}`);
       };
-      const server = await startMcpServer({ roomDir, port, toolsets, log,
-        toolsetOptions: { jobs: { localEndpoint }, jev: { localEndpoint } } });
+      const server = await startMcpServer({ roomDir, port, toolsets, log, mode,
+        toolsetOptions: mode === "jev"
+          ? { jobs: { standInModel }, jev: { localEndpoint: null, eager: true } }
+          : { jobs: { localEndpoint }, jev: { localEndpoint } } });
       out(`  BANTAM MCP serving ${server.url}/mcp/<agent>  room ${roomDir}`);
+      out(mode === "jev" ? `  mode: jev · DiffusionGemma stays awake · local jobs run on ${standInModel} (stand-in)` : `  mode: llama · local jobs on ${localEndpoint} · Jev on demand`);
       out(`  toolsets: ${server.toolsets.join(", ") || "(none)"} · ${server.tools.length} tools`);
       out(`  connect Claude Code:  bantam mcp config --room ${JSON.stringify(roomDir)}`);
       out(`  watch the room:       bantam mcp log --follow --room ${JSON.stringify(roomDir)}`);

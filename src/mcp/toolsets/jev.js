@@ -19,6 +19,8 @@ export function describeAnswer(id, answer) {
   return `${id}: level ${answer.score} "${answer.legend[String(answer.score)] ?? ""}" (confidence ${answer.confidence.toFixed(3)})`;
 }
 
+// localEndpoint null: no local llama.cpp worker shares the GPU (Jev mode), so
+// DiffusionGemma runs alongside and stays awake.
 async function defaultServiceFactory({ localEndpoint }) {
   const { loadJevConfig } = await import("../../jev/config.js");
   const { createJevService } = await import("../../jev/service.js");
@@ -27,12 +29,12 @@ async function defaultServiceFactory({ localEndpoint }) {
   if (config.engine.mode === "unconfigured") throw new JevNotConfigured();
   // Leave an engine someone else started running when this server stops.
   const wasAwake = (await createJevEngine(config).status()).state === "awake";
-  const service = createJevService({ config, worker: { endpoint: localEndpoint } });
+  const service = createJevService({ config, worker: localEndpoint ? { endpoint: localEndpoint } : null });
   await service.on({ serve: false });
   return { service, keepEngine: wasAwake };
 }
 
-export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", serviceFactory = defaultServiceFactory } = {}) {
+export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", eager = false, serviceFactory = defaultServiceFactory } = {}) {
   let ctx = null, pending = null, started = null;
 
   function ensure() {
@@ -81,7 +83,11 @@ export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", serv
 
   return {
     name: "jev",
-    start(context) { ctx = context; },
+    start(context) {
+      ctx = context;
+      // Jev mode: bring the engine up with the server so the first question is fast.
+      if (eager) ensure().then(() => ctx.log({ event: "jev_ready" }), (error) => ctx.log({ event: "jev_start_failed", error: error.message }));
+    },
     async stop() {
       const value = started ?? (pending ? await pending.catch(() => null) : null);
       if (value) await value.service.off({ keepEngine: value.keepEngine });
@@ -99,6 +105,32 @@ export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", serv
           },
         },
         handler: async (a) => decide(a),
+      },
+      {
+        name: "jev_generate",
+        description: "Get a plain text response from DiffusionGemma, the fast local model behind Jev: drafting a line, a quick summary, alternatives to choose from, a second opinion. It is quick and capable but has a short context window (about 16k tokens including the reply), so give it focused material, not whole chapters.",
+        inputSchema: {
+          type: "object", additionalProperties: false, required: ["prompt"],
+          properties: {
+            prompt: { type: "string", minLength: 1, maxLength: 40_000 },
+            system: { type: "string", maxLength: 4000, description: "Optional system instruction." },
+            max_tokens: { type: "integer", minimum: 1, maximum: 4096, description: "Reply length limit (default 512)." },
+          },
+        },
+        handler: async (a) => {
+          let service;
+          try { ({ service } = await ensure()); }
+          catch (error) { throw new ToolError(`Jev is not available: ${error.message}`); }
+          try {
+            const out = await service.generate({ user: a.prompt, ...(a.system ? { system: a.system } : {}), maxTokens: a.max_tokens ?? 512,
+              releaseAfter: ctx.localJobRunning?.() ?? false });
+            return { text: out.text, truncated: out.truncated, ms: Math.round(out.elapsedMs), promptTokens: out.promptTokens, completionTokens: out.completionTokens };
+          } catch (error) {
+            if (error instanceof JevBusy || error instanceof JevUnavailable) throw new ToolError(`Jev could not answer now: ${error.message}`);
+            if (/maximum context length|max_model_len|too long/i.test(error.message)) throw new ToolError(`The prompt is too long for DiffusionGemma's context window: ${error.message}`);
+            throw error;
+          }
+        },
       },
       {
         name: "jev_status",

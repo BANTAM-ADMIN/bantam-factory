@@ -5,8 +5,13 @@ import { createJevToolset } from "../src/mcp/toolsets/jev.js";
 import { JevBusy } from "../src/jev/api.js";
 
 function fakeService({ fail = null } = {}) {
-  const calls = { decide: [], off: [] };
+  const calls = { decide: [], off: [], generate: [] };
   const service = {
+    async generate(request) {
+      calls.generate.push(request);
+      if (fail) throw fail;
+      return { text: "The lamp stayed dark.", truncated: false, elapsedMs: 41.6, promptTokens: 30, completionTokens: 6 };
+    },
     async decide(request) {
       calls.decide.push(request);
       if (fail) throw fail;
@@ -89,6 +94,30 @@ describe("jev toolset", () => {
     assert.equal(attempts, 2);
     const busy = setup({ fail: new JevBusy("the GPU is reserved for an image job") });
     await assert.rejects(busy.call("jev_decide", request), /Jev could not answer now: the GPU is reserved/);
+  });
+
+  it("generates plain text through the service, handing the GPU back during local jobs", async () => {
+    const { call, calls } = setup({ localBusy: true });
+    const out = await call("jev_generate", { prompt: "One line: Mara at the dark lamp.", system: "Be terse.", max_tokens: 40 });
+    assert.deepEqual(out, { text: "The lamp stayed dark.", truncated: false, ms: 42, promptTokens: 30, completionTokens: 6 });
+    assert.deepEqual(calls.generate[0], { user: "One line: Mara at the dark lamp.", system: "Be terse.", maxTokens: 40, releaseAfter: true });
+    const busy = setup({ fail: new JevBusy("queued out") });
+    await assert.rejects(busy.call("jev_generate", { prompt: "x" }), /Jev could not answer now: queued out/);
+    const long = setup({ fail: new Error("This model's maximum context length is 16384 tokens") });
+    await assert.rejects(long.call("jev_generate", { prompt: "x" }), /too long for DiffusionGemma's context window/);
+  });
+
+  it("starts the engine with the server when eager (Jev mode)", async () => {
+    let factoryCalls = 0;
+    const logged = [];
+    const { service } = fakeService();
+    const toolset = createJevToolset({ eager: true, localEndpoint: null, serviceFactory: async (options) => { factoryCalls++; assert.equal(options.localEndpoint, null); return { service, keepEngine: false }; } });
+    toolset.start({ log: (e) => logged.push(e) });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(factoryCalls, 1);
+    assert.deepEqual(logged, [{ event: "jev_ready" }]);
+    await toolset.tools.find((t) => t.name === "jev_decide").handler({ state: "x", questions: { q: { type: "noul", instructions: "?" } } }, { caller: "claude" });
+    assert.equal(factoryCalls, 1, "reuses the engine it started");
   });
 
   it("turns the engine off on stop unless it was already running", async () => {

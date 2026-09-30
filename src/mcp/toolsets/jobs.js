@@ -101,6 +101,9 @@ export function createJobsToolset({
   bantamBin = BANTAM_BIN,
   codexCommand = "codex",
   codexSandbox = "docker",
+  // Jev mode: no llama.cpp model is loaded, so "local" jobs run BANTAM with
+  // this Codex model standing in for it. Null runs the local model.
+  standInModel = null,
   commandFor = null,
   lanes = { local: 1, codex: 1 },
   pollMs = 1000,
@@ -135,6 +138,7 @@ export function createJobsToolset({
     return job;
   };
   const exclusions = (root, extra = []) => [...ALWAYS_EXCLUDED, ...extra].map((rel) => path.resolve(root, rel));
+  const label = (job) => job.standIn ? `local → ${job.standIn} stand-in` : job.worker;
   const duration = (job) => {
     const ms = (job.finishedAt ? Date.parse(job.finishedAt) : Date.now()) - Date.parse(job.startedAt ?? job.createdAt);
     return ms < 60_000 ? `${Math.round(ms / 1000)}s` : `${Math.floor(ms / 60_000)}m${String(Math.round((ms % 60_000) / 1000)).padStart(2, "0")}s`;
@@ -234,6 +238,7 @@ export function createJobsToolset({
       schema: 1, id, worker: a.worker, lane: spec.lane, steerable: spec.steerable,
       task: a.task, workspace, verify: a.verify ?? null, model: a.model ?? null, effort: a.effort ?? null,
       maxTurns: a.max_turns ?? 60, timeoutMs: (a.timeout_min ?? 120) * 60_000, exclude, roomTask: a.room_task ?? null,
+      standIn: a.worker === "local" && standInModel ? standInModel : null,
       createdBy: caller, createdAt: new Date().toISOString(), state: "queued", files,
       baselineCommit: baseline.commit, candidateCommit: null, startedAt: null, finishedAt: null, exitCode: null,
       outcome: null, verification: null, changes: [], progress: null, steering: [], apply: null, error: null,
@@ -243,7 +248,7 @@ export function createJobsToolset({
     queues[spec.lane].push(id);
     log(job, `${job.worker}: ${job.task.split("\n")[0].slice(0, 80)}`);
     pump(spec.lane);
-    return { job: id, state: job.state, worker: job.worker, files, position: job.state === "queued" ? queues[spec.lane].indexOf(id) + 1 : 0,
+    return { job: id, state: job.state, worker: label(job), files, position: job.state === "queued" ? queues[spec.lane].indexOf(id) + 1 : 0,
       note: `You will get a room message when ${id} finishes; call room_wait to block for it.` };
   }
 
@@ -258,8 +263,8 @@ export function createJobsToolset({
 
   async function launch(job) {
     const p = paths(job.id);
-    const command = commandFor ? commandFor(job, p) : workerCommand({ worker: job.worker, task: job.task, ws: p.ws, control: p.control,
-      runFile: p.runFile, verify: job.verify, model: job.model, effort: job.effort, maxTurns: job.maxTurns, localEndpoint, bantamBin, codexCommand,
+    const command = commandFor ? commandFor(job, p) : workerCommand({ worker: job.standIn ? "codex" : job.worker, task: job.task, ws: p.ws, control: p.control,
+      runFile: p.runFile, verify: job.verify, model: job.standIn ?? job.model, effort: job.effort, maxTurns: job.maxTurns, localEndpoint, bantamBin, codexCommand,
       codexSandbox, containerDir: p.containers });
     if (job.worker === "codex-native" && codexSandbox !== "host") fs.mkdirSync(p.containers, { recursive: true, mode: 0o700 });
     const out = fs.openSync(p.log, "a", 0o600);
@@ -350,7 +355,7 @@ export function createJobsToolset({
     const verified = job.verification ? ` Verification (${job.verify}): ${job.verification.status}.` : "";
     const summary = job.outcome?.summary ? ` Summary: ${excerpt(job.outcome.summary, 600)}` : "";
     const next = job.state === "succeeded" && job.changes.length ? " Inspect with job_result (diff: true); apply with job_apply." : "";
-    notify(job, `Job ${job.id} (${job.worker}) ${job.state} after ${duration(job)}. ${changed}.${verified}${job.error ? ` Reason: ${job.error}.` : ""}${summary}${next}`);
+    notify(job, `Job ${job.id} (${label(job)}) ${job.state} after ${duration(job)}. ${changed}.${verified}${job.error ? ` Reason: ${job.error}.` : ""}${summary}${next}`);
   }
 
   function finishWithError(job, error) {
@@ -415,7 +420,7 @@ export function createJobsToolset({
   function status(id) {
     const job = requireJob(id);
     const position = job.state === "queued" ? queues[job.lane].indexOf(id) + 1 : 0;
-    return { job: job.id, worker: job.worker, state: job.state, position, elapsed: job.startedAt ? duration(job) : null,
+    return { job: job.id, worker: label(job), state: job.state, position, elapsed: job.startedAt ? duration(job) : null,
       task: excerpt(job.task, 400), progress: job.progress, steering: job.steering, error: job.error,
       changes: FINAL.has(job.state) ? job.changes.length : null, apply: job.apply };
   }
@@ -502,7 +507,7 @@ export function createJobsToolset({
       fs.mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
       store = new WorkspaceStore(path.join(ctx.runtimeDir, "store"));
       // Jev hands the GPU straight back while the local model has work.
-      ctx.localJobRunning = () => [...running.keys()].some((id) => jobs.get(id)?.lane === "local");
+      ctx.localJobRunning = () => [...running.keys()].some((id) => jobs.get(id)?.lane === "local" && !jobs.get(id)?.standIn);
       recoverJobs();
     },
     async stop() {

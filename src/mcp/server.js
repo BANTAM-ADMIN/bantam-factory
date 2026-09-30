@@ -80,6 +80,7 @@ export async function startMcpServer({
   toolsets = DEFAULT_TOOLSETS,
   factories = TOOLSET_FACTORIES,
   toolsetOptions = {},
+  mode = "llama",
   log = () => {},
 } = {}) {
   if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw new Error("the BANTAM MCP server binds to localhost only");
@@ -97,7 +98,7 @@ export async function startMcpServer({
     const store = new RoomStore(paths.log);
     if (store.recovered) log({ event: "room_log_recovered", file: paths.log });
     const room = new Room(store);
-    const ctx = { room, store, roomDir: paths.root, runtimeDir: paths.runtime, log, toolsets: [] };
+    const ctx = { room, store, roomDir: paths.root, runtimeDir: paths.runtime, log, toolsets: [], mode };
     for (const name of toolsets) {
       const factory = factories[name];
       if (!factory) throw new Error(`unknown toolset: ${name} (have ${Object.keys(factories).join(", ")})`);
@@ -137,7 +138,7 @@ export async function startMcpServer({
     });
     const bound = server.address().port;
     const url = `http://${host === "::1" ? "[::1]" : host}:${bound}`;
-    writeJsonAtomic(paths.serverInfo, { url, port: bound, pid: process.pid, startedAt: new Date().toISOString(), toolsets: ctx.toolsets });
+    writeJsonAtomic(paths.serverInfo, { url, port: bound, pid: process.pid, startedAt: new Date().toISOString(), toolsets: ctx.toolsets, mode });
     log({ event: "mcp_listening", url, toolsets: ctx.toolsets, room: paths.root });
     let closed = false;
     return {

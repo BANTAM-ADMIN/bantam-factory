@@ -103,7 +103,9 @@ rolled back from its journal on the next start. Applies to one folder run one at
 It needs Jev mode set up (`bantamfactory jev setup`). Under the swap policy Jev waits for the
 local llama.cpp model to idle-sleep before it takes the GPU, for up to `gpu.sleepTimeoutMs` in
 `~/.bantam/jev.json`, so that must exceed llama-server's `--sleep-idle-seconds`. Jev
-expects about 5 s; with a longer idle window, raise the timeout to match. The engine starts on the first question, which can
+expects about 5 s; with a longer idle window, raise the timeout to match. If the local model needs
+nearly the whole card, set `gpu.handback` to `"stop"`. Otherwise the sleeping DiffusionGemma
+process still holds about 2.5 GB of VRAM, and llama.cpp can fail to wake into what is left. The engine starts on the first question, which can
 take minutes, and is turned off when the server stops, unless it was already running
 before. It shares the GPU with the local worker through Jev mode's swap policy. While a local
 job runs, each answer hands the GPU straight back.

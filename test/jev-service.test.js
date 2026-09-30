@@ -134,6 +134,26 @@ describe("jev GPU policy", () => {
     });
   });
 
+  it("handback stop frees the whole GPU: no engine at on(), and the container stops when the GPU goes back", async () => {
+    const llama = fakeLlama({ awakePolls: 0 });
+    const engine = fakeEngine("stopped");
+    const config = loadJevConfig({ gpu: { policy: "swap", handback: "stop" } }, noFile);
+    const service = createJevService({ config, worker: { endpoint: llama.endpoint }, engine, fetchImpl: llama.fetch });
+    await withLeaseDir(async (dir) => {
+      await service.on({ serve: false });
+      assert.deepEqual(engine.calls, [], "nothing starts until a question needs it");
+      await service.decide({ profile: { options: {} }, state: "s", questions: { q: { type: "noul" } }, seed: 1, releaseAfter: true }).catch(() => {});
+      assert.deepEqual(engine.calls, ["ensureAwake", "stop"], "started for the question, stopped (not slept) on handback");
+      assert.equal(engine.state, "stopped");
+      assert.deepEqual(imageLeases(dir), [], "the local worker has the GPU back");
+    });
+  });
+
+  it("rejects an unknown handback", () => {
+    assert.throws(() => loadJevConfig({ gpu: { handback: "nap" } }, noFile), /gpu.handback must be sleep or stop/);
+    assert.equal(loadJevConfig({}, noFile).gpu.handback, "sleep");
+  });
+
   it("off() stops the engine unless asked to keep it", async () => {
     const engine = fakeEngine();
     const service = createJevService({ config: configWith("alongside"), engine });

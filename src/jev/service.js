@@ -102,7 +102,15 @@ export function createJevService({ config, worker = null, engine = createJevEngi
   async function swapOut() {
     burstTimer = null;
     if (!lease) return;
-    try { await engine.sleep(); } catch (error) { log({ event: "jev_sleep_failed", error: error.message }); }
+    if (config.gpu.handback === "stop") {
+      // Sleep mode keeps vLLM's process and about 2.5 GB of VRAM; a local model
+      // that needs the whole card crashes waking into what is left.
+      try { await engine.stop(); primed = false; } catch (error) { log({ event: "jev_stop_failed", error: error.message }); }
+      reader = null;
+      pool = null;
+    } else {
+      try { await engine.sleep(); } catch (error) { log({ event: "jev_sleep_failed", error: error.message }); }
+    }
     releaseLease();
     stats.swapsOut++;
     log({ event: "jev_swap_out" });
@@ -201,7 +209,9 @@ export function createJevService({ config, worker = null, engine = createJevEngi
       // Queued behind any decide in flight; nothing to do while Jev already
       // holds the GPU (the engine is awake in its burst window).
       const bringUp = async () => {
-        if (lease) return;
+        // Under handback "stop" the engine lives only while Jev holds the GPU:
+        // it starts on the first question instead.
+        if (lease || config.gpu.handback === "stop") return;
         onProgress("waiting for the local model to go idle and release the GPU");
         let took = false;
         try { took = await takeGpu("starting"); }

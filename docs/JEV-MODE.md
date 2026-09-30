@@ -192,6 +192,7 @@ another file. Setup writes the file; you can also edit it by hand.
 | `gpu.policy` | `auto` | `auto`, `alongside`, `swap` or `off` (§5). |
 | `gpu.burstMs` | 30000 | Swap policy: how long DiffusionGemma keeps the GPU after the last question. |
 | `gpu.sleepTimeoutMs` | 180000 | The limit for a sleep or wake. The first sleep after a start takes about 86 s (§5.3). |
+| `gpu.handback` | `"sleep"` | Swap policy: how the GPU goes back to the local worker. `"sleep"` keeps DiffusionGemma's process, which still holds about 2.5 GB of VRAM, and wakes it in about a second. `"stop"` stops the container and frees all of it, at the cost of a cold start on the next question. Use `"stop"` when the local model needs nearly the whole card. |
 | `execCellImage` | `bantam/exec-cell:1` | The sandbox image for the code-execution gauge. |
 
 **The vLLM arguments setup uses:**

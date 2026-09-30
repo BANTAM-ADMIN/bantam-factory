@@ -47,7 +47,11 @@ export const DEFAULT_JEV_CONFIG = Object.freeze({
   // swap for a local worker.
   // The first sleep after a start copies the weights to host memory (85.9 s
   // measured); later sleeps take under a second and wakes about one.
-  gpu: { policy: "auto", burstMs: 30_000, sleepTimeoutMs: 180_000 },
+  // handback: how the GPU goes back to a local worker under swap. "sleep" keeps
+  // DiffusionGemma's process (about 2.5 GB of VRAM stays in use, wakes in about a
+  // second); "stop" stops the container so all of it is freed, for a local model that
+  // needs the whole card, at the cost of a cold start on the next question.
+  gpu: { policy: "auto", burstMs: 30_000, sleepTimeoutMs: 180_000, handback: "sleep" },
   // The execution gauge's sandbox image (docker/exec-cell).
   execCellImage: "bantam/exec-cell:1",
 });
@@ -81,6 +85,9 @@ export function loadJevConfig(overrides = {}, { readFile = fs.readFileSync, file
   const config = merge(merge(DEFAULT_JEV_CONFIG, fromFile), overrides);
   if (!["unconfigured", "external", "managed"].includes(config.engine.mode)) {
     throw new Error(`jev engine.mode must be external or managed (got ${config.engine.mode})`);
+  }
+  if (!["sleep", "stop"].includes(config.gpu.handback)) {
+    throw new Error(`jev gpu.handback must be sleep or stop (got ${config.gpu.handback})`);
   }
   if (!["auto", "alongside", "swap", "off"].includes(config.gpu.policy)) {
     throw new Error(`jev gpu.policy must be auto, alongside, swap or off (got ${config.gpu.policy})`);

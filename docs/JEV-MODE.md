@@ -402,7 +402,7 @@ Add a `bantam` object to a request:
 |---|---|
 | `explain: true` | The response gains `bantam.answers[id]` with `confidence`, `authority` and the per-step `evidence` (the fast read, both option orders, the thought, the gauge that decided). |
 | `abstainBelow: 0.8` | An answer whose confidence is below the threshold becomes `{"type": "unknown", "reason", "best": <the answer>}`. This is the andon cord for gates. |
-| `thought: "…"` | **Experimental.** Decide with supplied reasoning in the model's thought channel. DiffusionGemma follows a conclusion stated in the reasoning almost always (see `BORROWED_THOUGHT_EXPERIMENT.md`), so this is for reusing one analysis across many questions, not for checking the reasoning. |
+| `thought: "…"` | **Experimental.** Decide with supplied reasoning in the model's thought channel. DiffusionGemma follows a conclusion stated in the reasoning almost always in our tests, so this is for reusing one analysis across many questions, not for checking the reasoning. |
 
 `authority` is `exact` when a gauge or rule decided (code execution, state derivation,
 preference fit, a single-option question) and `model` when a structured read did.
@@ -512,8 +512,7 @@ model on the same vLLM.
    `abstainBelow` / `confidence` as a relative signal.
 
 On the Decision Index sample, this setup scored an estimated **57.2 index** at a **0.98 s
-median**. For comparison, the best other DiffusionGemma entry scores 49.5 and Jev 57.9
-(`SYSTEM_ONE_HANDOFF.md`).
+median**. For comparison, the best other DiffusionGemma entry scores 49.5 and Jev 57.9.
 
 ---
 
@@ -700,8 +699,3 @@ The rest of this guide's captures:
 **Demos:**
 - `scripts/jev-live-demo.mjs` writes `docs/jev-demos/transcript.json`;
 - `scripts/jev-swap-demo.mjs` writes `docs/jev-demos/swap.json`.
-
-**Related:**
-- `JEV_MODE_DESIGN.md`: the design;
-- `SYSTEM_ONE_HANDOFF.md`: the engine's measurements;
-- `DIFFUSIONGEMMA_IN_BANTAM.md`: where it fits in BANTAM.

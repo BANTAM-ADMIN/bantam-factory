@@ -1,7 +1,7 @@
 // Jev mode's model ids. Each names a System One profile: the options passed to
 // decideJevAdaptive. `bantam-jev` is the configuration measured on the Decision
-// Index (SYSTEM_ONE_HANDOFF.md §2.3); `bantam-jev-fast` never thinks, so every
-// answer is a structured read or an exact gauge (tens of milliseconds).
+// Index; `bantam-jev-fast` never thinks, so every answer is a structured read
+// or an exact gauge (tens of milliseconds).
 
 const FULL = Object.freeze({
   gate: 0.95, thinkBudget: 8192, binaryDebias: true, quantGate: true, temperature: 3,

@@ -342,7 +342,7 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
    * A thought supplied from outside (another model's reasoning) placed in the
    * thought channel, as if this model had thought it. Returns prompt ids a
    * `readAfter` continues from. The borrowed-thought pilot found the read
-   * follows a stated conclusion almost always (BORROWED_THOUGHT_EXPERIMENT.md).
+   * follows a stated conclusion almost always.
    */
   async function borrowThought({ system, user, thought }) {
     const prompt = await postJson(fetchImpl, `${root}/tokenize`, {
@@ -1056,7 +1056,7 @@ export function asksForProbability(instructions) {
  * thought agree the answer is their geometric mean; when they disagree, a duel
  * between the two candidates (both orders, fresh handles, a thought first)
  * decides, with a little of the other evidence kept. Chosen on JevBench's
- * public hard items; see SYSTEM_ONE_GUIDE.md for what it costs.
+ * public hard items; it costs extra reads per contested row.
  */
 export async function decideJevDeep({ reader, pool, state, questions, seed = 0, thinkBudget = 1024 }) {
   const stateText = typeof state === "string" ? state : JSON.stringify(state);

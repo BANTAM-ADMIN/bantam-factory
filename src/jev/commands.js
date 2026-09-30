@@ -1,5 +1,5 @@
 // `:jev` in a BANTAM Factory session and `bantam jev …` on the command line.
-// See JEV_MODE.md for the full guide.
+// See docs/JEV-MODE.md for the full guide.
 import { loadJevConfig, saveJevConfig } from "./config.js";
 import { createJevService, effectivePolicy } from "./service.js";
 

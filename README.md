@@ -144,8 +144,7 @@ Inside a session:
 Needs an NVIDIA GPU with about 22 GB free and vLLM with structured reads (PR #57250).
 Setup checks your server before saving anything, and never downloads without your consent.
 
-**[Jev mode guide, API, and real captures →](JEV_MODE.md)** ·
-[How DiffusionGemma fits in BANTAM](DIFFUSIONGEMMA_IN_BANTAM.md)
+**[Jev mode guide, API, and real captures →](docs/JEV-MODE.md)**
 
 ## Get started
 
@@ -184,4 +183,4 @@ Register Codex, Hermes, OpenCode, Pi, or DeepSeek Harness and run your own fight
 
 **[Run your own cage match →](docs/BRING-YOUR-OWN-COMPARISONS.md)**
 
-[Jev mode](JEV_MODE.md) · [Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)
+[Jev mode](docs/JEV-MODE.md) · [Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)

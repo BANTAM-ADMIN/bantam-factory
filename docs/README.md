@@ -9,6 +9,7 @@
 | Connect a model or choose a local setup | [Models & hardware](FIRST-RUN-SETUP.md) |
 | Build a candidate and review it before applying | [Build, inspect, apply](FACTORY-GETTING-STARTED.md) |
 | Run your own fight cards | [Put it in the ring](BRING-YOUR-OWN-COMPARISONS.md) |
+| Run a local Jev decision engine next to your worker | [Jev mode](JEV-MODE.md) |
 | Help the factory improve itself | [Self-improvement](SELF-IMPROVEMENT.md) |
 | Understand the factory formula | [Chicken problems](FACTORY-MODEL.md) |
 

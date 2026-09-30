@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * SUPERSEDED by Jev mode (`bantam jev serve`, `:jev on`; see JEV_MODE.md), which
+ * SUPERSEDED by Jev mode (`bantam jev serve`, `:jev on`; see docs/JEV-MODE.md), which
  * serves the full Jev wire contract (errors, auth, headers, model list) with the
- * adopted configuration. Kept for the Decision Index lab runs recorded in
- * SYSTEM_ONE_HANDOFF.md, which used these flags.
+ * adopted configuration. Kept for the Decision Index lab runs, which used
+ * these flags.
  *
  * A Jev-compatible System One endpoint backed by BANTAM's DiffusionGemma
  * reads (`decideJev`). Anything that speaks TypeSafe's wire contract (their

@@ -7,7 +7,7 @@
 //     { "engine": { "mode": "managed" }, "container": "dg-jev-vllm", "endpoint": "http://127.0.0.1:8001",
 //       "create": { "image": "...", "modelPath": "...", "args": [...] } }
 //
-// Everything else has defaults below. See JEV_MODE.md for each setting.
+// Everything else has defaults below. See docs/JEV-MODE.md for each setting.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

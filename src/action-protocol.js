@@ -62,7 +62,7 @@ export const WRITE_BATCH_FEATURE = "write_batch";
 export const LINE_EDIT_FEATURE = "line_edit";
 export const FILE_OPS_FEATURE = "file_ops";
 export const PROBE_ACTION_FEATURE = "probe";
-// The live Jev decision engine (Jev mode, `:jev tool on`); see JEV_MODE.md.
+// The live Jev decision engine (Jev mode, `:jev tool on`); see docs/JEV-MODE.md.
 export const JEV_DECIDE_FEATURE = "jev_decide";
 export const EDIT_CONFIRMATION_FEATURE = "confirm_edit";
 

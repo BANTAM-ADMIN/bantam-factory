@@ -673,7 +673,7 @@ if (cmd === "chat-transport") {
 }
 if (cmd === "jev") {
   // `bantam jev …` — Jev mode: serve DiffusionGemma System One behind a
-  // Jev-compatible API, and control its engine. See JEV_MODE.md.
+  // Jev-compatible API, and control its engine. See docs/JEV-MODE.md.
   const { runJevCli } = await import("../src/jev/commands.js");
   process.exit(await runJevCli(process.argv.slice(process.argv.indexOf("jev") + 1)));
 }
@@ -5220,7 +5220,7 @@ async function repl() {
     }
 
     // `:jev` — Jev mode: a live DiffusionGemma System One decision engine and its
-    // Jev-compatible API, alongside this session's worker. See JEV_MODE.md.
+    // Jev-compatible API, alongside this session's worker. See docs/JEV-MODE.md.
     if (/^:jev\b/i.test(request)) {
       const { handleJevCommand } = await import("../src/jev/commands.js");
       await handleJevCommand(request.replace(/^:jev\b\s*/i, ""), { model, ask: async (question) => { console.log(question); return wizardPrompt("jev"); } });

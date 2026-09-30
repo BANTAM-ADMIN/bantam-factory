@@ -2,7 +2,7 @@
 // Live demonstration of Jev mode's swap policy: a local llama.cpp worker and
 // DiffusionGemma share one GPU. Plays both sides (the agent's local calls and a
 // burst of Jev questions) and records timings and GPU memory at each step to
-// docs/jev-demos/swap.json. Used for JEV_MODE.md.
+// docs/jev-demos/swap.json. Used for docs/JEV-MODE.md.
 //
 //   node scripts/jev-swap-demo.mjs [--worker http://127.0.0.1:8085] [--burst-ms 8000]
 import fs from "node:fs";

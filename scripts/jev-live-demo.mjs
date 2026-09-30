@@ -2,7 +2,7 @@
 // Live demonstration of BANTAM Jev mode: starts the service on the real
 // DiffusionGemma engine, sends a set of requests through the Jev API, and
 // records every request/response with timings to docs/jev-demos/transcript.json.
-// Used to produce the examples in JEV_MODE.md.
+// Used to produce the examples in docs/JEV-MODE.md.
 //
 //   node scripts/jev-live-demo.mjs [--port 8095] [--rows .bantam/decision-index/dev-1500.jsonl.gz]
 import fs from "node:fs";

@@ -5,7 +5,6 @@
 - **Compatibility:** Existing Gemma 31B and Qwen paths retain their behavior. Explicit profile choices and pinned prompt settings remain respected.
 - **Terminal version:** The startup splash and package metadata now show 1.5.0, including the patch version in the large banner.
 - **Test reliability:** Corrected Node test discovery in CI and fixtures, ensured sealed holdout tests are discovered and cleaned up, and fixed a sandbox test that referenced a host-only Node path.
-- **Integration notes:** `orion-26ba4b.md` documents the failures, exact-prompt comparisons, implementation, and live validation.
 
 ## Validation
 

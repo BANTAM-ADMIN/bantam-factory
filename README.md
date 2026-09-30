@@ -10,177 +10,166 @@
 </p>
 
 <p align="center">
-  <a href="#get-started"><strong>Get started</strong></a> ·
+  <a href="#-getting-started"><strong>Get started</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/fights.html"><strong>Watch the fights</strong></a> ·
   <a href="https://bantam-admin.github.io/bantam-factory/#builds"><strong>Play the builds</strong></a> ·
   <a href="docs/README.md">Docs</a>
 </p>
 
-BANTAM FACTORY is an open source coding factory. Put **Codex Astra** inside it,
-or run a **local 27B on your own GPU**. Give it a job in plain language:
-build an app, fix a bug, automate the boring part.
+---
 
-A harness for Codex. A factory for your local model. A fight card that lets
-you see the difference.
+# Bantam Factory 🏭
 
-## Your Codex account. More work from your tokens.
+> **"You provide the task; I provide the process."**
 
-The same Astra completed these jobs with fewer tokens and less time inside
-BANTAM FACTORY than in native Codex:
+Bantam is a bantamweight local-model coding agent harness designed to turn raw model intelligence into reliable, verifiable software. Every action is grammar-constrained, observable, and verifiable.
 
-| Job | Less input | Less output | Less time | Inspect the work |
-| --- | --- | --- | --- | --- |
-| **Plan dependent jobs** | **44%** | **25%** | **21%** | [Two recorded pairs ↗](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-5/share/index.html) · [second pair](https://bantam-admin.github.io/bantam-factory/codex/job-planner-codex-6/share/index.html) |
-| **Pack project context** | **46%** | **18%** | **18%** | [Two recorded pairs ↗](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-1/share/index.html) · [second pair](https://bantam-admin.github.io/bantam-factory/codex/context-packet-astra-context-2/share/index.html) |
-| **Check changed files** | **35%** | **14%** | **12%** | [Replay ↗](https://bantam-admin.github.io/bantam-factory/codex/snapshot-drift-qualified-4/share/index.html) |
+---
 
-Same task, starting files, and medium reasoning effort within each comparison.
-All passed five independent acceptance groups. The paired results combine both
-repeats. Job planner also used **12% less uncached input**. Prefix-cache tokens
-are included in input; each card shows the complete counters and conditions.
+## In-session turn limits
 
-**Less context to carry. More room for the work.** Open a fight to follow every
-action, read the tests, and inspect what each harness delivered.
+In `bantamfactory` chat, type `:max-turns` to show the current limit or
+`:max-turns 100` to change it. Use a positive integer. The setting lasts for
+this session and applies to subsequent requests (including `keep going`), not
+an already-running request. After a turn-limit pause, set the limit and then
+say `keep going`. `:help` lists this and the other session commands.
 
-## Don't just watch. Play it.
+## 🏗️ How It Works
 
-**A design becomes a world you can walk into.**
+```mermaid
+graph TD
+  User[User Request] --> Agent[Agent: src/agent.js]
+  Agent --> Action{Action: JSON Schema}
+  Action --> Executor[Executor: src/executor.js]
+  Executor --> Sandbox[Fresh Sandbox]
+  Sandbox --> Observation[Observation]
+  Observation --> Agent
+  Agent --> Done[Done: Verified]
+```
 
-[![ASHWORTH ST — a detailed subway survival game built by GPT-6 Astra inside BANTAM FACTORY.](site/examples/ashworth/station.jpg)](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/index.html)
+### The Core Loop
 
-**ASHWORTH ST · Last Stop.** Astra inside BANTAM FACTORY built a 3D subway
-survival game from a detailed design: a moving train, animated enemies,
-three weapons, procedural textures and sound. Explore the station. Survive
-the passengers. Play the preview in your browser.
+```
+User: "Fix the bug in auth.js"
 
-**[Play ASHWORTH ST →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/index.html)**
-· [Explore the source](site/examples/ashworth/game)
-· [Download the game](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/ashworth/ashworth-st.zip)
+Me:   {"a":"read_file","p":"src/auth.js","start":1,"limit":50}
 
-Desktop · keyboard + mouse. The factory is still refining this build;
-the published preview includes its snapshot and browser-check record.
+← Harness: returns file content
 
-**Same Astra. Same puzzle brief. Two harnesses.**
+Me:   {"a":"replace","p":"src/auth.js","old":"...","new":"...","line":12}
 
-> Make me a beautiful, complete falling-block puzzle game in one self-contained HTML file.
+← Harness: writes file, returns success
 
-Factory Astra built **Moonstack in 5m 57s**: hold, ghost landing, combos,
-levels, saved best score, and keyboard and touch controls. One preview action
-checked desktop and two phone sizes, caught a keyboard-focus bug, and sent
-Astra back to repair it. The finished game has **13 passing tests**.
+Me:   {"a":"shell","c":"npm test"}
 
-Against the saved native Astra baseline: **78% less input, 9% less output,
-and 12% less time**, with **5% less uncached input**. Eight Astra calls in
-the factory; 19 in native Codex. Both delivered playable games. The page
-includes both recordings, retained tests, and independent browser playtests.
+← Harness: runs tests, returns results
 
-**[Play factory Astra · native Astra · local 27B →](https://bantam-admin.github.io/bantam-factory/assets/showcase/examples/arcade/index.html)**
+Me:   {"a":"done","summary":"Fixed auth bug. Tests pass."}
+```
 
-Three clearly labelled builds. Each has its own prompt, clock, actions, and
-original downloadable file. The local game came from a shorter prompt.
+---
 
-## The factory formula: chicken problems.
+## 🛠️ Available Actions
 
-Big jobs become small jobs the model can finish and check. Stations give it
-the right context and tools, run the checks, and feed back the next repair.
-The model can work, review, and build tests. Reusable tools become the factory's
-jigs; guards catch recurring mistakes before they spread.
+| Action | Description |
+|---|---|
+| `read_file` | Read a file |
+| `write_file` | Create/overwrite a file |
+| `replace` | Edit by exact match |
+| `patch` | Apply a diff |
+| `search` | Regex code search |
+| `query` | Semantic code query |
+| `inspect` | Batch read-only ops |
+| `shell` | Run a shell command |
+| `done` | Verify and finish |
+| `respond` | Talk to the user |
+| `decide` | Ask Jev for a fast, calibrated judgment (with `:jev tool on`) |
 
-- **Build it. Check it. Improve it.** Actual test results guide the next step.
-- **Check desktop and phone together.** One browser-preview action can exercise three screen sizes and return each result, so Astra can fix the layout with fewer trips back and forth.
-- **Keep the work contained.** Project file boundaries and Docker shell isolation; shell networking is off by default.
-- **Improve the machinery.** The experimental [self-improvement loop](docs/SELF-IMPROVEMENT.md) studies recorded friction, builds changes, and tests them before eligible promotion. You choose when to run it.
+---
 
-[See the factory at work →](https://bantam-admin.github.io/bantam-factory/)
+## 📂 Architecture
 
-## Small model. Heavy hitter.
+```
+.claude/    ← Harness internals
+test/       ← 709 test files (TDD by default)
+src/        ← 437 source files
+  ├── agent.js     ← Core agent logic, 110+ actions
+  ├── factory.js   ← Task orchestration (90 dependents)
+  ├── executor.js  ← Safe action execution (64 dependents)
+  ├── model.js     ← Model interface
+  └── prompt.js    ← Structured prompts
+bin/        ← CLI entry points
+gauntlet/    ← Benchmark suites
+examples/    ← Demonstrations
+```
 
-Local Qwen 27B on **one RTX 4090 · 24 GB VRAM**.
-Recorded generation speeds: **82.6–105.2 tokens/second**.
+---
 
-| Same model inside… | Factory finished | Fewer input tokens | Fight |
-| --- | --- | --- | --- |
-| **Pi** | **6.0× faster** | **74%** | [Context packer ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=pi) |
-| **Hermes** | **8.8× faster** | **≥69%** | [Context packer ↗](https://bantam-admin.github.io/bantam-factory/context-packet/share/index.html#card=context-packet&view=results&layout=compare&left=bantam-local-27b&right=hermes) |
-| **OpenCode** | **6.8× faster** | **73%** | [Patch transaction ↗](https://bantam-admin.github.io/bantam-factory/patch-transaction/share/index.html#card=patch-transaction&view=results&layout=compare&left=bantam-local-27b&right=opencode) |
-| **DeepSeek Harness** | **3.9× faster** | **47%** | [Receipt reducer ↗](https://bantam-admin.github.io/bantam-factory/receipt-reducer/share/index.html) |
+## 🧠 Jev Mode (new in 2.0)
 
-Selected recorded fights; both contenders passed each job. Hermes' saving is
-at least 69% because one of its 19 requests lacks token counters.
-
-## New in 2.0: Jev mode. A decision engine on your own GPU.
-
-Turn on **DiffusionGemma 26B-A4B** next to whatever runs the factory. It answers
-typed questions (yes/no, choice, score) with calibrated probabilities, usually in
-**tens of milliseconds**. It speaks **Jev's wire API**, so TypeSafe's SDK, OpenJev
+Turn on **DiffusionGemma 26B-A4B** as a local decision engine next to whatever runs the
+factory. It answers typed questions (yes/no, choice, score) with calibrated probabilities,
+usually in **tens of milliseconds**, and speaks **Jev's wire API**. TypeSafe's SDK, OpenJev
 clients, and the Decision Index kit work unchanged.
 
 ```bash
-bantam jev setup                     # use your DiffusionGemma vLLM server, or install one (asks first)
-bantam jev serve                     # Jev API on http://127.0.0.1:8090
+bantam jev setup                        # use your DiffusionGemma vLLM server, or install one (asks first)
+bantam jev serve                        # Jev API on http://127.0.0.1:8090
 bantam jev ask "Is 91 a prime number?"
 #   no (P(yes) = 0.094)
 ```
 
-Inside a session:
+In a session:
 
 ```
 :jev on              start DiffusionGemma and serve the API
 :jev ask Which planet is largest? | Mars | Jupiter | Venus | Earth
   Jupiter (confidence 0.464; Jupiter 0.779, Earth 0.103, Mars 0.093)  · 46 ms
-:jev tool on         let your working agent call Jev mid-task (the decide tool)
+:jev tool on         let the working agent call Jev mid-task (the decide action)
 ```
 
-- **Runs alongside your worker.** With Codex or an API model, both run at once.
-  With a local Qwen on the same GPU, BANTAM swaps the two in and out of VRAM
-  automatically (about 6–7 s to swap in, then normal speed for the burst).
-- **Exact where it can be.** Code runs in a sandbox, tool calls are checked
-  against their schema, and state changes are derived. The model read is the fallback.
-- **More than Jev.** Per-answer evidence, abstention below a confidence you choose,
-  batches, NDJSON streaming, and a gauge listing, all opt-in. Plain Jev clients never see them.
+- **Runs alongside your worker.** With Codex or an API model, both run at once. With a
+  local Qwen on the same GPU, BANTAM swaps the two in and out of VRAM automatically.
+- **Exact where it can be.** Code runs in a sandbox, tool calls are checked against their
+  schema, and state changes are derived. The model read is the fallback.
+- **More than Jev.** Per-answer evidence, abstention below a confidence you set, batches,
+  and NDJSON streaming, all opt-in.
 - **Measured.** 56.2 on a full Decision Index run, median 0.98 s per row. The best
   published DiffusionGemma entry is 49.5, and TypeSafe's Jev scores 57.9.
 
 Needs an NVIDIA GPU with about 22 GB free and vLLM with structured reads (PR #57250).
-Setup checks your server before saving anything, and never downloads without your consent.
+Setup checks your server before saving anything and never downloads without your consent.
+**[Full guide →](docs/JEV-MODE.md)**
 
-**[Jev mode guide, API, and real captures →](docs/JEV-MODE.md)**
+---
 
-## Get started
-
-<a id="quick-start"></a><a id="platforms"></a><a id="start-with-what-you-already-have"></a>
-
-**Linux / WSL2 · Node.js 20+ · Git · Docker**
+## 🚀 Getting Started
 
 ```bash
-git clone https://github.com/BANTAM-ADMIN/bantam-factory.git
-cd bantam-factory
-npm ci
-docker pull alpine:3
-npm link
-bantamfactory setup
+npm install
+npm test
 ```
-
-Setup connects your signed-in Codex CLI or local model. To use Astra, open a project:
 
 ```bash
-cd /path/to/your/project
-bantamfactory --codex --model gpt-6-astra
+npm start               # Start the bantam CLI
+npm run factory:demo    # Run the factory demo
+npm run eval            # Run evals
 ```
 
-Then ask for the work. Your existing Codex account works here; no local GPU is
-needed for Astra. Sol and Terra are supported too.
+---
 
-In a session, `:help` lists the session commands; `:max-turns 100` raises the
-turn limit for later requests.
+## ⚖️ Verification First
 
-[Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md)
+I don't mark anything `done` until I've **verified** it. After every change, I run the relevant tests, check the output, and confirm it works. If tests fail, I diagnose and fix — I don't give up.
 
-## Bring your harness. Put it in the ring.
+---
 
-Same task. Same starting files. Side-by-side work, checks, tokens, and clocks.
-Register Codex, Hermes, OpenCode, Pi, or DeepSeek Harness and run your own fights.
+## 🤝 Contributing
 
-**[Run your own cage match →](docs/BRING-YOUR-OWN-COMPARISONS.md)**
+See `CONTRIBUTING.md` for details.
 
-[Jev mode](docs/JEV-MODE.md) · [Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)
+---
+
+## 🔗 More
+
+[Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md) · [Bring your own comparisons](docs/BRING-YOUR-OWN-COMPARISONS.md) · [Jev mode](docs/JEV-MODE.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE)

@@ -53,7 +53,6 @@ async function ask(prompt, schema, maxTokens = 512) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: schema,

@@ -7,6 +7,7 @@
 // model, but callers can select another profile as we benchmark more models.
 
 import crypto from "node:crypto";
+import { localModelEndpoint, waitForImageGpu } from './image-gpu.js';
 import { getGlobalDispatcher } from "undici";
 import { snapshotJsonValue } from "./json-file.js";
 import { resolveProfile } from "./profiles.js";
@@ -382,6 +383,7 @@ export class ModelClient {
   }
 
   async complete(prompt, opts = {}) {
+    await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const requestOptions = { ...opts };
     if (requestOptions.signal?.aborted) throw interruptedError();
     if (opts.seed !== undefined) requestOptions.seed = normalizeSeed(opts.seed);
@@ -464,6 +466,7 @@ export class ModelClient {
 
   /** Send a request captured by buildRequest()/requestLog() without reconstructing its body. */
   async completeRequest(recordedRequest, opts = {}) {
+    await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const request = normalizeExactRequest(recordedRequest);
     if (!request) throw new Error("recorded completion request needs url, method, headers, and a serialized body");
     // Stored evidence carries a redacted Authorization header; the live key
@@ -772,6 +775,7 @@ export class ModelClient {
   }
 
   async _completeOnce(request, opts = {}, exchange = {}) {
+    await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
     // Wall-clock origin for the client-side timings fallback. Set before any
     // network work so a server that reports nothing still yields a real rate.

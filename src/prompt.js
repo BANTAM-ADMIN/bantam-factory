@@ -51,8 +51,11 @@ export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedSh
   const sandboxRule = sandboxedShell
     ? '\n- Each "shell" action runs in a fresh, isolated sandbox: background processes and servers do NOT survive to the next action (setsid/nohup cannot change this); only files in the workspace persist. To prove a server works, start it and curl it in the SAME action. If the task needs a persistently running service, get it working, verify it in one action, and give the user the exact command to run it themselves — do not spend turns relaunching it.'
     : "";
+  const llmSocketRule = sandboxedShell
+    ? '\n- For local LLM requests, check $BANTAM_LLM_SOCKET. When set, it provides HTTP access to the configured local model while the sandbox stays offline. Use curl --unix-socket "$BANTAM_LLM_SOCKET" http://localhost/v1/models, or POST JSON to /v1/chat/completions or /completion. Node http.request supports socketPath; Python can use AF_UNIX with http.client. Read the socket environment variable at runtime instead of using a host localhost URL. Only inference, models, health, tokenize and detokenize routes are exposed; clients must finish within this shell action.'
+    : '';
   const extraRules = featureRules || sandboxRule
-    ? `\n\nAdditional action rules:\n${featureRules}${sandboxRule}`
+    ? `\n\nAdditional action rules:\n${featureRules}${sandboxRule}${llmSocketRule}`
     : "";
   // Say the budget exists. Every run of the workday refactor request landed
   // within four turns of its cap across three harness eras, and the audit
@@ -593,7 +596,7 @@ export function buildPrompt({
   for (const [index, turn] of turns.entries()) {
     const action = turn.action ?? turn.parsedAction;
     if (!turnEditApplied(turn)) {
-      if (editPaths(action).length && /^ERROR:/m.test(String(turn.observation ?? ""))) {
+      if (editPaths(action).length && /^(?:ERROR:|\[edit-confirmation\])/m.test(String(turn.observation ?? ""))) {
         latestFailedEditProposal = index;
       }
       continue;

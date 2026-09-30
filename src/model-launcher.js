@@ -84,6 +84,26 @@ async function isHealthy(endpoint, timeoutMs = 1200) {
   return reachable && !sleeping;
 }
 
+/** Wake a llama.cpp server that is deliberately asleep before selecting it.
+ * `/health` and `/props` intentionally bypass llama.cpp's sleep gate, so a
+ * real tiny completion is the only request that both wakes it and proves it
+ * has actually reloaded. */
+async function wakeSleepingServer(endpoint, out) {
+  out(`Waking the sleeping model at ${endpoint} …\n`);
+  try {
+    const r = await fetch(`${String(endpoint).replace(/\/$/, "")}/completion`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "Ready", n_predict: 1, temperature: 0, cache_prompt: false }),
+      signal: AbortSignal.timeout(120000),
+    });
+    if (!r.ok) return false;
+    await r.text();
+  } catch { return false; }
+  const state = await serverState(endpoint, 3000);
+  return state.reachable && !state.sleeping;
+}
+
 function prompt(q) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
   return new Promise((res) => rl.question(q, (a) => { rl.close(); res(a); }));
@@ -281,7 +301,15 @@ export async function switchToModel(model, target, {
   stop = stopServerAt,
   verify = verifyResidentProfile,
 } = {}) {
-  if (await isHealthy(target.endpoint)) {
+  let ready = await serverState(target.endpoint);
+  if (ready.reachable && ready.sleeping) {
+    if (!(await wakeSleepingServer(target.endpoint, out))) {
+      out(`Could not wake the sleeping model at ${target.endpoint}.\n`);
+      return false;
+    }
+    ready = { reachable: true, sleeping: false };
+  }
+  if (ready.reachable && !ready.sleeping) {
     // "Already running" used to mean only "the model id matches, or there is no
     // id constraint" — and no profile in this registry declares one, so a
     // 4-slot crew server satisfied a request for the 2-slot profile. Ask the

@@ -1,0 +1,35 @@
+{
+  "url": "http://127.0.0.1:8188",
+  "workflow": "krea2-turbo.api.json",
+  "bindings": {
+    "prompt": [
+      "4",
+      "text"
+    ],
+    "seed": [
+      "7",
+      "seed"
+    ],
+    "width": [
+      "6",
+      "width"
+    ],
+    "height": [
+      "6",
+      "height"
+    ],
+    "filename_prefix": [
+      "9",
+      "filename_prefix"
+    ]
+  },
+  "outputs": [
+    "9"
+  ],
+  "gpu": {
+    "mode": "auto"
+  },
+  "timeoutMs": 900000,
+  "cleanupTimeoutMs": 180000,
+  "stallWarningMs": 180000
+}

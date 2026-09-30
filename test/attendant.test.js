@@ -59,6 +59,23 @@ test("frameInjection: user text vs the agent's own voice, unmistakably", async (
   assert.doesNotMatch(f, /The user interjected/);
 });
 
+test("only undelivered operator messages become new requests", async () => {
+  const { pendingOperatorRequests } = await import("../src/logic/attendant.js");
+  const messages = [
+    "please fix that",
+    { kind: "attendant", text: "I told the operator I am checking it" },
+    { kind: "user", text: "then run the tests" },
+    { kind: "image", text: "image job complete" },
+    { kind: "supervisor", text: "inspect the evidence" },
+    null,
+    { kind: "user", text: { invalid: true } },
+  ];
+  assert.deepEqual(pendingOperatorRequests(messages), ["please fix that", "then run the tests"]);
+  assert.equal(messages.length, 7, "does not mutate the worker queue");
+  assert.deepEqual(pendingOperatorRequests([{ kind: "attendant", text: "Already answered" }]), []);
+  assert.deepEqual(pendingOperatorRequests([]), []);
+});
+
 test("the prompt carries the handoff contract and optional persona", () => {
   const base = buildAttendantPrompt({ task: "t", turns: seed().turns, question: "q" });
   assert.match(base, /handed to the working sibling at its next turn boundary/);

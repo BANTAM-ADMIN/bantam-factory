@@ -88,6 +88,14 @@ export { renderCognitiveActuationFoundry } from "./factory/cognitive-actuation-r
 export { defineCandidatePressTask, runCandidatePress } from "./factory/candidate-foundry.js";
 export { auditAnchorRegistry, canonicalizeSingleArrayWrapper, createVerbatimAnchorLocator, recoverPartialLots } from "./factory/diffusion-recovery.js";
 export { classifyDieBindingHttpFailure, DIE_BINDING_DECOY, DIE_BINDING_SENTINEL, dieBindingRequest, dieBindingVerdict, readDieBinding } from "./factory/die-binding-gauge.js";
+export { formatCalcResults, runCalcSetup } from "./factory/calc-gauge.js";
+export { createExecCell, execGaugeChoice, findPythonCall } from "./factory/exec-gauge.js";
+export { checkToolCalls, formatToolCallNotes } from "./factory/tool-call-gauge.js";
+export { findPalettePreference, paletteFeatures, palettePreferenceChoice, palettePreferenceScores } from "./factory/preference-gauge.js";
+export { derivedAfterChoice, entityTable, isChangeQuestion, noopChanges, parseChanges } from "./factory/state-gauge.js";
+export { claimCheckNote, findClaim, unsourcedDetails } from "./factory/claim-gauge.js";
+export { digestNote, verifiedPoints, wantsDigest } from "./factory/digest-station.js";
+export { asksForProbability, buildReadCanvas, compileHandlePool, createStructuredReader, decideJev, decideJevAdaptive, decideJevDeep, decideJevThink, isQuantitative, rackOptions, readSlotDistribution, selectAllGroup, seededNoise, systemOneDecide, temperProbs } from "./factory/system-one.js";
 export { verbatimAnchorStationAsset } from "./factory/verbatim-anchor-station.js";
 export {
   COGNITIVE_DEFECT_CLASSES,

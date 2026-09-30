@@ -51,7 +51,6 @@ async function invoke({ prompt, tool, maxTokens = 2048 }) {
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "function", function: tool }],
       tool_choice: { type: "function", function: { name: tool.name } },
-      temperature: 0.3,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
     }),

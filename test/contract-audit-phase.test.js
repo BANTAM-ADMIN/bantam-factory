@@ -161,6 +161,11 @@ async function run(workspace, actions, options = {}) {
   const requests = [], prompts = [];
   const result = await runAgent({ task: TASK, workspace, maxTurns: actions.length, maxInvalidPerTurn: 0,
     model: { assistantPrefill: "", actTemperature: null, async complete(prompt, request) {
+      if(prompt.includes('Propose ONE small discriminating assertion'))return {content:JSON.stringify({assertion:options.correctionProposal??''}),tokens:1};
+      if (prompt.includes("Review the ASSERTION, not the implementation.") || prompt.includes("Review COVERAGE")) return {
+        content: JSON.stringify({verdict: options.groundingVerdictForPrompt?.(prompt) ?? (prompt.includes('COMPLETION COVERAGE REVIEW:') ? options.coverageVerdict : undefined) ?? options.groundingVerdict ?? 'grounded', requirement: TASK.slice(0,100),
+          reason: 'Check the public observable, not a test-selected substitute.'}), tokens: 1,
+      };
       if (prompt.includes("You are a source-code state-machine auditor.")) return {
         content: JSON.stringify({ findings: [], note: "Source review only; execute a public-API assertion." }), tokens: 1,
       };
@@ -199,6 +204,168 @@ test("actual audit masks the next request and fresh focused/project receipts res
   assert.match(prompts[4].slice(0, prompts[4].lastIndexOf("<observation>")), /CONTRACT AUDIT PHASE:/,
     "old phase text remains historical evidence, not a rewritten cache prefix");
   assert.equal(result.metrics.contractAuditRecoveryRejections ?? 0, 0);
+});
+
+test('Factory assertion-grounding refuses unsupported checks before they execute, with cached review', async t => {
+  const events=[];
+  const {result}=await run(fixture(t),[EDIT,VERIFY,FOCUS,FOCUS],{
+    assertionGrounding:true,groundingVerdict:'revise',onEvent:e=>events.push(e),
+  });
+  assert.equal(result.reachedDone,false);
+  assert.equal(result.metrics.assertionGroundingReviews,1,'identical proof must not reroll the review');
+  assert.match(result.turns.at(-1).observation,/assertion-grounding/);
+  assert.equal(events.filter(e=>e.type==='assertion_grounding').length,2);
+  for(const turn of result.turns.slice(2)){
+    assert.match(turn.observation,/Check NOT EXECUTED/);
+    assert.equal(turn.shellExecution ?? null,null);
+    assert.equal(turn.verificationEvidence ?? null,null);
+  }
+  assert.equal(result.metrics.assertionGroundingExecutionDeferrals,2);
+});
+
+test('a grounded review permits normal completion without replacing execution receipts', async t => {
+  const {result}=await run(fixture(t),[EDIT,VERIFY,FOCUS,DONE],{assertionGrounding:true});
+  assert.equal(result.reachedDone,true,result.turns.at(-1).observation);
+  assert.equal(result.metrics.assertionGroundingReviews,2,'focused approval is not completion coverage approval');
+});
+
+test('a valid executed focused check does not waive missing completion coverage', async t => {
+  const events=[];
+  const {result}=await run(fixture(t),[EDIT,VERIFY,FOCUS,DONE,DONE],{assertionGrounding:true,coverageVerdict:'revise',onEvent:e=>events.push(e)});
+  assert.equal(result.reachedDone,false);
+  assert.equal(result.turns[2].shellExecution.exitCode,0);
+  assert.equal(result.metrics.assertionGroundingReviews,2,'cache separately binds each review scope');
+  assert.match(result.turns.at(-1).observation,/Completion deferred/);
+  const coverage=events.find(e=>e.type==='assertion_grounding'&&e.phase==='completion');
+  assert.ok(coverage.checks.some(c=>c.command===FOCUS.c));
+});
+
+test('a rejected hand-written throwing expectation cannot become a measured implementation failure', async t => {
+  const check={a:'shell',c:`node --input-type=module -e "import {collectItems} from './src/items.js'; if(collectItems('ok',[1]).length!==0) throw Error('invented expectation');"`};
+  const {result}=await run(fixture(t),[EDIT,VERIFY,check],{assertionGrounding:true,groundingVerdict:'revise'});
+  assert.match(result.turns[2].observation,/Check NOT EXECUTED/);
+  assert.equal(result.turns[2].shellExecution ?? null,null);
+  assert.equal(result.turns[2].verificationEvidence ?? null,null);
+  assert.equal(result.metrics.assertionGroundingExecutionDeferrals,1);
+});
+
+for(const trajectory of ['rebuild','extension'])test(`assertion recovery remains current after duplicate rejections, no-op edits and reads (${trajectory})`,async t=>{
+ const {result,prompts}=await run(fixture(t),[EDIT,VERIFY,FOCUS,FOCUS,EDIT,{a:'read_file',p:'src/items.js'},FOCUS],
+   {assertionGrounding:true,groundingVerdict:'revise',promptTrajectory:trajectory});
+ assert.equal(result.turns[4].editApplied,false,'fixture exercises a no-op edit');
+ for(const i of [3,4,5,6]){
+   const current=prompts[i].slice(prompts[i].lastIndexOf('[verification workflow: current decision]'));
+   assert.match(current,/\[assertion recovery: current decision\]/);
+   assert.match(current,/Check the public observable, not a test-selected substitute/);
+   assert.match(current,/For an inline check, change the shell assertion/);
+   assert.doesNotMatch(current,/Next: run an existing focused assertion directly/);
+ }
+ assert.equal(result.metrics.assertionGroundingReviews,1,'persistent context does not reroll reviews');
+ if(trajectory==='extension')for(let i=3;i<prompts.length;i++)assert.ok(prompts[i].startsWith(prompts[i-1]),'current recovery appends without rewriting provider prefix');
+});
+
+test('a repeated rejection can propose a source-blind correction without executing or approving it',async t=>{
+ const events=[];
+ const proposal='const independentProposal = true;';
+ const {result,prompts}=await run(fixture(t),[EDIT,VERIFY,FOCUS,FOCUS,FOCUS],
+   {assertionGrounding:true,groundingVerdict:'revise',correctionProposal:proposal,onEvent:e=>events.push(e)});
+ assert.equal(result.metrics.assertionCorrectionAttempts,1);
+ assert.equal(result.metrics.assertionGroundingReviews,1);
+ assert.match(prompts[4],/const independentProposal = true/);
+ assert.equal(result.reachedDone,false);
+ assert.equal(events.filter(e=>e.type==='assertion_correction_proposal').length,1);
+ for(const turn of result.turns.slice(2))assert.equal(turn.shellExecution??null,null);
+});
+
+test('duplicate-command suppression cannot bypass a pending assertion correction proposal',async t=>{
+ const check={a:'shell',c:`node --input-type=module -e "import {collectItems} from './src/items.js';if(collectItems('ok',[1]).length!==0)throw Error('rejected_marker');"`};
+ const {result,prompts,requests}=await run(fixture(t),[EDIT,VERIFY,FOCUS,check,FOCUS,FOCUS],
+   {assertionGrounding:true,dedupeShell:true,groundingVerdictForPrompt:p=>p.includes('rejected_marker')?'revise':'grounded',correctionProposal:'const duplicateRecoveryProposal = true;'});
+ assert.ok(result.metrics.duplicateShellRejections>0,'must exercise the earlier duplicate guard');
+ assert.equal(result.metrics.assertionCorrectionAttempts,1);
+ assert.match(prompts[5],/duplicateRecoveryProposal/);
+ assert.match(prompts[5],/assertion recovery: current decision/);
+ assert.ok(requests[5].jsonSchema.properties.a.enum.includes('shell'),'a revised inline assertion must remain executable despite an exact-command duplicate');
+ assert.ok(requests[5].jsonSchema.properties.a.enum.includes('write_file'),'a corrective check edit remains available');
+ assert.equal(result.reachedDone,false);
+});
+
+for (const trajectory of ['rebuild', 'extension']) test(`rejected completion keeps corrective shell available and DONE masked until fresh coverage (${trajectory})`, async t => {
+  const fresh = {a:'shell',c:`node --input-type=module -e "import assert from 'node:assert/strict'; import {collectItems} from './src/items.js'; assert.deepEqual(collectItems('ok', [3,2]), [3,2]);"`};
+  const {result, requests} = await run(fixture(t), [EDIT, VERIFY, FOCUS, DONE,
+    VERIFY, VERIFY, VERIFY, fresh, DONE], {
+    assertionGrounding: true, dedupeShell: true, promptTrajectory: trajectory,
+    excludeActions: ['replace', 'query'],
+    groundingVerdictForPrompt: prompt => prompt.includes('COMPLETION COVERAGE REVIEW:') && !prompt.includes('[3,2]') ? 'revise' : 'grounded',
+  });
+  assert.equal(result.turns[2].shellExecution.exitCode, 0);
+  assert.match(result.turns[3].observation, /Completion deferred/);
+  for (const index of [4, 5, 6, 7]) {
+    const allowed = requests[index].jsonSchema.properties.a.enum;
+    assert.ok(allowed.includes('shell'), `turn ${index}: new inline evidence must remain available`);
+    for (const forbidden of ['done', 'respond', 'replace', 'query']) assert.ok(!allowed.includes(forbidden), `${index}: ${forbidden}`);
+  }
+  for (const index of [4, 5, 6]) {
+    assert.equal(result.turns[index].shellExecution ?? null, null, 'duplicate refusal still prevents another execution');
+    assert.match(result.turns[index].observation, /assertion recovery: current decision/);
+    assert.doesNotMatch(result.turns[index].observation, /mark it done|respond now|Either respond/);
+  }
+  assert.equal(result.turns[7].shellExecution.exitCode, 0, 'changed evidence comes from a real process');
+  assert.ok(requests[8].jsonSchema.properties.a.enum.includes('done'), 'new successful assertion permits a new completion review');
+  assert.equal(result.metrics.assertionGroundingReviews, 4, 'both focused checks and both different coverage bundles are reviewed');
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
+});
+
+for (const admission of ['grounded', 'revise']) test(`a fresh ${admission === 'grounded' ? 'failed' : 'unexecuted'} check cannot reopen rejected completion`, async t => {
+  const failed = {a:'shell',c:`node --input-type=module -e "import assert from 'node:assert/strict'; import {collectItems} from './src/items.js'; assert.deepEqual(collectItems('ok', [3,2]), []);"`};
+  const {result, requests} = await run(fixture(t), [EDIT, VERIFY, FOCUS, DONE,
+    failed, {a:'read_file',p:'src/items.js'}], {assertionGrounding:true, coverageVerdict:'revise',
+    groundingVerdictForPrompt: prompt => prompt.includes('[3,2]') ? admission : undefined});
+  if (admission === 'grounded') assert.equal(result.turns[4].shellExecution.exitCode, 1);
+  else assert.equal(result.turns[4].shellExecution ?? null, null);
+  for (const index of [4, 5]) for (const verb of ['done','respond']) {
+    assert.ok(!requests[index].jsonSchema.properties.a.enum.includes(verb));
+  }
+  assert.equal(result.reachedDone, false);
+});
+
+test('replaying the same successful assertion changes receipts but cannot reopen rejected completion', async t => {
+  const {result, requests} = await run(fixture(t), [EDIT, VERIFY, FOCUS, DONE,
+    FOCUS, {a:'read_file',p:'src/items.js'}], {assertionGrounding:true, coverageVerdict:'revise', dedupeShell:false});
+  assert.equal(result.turns[4].shellExecution.exitCode, 0, 'fixture exercises a real second execution');
+  assert.equal(result.metrics.assertionGroundingReviews, 2, 'new receipt does not reroll either review');
+  for (const index of [4, 5]) for (const verb of ['done','respond']) {
+    assert.ok(!requests[index].jsonSchema.properties.a.enum.includes(verb));
+  }
+  assert.equal(result.reachedDone, false);
+});
+
+test('identical check source at different paths is distinct executed coverage', async t => {
+  const workspace = fixture(t);
+  const source = "import assert from 'node:assert/strict'; import {collectItems} from './items.js'; assert.deepEqual(collectItems('ok', [2,1]), [2,1]);\n";
+  for (const directory of ['evidence-one', 'evidence-two']) {
+    fs.mkdirSync(path.join(workspace, directory));
+    fs.writeFileSync(path.join(workspace, directory, 'check-contract.mjs'), source);
+    // The same relative import resolves to two different module paths.
+    fs.writeFileSync(path.join(workspace, directory, 'items.js'), GOOD);
+  }
+  const first = {a:'shell',c:'node evidence-one/check-contract.mjs'};
+  const second = {a:'shell',c:'node evidence-two/check-contract.mjs'};
+  const events = [];
+  const {result, requests} = await run(workspace, [EDIT, VERIFY, first, DONE, second, DONE], {
+    assertionGrounding:true, onEvent:event=>events.push(event),
+    groundingVerdictForPrompt: prompt => prompt.includes('COMPLETION COVERAGE REVIEW:') && !prompt.includes(second.c) ? 'revise' : 'grounded',
+  });
+  assert.match(result.turns[3].observation, /Completion deferred/);
+  assert.ok(!requests[4].jsonSchema.properties.a.enum.includes('done'));
+  assert.equal(result.turns[4].shellExecution.exitCode, 0, 'the second path actually executes');
+  assert.ok(requests[5].jsonSchema.properties.a.enum.includes('done'), 'a distinct invocation permits fresh review');
+  const reviews = events.filter(event=>event.type==='assertion_grounding' && event.phase==='completion');
+  assert.equal(reviews.length, 2);
+  const firstCheck = reviews[1].checks.find(check=>check.command===first.c);
+  const secondCheck = reviews[1].checks.find(check=>check.command===second.c);
+  assert.equal(firstCheck.assertion, secondCheck.assertion, 'source text alone cannot distinguish these receipts');
+  assert.equal(result.reachedDone, true, result.turns.at(-1).observation);
 });
 
 test("grammar-free or disobedient DONE still reaches the unchanged evidence gate", async t => {

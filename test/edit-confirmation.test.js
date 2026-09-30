@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {Executor} from '../src/executor.js';
-import {runAgent} from '../src/agent.js';
+import {runAgent,autoEditCommitNote} from '../src/agent.js';
 import {parseAction} from '../src/actions.js';
 import {actionGrammar,actionJsonSchema} from '../src/grammar.js';
 import {buildArtifact} from '../src/artifact.js';
@@ -13,11 +13,24 @@ import {RunCheckpoint} from '../src/run-checkpoint.js';
 const before='export function report(xs) { const out = [...xs]; out.sort(); return out; }\n';
 const after='export function report(xs) { const out = [...xs]; return out; }\nfunction cli() { console.log("ready"); }\n';
 const proposal={a:'write_file',p:'source.mjs',content:after};
+const replaceProposal={a:'replace',p:'source.mjs',old:before,new:after};
 const batchProposal={a:'write_batch',files:[
  {p:'source.mjs',content:after},
  {p:'new/nested/check.mjs',content:'export const ready = true;\n'},
 ]};
 const receipt=text=>JSON.parse(String(text).match(/\{"a":"confirm_edit","id":"[a-f0-9]+"\}/)?.[0]??'null');
+test('commit pressure preserves the pending review decision instead of demanding another rewrite',()=>{
+ const action=JSON.stringify({a:'confirm_edit',id:'a'.repeat(64)});
+ const refused={editApplied:false,observation:`[edit-confirmation] To accept this reviewed write, use ${action}.`};
+ for(const extension of [false,true]){
+  const note=autoEditCommitNote([refused],extension);
+  assert.ok(note.includes(action));
+  assert.doesNotMatch(note,/Write your first real implementation NOW/);
+  assert.match(note,/If the proposal was wrong/);
+  assert.match(autoEditCommitNote([{...refused,editApplied:true}],extension),/Write your first real implementation NOW/);
+  assert.match(autoEditCommitNote([refused,{observation:'unrelated'}],extension),/Write your first real implementation NOW/);
+ }
+});
 function fixture(t){
  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-confirm-edit-'));
  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
@@ -28,6 +41,8 @@ function fixture(t){
 test('a receipt applies exactly the reviewed source once without regenerated content',async t=>{
  const {workspace,executor}=fixture(t),first=await executor.execute(proposal),confirm=receipt(first.observation);
  assert.ok(confirm);assert.equal(first.editOutcome.applied,false);
+ assert.doesNotMatch(first.observation,/reissue the identical edit/);
+ assert.match(first.observation,/Submit a different edit only to correct the proposal/);
  assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),before);
  assert.deepEqual(parseAction(JSON.stringify(confirm)).action,confirm);
  const applied=await executor.execute(confirm);
@@ -42,6 +57,18 @@ test('a changed target invalidates a receipt before it can overwrite newer work'
  const updated=before+'// newer operator work\n';fs.writeFileSync(path.join(workspace,'source.mjs'),updated);
  assert.match((await executor.execute(confirm)).observation,/Stale edit confirmation/);
  assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),updated);
+});
+
+test('a refused replacement can confirm retained exact anchors and replacement bytes',async t=>{
+ const {workspace,executor}=fixture(t);
+ const refused=await executor.execute(replaceProposal),confirm=receipt(refused.observation);
+ assert.ok(confirm,refused.observation);
+ assert.equal(refused.editOutcome.applied,false);
+ assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),before);
+ assert.deepEqual(executor._reviewedWrites.get(confirm.id).action,replaceProposal);
+ const applied=await executor.execute(confirm);
+ assert.equal(applied.editOutcome.applied,true,applied.observation);
+ assert.equal(fs.readFileSync(path.join(workspace,'source.mjs'),'utf8'),after);
 });
 
 test('a batch receipt commits the exact existing and new files without staging during review',async t=>{
@@ -155,16 +182,17 @@ test('receipt syntax is opt-in and its compact shape is shared by grammar and va
  assert.equal(parseAction('{"a":"confirm_edit"}').ok,false);
 });
 
-for(const proposed of [proposal,batchProposal])for(const blocked of [false,true])test(`agent keeps ordinary edit guards and compact durable history (${proposed.a}, blocked=${blocked})`,async t=>{
+for(const codex of [false,true])for(const proposed of [proposal,batchProposal,replaceProposal])for(const blocked of [false,true])test(`agent keeps ordinary edit guards and compact durable history (codex=${codex}, ${proposed.a}, blocked=${blocked})`,async t=>{
  const {workspace}=fixture(t),prompts=[],checkpoint=new RunCheckpoint({autosaveEvery:0});let calls=0,deny=false;
- const model={codex:true,assistantPrefill:'',stop:[],async complete(prompt){
+ const model={codex,assistantPrefill:'',stop:[],async complete(prompt,settings){
   prompts.push(String(prompt));calls++;
+  if(!codex)assert.match(settings.grammar,/confirm_edit/,'local constrained decoding must expose receipt confirmation');
   const action=calls===1?proposed:calls===2?receipt(prompt):{a:'respond',text:'Reviewed.'};
   if(calls===2){assert.ok(action);deny=blocked;}
   return {content:JSON.stringify(action),tokens:1,stoppedEos:true,timings:{}};
  }};
  const options={workspace,model,task:'Update source.mjs.',interactive:true,maxTurns:3,
-  grounding:false,useGrammar:true,shellSandbox:'host',promptTrajectory:'extension',
+  grounding:false,useGrammar:true,shellSandbox:'host',promptTrajectory:codex?'extension':'rebuild',
   preGate:false,completionAudit:false,progressAwareness:false,regressionGuard:false,
   autoVerifyBlindEdits:0,autoVerifyProbes:0,autoVerifyStaleTurns:0,
   editGuard:()=>deny?'caller-protected':null,onEvent:e=>checkpoint.note(e)};
@@ -177,10 +205,10 @@ for(const proposed of [proposal,batchProposal])for(const blocked of [false,true]
  assert.deepEqual(checkpoint.turns()[1].editConfirmation,confirmed.editConfirmation);
  const film=buildArtifact({runId:'confirmation',stamp:'test',result,model:null});
  assert.deepEqual(film.turns[1].editConfirmation,confirmed.editConfirmation);
- assert.ok(prompts[2].startsWith(prompts[1]),'the provider prefix remains unchanged');
- const delta=prompts[2].slice(prompts[1].length);
+ if(codex)assert.ok(prompts[2].startsWith(prompts[1]),'the provider prefix remains unchanged');
+ const delta=codex?prompts[2].slice(prompts[1].length):prompts[2];
  assert.match(delta,/"a":"confirm_edit"/);
- assert.ok(!delta.includes(JSON.stringify(proposed)),'the confirmed body is not retransmitted');
+ if(codex)assert.ok(!delta.includes(JSON.stringify(proposed)),'the confirmed body is not retransmitted');
  await runAgent({...options,maxTurns:1,resumeTurns:film.turns.slice(0,2)});
  assert.match(prompts.at(-1),/"a":"confirm_edit"/);
 });

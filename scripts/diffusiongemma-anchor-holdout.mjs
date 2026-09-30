@@ -87,7 +87,6 @@ async function ask(records) {
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "function", function: tool }],
       tool_choice: { type: "function", function: { name: tool.name } },
-      temperature: 0.3,
       max_tokens: 256,
       chat_template_kwargs: { enable_thinking: false },
     }),

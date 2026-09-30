@@ -32,17 +32,48 @@ test("a newer failed or inconclusive execution suppresses an older hypothesis", 
   assert.match(formatWorkingNoteReanchor(state, { recoveryEvidence: { turn: 7, status: "fail" } }), /model hypothesis/);
 });
 
-test("missing focused execution suppresses a newer private success claim without rewriting history", () => {
+test("missing focused execution retains a newer hypothesis without promoting a private success claim", () => {
   const claimed = { ...state, workingNote: { turn: 57,
     text: "FINAL_WITNESS_PASSED means verification is complete. Emit done." } };
   const before = structuredClone(claimed);
   const pending = { turn: 13, generation: 3, needsFocused: true, needsProject: true };
   assert.match(formatWorkingNoteReanchor(claimed, { recoveryEvidence: pending }), /FINAL_WITNESS_PASSED/);
-  assert.equal(formatWorkingNoteReanchor(claimed, { recoveryEvidence: pending, pendingVerification: pending }), "");
+  const retained = formatWorkingNoteReanchor(claimed, { recoveryEvidence: pending, pendingVerification: pending });
+  assert.match(retained, /FINAL_WITNESS_PASSED/);
+  assert.match(retained, /disputed-check continuity/);
+  assert.match(retained, /does not establish PASS, invalidate a test, or authorize DONE/);
+  assert.match(retained, /focused execution remains unresolved/);
   assert.deepEqual(claimed, before, "the immutable reasoning remains auditable");
   assert.match(formatWorkingNoteReanchor(claimed, { pendingVerification: { needsFocused: false, needsProject: true } }),
-    /model hypothesis/, "only the specifically missing focused obligation triggers this suppression");
+    /model hypothesis/, "ordinary hypothesis behavior remains outside focused recovery");
   assert.match(formatWorkingNoteReanchor(claimed, { pendingVerification: null }), /model hypothesis/);
+});
+
+test("a same-turn configured PASS cannot erase a newer disputed-test hypothesis", () => {
+  const corrected = { ...state, workingNote: { turn: 15,
+    text: "The expected bytes in my reset assertion are wrong; reset must produce empty bytes. Correct that check and execute it." },
+    lastVerdict: { turn: 15, result: "pass" } };
+  const pending = { turn: 14, generation: 3, needsFocused: true, needsProject: true };
+  const retained = formatWorkingNoteReanchor(corrected, {
+    retireAfterVerifiedPass: true, recoveryEvidence: pending, pendingVerification: pending,
+  });
+  assert.match(retained, /expected bytes in my reset assertion are wrong/);
+  assert.match(retained, /^\[working-checkpoint/);
+  assert.match(retained, /model hypothesis, NOT verified evidence/);
+  assert.match(retained, /configured project PASS does not resolve/);
+  assert.equal(pending.needsFocused, true);
+});
+
+test("pending-check continuity still rejects stale notes, current configured failure and unbounded carry", () => {
+  const pending = { turn: 7, needsFocused: true, needsProject: true };
+  const opts = { pendingVerification: pending, recoveryEvidence: pending };
+  assert.equal(formatWorkingNoteReanchor(state, { ...opts, recoveryEvidence: { turn: 8 } }), "");
+  assert.equal(formatWorkingNoteReanchor(state, { ...opts, suppressDuringCurrentFailure: true }), "");
+  assert.equal(formatWorkingNoteReanchor({ ...state, editsSinceWorkingNote: 5 }, opts), "");
+  assert.equal(formatWorkingNoteReanchor({ ...state, lastEdit: null }, { ...opts, suppressBeforeFirstEdit: true }), "");
+  const bounded = formatWorkingNoteReanchor({ ...state,
+    workingNote: { turn: 8, text: "x".repeat(10000) } }, opts);
+  assert.ok(bounded.length < 2200, "continuity is a bounded note, not another transcript");
 });
 
 test("a PASS before the latest edit cannot retire the checkpoint", () => {

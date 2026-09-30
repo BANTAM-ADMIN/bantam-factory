@@ -825,7 +825,7 @@ describe('prompt-resident source recovery', () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-output-limit-format-'));
     t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
     const prompts = [];
-    const model = { nPredict: 8192, assistantPrefill: '', actTemperature: null,
+    const model = { nPredict: 8192, assistantPrefill: '', actTemperature: null, chatDialect: true,
       async complete(prompt) {
         prompts.push(String(prompt));
         return prompts.length === 1

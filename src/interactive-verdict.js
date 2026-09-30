@@ -9,6 +9,7 @@ export function classifyInteractiveResult(result) {
 
   if (res.interrupted) return verdict("interrupted", res, { externallyVerified: false });
   if (res.blocked) return verdict("blocked", res, { externallyVerified: false });
+  if (res.modelFailure) return verdict("model_error", res, { externallyVerified: false });
   if (verification?.status === "fail") {
     return verdict("verification_failed", res, { externallyVerified: false });
   }

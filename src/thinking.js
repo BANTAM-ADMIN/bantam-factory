@@ -152,6 +152,7 @@ export function shouldThink(mode, ctx = {}) {
   const lean = typeof ctx.lean === "boolean" ? ctx.lean : flag(env.BANTAM_THINK_LEAN);
   const trim = typeof ctx.trim === "boolean" ? ctx.trim : flag(env.BANTAM_THINK_TRIM);
   if (ctx.lastWasInvalid) return true;                  // a repair attempt — reason about the miss
+  if (ctx.assertionRecovery) return true;               // an unexecuted check needs reconsideration, not blind replay
   if (ctx.preEditSynthesis) return true;                // source is now present; synthesize before first mutation
   if (ctx.inspectionCheckpoint) return true;            // reconcile a long inspection sequence with its milestone
   if (ctx.lastObservation && COMPLETION_AUDIT_RE.test(ctx.lastObservation)) return true;

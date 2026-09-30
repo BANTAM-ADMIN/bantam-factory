@@ -73,6 +73,9 @@ test("a failed focused command survives unrelated green diagnostics and broad ve
   const failure = latestUnresolvedFocusedFailure(turns, reminderOptions);
   assert.deepEqual(failure, { command, generation: 6, turn: 0, exitCode: 1, historical: false });
   assert.match(focusedFailureReminder(failure), /different green command or printed diagnostic does not show this check passed/);
+  assert.match(focusedFailureReminder(failure), /Validate the fixture and expected value against the public contract/);
+  assert.match(focusedFailureReminder(failure), /model approval is fallible/);
+  assert.match(focusedFailureReminder(failure), /do not bend correct production code/);
   assert.equal(latestUnresolvedFocusedFailure([...turns, reminderTurn(3, [reminderEntry(command)])], reminderOptions), null);
   assert.equal(latestUnresolvedFocusedFailure([{ ...reminderEntry(command, 1) }], reminderOptions)?.command, command,
     "fully bound legacy execution remains readable without inventing an envelope");

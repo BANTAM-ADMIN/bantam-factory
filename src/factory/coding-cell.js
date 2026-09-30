@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { runAgent } from "../agent.js";
+import { normalizeThinkMode } from "../thinking.js";
 import { writeJsonAtomic } from "../atomic-file.js";
 import { wasControllerStopped } from "../controller-stop.js";
 import { ModelClient } from "../model.js";
@@ -80,10 +81,14 @@ export async function runFactoryCodingCell({
   task,
   verificationScript,
   focusedVerificationScript = null,
+  copyPreservationStation = process.env.BANTAM_COPY_PRESERVATION_STATION ?? 'auto',
+  probeEnabled = process.env.BANTAM_PROBE === undefined
+    ? true : /^(?:1|true|yes|on)$/i.test(String(process.env.BANTAM_PROBE)),
   root = null,
   jobId = null,
   model = undefined,
   maxTurns = 30,
+  thinkMode = 'auto',
   verificationTimeoutMs = 120_000,
   shellSandbox = process.env.BANTAM_SHELL_SANDBOX ?? "docker",
   shellNetwork = undefined,
@@ -142,7 +147,17 @@ export async function runFactoryCodingCell({
           workspace: candidateWorkspace,
           ...(workerModel === undefined ? {} : { model: workerModel }),
           maxTurns,
-          verificationScript: optionalString(focusedVerificationScript),
+          // Match the normal CLI's critical-boundary reasoning default.
+          // The lower-level agent intentionally defaults off for embedders;
+          // Factory must forward its worker policy instead of inheriting that.
+          thinkMode: normalizeThinkMode(thinkMode),
+          // Without this fallback the worker cannot distinguish the supplied
+          // suite from a new focused assertion, and audit recovery can accept
+          // the same old suite as evidence for an untested review finding.
+          verificationScript: optionalString(focusedVerificationScript) ?? finalVerifier,
+          assertionGrounding: true,
+          copyPreservationStation,
+          probeEnabled,
           verificationTimeoutMs,
           shellSandbox, shellNetwork, dockerImage, shellProcessRunner,
           signal,

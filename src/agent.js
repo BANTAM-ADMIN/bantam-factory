@@ -20,6 +20,7 @@ import { formatTypeContractSmoke } from "./logic/type-contract-smoke.js";
 import { numericContractWitness, formatNumericContractWitness } from "./logic/numeric-contract-witness.js";
 import { GATE_ENGAGEMENT_METRIC } from "./logic/gate-engagement.js";
 import { ModelClient, modelOutputTokenCap } from "./model.js";
+import { canResumeWriteFile, resumableWriteFilePrefix } from "./output-limit-continuation.js";
 import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
 import { trustedReviewEvidenceEnd } from "./run-continuation.js";
@@ -38,8 +39,12 @@ import { latestVerificationRecovery, verificationRecoveryNote, latestUnresolvedF
 import { terminalClosureAllowance, terminalClosureEligible, terminalClosureNote, wallClosureDue } from "./terminal-closure.js";
 import { createTestProvenance } from "./test-provenance.js";
 import { priorDiagnosisFollowup } from "./diagnosis-evidence.js";
-import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit } from "./contract-state-audit.js";
-import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, sameAuditCommand, existingFocusedCheck, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
+import { contractStateAuditEnabled, collectionContractAuditApplies, collectContractAuditSources, runContractStateAudit, formatContractStateAudit, collectionReviewScope } from "./contract-state-audit.js";
+import { assertionInput, reviewAssertionGrounding, inlineThrowCheck, coverageAssertions, updateAssertionRecovery, assertionRecoveryText, proposeAssertionCorrection, publicRequirementQuote } from "./assertion-grounding.js";
+import { failedAssertionSite } from "./failed-assertion-site.js";
+import { wordsForDirectCommand } from "./verification-command.js";
+import { permitsWholeAssertionCoverage } from "./assertion-execution-scope.js";
+import { pendingContractAudit, currentFocusedAuditWitness, contractAuditRecoveryNote, isFocusedAuditCommand, isConfiguredAuditCommand, canonicalAuditCommand, sameAuditCommand, existingFocusedCheck, VERIFICATION_RECEIPTS_SCHEMA } from "./contract-audit-recovery.js";
 import { contractAuditMeasuredFacts } from "./contract-audit-measured-facts.js";
 import { contractAuditPhaseState, contractAuditDecisionContext } from "./contract-audit-phase.js";
 import { compoundAuditCleanupRefusal, filteredAuditCheckRefusal } from "./contract-audit-workflow.js";
@@ -49,6 +54,7 @@ import { collectObjectConstructionFacts, formatObjectConstructionFacts } from ".
 import { directNodeCheckScript, nodeCheckSelfSpawnRefusal } from "./node-check-self-spawn.js";
 import { runContractAssertionStation, formatContractAssertionStation } from "./contract-assertion-station.js";
 import { streamObligations, runStreamObligationStation, streamObligationDecision } from "./stream-obligation-station.js";
+import { captureCopyInterfaceDocuments, copyPreservationApplies, runCopyPreservationStation, copyPreservationDecision } from "./copy-preservation-station.js";
 import { deriveCliContract } from "./contract-cli-assertion-spec.js";
 import { runContractCliStation, formatContractCliStation, createCliProposalCache } from "./contract-cli-station.js";
 import { cliVerificationPassed, cliVerificationDecisionContext } from "./contract-cli-verification.js";
@@ -60,6 +66,7 @@ import { detectSiblings } from "./logic/completeness-critic.js";
 import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-anchors.js";
 import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, testFailureDetail, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
+import { localLlmEndpoint } from "./local-llm-bridge.js";
 import { buildPrompt, clipKeepingControllerAnnotation, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
 import { clipReadObservation } from "./read-observation.js";
 import { recordPagingWindow } from "./read-paging.js";
@@ -158,6 +165,7 @@ import {
   WRITE_BATCH_FEATURE,
   LINE_EDIT_FEATURE,
   PROBE_ACTION_FEATURE,
+  JEV_DECIDE_FEATURE,
   EDIT_CONFIRMATION_FEATURE,
 } from "./action-protocol.js";
 import { decidePatchAction } from "./patch-policy.js";
@@ -226,7 +234,7 @@ import { asyncAssertionGuard } from "./async-test-guard.js";
 import { immutableViolations } from "./logic/self-check.js";
 import { buildGrounding, codeMap, groundAction, refreshGrounding } from "./logic/grounding.js";
 import { scopedVerifyPlan } from "./logic/scoped-verify.js";
-import { buildToolRegistry, historyTool } from "./logic/tools.js";
+import { ToolRegistry, buildToolRegistry, historyTool, registerImageGenerationTools } from "./logic/tools.js";
 import { recordTurns, repositoryQueryTool, stateAsOf } from "./logic/runlog.js";
 import { deriveExecutionStateShadow } from "./logic/execution-state-shadow.js";
 import {
@@ -293,6 +301,13 @@ const AUTO_EDIT_NOTE = "[commit] You have investigated enough — reading and sh
 // Extension trajectory renders no <open_files> panel; the model's own reads in
 // history are the source of truth, so the commit nudge points there instead.
 const AUTO_EDIT_NOTE_EXTENSION = "[commit] You have investigated enough — reading and shell are now disabled. Write your first real implementation NOW with write_file or replace, using the file contents already shown in your reads above. A rough first version is progress: make the edit, then run the tests and iterate on the failures. Do NOT respond with a plan or say you need to read more.";
+export function autoEditCommitNote(turns, extension = false) {
+  const previous = turns.at(-1);
+  const receipt = previous?.editApplied === false && String(previous.observation ?? "")
+    .match(/\[edit-confirmation\] To accept this reviewed write, use (\{"a":"confirm_edit","id":"[a-f0-9]{64}"\})/);
+  if (receipt) return `[commit] Your last write was staged for review, NOT applied. To accept those exact proposed bytes, use ${receipt[1]}. Do not regenerate an intentional proposal to confirm it. If the proposal was wrong, submit a corrected edit instead. Confirmation is an explicit edit decision, not proof of correctness; verification is still required after the edit lands.`;
+  return extension ? AUTO_EDIT_NOTE_EXTENSION : AUTO_EDIT_NOTE;
+}
 // Source-code extensions. A shell command that rewrites one of these (and isn't touching generated
 // output) is a real code edit the completion gates must account for — see the shell-mutation guard.
 const SOURCE_EXT_RE = /\.(?:js|mjs|cjs|jsx|ts|tsx|mts|cts|py|go|rs|rb|java|kt|c|cc|cpp|cxx|h|hpp|hh|cs|php|swift|scala|m|mm|sh|sql)$/i;
@@ -672,6 +687,8 @@ async function runAgentCore({
   stateAudit = process.env.BANTAM_STATE_AUDIT ?? (extraModelStationsEnabled(model) ? "auto" : "off"),
   contractStateAudit = process.env.BANTAM_CONTRACT_STATE_AUDIT ?? (extraModelStationsEnabled(model) ? "auto" : "off"),
   contractAssertionStation = process.env.BANTAM_CONTRACT_ASSERTION_STATION ?? "off",
+  copyPreservationStation = process.env.BANTAM_COPY_PRESERVATION_STATION ?? "off",
+  assertionGrounding = false,
   // Two bounded objections prevent an immediate second-done bypass while the
   // global turn budget remains a hard escape from a heuristic audit.
   stateAuditMaxDeferrals = positiveInt(process.env.BANTAM_STATE_AUDIT_MAX_DEFERRALS, 2),
@@ -701,6 +718,8 @@ async function runAgentCore({
     model?.codex === true || model?.codexBacked === true ? 24000 : 4000),
   // Candidate fixture experiments remain opt-in until downstream qualification.
   probeEnabled = envTruthy(process.env.BANTAM_PROBE),
+  // Jev mode's decide tool (src/jev/commands.js jevDecideTool): null keeps the verb out of the grammar.
+  jevDecide = null,
   // Direct delete/move actions only for tasks that explicitly name those file
   // operations. A balanced local-Qwen A/B preserved 8/8 strict passes, used
   // both verbs with zero failures, and reduced summed task time by 3.1%.
@@ -762,6 +781,7 @@ async function runAgentCore({
   groundingMap = false,
   // Extra {name,describe,answer} tools to register on the query socket.
   extraTools = null,
+  imageJobs = null,
   // Live control (interactive): signal cancels in-flight model/shell work, while
   // shouldAbort() preserves the older between-turn callback API;
   // drainInjections() returns any messages the user typed mid-run so the model can adjust
@@ -862,8 +882,10 @@ async function runAgentCore({
   // replayed byte-for-byte; the rebuild panel re-renders history anyway.
   const bareHistory = extensionTrajectory && Boolean(extensionBareHistory);
   const lineEditEnabled = /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_LINE_EDIT ?? ""));
-  const editConfirmations = (model?.codex === true || model?.codexBacked === true)
-    && process.env.BANTAM_EDIT_CONFIRMATION !== "0";
+  // Exact-byte replay is a harness capability, not a provider capability.
+  // Local models must be able to confirm retained proposals too: regenerating
+  // a large refused rewrite can change its identity and restart review forever.
+  const editConfirmations = process.env.BANTAM_EDIT_CONFIRMATION !== "0";
   const baseActionFeatures = [
     ...(editConfirmations ? [EDIT_CONFIRMATION_FEATURE] : []),
     ...(lineEditEnabled ? [LINE_EDIT_FEATURE] : []),
@@ -871,6 +893,7 @@ async function runAgentCore({
     ...(writeBatch ? [WRITE_BATCH_FEATURE] : []),
     ...(fileOperationPolicy.enabled ? [FILE_OPS_FEATURE] : []),
     ...(probeEnabled ? [PROBE_ACTION_FEATURE] : []),
+    ...(jevDecide ? [JEV_DECIDE_FEATURE] : []),
   ];
   // Codex places the response schema before conversation history. Changing a
   // per-turn grammar mask there invalidates the cached prefix for the entire
@@ -913,11 +936,14 @@ async function runAgentCore({
     readOnlyWorkspacePaths = [...new Set([...(readOnlyWorkspacePaths ?? []),
       ...instructionGuards.protectedExistingTests])];
   }
+  const shellLlmEndpoint = localLlmEndpoint(model);
   const exec = new Executor(workspace, {
+    localLlm: shellLlmEndpoint ? { endpoint: shellLlmEndpoint, apiKey: model.apiKey } : null,
     editConfirmations,
     fixtureDefaultHints,
     inspectMaxChars: readObservationMaxChars,
     probeEnabled,
+    jevDecide,
     noopEditGuard,
     shellSandbox,
     shellNetwork,
@@ -949,7 +975,16 @@ async function runAgentCore({
       .slice(0, 4).map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.truncated === true || document.text.length > 12000 }))
     : uneditedTaskSpecDocuments(task, [], exec).slice(0, 4)
       .map((document) => ({ path: document.path, text: document.text.slice(0, 12000), truncated: document.text.length > 12000 }));
-  const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments,
+  // Freeze explicitly supplied interface examples before the worker can edit
+  // them. Candidate-authored tests are never new public-contract authority.
+  const copyInterfaceDocuments = resumingContext
+    ? (Array.isArray(savedContextBasis?.copyInterfaceDocuments) ? savedContextBasis.copyInterfaceDocuments : [])
+      .filter(document => typeof document?.path === 'string' && typeof document?.text === 'string')
+      .slice(0, 2).map(document => ({ path: document.path, text: document.text.slice(0, 12000),
+        truncated: document.truncated === true || document.text.length > 12000 }))
+    : captureCopyInterfaceDocuments(task, relative => exec.safeReadText(exec.resolveExisting(relative)));
+  const copyTaskDocuments = [...suppliedTaskDocuments, ...copyInterfaceDocuments];
+  const contextBasis = { schema: 1, testProvenance: testProvenance.snapshot(), suppliedTaskDocuments, copyInterfaceDocuments,
     verificationOutputDirs: declaredVerificationOutputs,
     ...(instructionGuards.inheritedScope ? { inheritedInstructionScope: instructionGuards.inheritedScope } : {}),
     ...(instructionGuards.frozenTestCheckpoint ? { frozenTests: instructionGuards.frozenTestCheckpoint } : {}) };
@@ -1017,7 +1052,8 @@ async function runAgentCore({
     : { underSpecified: false, functions: [] };
   const specGap = specGapInfo.underSpecified;
   if (specGap) onEvent({ type: "spec_gap", detail: formatSpecGap(specGapInfo), functions: specGapInfo.functions });
-  const tools = ground ? buildToolRegistry(ground, {
+  const toolOptions = {
+    model, imageJobs, interactive,
     endpoint: model?.endpoint,
     task,
     visualTask,
@@ -1027,7 +1063,15 @@ async function runAgentCore({
     codexEffort: model?.codexToolIdentity?.effort ?? model?.codexEffort,
     signal,
     onExternalUsage: (usage, meta) => model?.recordExternalUsage?.(usage, meta),
-  }) : null;
+  };
+  // Image generation does not need a repository index. Without this separate
+  // path, a huge workspace disabled its KB and silently took generate_image
+  // away, leaving the model to invent brittle shell/API commands instead.
+  const tools = ground ? buildToolRegistry(ground, toolOptions) : (() => {
+    const registry = new ToolRegistry();
+    registerImageGenerationTools(registry, workspace, toolOptions);
+    return registry.list().length ? registry : null;
+  })();
   // The history tool reads the LIVE trajectory (`turns` is declared below; the closure defers to
   // query time, so it always reflects the current run).
   if (tools) tools.register(historyTool(() => turns));
@@ -1054,8 +1098,11 @@ async function runAgentCore({
   // source-file floor, which is the same territory where seam-first integration pays.
   const seamSteer = decideSeamSteer(task, { largeRepo: Boolean(tools?.get("map")) });
   const seamNudge = seamSteer.enabled ? SEAM_STEER_TIP : "";
+  const imageNudge = tools?.get("generate_image")
+    ? "\nWhen the operator asks to create or generate an image, use `query generate_image <their prompt>` immediately. Do not write a workflow, launch ComfyUI, or call its HTTP API through shell; the image provider owns that work."
+    : "";
   const toolsText = tools
-    ? `You can ask local retrieval and reasoning tools with the "query" action instead of reading/searching blindly. Structural tools return exact facts; ranked tools label their evidence. Menu:\n${tools.describe()}${mapNudge}${seamNudge}`
+    ? `You can ask local retrieval and reasoning tools with the "query" action instead of reading/searching blindly. Structural tools return exact facts; ranked tools label their evidence. Menu:\n${tools.describe()}${mapNudge}${seamNudge}${imageNudge}`
     : "";
   let map = (ground && groundingMap) ? codeMap(ground) : "";
   // Name the verification command. The harness runs it for the model
@@ -1097,6 +1144,11 @@ async function runAgentCore({
     && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? 'docker') === 'docker'
     && !callerExcludedActions.includes('probe') && !callerExcludedActions.includes('shell')
     && streamObligations(task).length > 0;
+  const copyStationEnabled = !/^(?:0|false|no|off)$/i.test(String(copyPreservationStation))
+    && !interactive && !advisoryMode && probeEnabled && Boolean(verificationScript)
+    && (shellSandbox ?? process.env.BANTAM_SHELL_SANDBOX ?? 'docker') === 'docker'
+    && !callerExcludedActions.includes('probe') && !callerExcludedActions.includes('shell')
+    && copyPreservationApplies(task, copyTaskDocuments);
   if (cliContract) {
     env += `\n[public CLI verification] ${cliContract.module} has a separate required process contract. After an authored edit, green verification or proposed completion, the controller can compare the real CLI with this module's own exported function on the same bounded input. This checks wiring and explicitly documented argument errors, not whether the function's answer is correct. Independent correctness tests remain required. API-only assertions and printed statuses cannot discharge this CLI obligation.\n`;
     onEvent({ type: "cli_contract", contract: structuredClone(cliContract) });
@@ -1194,11 +1246,13 @@ async function runAgentCore({
         ...(t.stateAudit ? { stateAudit: { ...t.stateAudit } } : {}),
         ...(t.contractStateAudit ? { contractStateAudit: { ...t.contractStateAudit } } : {}),
         ...(t.repairHandoff ? { repairHandoff: structuredClone(t.repairHandoff) } : {}),
+        ...(t.failedAssertionReview ? { failedAssertionReview: structuredClone(t.failedAssertionReview) } : {}),
         ...(t.contractAssertion ? { contractAssertion: structuredClone(t.contractAssertion) } : {}),
         ...(t.verificationWorkflow ? { verificationWorkflow: structuredClone(t.verificationWorkflow) } : {}),
         ...(t.requiredReadHistory ? { requiredReadHistory: structuredClone(t.requiredReadHistory) } : {}),
         ...(t.cliVerification ? { cliVerification: structuredClone(t.cliVerification) } : {}),
         ...(t.streamVerification ? { streamVerification: structuredClone(t.streamVerification) } : {}),
+        ...(t.copyVerification ? { copyVerification: structuredClone(t.copyVerification) } : {}),
         ...(t.contextBasis ? { contextBasis: t.contextBasis } : {}),
         ...(Object.hasOwn(t, "contextUpdates") ? { contextUpdates: structuredClone(t.contextUpdates) } : {}),
         ...(t.workspaceCoherence ? {
@@ -1409,6 +1463,7 @@ async function runAgentCore({
     writeBatchEnabled: Boolean(writeBatch),
     probeEnabled: Boolean(probeEnabled),
     contractAssertionStationEnabled: assertionStationEnabled,
+    copyPreservationStationEnabled: copyStationEnabled,
     cliVerificationEnabled: Boolean(cliContract),
     fileOperationPolicy,
     verificationPolicy,
@@ -1966,11 +2021,145 @@ async function runAgentCore({
   const priorAuthoredCheckPaths = [...new Set(turns.flatMap(turn =>
     turnEditApplied(turn) ? editPaths(turn.action ?? turn.parsedAction) : []))];
   let contractAudits = turns.filter((turn) => turn.contractStateAudit).length;
+  const assertionGroundingReviews = new Map();
+  const assertionCorrectionAttempts = new Set();
+  let assertionRecovery = [];
+  const assertionPublicBasisSha256 = crypto.createHash("sha256")
+    .update(JSON.stringify({ task, documents: suppliedTaskDocuments })).digest("hex");
+  const failedAssertionReviews = new Map(), rejectedAssertionBundles = new Map();
+  const failedAssertionBundleKey = captured => crypto.createHash("sha256")
+    .update(JSON.stringify([assertionPublicBasisSha256, captured.scriptIdentity, captured.sourceSha256])).digest("hex");
+  const failedAssertionSiteKey = (captured, site) => crypto.createHash("sha256")
+    .update(JSON.stringify([failedAssertionBundleKey(captured), site.start, site.end])).digest("hex");
+  // Resumed reviews can retain a negative expectation objection, never PASS.
+  // Require the original completed receipt and the entire captured script;
+  // model prose or a free-standing review is not enough to seed this cache.
+  for (const turn of turns) {
+    const record = turn.failedAssertionReview;
+    if (!validFailedAssertionReview(record, turn, assertionPublicBasisSha256)) continue;
+    if (record.bundleKey !== failedAssertionBundleKey(record)
+        || record.siteKey !== failedAssertionSiteKey(record, record.focusSite)) continue;
+    failedAssertionReviews.set(record.siteKey, record);
+    if (record.review.verdict === "revise" && record.review.authority === "assertion-site-only"
+        && record.review.executionEvidence === false
+        && record.review.assertionSha256 === record.sourceSha256
+        && publicRequirementQuote([task, ...suppliedTaskDocuments.map(document => document.text)].join("\n"), record.review.requirement)) {
+      rejectedAssertionBundles.set(record.bundleKey, record);
+      assertionRecovery = updateAssertionRecovery(assertionRecovery, { phase: "after-failed-execution",
+        generation: record.generation, command: record.command,
+        review: { ...record.review, executedFailure: true, failedAssertionKey: record.siteKey } });
+    }
+  }
+  let rejectedCompletionCoverage = null;
+  const currentCoverageAssertions = () => coverageAssertions(turns, workspaceEditGeneration,
+    relative => exec.safeReadText(exec.resolveExisting(relative)));
+  // Replaying a command or moving a receipt within the bundle is not fresh
+  // coverage. Bind the retry checkpoint to the source generation and the set
+  // of actually executed invocation/assertion pairs, never to a model summary
+  // or DONE. Identical scripts at different paths can import different modules.
+  const completionCoverageIdentity = checks => JSON.stringify([workspaceEditGeneration,
+    [...new Set(checks.map(check => JSON.stringify([
+      canonicalAuditCommand(check.command) ?? check.command, check.assertion,
+    ])))].sort()]);
+  let pendingAssertionCorrection = null, assertionRecoveryDecisions = 0;
+  const reviewGroundingCommand = async (command, phase, captured = null) => {
+    const read=relative => exec.safeReadText(exec.resolveExisting(relative));
+    const scope=phase==='completion'?'completion':'focused';
+    const checks=scope==='completion'?currentCoverageAssertions():null;
+    const assertion = checks ? (checks.length?JSON.stringify(checks):null) : captured?.assertion ?? (command ? assertionInput(command,read) : null);
+    const key = JSON.stringify([scope, workspaceEditGeneration, command, assertion]);
+    const rejected = scope === "focused" && captured ? rejectedAssertionBundles.get(failedAssertionBundleKey(captured)) : null;
+    let review = rejected ? { ...rejected.review, executedFailure: true, failedAssertionKey: rejected.siteKey,
+      cachedFailedAssertion: true, failedExecutionGeneration: rejected.generation } : assertionGroundingReviews.get(key);
+    if (!review) {
+      onEvent({ type: "activity", label: "reviewing assertion grounding" });
+      review = await reviewAssertionGrounding({ model, task, documents: suppliedTaskDocuments, assertion, scope, signal });
+      assertionGroundingReviews.set(key, review);
+      metrics.assertionGroundingReviews = (metrics.assertionGroundingReviews ?? 0) + 1;
+      metrics.assertionGroundingTokens = (metrics.assertionGroundingTokens ?? 0) + (review.tokens ?? 0);
+      metrics.assertionGroundingRetries = (metrics.assertionGroundingRetries ?? 0) + Math.max(0,(review.reviewAttempts?.length??1)-1);
+    }
+    onEvent({ type: "assertion_grounding", phase, generation: workspaceEditGeneration, command, ...(checks?{checks}:{}), review });
+    // Reviewer generation/transport exhaustion is not a bad assertion. Do not
+    // ask the worker to invent new evidence to unstick an unavailable reviewer.
+    if(review.reviewFailure?.schema===1&&review.reviewFailure.exhausted===true)return review;
+    if(scope==='focused')pendingAssertionCorrection=review.verdict==='grounded'?null:{
+      key: rejected ? `failed:${rejected.bundleKey}` : key, assertion,review,command };
+    if(scope==='completion')rejectedCompletionCoverage=review.verdict==='grounded'?null:completionCoverageIdentity(checks);
+    if(review.verdict==='grounded'&&(scope==='focused'||scope==='completion'))assertionRecoveryDecisions=0;
+    assertionRecovery = updateAssertionRecovery(assertionRecovery,{phase: rejected ? "after-failed-execution" : phase,
+      generation: rejected?.generation ?? workspaceEditGeneration,command,review});
+    return review;
+  };
+  const reviewFailedAssertion = async (captured, admission, execution, receipt) => {
+    if (!captured || admission?.verdict !== "grounded" || !completedFailedAssertionReceipt(receipt)
+        || receipt.generation !== captured.generation || receipt.command !== captured.command
+        || receipt.executedCommand !== captured.command || receipt.cwd !== exec.realWorkspace) return null;
+    if (captured.sourcePath) {
+      try {
+        if (exec.safeReadText(exec.resolveExisting(captured.sourcePath)) !== captured.assertion) return null;
+      } catch { return null; }
+    }
+    // Ordinary host and Docker workers both execute at the receipt's exact
+    // workspace path. Only isolated probes use /probe; they are not eligible.
+    const runtimePath = captured.sourcePath ? path.join(receipt.cwd, captured.sourcePath) : null;
+    const focusSite = failedAssertionSite({ assertion: captured.assertion,
+      output: String(execution.stdout ?? "") + "\n" + String(execution.stderr ?? ""), sourcePath: runtimePath });
+    if (!focusSite) return null;
+    if (captured.sourcePath && !["generated", "self-authored"].includes(testProvenance({
+      file: captured.sourcePath, line: focusSite.line,
+    }))) return null;
+    const bundleKey = failedAssertionBundleKey(captured), siteKey = failedAssertionSiteKey(captured, focusSite);
+    // Production-only edits cannot buy another judgment of identical script
+    // expectations. At most two distinct sites may spend this run's budget.
+    if (failedAssertionReviews.has(siteKey) || failedAssertionReviews.size >= 2) return null;
+    failedAssertionReviews.set(siteKey, null);
+    onEvent({ type: "activity", label: "reviewing failed assertion expectation" });
+    let review;
+    try {
+      review = await reviewAssertionGrounding({ model, task, documents: suppliedTaskDocuments,
+        assertion: captured.assertion, scope: "focused", focusSite, signal });
+    } catch (error) {
+      // The worker process has already completed. Cancellation of this
+      // optional review must not throw away its failed execution receipt.
+      if (signal?.aborted) markInterrupted("failed-assertion-review");
+      review = { verdict: "unknown", reason: `Targeted assertion review unavailable: ${String(error?.message ?? error).slice(0, 500)}`,
+        authority: "assertion-site-only", executionEvidence: false,
+        ...(signal?.aborted ? { interrupted: true } : {}) };
+    }
+    const record = { schema: "bantam.failed-assertion-review.v1", turn: turns.length,
+      generation: captured.generation, publicBasisSha256: assertionPublicBasisSha256,
+      command: captured.command, scriptIdentity: captured.scriptIdentity, sourcePath: captured.sourcePath,
+      sourceSha256: captured.sourceSha256, assertion: captured.assertion, focusSite, bundleKey, siteKey,
+      admissionPromptSha256: admission.promptSha256 ?? null, receiptSequence: 0,
+      execution: structuredClone(receipt), review, executionEvidence: false };
+    failedAssertionReviews.set(siteKey, record);
+    metrics.failedAssertionReviews = (metrics.failedAssertionReviews ?? 0) + 1;
+    metrics.failedAssertionReviewTokens = (metrics.failedAssertionReviewTokens ?? 0) + (review.tokens ?? 0);
+    if (review.verdict === "revise") {
+      rejectedAssertionBundles.set(bundleKey, record);
+      const objection = { ...review, executedFailure: true, failedAssertionKey: siteKey };
+      assertionRecovery = updateAssertionRecovery(assertionRecovery, { phase: "after-failed-execution",
+        generation: captured.generation, command: captured.command, review: objection });
+      pendingAssertionCorrection = { key: `failed:${bundleKey}`, assertion: captured.assertion,
+        review: objection, command: captured.command };
+    }
+    // A grounded site is NOT a grounded bundle and cannot clear recovery.
+    // Unknown/infrastructure failures remain advisory, not terminal blockers.
+    onEvent({ type: "failed_assertion_review", failedAssertionReview: structuredClone(record) });
+    return record;
+  };
+  const unavailableAssertionReviewer = review => review?.reviewFailure?.schema===1&&review.reviewFailure.exhausted===true
+    ? {done:true,summary:`Blocked: ${review.reason}`,observation:`[assertion-review-unavailable] ${review.reason} The bounded reviewer retry budget is exhausted; no source or assertion change is justified by this infrastructure failure.`,
+      controllerStop:{kind:'assertion-review-unavailable',reason:review.reason,scope:review.scope,
+        reviewFailure:review.reviewFailure,promptSha256:review.promptSha256}} : null;
   // A resumed film is retained for audit, but does not grant live CLI authority.
   // Obtain a fresh isolated receipt on the current invocation/tree.
   let cliVerification = null;
   let streamVerification = null;
   const streamStationGenerations = new Set(), streamProposalCache = new Map();
+  let copyVerification = null;
+  const copyStationGenerations = new Set(), copyProposalCache = new Map();
   const cliStationGenerations = new Set();
   const cliProposalCache = createCliProposalCache();
   const auditRecoveryVerifications = new Set(turns.flatMap(turn =>
@@ -2343,6 +2532,22 @@ async function runAgentCore({
     }
     onEvent({ type: "turn_start", turn: metrics.turns });
     detectExternalWorkspaceChanges("turn_start");
+    // Schedule from unresolved controller state, not a retry's execution path:
+    // duplicate guards may correctly suppress that path before review runs.
+    if(!terminalClosureTurn&&pendingAssertionCorrection&&++assertionRecoveryDecisions>=2
+      &&!assertionCorrectionAttempts.has(pendingAssertionCorrection.key)){
+      const {key,assertion,command,review}=pendingAssertionCorrection;
+      assertionCorrectionAttempts.add(key);
+      onEvent({type:'activity',label:'proposing assertion correction'});
+      const proposal=await proposeAssertionCorrection({model,task,documents:suppliedTaskDocuments,assertion,review,signal});
+      metrics.assertionCorrectionAttempts=(metrics.assertionCorrectionAttempts??0)+1;
+      metrics.assertionCorrectionTokens=(metrics.assertionCorrectionTokens??0)+(proposal?.tokens??0);
+      onEvent({type:'assertion_correction_proposal',generation:workspaceEditGeneration,command,proposal,executionEvidence:false});
+      if(proposal){
+        const updated={...review,correctionProposal:proposal};assertionGroundingReviews.set(key,updated);
+        assertionRecovery=updateAssertionRecovery(assertionRecovery,{phase:'before-execution',generation:workspaceEditGeneration,command,review:updated});
+      }
+    }
     if (terminalClosureTurn) {
       if (workspaceEditGeneration !== metrics.terminalClosure.generation || pendingExternalChanges.size
           || doneVerificationProof?.verification?.status !== "pass") {
@@ -2402,9 +2607,14 @@ async function runAgentCore({
     }) : null;
     const streamDecision = streamStationEnabled && hasAuthoredWork
       ? streamObligationDecision(task, streamVerification, workspaceEditGeneration) : null;
-    const contractAuditPhase = contractAuditPhaseState(streamDecision
+    const copyDecision = copyStationEnabled && hasAuthoredWork
+      ? copyPreservationDecision(task, copyVerification, workspaceEditGeneration, copyTaskDocuments) : null;
+    const unchangedRejectedCompletion = rejectedCompletionCoverage !== null
+      && rejectedCompletionCoverage === completionCoverageIdentity(currentCoverageAssertions());
+    const contractAuditPhase = contractAuditPhaseState(copyDecision || streamDecision
       ? { ...auditRecovery, needsFocused: true, configuredCommand: verificationScript } : cliDecision
-      ? { ...auditRecovery, needsCli: true, configuredCommand: verificationScript } : auditRecovery, {
+      ? { ...auditRecovery, needsCli: true, configuredCommand: verificationScript } : unchangedRejectedCompletion
+      ? { ...auditRecovery, needsFocused: true, configuredCommand: verificationScript } : auditRecovery, {
       useGrammar, interactive, advisoryMode, writeBatch, callerExcludedActions,
     });
     const auditWitness = collectionAuditEnabled && !auditRecovery
@@ -2443,18 +2653,27 @@ async function runAgentCore({
           readSource: p => exec.safeReadText(exec.resolveExisting(p)),
           facts: [cliSourceNote, ...failureSourceFacts.map(formatObjectConstructionFacts)].filter(Boolean),
         }), sourceFacts: [...failureSourceFacts, ...(cliSourceFact ? [cliSourceFact] : [])] }
-      : streamDecision ?? cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness) : null);
+      : copyDecision ?? streamDecision ?? cliDecision ?? (collectionAuditEnabled ? contractAuditDecisionContext(auditRecovery, auditWitness,
+        collectionReviewScope(turns.findLast(turn => turn.contractStateAudit)?.contractStateAudit?.proposedNote)) : null);
     if (cliDecision && verificationWorkflow === cliDecision && cliSourceNote
         && verificationWorkflow.text.length + cliSourceNote.length + 1 <= 2400) {
       verificationWorkflow = { ...verificationWorkflow, text: verificationWorkflow.text + "\n" + cliSourceNote,
         sourceFacts: [cliSourceFact] };
+    }
+    const assertionRecoveryNote=assertionRecoveryText(assertionRecovery,workspaceEditGeneration);
+    if(assertionRecoveryNote){
+      // Do not let a generic "rerun the focused check" overwrite a concrete
+      // assertion refusal. Measured project failures retain their precedence.
+      if(!currentFailure&&!cliDecision&&!streamDecision&&!copyDecision)verificationWorkflow={schema:1,phase:'focused',generation:workspaceEditGeneration,
+        text:'CONTRACT AUDIT PHASE: assertion admission or completion coverage is unresolved. Resolve the assertion recovery below before retrying a rejected check or DONE. Generic launcher advice does not authorize replay of a rejected assertion.'};
+      if(verificationWorkflow)verificationWorkflow={...verificationWorkflow,assertionRecovery:assertionRecoveryNote};
     }
     const stalledAfterAuthoredWork = hasAuthoredWork && progressAwareness
       && autoForceEditAfter > 0 && progresslessTurns >= autoForceEditAfter;
     const callerInvestigationLimitReached = useGrammar && callerInvestigationActionLimit !== null
       && investigationActionCount >= callerInvestigationActionLimit;
     const verificationRecoveryTurn = useGrammar && (consecutiveDuplicates >= 3 || stalledAfterAuthoredWork)
-      && Boolean(recoveryEvidence || auditRecovery) && !autoForceEdit && !forceBuildEdit
+      && Boolean(recoveryEvidence || auditRecovery || assertionRecovery.length || copyDecision) && !autoForceEdit && !forceBuildEdit
       && !documentRevisionTurn && !documentReviewTurn
       && !callerInvestigationLimitReached && !callerExcludedActions.includes("shell")
       && !(interactive && interactiveReconStreak >= interactiveReconLimit)
@@ -2552,6 +2771,7 @@ async function runAgentCore({
     let protocolViolation = false;
     let reasoning = null;      // reasoning that produced the accepted action, if any
     let repairObs = null;
+    let pendingWriteFilePrefix = null;
     // Rejected generations are real conversation history, not executed actions.
     // Ephemeral retry notes rewrote a Sol observation and then disappeared,
     // restarting its native Codex thread twice. Keep them before this turn's
@@ -2561,7 +2781,7 @@ async function runAgentCore({
     const promptPrelude = preservePromptAttempts ? (terminalClosureTurn ? terminalClosureNote(maxTurns)
       : forceWrapUp ? (verificationRecoveryTurn
         ? [recoveryEvidence ? verificationRecoveryNote(recoveryEvidence) : "", contractAuditRecoveryNote(auditRecovery)].filter(Boolean).join("\n\n")
-        : autoForceEdit ? AUTO_EDIT_NOTE_EXTENSION : WRAP_UP_NOTE) : "") : "";
+        : autoForceEdit ? autoEditCommitNote(turns, true) : WRAP_UP_NOTE) : "") : "";
     const recordRejectedPrompt = out => {
       if (preservePromptAttempts) promptAttempts.push({ rawOutput: String(out.content ?? ""), observation: repairObs });
     };
@@ -2653,13 +2873,19 @@ async function runAgentCore({
     // A long task restatement can clip ordinary guidance. Carry the bounded
     // receipt-linked advice with the current typed decision, not only prose.
     if (verificationWorkflow && repairContext) verificationWorkflow = { ...verificationWorkflow, repairContext };
-    const workingNoteReanchor = repairContext || formatWorkingNoteReanchor(temporalState, {
+    const renderedWorkingNote = formatWorkingNoteReanchor(temporalState, {
       retireAfterVerifiedPass: retireVerifiedCheckpoint,
       suppressBeforeFirstEdit: suppressPreEditCheckpoint,
       recoveryEvidence: recoveryEvidence ?? auditRecovery,
       suppressDuringCurrentFailure: Boolean((currentFailure && !pendingVerifierAtDecision) || currentCliFailed),
       pendingVerification: auditRecovery,
     });
+    // A structured repair offer and a newer disputed-test hypothesis are
+    // complementary. Neither supplies execution authority. Do not let an
+    // older offer erase what the worker learned while a check remains pending.
+    const workingNoteReanchor = auditRecovery?.needsFocused
+      ? [renderedWorkingNote, repairContext].filter(Boolean).join("\n")
+      : repairContext || renderedWorkingNote;
     decisionWorkingNote = workingNoteReanchor.startsWith("[working-checkpoint") ? workingNoteReanchor : "";
     let repositoryText = "";
     let repositoryTurnId = null;
@@ -2802,7 +3028,7 @@ async function runAgentCore({
           ? [...turns, { observation: verificationRecoveryTurn
             ? [recoveryEvidence ? verificationRecoveryNote(recoveryEvidence) : "", contractAuditRecoveryNote(auditRecovery)].filter(Boolean).join("\n\n")
             : autoForceEdit
-            ? (extensionTrajectory ? AUTO_EDIT_NOTE_EXTENSION : AUTO_EDIT_NOTE)
+            ? autoEditCommitNote(turns, extensionTrajectory)
             : WRAP_UP_NOTE }]
           : turns);
 
@@ -3103,6 +3329,7 @@ async function runAgentCore({
         lastWasInvalid: attempt > 0,
         preEditSynthesis: synthesisThisAttempt,
         inspectionCheckpoint: inspectionCheckpointTurn && attempt === 0,
+        assertionRecovery: assertionRecovery.length > 0 && attempt === 0,
         verifiedGreen,
       })) {
         if (verifiedGreen && attempt === 0) metrics.verificationBoundaryThinks = (metrics.verificationBoundaryThinks ?? 0) + 1;
@@ -3207,6 +3434,7 @@ async function runAgentCore({
         }
       }
 
+      if (pendingWriteFilePrefix) assistantPrefill += pendingWriteFilePrefix;
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
@@ -3216,7 +3444,9 @@ async function runAgentCore({
           return built;
         },
         {
-          ...(useGrammar ? { grammar: turnActionGrammar, jsonSchema: turnActionJsonSchema } : {}),
+          // A grammar rooted at a fresh JSON object cannot resume from inside
+          // the content string already present in the prompt.
+          ...(useGrammar && !pendingWriteFilePrefix ? { grammar: turnActionGrammar, jsonSchema: turnActionJsonSchema } : {}),
           temperature: model.actTemperature ?? undefined,
           // The bounded post-green audit is a terminal phase, even when it
           // finds one correction and re-verifies it. Keep exact deltas, but do
@@ -3257,8 +3487,15 @@ async function runAgentCore({
         }
       }
 
-      const parsed = parseAction(out.content);
+      const candidateOutput = pendingWriteFilePrefix
+        ? pendingWriteFilePrefix + out.content : out.content;
+      const parsed = parseAction(candidateOutput);
       if (parsed.ok) {
+        if (pendingWriteFilePrefix) {
+          onEvent({ type: "output_limit_continued", target: parsed.action.p ?? null,
+            recoveredChars: pendingWriteFilePrefix.length });
+          pendingWriteFilePrefix = null;
+        }
         degeneratePenalty = 0;
         let normalizedAction = normalizeWorkspaceAction(parsed.action);
         if (normalizedAction.a === "confirm_edit") {
@@ -3270,9 +3507,9 @@ async function runAgentCore({
           } catch (error) {
             metrics.invalid++;
             repairObs = String(error.message);
-            rejectedOutputs.push({turn:turns.length,attempt,rawOutput:out.content,error:repairObs,
+            rejectedOutputs.push({turn:turns.length,attempt,rawOutput:candidateOutput,error:repairObs,
               reasoning:turnReasoning,kind:"edit_confirmation",tokens:out.tokens,stoppedLimit:Boolean(out.stoppedLimit)});
-            onEvent({type:"invalid_action",error:repairObs,raw:out.content});
+            onEvent({type:"invalid_action",error:repairObs,raw:candidateOutput});
             recordRejectedPrompt(out);
             continue;
           }
@@ -3285,24 +3522,27 @@ async function runAgentCore({
         if (maskedAction) {
           metrics.invalid++;
           const error = `Action "${maskedAction.a}" is unavailable at this checkpoint. ${codexActionPolicy}`;
-          rejectedOutputs.push({ turn: turns.length, attempt, rawOutput: out.content, error,
+          rejectedOutputs.push({ turn: turns.length, attempt, rawOutput: candidateOutput, error,
             reasoning: turnReasoning, kind: "action_policy", target: normalizedAction.path ?? null,
             tokens: out.tokens, stoppedLimit: Boolean(out.stoppedLimit) });
-          onEvent({ type: "invalid_action", error, raw: out.content });
+          onEvent({ type: "invalid_action", error, raw: candidateOutput });
           repairObs = error;
           recordRejectedPrompt(out);
           continue;
         }
         if (callerExcludedActions.includes(normalizedAction.a)
-            || (normalizedAction.a === "probe" && !probeEnabled)) {
+            || (normalizedAction.a === "probe" && !probeEnabled)
+            || (normalizedAction.a === "decide" && !jevDecide)) {
           metrics.invalid++;
           const error = normalizedAction.a === "probe" && !probeEnabled
             ? 'Action "probe" is disabled. Enable the fixture-probe feature explicitly before using it.'
-            : `Action "${normalizedAction.a}" is disabled by the caller policy.`;
+            : normalizedAction.a === "decide" && !jevDecide
+              ? 'Action "decide" needs Jev mode (the operator turns it on with :jev on and :jev tool on).'
+              : `Action "${normalizedAction.a}" is disabled by the caller policy.`;
           rejectedOutputs.push({
             turn: turns.length,
             attempt,
-            rawOutput: out.content,
+            rawOutput: candidateOutput,
             error,
             reasoning: turnReasoning,
             kind: "caller_policy",
@@ -3310,7 +3550,7 @@ async function runAgentCore({
             tokens: out.tokens,
             stoppedLimit: Boolean(out.stoppedLimit),
           });
-          onEvent({ type: "invalid_action", error, raw: out.content });
+          onEvent({ type: "invalid_action", error, raw: candidateOutput });
           repairObs = error;
           recordRejectedPrompt(out);
           continue;
@@ -3321,12 +3561,12 @@ async function runAgentCore({
           metrics.workspaceAliasNormalizations++;
           onEvent({ type: "workspace_alias_normalized", original: parsed.action, action });
         }
-        rawOutput = out.content;
+        rawOutput = candidateOutput;
         reasoning = turnReasoning;
         protocolViolation = !parsed.strictJson;
         if (protocolViolation) {
           metrics.protocolViolations++;
-          onEvent({ type: "protocol_violation", raw: out.content, repairedJson: parsed.repairedJson });
+          onEvent({ type: "protocol_violation", raw: candidateOutput, repairedJson: parsed.repairedJson });
         }
         break;
       }
@@ -3338,10 +3578,12 @@ async function runAgentCore({
           || (outputTokenCap !== null
             && Number(out.tokens) >= Math.max(1, outputTokenCap - 8)));
       const target = parsed.partialAction?.path ?? null;
+      const resumablePrefix = outputLimit && canResumeWriteFile(model)
+        ? resumableWriteFilePrefix(candidateOutput) : null;
       rejectedOutputs.push({
         turn: turns.length,
         attempt,
-        rawOutput: out.content,
+        rawOutput: candidateOutput,
         error: parsed.error,
         reasoning: turnReasoning,
         kind: outputLimit ? "output_limit" : parsed.kind,
@@ -3361,13 +3603,16 @@ async function runAgentCore({
       // (where repeated tokens are correct) is never penalised.
       if (degenerate) degeneratePenalty = 0.6;
       if (degenerate) {
+        pendingWriteFilePrefix = null;
         metrics.degenerateOutputRecoveries = (metrics.degenerateOutputRecoveries ?? 0) + 1;
         repairObs = degenerateRepairMessage(degenerate, target);
         onEvent({ type: "degenerate_output", unit: degenerate.unit, repeats: degenerate.repeats, tokens: out.tokens });
       } else if (outputLimit) {
         metrics.outputLimitRecoveries++;
+        pendingWriteFilePrefix = resumablePrefix && attempt < maxInvalidPerTurn
+          ? resumablePrefix : null;
         const subject = target ? ` for \`${target}\`` : "";
-        repairObs = [
+        repairObs = pendingWriteFilePrefix ? null : [
           `[output-limit] Your previous ${parsed.partialAction?.action || "action"}${subject} reached the model's output limit before its JSON object could close.`,
           "Do NOT regenerate the same monolithic action: it will hit the same fixed limit again.",
           "Emit one much smaller valid action now. For a large new program, write a compact runnable skeleton first, then extend it with bounded replace/edit_lines/patch actions. Preserve the requested delivery format: if the user requires one self-contained file, keep the program in that file; split into modules only when the task permits it.",
@@ -3376,6 +3621,7 @@ async function runAgentCore({
           ]),
         ].join(" ");
       } else {
+        pendingWriteFilePrefix = null;
         repairObs = `Your previous output was rejected: ${parsed.error}. Emit exactly one valid action JSON object.`;
       }
       recordRejectedPrompt(out);
@@ -3384,9 +3630,10 @@ async function runAgentCore({
         error: parsed.error,
         kind: outputLimit ? "output_limit" : parsed.kind,
         target,
+        continuing: Boolean(pendingWriteFilePrefix),
         tokens: out.tokens,
         stoppedLimit: Boolean(out.stoppedLimit),
-        raw: out.content,
+        raw: candidateOutput,
       });
     }
 
@@ -3736,6 +3983,7 @@ async function runAgentCore({
     let queryOutcome = null;
     let queryExecuted = false;
     let queryPreviewProof = null;
+    let admittedAssertion = null;
     if (externalMutationRejection) {
       result = { observation: externalMutationRejection };
     } else if (artifactGateTermination) {
@@ -3776,11 +4024,11 @@ async function runAgentCore({
       // Repetition is not completion authority. A pending review may require
       // a DIFFERENT shell command, so do not tell the worker DONE or mask its
       // only route to the outstanding execution.
-      const auditShellRecovery = action.a === "shell" && auditRecovery;
+      const auditShellRecovery = action.a === "shell" && (auditRecovery || assertionRecovery.length > 0 || copyDecision);
       result = { observation: auditShellRecovery
         ? (duplicate.duplicateOfTurn >= 0
-          ? `[repetition] This identical command was not executed again (previous execution: turn ${duplicate.duplicateOfTurn}). No new receipt was created.`
-          : duplicate.observation) + `\n${contractAuditRecoveryNote(auditRecovery)}`
+          ? `[repetition] This identical command was not executed again (previous matching attempt: turn ${duplicate.duplicateOfTurn}). No new receipt was created.`
+          : duplicate.observation) + `\n${copyDecision?.text || assertionRecoveryText(assertionRecovery,workspaceEditGeneration)||contractAuditRecoveryNote(auditRecovery)}`
         : duplicate.observation };
       metrics.duplicateActionRejections = repetition.duplicateActionRejections;
       metrics.duplicateShellRejections = repetition.duplicateShellRejections;
@@ -3789,6 +4037,10 @@ async function runAgentCore({
       // permitting the same verb immediately again only buys another API call.
       // Replay of the self-host failure's exact prompt changed a third identical
       // read into a targeted symbol search when read_file was masked.
+      // Refuse this exact duplicate without masking every shell command: a
+      // revised inline assertion uses the same verb, and may be the only next
+      // executable recovery step. Caller/document restrictions still compose
+      // normally; this exemption neither executes the duplicate nor grants proof.
       if (useGrammar && !auditShellRecovery) nextMaskedVerb = action.a;
       onEvent({ type: "duplicate_action", action, duplicateOfTurn: duplicate.duplicateOfTurn, message: result.observation });
     } else if (panelRedirect) {
@@ -3884,11 +4136,36 @@ async function runAgentCore({
       // lands, so the model can redirect instead of building on a change that has
       // already disqualified the run (see immutableEditReason).
       const scopeRefusal = editScopeRefusal(action, editGuard);
+      // Review worker-authored focused expectations BEFORE executing them. A
+      // fabricated failing expectation must not become repair authority merely
+      // because a process can run it. Configured project verification is exempt;
+      // this gate never replaces its independent execution receipts.
+      const needsAssertionReview = !scopeRefusal && assertionGrounding && collectionAuditEnabled
+        && action.a === "shell" && (isFocusedAuditCommand(action.c, verificationScript)
+          || (!isConfiguredAuditCommand(action.c, verificationScript) && inlineThrowCheck(action.c)));
+      const capturedAssertion = needsAssertionReview ? captureFailedAssertionInput(action.c,
+        relative => exec.safeReadText(exec.resolveExisting(relative)), {
+          workspace: exec.realWorkspace, generation: workspaceEditGeneration,
+        }) : null;
+      const assertionReview = needsAssertionReview
+        ? await reviewGroundingCommand(action.c, "before-execution", capturedAssertion) : null;
       if (scopeRefusal) {
         result = { observation: scopeRefusal };
         metrics.immutableEditRejections = (metrics.immutableEditRejections ?? 0) + 1;
         onEvent({ type: "immutable_edit_blocked", action, message: scopeRefusal });
+      } else if (unavailableAssertionReviewer(assertionReview)) {
+        result = unavailableAssertionReviewer(assertionReview);
+      } else if (assertionReview && assertionReview.verdict !== "grounded") {
+        result = { observation: (assertionReview.cachedFailedAssertion
+          ? "[assertion-grounding] Repeated check NOT EXECUTED: this identical script previously EXECUTED AND FAILED, and its selected expectation remains disputed. Production-only edits cannot resolve that expectation. The original failure receipt is unchanged. Reviewer output is unverified advice: "
+          : "[assertion-grounding] Check NOT EXECUTED: its expected behavior lacks public-contract grounding. No process failure or implementation defect has been established. Reviewer output is unverified advice: ")
+          + JSON.stringify({ verdict: assertionReview.verdict, requirement: assertionReview.requirement, reason: assertionReview.reason })
+          + "\nCompare the assertion's actual expression and expected value against the original public requirements. Correct an unsupported assertion or provide a different grounded check, then execute it and the configured project verification. Do not edit implementation merely to satisfy this assertion or reviewer. An unknown review supplies no execution credit." };
+        metrics.assertionGroundingExecutionDeferrals = (metrics.assertionGroundingExecutionDeferrals ?? 0) + 1;
       } else {
+        if (capturedAssertion && assertionReview?.verdict === "grounded") {
+          admittedAssertion = { captured: capturedAssertion, review: assertionReview };
+        }
         if (action.a === "shell") onEvent({ type: "activity", label: "running", detail: String(action.c || "").replace(/\s+/g, " ") });
         // Run only the parts of an inspect batch the ledger does not already
         // cover. The whole-batch guards above handle "all covered"; this is the
@@ -4321,6 +4598,21 @@ async function runAgentCore({
       applyVerificationCadence(evidence);
     };
     recordVerification(result.verificationEvidence, shellReceipt);
+    if (admittedAssertion && allShellChangedPaths.length === 0 && !result.shellScopeRollback?.violations?.length) {
+      result.failedAssertionReview = await reviewFailedAssertion(admittedAssertion.captured,
+        admittedAssertion.review, result.shellExecution, shellReceipt);
+      if (result.failedAssertionReview) {
+        const review = result.failedAssertionReview.review;
+        result.observation += "\n[failed-assertion review] This check EXECUTED AND FAILED. "
+          + (review.verdict === "revise" ? "Its selected expectation is disputed by an independent public-contract review. "
+            : review.verdict === "grounded" ? "The selected expectation is grounded; the failed execution remains unresolved. "
+              : "The selected expectation could not be independently resolved; no new repair conclusion was established. ")
+          + JSON.stringify({ verdict: review.verdict, requirement: review.requirement, reason: review.reason,
+            focusSite: result.failedAssertionReview.focusSite, executionEvidence: false })
+          + "\nThis site-only review neither clears the execution failure nor approves the rest of the bundle. "
+          + "Compare the selected assertion with the public contract, correct only a demonstrated defect in the check or implementation, then execute the grounded check and configured project verification.";
+      }
+    }
     result.repairHandoff = createRepairHandoff(action, turns, { generation: workspaceEditGeneration,
       workspace: exec.realWorkspace, editApplied: directEditSucceeded,
       readApplied: action.a === 'read_file' && result.observation?.startsWith(`${action.p} (`) && !result.controllerStop,
@@ -6019,6 +6311,43 @@ async function runAgentCore({
     // an incomplete initial edit must not spend the zero-work boundary review.
     const postEditGreen = result.verificationEvidence?.status === "pass"
       && result.verificationEvidence.generation === workspaceEditGeneration;
+    // Explicit copy contracts need measured shape/aliasing witnesses, not a
+    // broad source-review opinion. The station owns isolated diagnostic cases;
+    // its receipts do not enter ordinary assertion coverage or certify the task.
+    // Unlike source review this executes again after every actual generation
+    // change, including repairs made after the two source audits were consumed.
+    if (copyStationEnabled && !interrupted && !result.controllerStop
+        && (postEditGreen || (action.a === 'done' && result.done))
+        && !copyStationGenerations.has(workspaceEditGeneration)
+        && (callerInvestigationActionLimit === null || investigationActionCount < callerInvestigationActionLimit)) {
+      const { sources } = collectContractAuditSources([...taskNamedPaths, ...editedPathsThisRun, ...openList],
+        relative => exec.safeReadText(exec.resolveExisting(relative)));
+      copyStationGenerations.add(workspaceEditGeneration);
+      onEvent({ type: 'activity', label: 'checking copy preservation obligations' });
+      try {
+        copyVerification = await runCopyPreservationStation({ workspace, model, task,
+          documents: copyTaskDocuments, sources, generation: workspaceEditGeneration, signal, dockerImage,
+          processRunner: shellProcessRunner, proposalCache: copyProposalCache });
+      } catch (error) {
+        if (signal?.aborted) { markInterrupted('copy_preservation'); break; }
+        throw error;
+      }
+      result.copyVerification = copyVerification;
+      metrics.copyPreservationStations = (metrics.copyPreservationStations ?? 0) + 1;
+      metrics.copyPreservationTokens = (metrics.copyPreservationTokens ?? 0) + (copyVerification.tokens ?? 0);
+      for (const row of copyVerification.obligations ?? []) if (row.probeEvidence)
+        onEvent({ type: 'probe', probeEvidence: structuredClone(row.probeEvidence) });
+      onEvent({ type: 'copy_preservation', generation: workspaceEditGeneration,
+        status: copyVerification.status, copyVerification: structuredClone(copyVerification) });
+      const decision = copyPreservationDecision(task, copyVerification, workspaceEditGeneration, copyTaskDocuments);
+      const copyStationNote = copyVerification.advisoryFallback?.kind === 'ordinary-verification'
+        && copyVerification.advisoryFallback.executionEvidence === false
+        ? '[copy preservation unavailable] ' + copyVerification.advisoryFallback.reason
+          + ' No copy verification credit was granted. Continue existing public-contract verification; do not change production to satisfy an unsupported fixture. Configured project verification and every ordinary completion gate still apply.'
+        : '[copy preservation] All recorded shape-preservation and input-detachment cases passed on the current source. Scope: these executed fixtures only, not complete contract certification. Current configured project verification and other completion gates still apply.';
+      result.observation += '\n\n' + (decision?.text ?? copyStationNote);
+      if (decision && result.done) { result.done = false; result.summary = undefined; }
+    }
     if (streamStationEnabled && hasAuthoredWork && !interrupted && !result.controllerStop
         && (postEditGreen || (action.a === 'done' && result.done))
         && !streamStationGenerations.has(workspaceEditGeneration)) {
@@ -6181,11 +6510,14 @@ async function runAgentCore({
     }
     if (landingPassNote !== null) {
       const pending = collectionAuditEnabled ? currentAuditState() : null;
+      const pendingCopy = copyStationEnabled
+        ? copyPreservationDecision(task, copyVerification, workspaceEditGeneration, copyTaskDocuments) : null;
       if ((landingPassNote === 0 || wallDeadlineReached()) && terminalClosureEligible({
         allowance: terminalClosureTurns, used: metrics.terminalClosure.used,
         turnsUsed: turns.length + 1, workTurnLimit: maxTurns, deadlineReached: wallDeadlineReached(), action, proof: doneVerificationProof,
         generation: workspaceEditGeneration, configuredCommand: verificationScript, workspace: exec.realWorkspace,
-        verificationWorkspaceReadOnly, pendingAudit: cliContract && !cliVerificationPassed(cliContract, cliVerification,
+        verificationWorkspaceReadOnly, pendingAudit: pendingCopy
+          ? { ...pending, needsFocused: true } : cliContract && !cliVerificationPassed(cliContract, cliVerification,
           { generation: workspaceEditGeneration }) ? { ...pending, needsCli: true } : pending, interrupted,
         controllerStopped: controllerStop || result.controllerStop, resultDone: result.done, callerExcludedActions,
         freshEvidence: verificationReceipts.entries.some(entry => entry.verificationEvidence?.status === "pass"
@@ -6195,7 +6527,9 @@ async function runAgentCore({
         Object.assign(metrics.terminalClosure, { granted: true, grantedTurn: turns.length, generation: workspaceEditGeneration });
         onEvent({ type: "terminal_closure", phase: "granted", ...metrics.terminalClosure });
       }
-      result.observation += pending
+      result.observation += pendingCopy
+        ? `\n[completion state] ${pendingCopy.text} ${landingPassNote === 0 ? 'No actions remain; completion is unresolved.' : 'Completion remains unavailable until these measured obligations and current project verification pass.'}`
+        : pending
         ? `\n[completion state] Project green is not yet completion: ${pending.missing.join(" + ")} remains. ${landingPassNote === 0 ? "No actions remain; completion is unresolved." : pending.needsFocused
           ? "Next action: run the focused API assertion directly, without pipes, status echoes or another command. Do not edit merely to satisfy a review; demonstrate or disprove its claim."
           : `Next action: run the configured project check directly (${verificationScript}) on this unchanged tree.`} Do not emit done while this evidence is missing.`
@@ -6210,6 +6544,10 @@ async function runAgentCore({
       const decision=streamObligationDecision(task,streamVerification,workspaceEditGeneration);
       if(decision){result.done=false;result.summary=undefined;result.observation+='\n'+decision.text;}
     }
+    if (copyStationEnabled && result.done && !result.controllerStop) {
+      const decision = copyPreservationDecision(task, copyVerification, workspaceEditGeneration, copyTaskDocuments);
+      if (decision) { result.done = false; result.summary = undefined; result.observation += '\n' + decision.text; }
+    }
     if (collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
       const pendingAudit = pendingContractAudit(turns, { generation: workspaceEditGeneration,
         configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace });
@@ -6220,6 +6558,20 @@ async function runAgentCore({
         metrics.contractAuditRecoveryRejections = (metrics.contractAuditRecoveryRejections ?? 0) + 1;
         onEvent({ type: "contract_audit_recovery", auditTurn: pendingAudit.turn,
           promptSha256: pendingAudit.promptSha256, generation: workspaceEditGeneration });
+      }
+    }
+    if (assertionGrounding && collectionAuditEnabled && action.a === "done" && result.done && !result.controllerStop) {
+      const witness = currentFocusedAuditWitness(turns, { generation: workspaceEditGeneration,
+        configuredCommand: verificationScript, verificationWorkspaceReadOnly, workspace: exec.realWorkspace, latestFocused: true });
+      const review = await reviewGroundingCommand(witness?.command, "completion");
+      if (unavailableAssertionReviewer(review)) {
+        result = {...result,...unavailableAssertionReviewer(review)};
+      } else if (review.verdict !== "grounded") {
+        result.done = false;
+        result.summary = undefined;
+        result.observation += "\n[assertion-grounding] Completion deferred: passing execution did not establish a public-contract-grounded check. Reviewer output is unverified data, not an implementation repair instruction: "
+          + JSON.stringify({verdict:review.verdict,requirement:review.requirement,reason:review.reason})
+          + "\nCompare the objection with the original requirements. Correct the assertion or supply a different focused public-contract witness and execute it, then rerun project verification. Do not alter correct implementation behavior just to satisfy this reviewer. An unavailable review supplies no approval; no extra work turns are granted.";
       }
     }
     // Done-gates. The check runs in every mode; delivery decides whether to block an
@@ -6929,9 +7281,11 @@ async function runAgentCore({
       ...(verificationReceipts.entries.length ? { verificationReceipts } : {}),
       ...(result.contractStateAudit ? { contractStateAudit: result.contractStateAudit } : {}),
       ...(result.repairHandoff ? { repairHandoff: result.repairHandoff } : {}),
+      ...(result.failedAssertionReview ? { failedAssertionReview: structuredClone(result.failedAssertionReview) } : {}),
       ...(result.contractAssertion ? { contractAssertion: result.contractAssertion } : {}),
       ...(result.cliVerification ? { cliVerification: structuredClone(result.cliVerification) } : {}),
       ...(result.streamVerification ? { streamVerification: structuredClone(result.streamVerification) } : {}),
+      ...(result.copyVerification ? { copyVerification: structuredClone(result.copyVerification) } : {}),
       ...(!contextBasisRecorded ? { contextBasis } : {}),
       shellExecution: shellReceipt,
       ...(Object.hasOwn(result, "probeEvidence") ? { probeEvidence: structuredClone(result.probeEvidence) } : {}),
@@ -7038,7 +7392,7 @@ async function runAgentCore({
       // Preserve exactly the sealed turn's typed receipts in crash checkpoints,
       // including explicit null / false and bounded audit state for resume.
       ...Object.fromEntries([
-        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "repairHandoff",
+        "verificationEvidence", "verificationReceipts", "shellExecution", "probeEvidence", "editOutcome", "contractStateAudit", "contractAssertion", "cliVerification", "streamVerification", "copyVerification", "repairHandoff", "failedAssertionReview",
         "contextBasis", "contextUpdates", "verificationWorkflow", "doneAccepted", "controllerStop", "promptPrelude", "promptAttempts",
         "editApplied", "scopedVerify", "sourceEditedByShell", "shellChangedPaths", "shellOutputPaths",
         "shellScopeRollback", "stateAudit", "toolOutcome", "preview", "queryExecuted", "queryTool",
@@ -7675,6 +8029,68 @@ function mapQueryPayload(value) {
   return query;
 }
 
+// A deliberately narrow command-to-source capture. The full captured bytes,
+// not a later disk read or diagnostic label, are reviewed before execution.
+// Module-inline and test-runner wrappers are outside the plain Node mapper.
+function captureFailedAssertionInput(command, read, { workspace, generation } = {}) {
+  if (!permitsWholeAssertionCoverage(command)) return null;
+  const words = wordsForDirectCommand(command);
+  if (!words || !["node", "nodejs"].includes(path.basename(words[0] ?? ""))) return null;
+  let assertion, sourcePath = null, scriptIdentity;
+  if (words.length === 3 && ["-e", "--eval"].includes(words[1])) {
+    assertion = words[2];
+    scriptIdentity = "node:inline-commonjs";
+  } else if (words.length === 2 && /\.[cm]?js$/.test(words[1]) && !words[1].startsWith("-")) {
+    const full = path.resolve(workspace, words[1]);
+    if (!full.startsWith(workspace + path.sep)) return null;
+    sourcePath = path.relative(workspace, full).split(path.sep).join("/");
+    scriptIdentity = `node:file:${sourcePath}`;
+    try { assertion = read(sourcePath); } catch { return null; }
+  } else return null;
+  if (typeof assertion !== "string" || !assertion.trim() || assertion.length > 16000) return null;
+  return { command, assertion, sourcePath, scriptIdentity, generation,
+    sourceSha256: crypto.createHash("sha256").update(assertion).digest("hex") };
+}
+
+function completedFailedAssertionReceipt(receipt) {
+  return receipt && Number.isSafeInteger(receipt.exitCode) && receipt.exitCode > 0
+    && Number.isSafeInteger(receipt.generation) && receipt.generation >= 0
+    && typeof receipt.command === "string" && receipt.command === receipt.executedCommand
+    && typeof receipt.cwd === "string" && path.isAbsolute(receipt.cwd)
+    && /^[a-f0-9]{64}$/.test(receipt.outputSha256 ?? "")
+    && !["timedOut", "interrupted", "bufferExceeded", "error", "blocked", "invalidated", "signal"]
+      .some(key => Boolean(receipt[key]));
+}
+
+function validFailedAssertionReview(record, turn, publicBasisSha256) {
+  if (record?.schema !== "bantam.failed-assertion-review.v1" || record.executionEvidence !== false
+      || record.publicBasisSha256 !== publicBasisSha256 || record.turn !== turn.i
+      || record.generation !== record.execution?.generation || record.command !== record.execution?.command
+      || record.receiptSequence !== 0 || !completedFailedAssertionReceipt(record.execution)
+      || JSON.stringify(record.execution) !== JSON.stringify(turn.shellExecution)
+      || turn.verificationReceipts?.schema !== VERIFICATION_RECEIPTS_SCHEMA
+      || turn.verificationReceipts.authority !== "controller-execution-order"
+      || turn.verificationReceipts.entries?.[0]?.sequence !== 0
+      || JSON.stringify(record.execution) !== JSON.stringify(turn.verificationReceipts.entries[0].shellExecution)
+      || !["grounded", "revise", "unknown"].includes(record.review?.verdict)) return false;
+  const captured = captureFailedAssertionInput(record.command, () => record.assertion, {
+    workspace: record.execution.cwd, generation: record.generation,
+  });
+  if (!captured || captured.sourceSha256 !== record.sourceSha256
+      || captured.scriptIdentity !== record.scriptIdentity || captured.sourcePath !== record.sourcePath) return false;
+  const site = record.focusSite;
+  if (!site || site.sourceSha256 !== record.sourceSha256
+      || !Number.isSafeInteger(site.start) || !Number.isSafeInteger(site.end)
+      || site.start < 0 || site.end <= site.start || site.end > record.assertion.length
+      || site.expression !== record.assertion.slice(site.start, site.end)) return false;
+  const lines = record.assertion.slice(0, site.start).split(/\r\n|[\n\r\u2028\u2029]/);
+  if (site.line !== lines.length || site.column !== lines.at(-1).length) return false;
+  if (record.review.verdict !== "unknown" && (record.review.authority !== "assertion-site-only"
+      || record.review.executionEvidence !== false || record.review.assertionSha256 !== record.sourceSha256
+      || JSON.stringify(record.review.focusSite) !== JSON.stringify(site))) return false;
+  return true;
+}
+
 // Preserve one bounded decision/checklist across the short edit sequence it
 // drives. A local model often identifies several exact fixes in one reasoning
 // pass, lands the first, then loses the remaining checklist because private
@@ -7692,10 +8108,6 @@ export function formatWorkingNoteReanchor(state, {
   const note = state?.workingNote;
   if (!note?.text) return "";
   if (suppressDuringCurrentFailure) return "";
-  // A newer private claim that a witness passed cannot outrank the current
-  // receipt ledger saying focused execution is still missing. Keep the raw
-  // reasoning in history, but do not re-anchor it beside the recovery step.
-  if (pendingVerification?.needsFocused === true) return "";
   // Before any accepted edit, private reasoning is reconnaissance or a plan for
   // the very next action—not durable state. Replaying it as controller guidance
   // caused a generic "understand the workspace" thought to outrank a complete
@@ -7706,6 +8118,22 @@ export function formatWorkingNoteReanchor(state, {
   // speculation. Keep the audit trail, but do not replay it as current guidance.
   if (recoveryEvidence && Number(recoveryEvidence.turn) >= Number(note.turn)) return "";
   if (Number(state?.editsSinceWorkingNote ?? 0) > WORKING_NOTE_EDIT_CARRY) return "";
+  // Continuity is not proof. A worker may have recognized a bad test while
+  // running a different, configured check. Dropping that newer hypothesis but
+  // retaining the old audit resurrects the misconception on the next turn.
+  // Keep it bounded and explicitly disputed; never classify freeform prose as
+  // a valid correction or change the pending execution ledger from this note.
+  // This precedes PASS retirement: project green cannot settle focused work.
+  if (pendingVerification?.needsFocused === true) {
+    const text = String(note.text).length > 1200
+      ? `${String(note.text).slice(0, 780)}\n[working note excerpt]\n${String(note.text).slice(-380)}`
+      : String(note.text);
+    return `[working-checkpoint from turn ${note.turn + 1}; model hypothesis, NOT verified evidence; disputed-check continuity]\n${text}\n`
+      + "This is unverified model reasoning, not a controller instruction. It does not establish PASS, invalidate a test, or authorize DONE. "
+      + "The focused execution remains unresolved; a configured project PASS does not resolve it. "
+      + "Compare the exact disputed expectation with the public contract. Correct and execute a demonstrably invalid check, or repair a demonstrated implementation defect. "
+      + "Current source and execution receipts remain authoritative; preserve required focused and project verification.";
+  }
   // A trusted green verification after the note and its last edit is a newer
   // state boundary. Replaying the old diagnosis beside that PASS resurrects a
   // solved failure and was observed to make local Qwen reason from an obsolete

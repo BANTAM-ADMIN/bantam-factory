@@ -109,5 +109,5 @@ export function focusedFailureReminder(failure) {
   const command = String(failure.command ?? "");
   return `[diagnosis] Unresolved focused-check observation: ${JSON.stringify(command.slice(0, 180))}${command.length > 180 ? " (command excerpt)" : ""} exited ${failure.exitCode} at turn ${failure.turn + 1}, generation ${failure.generation}.`
     + (failure.historical ? " The workspace has since changed or its generation is unknown; this is historical evidence, not a claim the current code is defective." : " This failure was observed on the current generation.")
-    + " A different green command or printed diagnostic does not show this check passed. Use its failure to justify code/fixture repair, then rerun the check directly when execution is permitted. Advisory only: no oracle or completion proof.";
+    + " A different green command or printed diagnostic does not show this check passed. Validate the fixture and expected value against the public contract; model approval is fallible. If wrong, explain and correct the assertion, then execute it; do not bend correct production code to it. Otherwise repair production and rerun this check. Advisory only: no oracle or completion proof.";
 }

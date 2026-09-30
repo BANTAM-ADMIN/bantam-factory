@@ -571,7 +571,7 @@ function liveLogger(e) {
   if (e.type === "action") process.stderr.write(`  → ${JSON.stringify(e.action)}\n`);
   else if (e.type === "invalid") {
     if (e.kind === "output_limit") {
-      process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: split the action\n`);
+      process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: ${e.continuing ? "continuing the same action" : "split the action"}\n`);
     } else {
       process.stderr.write(`  ✗ invalid: ${e.error}\n`);
     }
@@ -2075,7 +2075,7 @@ function makeInteractiveLogger(emit, activity = {}) {
       // A malformed action costs a silent retry otherwise — say so (observed: minutes of
       // heartbeats while truncated big-write JSON was re-generated with no visible reason).
       if (e.kind === "output_limit") {
-        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""} — steering to smaller incremental edits`)}`);
+        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : " — steering to smaller incremental edits"}`)}`);
       } else {
         out(`  ${paint("33", "✗ malformed action, retrying")}${e.error ? dim(` — ${String(e.error).slice(0, 90)}`) : ""}`);
       }
@@ -2324,6 +2324,10 @@ async function repl() {
     } else if (verdict.kind === "blocked") {
       console.log(`\n${paint("33", "⏸ blocked")} ${res.summary || "The environment cannot perform that action safely."} ${meta}\n`);
       sessionLog.push({ request, summary: String(res.summary || "(infrastructure blocked)").replace(/\s+/g, " ").slice(0, 220) });
+    } else if (verdict.kind === "model_error") {
+      const reason = res.modelFailure.message || "The model request failed.";
+      console.log(`\n${paint("31", "✗ model error")} ${reason} ${meta}\n`);
+      sessionLog.push({ request, summary: `(model error) ${reason}`.slice(0, 220) });
     } else if (verdict.kind === "verification_failed") {
       console.log(`\n${paint("31", "✗ verification failed")} ${res.summary || "workspace changes did not pass"} ${meta}`);
       for (const line of verificationDetailLines(res.verification?.detail)) {

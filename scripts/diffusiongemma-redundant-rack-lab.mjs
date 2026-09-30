@@ -111,7 +111,6 @@ async function inspect(layout, query, expectedId, round) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
       max_tokens: 96,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: pointSchema,

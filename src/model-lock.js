@@ -35,6 +35,13 @@ export function modelLockPath({ endpoint, lockDir = defaultLockDir(), slot = 0 }
  *  Probe failure means 1 — the historical single-flight behavior. */
 export async function probeSlotCapacity(endpoint, { fetchImpl = fetch } = {}) {
   try {
+    // /slots wakes a sleeping llama.cpp model. A new session must not wake it
+    // while ComfyUI owns the GPU merely to discover lock capacity.
+    const props = await fetchImpl(`${String(endpoint).replace(/\/$/, "")}/props`, { signal: AbortSignal.timeout(1500) });
+    if (props.ok) {
+      const data = await props.json();
+      if (data.is_sleeping === true) return Math.max(1, Number(data.total_slots) || 1);
+    }
     const r = await fetchImpl(`${String(endpoint).replace(/\/$/, "")}/slots`, { signal: AbortSignal.timeout(1500) });
     if (!r.ok) return 1;
     const s = await r.json();

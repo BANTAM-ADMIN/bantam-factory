@@ -107,7 +107,6 @@ async function press(name) {
       messages: [{ role: "user", content: `${material}\n\n${die.instruction}` }],
       tools: [{ type: "function", function: die.tool }],
       tool_choice: { type: "function", function: { name: die.tool.name } },
-      temperature: 0.3,
       max_tokens: 2048,
       chat_template_kwargs: { enable_thinking: false },
     }),

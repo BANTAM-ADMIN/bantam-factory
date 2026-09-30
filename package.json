@@ -1,6 +1,6 @@
 {
   "name": "bantam",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "description": "A bantamweight local-model coding agent. Grammar-constrained, verifiable actions.",
@@ -65,6 +65,7 @@
     "factory:diffusiongemma-recovery": "node scripts/diffusiongemma-recovery-cell.mjs",
     "factory:diffusiongemma-anchor-holdout": "node scripts/diffusiongemma-anchor-holdout.mjs",
     "factory:diffusiongemma-die-convergence": "node scripts/diffusiongemma-die-convergence-lab.mjs",
+    "factory:diffusiongemma-system-one": "node scripts/diffusiongemma-system-one-lab.mjs",
     "factory:cognitive-wind-tunnel": "node scripts/cognitive-process-wind-tunnel.mjs",
     "factory:process-compiler-shadow": "node scripts/process-compiler-shadow-lab.mjs",
     "test": "node --test --test-concurrency=8 test/*.test.js"

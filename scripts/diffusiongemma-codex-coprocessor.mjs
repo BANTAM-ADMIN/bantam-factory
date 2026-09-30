@@ -188,7 +188,6 @@ async function inspectLot(lot, lotIndex, attempt = 1) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
       max_tokens: 512,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: die === 'bits' ? bitSchema : die === 'matrix' ? matrixSchema : pointSchema,

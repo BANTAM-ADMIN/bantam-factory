@@ -24,7 +24,9 @@ import {
   previewTool,
   taskAwarePreviewVisionEnabled,
 } from "./preview.js";
-import { codexImageEnabled, codexImageTool, codexImageEditTool } from "./codex-image.js";
+import { codexImageTool, codexImageEditTool } from "./codex-image.js";
+import { generationProvider } from './comfyui-client.js';
+import { ComfyImageJobs, comfyImageTools } from './comfyui-image.js';
 
 export class ToolRegistry {
   constructor() {
@@ -787,6 +789,34 @@ export function historyTool(getTurns) {
   };
 }
 
+/** Register generation independently of repository grounding. Image work must
+ * remain available in deliberately ungrounded workspaces such as a ComfyUI
+ * installation with tens of thousands of files. */
+export function registerImageGenerationTools(reg, workspace, opts = {}) {
+  if (!workspace) return reg;
+  if (generationProvider(opts.env) === 'comfyui') {
+    const jobs = opts.imageJobs || new ComfyImageJobs(workspace, { onEvent: opts.onEvent });
+    for (const tool of comfyImageTools(jobs, {
+      model: opts.model || { endpoint: opts.endpoint, codex: opts.codex },
+      background: Boolean(opts.imageJobs && opts.interactive), env: opts.env, signal: opts.signal,
+    })) reg.register(tool);
+  } else if (generationProvider(opts.env) === 'codex') {
+    reg.register(codexImageTool(workspace, {
+      onEvent: opts.onEvent,
+      onExternalUsage: opts.onExternalUsage,
+      env: opts.env,
+      signal: opts.signal,
+    }));
+    reg.register(codexImageEditTool(workspace, {
+      onEvent: opts.onEvent,
+      onExternalUsage: opts.onExternalUsage,
+      env: opts.env,
+      signal: opts.signal,
+    }));
+  }
+  return reg;
+}
+
 /** Build a registry with the code tool wired to a grounding context. */
 export function buildToolRegistry(ground, opts = {}) {
   const reg = new ToolRegistry().register(codeTool(ground));
@@ -868,25 +898,7 @@ export function buildToolRegistry(ground, opts = {}) {
         : null,
     }));
   }
-  // Opt-in because a Codex image call consumes the signed-in Codex account,
-  // but deliberately independent of the task model: any local/API model can
-  // ask BANTAM to create a managed workspace asset when this is enabled.
-  if (ground?.workspace && codexImageEnabled(opts.env)) {
-    reg.register(codexImageTool(ground.workspace, {
-      onEvent: opts.onEvent,
-      onExternalUsage: opts.onExternalUsage,
-      env: opts.env,
-      signal: opts.signal,
-    }));
-    // Editing rides the same gate: it spends the same account, and a model that
-    // can create an image should be able to change one it already has.
-    reg.register(codexImageEditTool(ground.workspace, {
-      onEvent: opts.onEvent,
-      onExternalUsage: opts.onExternalUsage,
-      env: opts.env,
-      signal: opts.signal,
-    }));
-  }
+  registerImageGenerationTools(reg, ground?.workspace, opts);
   return reg;
 }
 

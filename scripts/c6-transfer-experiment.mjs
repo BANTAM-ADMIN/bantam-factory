@@ -111,7 +111,6 @@ async function ask(model, promptText, schema, maxTokens = 96) {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: promptText }],
-      temperature: 0,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: schema,
@@ -272,7 +271,7 @@ async function main() {
     kind: "bantam.factory-c6-transfer-evidence",
     generatedAt: new Date().toISOString(),
     sources: [STATION_MODULE, "scripts/c6-transfer-experiment.mjs", path.relative(REPOSITORY_ROOT, RUNS)],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", thinking: false },
     experiment: {
       station: STATION_MODULE,
       originDomain: ORIGIN.id,

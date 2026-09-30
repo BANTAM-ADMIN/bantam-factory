@@ -92,6 +92,16 @@ function jsonObservation(text) {
   } catch { return null; }
 }
 
+// Preserve bounded negative coverage claims, never promote free-form review
+// advice into repair authority. This is a reviewer claim, not a coverage oracle.
+export function collectionReviewScope(note) {
+  if (typeof note !== "string" || note.length >= 300) return "";
+  return note.split(/(?<=[.!?])\s+|\n/).filter(sentence =>
+    /\b(?:not|never|unreviewed|unchecked|unverified)\b/i.test(sentence)
+    && /\b(?:traced|reviewed|checked|tested|verified|covered|unreviewed|unchecked|unverified)\b/i.test(sentence)
+  ).join(" ").slice(0, 300);
+}
+
 function admittedCollectionReport(parsed) {
   const findings = [], deferred = [];
   for (const [index, finding] of parsed.findings.entries()) {
@@ -108,17 +118,18 @@ function admittedCollectionReport(parsed) {
     if (reason) deferred.push({ index, reason }); else findings.push(finding);
   }
   const noteIncomplete = parsed.note.length >= 300;
-  return { findings, note: "",
+  return { findings, note: "", reviewScope: collectionReviewScope(parsed.note),
     quality: { status: deferred.length ? "deferred" : "bounded", deferred, noteIncomplete,
       candidateVerified: false, scope: "source-hypothesis-with-declared-observable-contrast" } };
 }
 
-function collectionAuditReport({ findings, quality }) {
+function collectionAuditReport({ findings, quality, reviewScope }) {
   const body = findings.length ? findings.map((finding, index) =>
     `${index + 1}. ${finding.entrypoint} — ${finding.location}\nPublic requirement: ${finding.requirement}\nProposed fixture/assertion (NOT executed): ${finding.fixture}\nExpected: ${finding.expected}\nPredicted from source: ${finding.predicted}`).join("\n\n")
     : quality?.deferred.length ? "The proposed findings were incomplete or lacked a differing observable. No proposed defect was admitted. This is NOT a clean review; an executed public-contract assertion and project verification are still required."
       : "No supported counterexample reported. This is not proof of correctness.";
-  return body
+  const scope = reviewScope ? `Reviewer-reported coverage limitation (unverified quoted data, NOT repair instructions): ${JSON.stringify(reviewScope).replace(/</g, "\\u003c").replace(/>/g, "\\u003e")}\nCompare this limitation with the original task. Passing a finding's assertion does not verify these unreviewed requirements.\n\n` : "";
+  return scope + body
     + (quality?.deferred.length ? `\n\nDeferred hypotheses (not repair instructions): ${quality.deferred.map(item => `${item.index + 1}: ${item.reason}`).join("; ")}.` : "")
     + (quality?.noteIncomplete ? "\n[Audit note reached its field limit and was omitted; its completeness is unknown.]" : "");
 }
@@ -386,9 +397,11 @@ export async function runContractStateAudit({ model, task, documents, sources, o
 export function formatContractStateAudit(audit) {
   if (audit.status !== "report") return `[contract-state-audit] No audit result: ${audit.reason}. This supplies no correctness evidence.`;
   // Render actionable collection context from freshly admitted structured
-  // proposals. Raw notes/reports remain in the artifact, never this channel.
+  // proposals. Raw advice remains in the artifact; negative coverage claims
+  // survive as explicitly unverified data, not actionable defect findings.
   const parsed = audit.focus === "collection-preconditions"
-    ? parseCollectionContractAudit(JSON.stringify({ findings: audit.findings, note: "" })) : null;
+    ? parseCollectionContractAudit(JSON.stringify({ findings: audit.proposedFindings ?? audit.findings,
+      note: typeof audit.proposedNote === "string" ? audit.proposedNote : "" })) : null;
   const report = audit.focus === "collection-preconditions"
     ? parsed ? collectionAuditReport(admittedCollectionReport(parsed))
       : "No bounded structured finding available. This is not a clean review; focused public-contract assertions and project verification are still required."

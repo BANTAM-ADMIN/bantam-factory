@@ -244,12 +244,13 @@ function canonicalizePoint(value, registry) {
     : { value, repaired: false };
 }
 
-async function ask(prompt, schema, { temperature = 0, enableThinking = false, maxTokens = 512 } = {}) {
+// No request `temperature`: DiffusionGemma's sampler runs a fixed server-side
+// schedule. The old build ignored the field and current vLLM rejects it.
+async function ask(prompt, schema, { enableThinking = false, maxTokens = 512 } = {}) {
   const started = performance.now();
   const requestBody = {
     model,
     messages: [{ role: 'user', content: prompt }],
-    temperature,
     max_tokens: maxTokens,
     chat_template_kwargs: { enable_thinking: enableThinking },
   };
@@ -320,9 +321,10 @@ async function runRound(round) {
     let normalizedRows = [];
     let structurallyAdmissible = false;
     let attempts = 0;
-    for (const temperature of [0, 0.5, 0.7]) {
+    // Up to three draws; they differ only through the sampler's own noise.
+    while (attempts < 3) {
       attempts += 1;
-      response = await ask(prompt, matrixSchema, { temperature, enableThinking: false, maxTokens: 512 });
+      response = await ask(prompt, matrixSchema, { enableThinking: false, maxTokens: 512 });
       matrixElapsedMs += response.elapsedMs;
       matrixPromptTokens += response.promptTokens;
       matrixCompletionTokens += response.completionTokens;

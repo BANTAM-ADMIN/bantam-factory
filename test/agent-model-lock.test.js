@@ -11,9 +11,11 @@ import {acquireModelLock} from '../src/model-lock.js';
 async function fixture(t){
  const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-cloud-lock-'));
  t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
- let probes=0;
+ const probes=[];
  const server=http.createServer((req,res)=>{
-  probes++;res.writeHead(200,{'content-type':'application/json'});res.end('[{}]');
+  probes.push(req.url);
+  res.writeHead(200,{'content-type':'application/json'});
+  res.end(req.url==='/props'?JSON.stringify({is_sleeping:false,total_slots:1}):'[{}]');
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  t.after(()=>new Promise(resolve=>server.close(resolve)));
@@ -43,7 +45,7 @@ for(const transport of ['codex','codexBacked','api'])test(`${transport} ignores 
   }});
  assert.equal(result.responded,true);assert.equal(calls,1);
  assert.equal(events.filter(e=>e.type==='model_lock_wait').length,0);
- assert.equal(probes(),0,'cloud dispatch never even queries local slot capacity');
+ assert.deepEqual(probes(),[],'cloud dispatch never even queries local slot capacity');
  assert.ok(fs.existsSync(held.path),'cloud completion cannot release another session’s local lock');
 });
 
@@ -60,6 +62,8 @@ test('a local-model run still waits for the occupied slot before generating',asy
    }
   }});
  assert.equal(result.responded,true);assert.equal(calls,1);
- assert.equal(probes(),1);assert.equal(events.filter(e=>e.type==='model_lock_wait').length,1);
+ // Capacity discovery checks sleep state before querying the awake server's slots.
+ assert.deepEqual(probes(),['/props','/slots']);
+ assert.equal(events.filter(e=>e.type==='model_lock_wait').length,1);
  assert.equal(fs.existsSync(held.path),false,'local run releases its own slot on completion');
 });

@@ -5,6 +5,14 @@ import path from 'node:path';
 import test from 'node:test';
 import {runAgent} from '../src/agent.js';
 import {QWEN_ASSISTANT_PREFILL} from '../src/profiles.js';
+import {shouldThink} from '../src/thinking.js';
+
+test('automatic thinking recognizes persistent assertion recovery after an intervening read',()=>{
+ const context={turnIndex:9,lastObservation:'read source.mjs',assertionRecovery:true,lean:true};
+ assert.equal(shouldThink('auto',context),true);
+ assert.equal(shouldThink('off',context),false,'explicit off remains authoritative');
+ assert.equal(shouldThink('auto',{...context,assertionRecovery:false}),false);
+});
 
 test('an actual non-TAP project pass reaches reasoning before the next milestone action', async t => {
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-verification-think-'));

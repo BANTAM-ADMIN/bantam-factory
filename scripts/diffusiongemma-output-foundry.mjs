@@ -25,7 +25,9 @@ const rounds = Number(option("rounds", "3"));
 const output = resolve(option("output", ".bantam/factory-benchmarks/diffusiongemma-output-foundry-v1.json"));
 if (!Number.isInteger(rounds) || rounds < 1 || rounds > 20) throw new Error("rounds must be an integer from 1 to 20");
 
-async function ask(prompt, candidateProperties, required, { maxTokens = 4096, temperature = 0.7 } = {}) {
+// No request `temperature`: DiffusionGemma's sampler runs a fixed server-side
+// schedule. The old build ignored the field and current vLLM rejects it.
+async function ask(prompt, candidateProperties, required, { maxTokens = 4096 } = {}) {
   const schema = {
     type: "object",
     properties: {
@@ -49,7 +51,6 @@ async function ask(prompt, candidateProperties, required, { maxTokens = 4096, te
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt }],
-      temperature,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
       tools: [{
@@ -199,7 +200,7 @@ async function produceExpansionLots(round) {
   const responses = [];
   for (const lot of [components.slice(0, 4), components.slice(4)]) {
     const prompt = `Manufacture the COMPLETE Cartesian work-order matrix for ONLY these four components: ${lot.join(", ")}. Each component needs each check: ${checks.join(", ")}. Gauge mapping: syntax=>parse-gauge, contract=>exact-set-gauge, security=>policy-gauge, evidence=>provenance-gauge. Priority is critical for every security check and for every actuator or supervisor work order; all others are standard. Return exactly 16 unique records as {"candidates":[{"component":"...","check":"...","gauge":"...","priority":"..."}]}. No prose.`;
-    responses.push(await ask(prompt, expansionShape, ["component", "check", "gauge", "priority"], { maxTokens: 4096, temperature: round === 1 ? 0.5 : 0.8 }));
+    responses.push(await ask(prompt, expansionShape, ["component", "check", "gauge", "priority"], { maxTokens: 4096 }));
   }
   return {
     answer: { candidates: responses.flatMap((response) => response.answer?.candidates ?? []) },
@@ -234,7 +235,7 @@ for (let round = 1; round <= rounds; round += 1) {
       produce: async () => {
         response = definition.produce
           ? await definition.produce(round)
-          : await ask(definition.prompt, definition.shape, definition.required, { maxTokens: definition.maxTokens, temperature: round === 1 ? 0.5 : 0.8 });
+          : await ask(definition.prompt, definition.shape, definition.required, { maxTokens: definition.maxTokens });
         return response;
       },
       gauge: definition.gauge,

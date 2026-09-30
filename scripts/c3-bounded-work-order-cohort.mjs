@@ -156,7 +156,6 @@ async function ask(model, promptText, schema, maxTokens) {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: promptText }],
-      temperature: 0,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: schema,
@@ -425,7 +424,7 @@ async function main() {
     kind: "bantam.factory-c3-station-cohort",
     generatedAt: new Date().toISOString(),
     sources: ["scripts/c3-bounded-work-order-cohort.mjs"],
-    control: { model, endpoint: ENDPOINT, temperature: 0, effort: "default", thinking: false },
+    control: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", effort: "default", thinking: false },
     design: {
       articlesPerArm: bounded.articles,
       // Both arms call the same served model at the same settings; nothing in

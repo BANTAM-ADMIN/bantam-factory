@@ -278,6 +278,13 @@ export function parseTestFailures(output) {
   if (/^\(fail\) /m.test(text)) return parseBunFailures(text);
   const nodeFailures = parseNodeFailures(text);
   if (nodeFailures.length) return nodeFailures;
+  // A plain `node check.js` assertion has no TAP test header or counts. Its
+  // uncaught error still carries a concrete user frame and assertion operands;
+  // omitting it silently disables the per-failure diagnostic recovery rail.
+  if (parseTestCounts(text)?.failed !== 0) {
+    const assertions = parseStandaloneNodeAssertions(text);
+    if (assertions.length) return assertions;
+  }
   // Small project runners often print "FAIL name - assertion message". Only
   // accept that format alongside a failing runner summary; keep the message
   // verbatim and leave unknown locations/expected values unknown.
@@ -286,6 +293,62 @@ export function parseTestFailures(output) {
     name: m[1], message: m[2], file: null, line: null,
     actual: null, expected: null, diff: [],
   }));
+}
+
+function standaloneNodeFrame(line) {
+  const frame = line.match(/^[ \t]+at[ \t]+(.+?)(?:[ \t]+\{)?[ \t]*$/)?.[1];
+  if (!frame) return null;
+  // The function/frame separator precedes the path; the path itself may have
+  // parentheses (a common temporary or checkout directory spelling).
+  const location = frame.endsWith(')') ? frame.slice(frame.indexOf(' (') + 2, -1) : frame;
+  const match = location.match(/^(.+):([1-9]\d*):([1-9]\d*)$/);
+  if (!match) return null;
+  let file = match[1];
+  try { if (file.startsWith('file:')) file = fileURLToPath(file); } catch { return null; }
+  if (file.length > 2048 || (!path.isAbsolute(file) && !path.win32.isAbsolute(file))
+      || /[\x00-\x1f\x7f]/.test(file) || /(?:^|[\\/])node_modules[\\/]/.test(file)
+      || !/\.[cm]?[jt]sx?$/.test(file)) return null;
+  const number = Number(match[2]);
+  return Number.isSafeInteger(number) ? { file, line: number } : null;
+}
+
+function parseStandaloneNodeAssertions(text) {
+  const lines = text.replace(/\u001b\[[0-9;]*m/g, '').split(/\r?\n/), failures = [];
+  for (let i = 0; i < lines.length && failures.length < 20; i++) {
+    const header = lines[i].match(/^AssertionError \[ERR_ASSERTION\]:[ \t]*(.*)$/);
+    if (!header) continue;
+    const block = []; let bytes = 0;
+    for (let j = i + 1; j < lines.length && j <= i + 200; j++) {
+      if (/^AssertionError\b|^Node\.js v\d/.test(lines[j]) || isLossyTestOutputBoundary(lines[j])) break;
+      bytes += lines[j].length;
+      if (bytes > 16000) break;
+      block.push(lines[j]);
+      if (lines[j] === '}') break;
+    }
+    // Require Node's complete inspected AssertionError footer, not a generic
+    // log mentioning an error or a stack fragment joined across clipped output.
+    const codeAt = block.findIndex(line => /^  code: (['"])ERR_ASSERTION\1,?$/.test(line));
+    if (codeAt < 0 || block.at(-1) !== '}') continue;
+    const source = block.slice(0, codeAt).map(standaloneNodeFrame).find(Boolean);
+    if (!source) continue;
+    const values = new Map(); let current = null, duplicate = false;
+    for (const line of block.slice(codeAt + 1, -1)) {
+      const property = line.match(/^  ([A-Za-z_$][\w$]*):[ \t]*(.*)$/);
+      if (property) {
+        if (property[1] === 'code' || values.has(property[1])) { duplicate = true; break; }
+        current = property[1]; values.set(current, property[2]);
+      } else if (current !== null) values.set(current, values.get(current) + '\n' + line);
+    }
+    const value = key => values.has(key) ? values.get(key).trim().replace(/,$/, '') : null;
+    const actual = value('actual'), expected = value('expected'), rawOperator = value('operator');
+    if (duplicate || actual === null || expected === null || !/^(['"])[A-Za-z][A-Za-z0-9]*\1$/.test(rawOperator ?? '')
+        || actual.length > 4096 || expected.length > 4096) continue;
+    const message = header[1].trim().slice(0, 500) || 'Uncaught Node assertion';
+    failures.push({ name: `${message} (${source.file}:${source.line})`, ...source,
+      actual, expected, operator: rawOperator.slice(1, -1), message,
+      diff: [`+ ${actual}`, `- ${expected}`], assertionLine: source.line });
+  }
+  return failures;
 }
 
 // bun test: an inline "error: expect(received).toBe(expected)" with jest-style Expected:/Received:

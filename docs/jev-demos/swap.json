@@ -1,0 +1,92 @@
+{
+ "worker": "http://127.0.0.1:8085",
+ "burstMs": 8000,
+ "events": [
+  {
+   "t": 0.01,
+   "what": "start",
+   "gpuMiB": 3627,
+   "qwenSleeping": true,
+   "jevSleeping": true
+  },
+  {
+   "t": 5.09,
+   "what": "agent: local Qwen call (worker busy)",
+   "gpuMiB": 23811,
+   "ms": 5048,
+   "qwenSleeping": false,
+   "jevSleeping": true
+  },
+  {
+   "t": 5.41,
+   "what": "agent: next local call requested (waits on the GPU lease)",
+   "gpuMiB": 23811
+  },
+  {
+   "t": 11.53,
+   "what": "service: jev_swap_in",
+   "gpuMiB": 21635
+  },
+  {
+   "t": 11.81,
+   "what": "jev #1 (swap in: Qwen idle-sleeps, DiffusionGemma wakes)",
+   "gpuMiB": 21689,
+   "ms": 6695,
+   "answer": 0.906
+  },
+  {
+   "t": 11.88,
+   "what": "jev #2 (burst, GPU already held)",
+   "gpuMiB": 21689,
+   "ms": 34,
+   "answer": "cancel"
+  },
+  {
+   "t": 11.96,
+   "what": "jev #3 (burst)",
+   "gpuMiB": 21689,
+   "ms": 60,
+   "answer": 0.864
+  },
+  {
+   "t": 12.04,
+   "what": "jev #4 (burst)",
+   "gpuMiB": 21689,
+   "ms": 57,
+   "answer": 0.091
+  },
+  {
+   "t": 12.06,
+   "what": "jev burst over; waiting for the burst window to close",
+   "gpuMiB": 21689
+  },
+  {
+   "t": 20.78,
+   "what": "service: jev_swap_out",
+   "gpuMiB": 3627
+  },
+  {
+   "t": 25.74,
+   "what": "agent: local Qwen call completes (after Jev hands the GPU back)",
+   "gpuMiB": 23811,
+   "ms": 4936,
+   "qwenSleeping": false,
+   "jevSleeping": true
+  },
+  {
+   "t": 25.79,
+   "what": "end",
+   "gpuMiB": 23811,
+   "qwenSleeping": false,
+   "jevSleeping": true,
+   "status": {
+    "swaps": {
+     "in": 1,
+     "out": 1
+    },
+    "requests": 4,
+    "p50Ms": 60
+   }
+  }
+ ]
+}

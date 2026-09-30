@@ -78,7 +78,6 @@ async function call(model, item, { jig, guided = true }) {
   const messages = [{ role: "user", content: prompt }];
   const body = {
     model,
-    temperature: 0,
     max_tokens: 64,
     chat_template_kwargs: { enable_thinking: false },
   };
@@ -187,7 +186,7 @@ async function main() {
     kind: "bantam.factory-poka-yoke-evidence",
     generatedAt: new Date().toISOString(),
     sources: ["scripts/poka-yoke-jig-cohort.mjs", "src/factory/stations/bounded-selection.js"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", thinking: false },
     experiment: {
       defect: "the worker emits a fenced JSON envelope the die did not ask for (D18)",
       repairArm: "ask for JSON, strip the fence afterwards — inspection",

@@ -92,7 +92,6 @@ async function ask(prompt, schema) {
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
       max_tokens: 512,
       guided_json: schema,
     }),

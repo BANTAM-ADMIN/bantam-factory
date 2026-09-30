@@ -29,7 +29,7 @@ const gbnf=(ks)=>{
 const prompt=(ks)=>`Assign one id to each key. Ids: ${IDS.join(", ")}.\nKeys: ${ks.join(", ")}.\nAnswer with JSON only, one key per line is not allowed; a single JSON object.`;
 async function call(ks,mode){
   const msgs=[{role:"user",content:prompt(ks)}];
-  const b={model:"dg-awq",temperature:0,max_tokens:300,chat_template_kwargs:{enable_thinking:false}};
+  const b={model:"dg-awq",max_tokens:300,chat_template_kwargs:{enable_thinking:false}};
   if(mode==="grammar") b.guided_grammar=gbnf(ks);
   if(mode==="prefill"){msgs.push({role:"assistant",content:`{"${ks[0]}":"`});b.continue_final_message=true;b.add_generation_prompt=false;}
   if(mode==="json") b.guided_json={type:"object",properties:Object.fromEntries(ks.map(k=>[k,{type:"string",enum:IDS}])),required:ks,additionalProperties:false};

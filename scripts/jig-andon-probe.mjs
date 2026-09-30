@@ -78,7 +78,7 @@ const prompt = (probe, catalog = CATALOG) => [
 
 async function ask(model, probe, { jig, escape = false }) {
   const messages = [{ role: "user", content: prompt(probe, escape ? CATALOG_WITH_ESCAPE : CATALOG) }];
-  const body = { model, temperature: 0, max_tokens: 96, chat_template_kwargs: { enable_thinking: false } };
+  const body = { model, max_tokens: 96, chat_template_kwargs: { enable_thinking: false } };
   if (jig) {
     messages.push({ role: "assistant", content: '{"statusId":"' });
     body.continue_final_message = true;
@@ -169,7 +169,7 @@ async function main() {
     kind: "bantam.factory-jig-andon-evidence",
     generatedAt: new Date().toISOString(),
     sources: ["scripts/jig-andon-probe.mjs"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", thinking: false },
     question: "does prefilling the answer prevent the worker from signalling that no catalogued answer is correct?",
     probes: PROBES.map((probe) => ({ id: probe.id, correctAnswerOutsideCatalog: probe.truth })),
     results: {

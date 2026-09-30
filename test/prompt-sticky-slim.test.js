@@ -160,6 +160,18 @@ describe("replayed edit bodies stay slimmed once the window moves on", () => {
 });
 
 describe("a failed edit proposal remains model-resident", () => {
+  it("keeps a pending review's proposed bytes distinct from unchanged disk bytes", () => {
+    const prompt = buildPrompt({
+      task: "repair it", env: "e",
+      turns: [{ i: 0, action: { a: "write_file", p: "src/a.js", content: "export const pending = 42;" },
+        editApplied: false, observation: '[edit-confirmation] To accept this reviewed write, use a receipt.' }],
+      openPaths: ["src/a.js"], readPaths: ["src/a.js"],
+      openFilesText: "# src/a.js (current)\n1\texport const pending = 0;\n",
+      everSlimmedPaths: new Set(["src/a.js"]),
+    });
+    assert.match(prompt, /export const pending = 42/);
+    assert.doesNotMatch(prompt, /"p":"src\/a\.js","note":"\[superseded/);
+  });
   it("retains the newest rejected patch body even when its path is live", () => {
     const proposed = "export const repaired = 42;";
     const prompt = buildPrompt({

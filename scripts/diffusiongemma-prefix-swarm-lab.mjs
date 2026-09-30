@@ -93,7 +93,6 @@ async function toolAsk(prompt, { name, description, parameters }, maxTokens = 20
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "function", function: { name, description, parameters } }],
       tool_choice: "auto",
-      temperature: 0.3,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
     }),

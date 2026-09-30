@@ -96,7 +96,7 @@ export function dieBindingRequest({ model, constraint }) {
   // that; without it I would have reported a thinking-mode misconfiguration as a
   // stack-wide binding result.
   const body = {
-    model, messages, temperature: 0,
+    model, messages,
     max_tokens: 400,
     chat_template_kwargs: { enable_thinking: false },
   };

@@ -8,6 +8,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { inflateSync } from "node:zlib";
 import { CodexAppServer } from "../codex-transport.js";
+import { assertImageGpuAvailable } from '../image-gpu.js';
 
 const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
@@ -287,6 +288,7 @@ export async function describeImageWithCodex(absPath, prompt, {
  * Returns the description string, or null when the model yields nothing.
  */
 export function describeImage(endpoint, absPath, { prompt = DESCRIBE, timeoutSec = 120, maxTokens = 700 } = {}) {
+  assertImageGpuAvailable(endpoint);
   const url = `${String(endpoint).replace(/\/$/, "")}/v1/chat/completions`;
   const ext = IMG_MIME[path.extname(absPath).slice(1).toLowerCase()] ?? "png";
   const b64 = fs.readFileSync(absPath).toString("base64");

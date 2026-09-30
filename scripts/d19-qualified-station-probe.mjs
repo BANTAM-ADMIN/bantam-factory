@@ -94,7 +94,6 @@ async function ask(model, contract, { escape = false } = {}) {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt(contract, { escape }) }],
-      temperature: 0,
       max_tokens: 160,
       chat_template_kwargs: { enable_thinking: false },
     }),
@@ -179,7 +178,7 @@ async function main() {
     kind: "bantam.factory-d19-qualified-station-evidence",
     generatedAt: new Date().toISOString(),
     sources: ["scripts/d19-qualified-station-probe.mjs", "examples/factory/contract-edge-catalog.json", "src/factory/contract-edge-cell.js"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", thinking: false },
     station: {
       name: "contract-edge enumeration",
       status: "qualified — 7/7 released, zero escapes, certified task family",

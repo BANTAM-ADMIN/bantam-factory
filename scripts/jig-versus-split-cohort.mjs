@@ -65,7 +65,7 @@ function score(selections) {
 
 async function monolith(model, { jig }) {
   const messages = [{ role: "user", content: allPrompt() }];
-  const body = { model, temperature: 0, max_tokens: 400, chat_template_kwargs: { enable_thinking: false } };
+  const body = { model, max_tokens: 400, chat_template_kwargs: { enable_thinking: false } };
   if (jig) {
     // The fixture: the answer is opened for the worker, so it cannot emit a
     // fence and cannot omit the first key.
@@ -114,7 +114,7 @@ async function decomposed(model, { jig }) {
   let repairs = 0;
   for (const fixture of FIXTURES) {
     const messages = [{ role: "user", content: onePrompt(fixture) }];
-    const body = { model, temperature: 0, max_tokens: 96, chat_template_kwargs: { enable_thinking: false } };
+    const body = { model, max_tokens: 96, chat_template_kwargs: { enable_thinking: false } };
     if (jig) {
       messages.push({ role: "assistant", content: '{"edgeCaseId":"' });
       body.continue_final_message = true;
@@ -205,7 +205,7 @@ async function main() {
     kind: "bantam.factory-jig-versus-split-evidence",
     generatedAt: new Date().toISOString(),
     sources: ["scripts/jig-versus-split-cohort.mjs", "scripts/live-decomposition-cohort.mjs"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", thinking: false },
     experiment: {
       question: "when a whole step fails on emission rather than judgment, is a fixture cheaper than a split?",
       arms: {

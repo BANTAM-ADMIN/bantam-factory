@@ -122,6 +122,16 @@ function inlineNodeAssertion(source) {
 
 export function isFocusedAuditCommand(command, configured = null) {
   if (configured && sameConfiguredExecution(command, configured)) return false;
+  // Denial-only alias recognition: a leading ./ on a standalone script does
+  // not turn the configured suite into an independent focused witness. Never
+  // use this relaxed comparison to grant project verification credit.
+  if (configured) {
+    const actual = wordsForDirectCommand(command), expected = wordsForDirectCommand(configured);
+    if (actual?.length === 2 && expected?.length === 2 && actual[0] === expected[0]
+        && /^(?:node|nodejs|python(?:3(?:\.\d+)?)?|ruby)$/.test(actual[0].split('/').at(-1))
+        && !actual[1].startsWith('-') && !expected[1].startsWith('-')
+        && actual[1].replace(/^(?:\.\/)+/, '') === expected[1].replace(/^(?:\.\/)+/, '')) return false;
+  }
   const words = wordsForDirectCommand(command);
   if (!words) return false;
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0] ?? "")) words.shift();
@@ -440,7 +450,7 @@ export function existingFocusedCheck(paths, readSource, { generation } = {}) {
   return null;
 }
 
-function evaluateContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null } = {}) {
+function evaluateContractAudit(turns = [], { generation, configuredCommand = null, verificationWorkspaceReadOnly = null, workspace = null, latestFocused = false } = {}) {
   let auditIndex = -1;
   for (let index = turns.length - 1; index >= 0; index--) {
     const audit = turns[index]?.contractStateAudit;
@@ -551,7 +561,9 @@ function evaluateContractAudit(turns = [], { generation, configuredCommand = nul
   }
   const projectAfterFocused = projectTurn !== null && focusedTurn !== null
     && projectOrder > focusedOrder;
-  if (completedPair) return {pending: null, witness: completedPair.witness};
+  // Grounding reviews need the latest replacement assertion, even when an
+  // older passing pair remains valid execution evidence on this same tree.
+  if (completedPair) return {pending: null, witness: latestFocused ? focusedWitness : completedPair.witness};
   if (focusedTurn !== null && (!configured || projectAfterFocused)) {
     return { pending: null, witness: focusedWitness && (!configured || projectWitnessValid) ? focusedWitness : null };
   }

@@ -134,7 +134,6 @@ async function ask(model, fixture) {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt(fixture) }],
-      temperature: 0,
       max_tokens: 96,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: ANSWER_SCHEMA,
@@ -338,7 +337,7 @@ async function main() {
     kind: "bantam.factory-live-station-evidence",
     generatedAt: new Date().toISOString(),
     sources: [path.relative(REPOSITORY_ROOT, RUNS), "scripts/live-station-cohort.mjs"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, guidedJson: true, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", guidedJson: "sent-not-enforced", thinking: false },
     experiment: {
       job: "select the single unhandled edge case from a closed catalog",
       fixtures: FIXTURES.map((fixture) => ({ id: fixture.id, expected: fixture.expected })),

@@ -7,6 +7,9 @@
 //   bantam strut [anim]               let the rooster loose (idle·peck·flap·crow·walk·all)
 
 import { readJsonFile } from "../src/json-file.js";
+import { generationProvider, readComfyConfig, ComfyClient } from '../src/logic/comfyui-client.js';
+import { ComfyImageJobs, ImageSleepInput, formatComfySizeChoices } from '../src/logic/comfyui-image.js';
+import { previewTerminalImage } from '../src/logic/terminal-image.js';
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -40,7 +43,7 @@ import { researchOffer, elicitGaps } from "../src/logic/research-triggers.js";
 import { diffClaims, renderClaimDiff } from "../src/logic/claim-diff.js";
 import { sampleAnswers, stabilityReport, renderStabilityReport } from "../src/logic/consistency-probe.js";
 import { makeStreamRenderer } from "../src/logic/stream-render.js";
-import { makeAttendantState, noteAttendantEvent, buildAttendantPrompt } from "../src/logic/attendant.js";
+import { makeAttendantState, noteAttendantEvent, buildAttendantPrompt, pendingOperatorRequests } from "../src/logic/attendant.js";
 import { loadUserSettings, saveUserSetting } from "../src/logic/user-settings.js";
 import { resolveCodexapiConfig, findCodexapiCheckout, bridgeStatus, codexapiChoices, launchBridge } from "../src/codexapi-bridge.js";
 import {
@@ -105,6 +108,7 @@ import { createLiveReview } from "../src/live-review.js";
 import { captureFinalDiff, prepareDiffBaseline } from "../src/diff.js";
 import { buildSessionTask, extractNextStep, isStatusQuestion } from "../src/continuation.js";
 import { beginChatEvidence } from "../src/chat-evidence.js";
+import { listSavedChatRuns, describeSavedChatRun } from "../src/chat-resume-picker.js";
 import { loadOperatorProfile } from "../src/operator-profile.js";
 import { EDIT_ACTIONS } from "../src/edit-actions.js";
 import { captureHarnessState, emptyHarnessState } from "../src/harness-state.js";
@@ -666,6 +670,12 @@ if (cmd === "chat-transport") {
     console.log("  The transport stays off until the renderer and the template agree.");
   }
   process.exit(v.ok ? 0 : 1);
+}
+if (cmd === "jev") {
+  // `bantam jev …` — Jev mode: serve DiffusionGemma System One behind a
+  // Jev-compatible API, and control its engine. See JEV_MODE.md.
+  const { runJevCli } = await import("../src/jev/commands.js");
+  process.exit(await runJevCli(process.argv.slice(process.argv.indexOf("jev") + 1)));
 }
 if (cmd === "models") {
   // `bantam models` — the registry an operator actually edits. Adding a
@@ -1417,6 +1427,41 @@ function applyImageMode(on) {
   imageModeState.on = on;
 }
 applyImageMode(imageModeState.on);
+if (!process.env.BANTAM_IMAGE_GENERATION_PROVIDER && imageModeState.source !== 'BANTAM_CODEX_IMAGE') {
+  const saved = loadUserSettings().imageGenerationProvider;
+  if (['off', 'codex', 'comfyui'].includes(saved)) process.env.BANTAM_IMAGE_GENERATION_PROVIDER = saved;
+}
+function applyGenerationProvider(provider) {
+  process.env.BANTAM_IMAGE_GENERATION_PROVIDER = provider;
+  applyImageMode(provider === 'codex');
+  saveUserSetting('imageGenerationProvider', provider);
+  saveUserSetting('imageMode', provider === 'codex');
+}
+// A preview changes the shape of the conversation, so it is deliberately
+// opt-in.  An environment value is useful for scripts; the REPL setting is
+// retained for ordinary interactive sessions.
+const previewEnv = String(process.env.BANTAM_IMAGE_PREVIEW ?? '').toLowerCase();
+const previewProtocolEnv = String(process.env.BANTAM_IMAGE_PREVIEW_PROTOCOL ?? '').toLowerCase();
+const savedPreviewProtocol = String(loadUserSettings().imagePreviewProtocol ?? 'auto').toLowerCase();
+let imagePreviewProtocol = ['auto', 'ansi', 'kitty', 'iterm', 'sixel'].includes(previewProtocolEnv)
+  ? previewProtocolEnv
+  : ['auto', 'ansi', 'kitty', 'iterm', 'sixel'].includes(savedPreviewProtocol) ? savedPreviewProtocol : 'auto';
+let imagePreview = previewEnv === 'on' || previewEnv === '1' || previewEnv === 'true'
+  ? true
+  : previewEnv === 'off' || previewEnv === '0' || previewEnv === 'false'
+    ? false
+    : loadUserSettings().imagePreview === true;
+function applyImagePreview(on, protocol = null) {
+  imagePreview = on;
+  if (protocol) {
+    imagePreviewProtocol = protocol;
+    saveUserSetting('imagePreviewProtocol', protocol);
+  }
+  process.env.BANTAM_IMAGE_PREVIEW = on ? 'on' : 'off';
+  if (imagePreviewProtocol === 'auto') delete process.env.BANTAM_IMAGE_PREVIEW_PROTOCOL;
+  else process.env.BANTAM_IMAGE_PREVIEW_PROTOCOL = imagePreviewProtocol;
+  saveUserSetting('imagePreview', on);
+}
 // Which eyes read an image. The tool registry is rebuilt per request, so this
 // can change mid-session like any other mode.
 const imageProviderState = resolveImageProvider({
@@ -1502,7 +1547,7 @@ function liveLogger(e) {
     : `  inspection ${e.cycle}: ${e.error ? 'incomplete — ' + e.error : 'evidence saved; returning to builder'}\n`);
   else if (e.type === "invalid") {
     if (e.kind === "output_limit") {
-      process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: split the action\n`);
+      process.stderr.write(`  ✗ output limit${e.target ? ` while writing ${e.target}` : ""}: ${e.continuing ? "continuing the same action" : "split the action"}\n`);
     } else {
       process.stderr.write(`  ✗ invalid: ${e.error}\n`);
     }
@@ -1527,7 +1572,7 @@ function liveLogger(e) {
       ? `  🧭 code KB: ${e.files.toLocaleString()} files${e.buildMs >= 50 ? ` indexed in ${(e.buildMs / 1000).toFixed(1)}s` : " ready"} — \`query\` answers defines/symbols/deps/flow\n`
       : e.tooLarge
         ? noteKbTooLarge(e)
-        : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
+        : "  🧭 code KB: off — repository lookup is unavailable (--ground enables it); image generation remains independent.\n");
   } else if (e.type === "skills_used") {
     process.stderr.write(`  📚 using ${e.skills.length} skill(s): ${e.skills.join("; ")}\n`);
   } else if (e.type === "skill_learned") {
@@ -1631,7 +1676,8 @@ function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, 
     // Printed even when off: this is the one mode whose ON state sends prompts
     // to an external account, so it must never be quietly enabled from a
     // remembered setting.
-    { key: "image", value: image ? "ON — via your Codex plan" : "off", command: ":image [on|off]", detail: describeImageMode(image) },
+    { key: "image", value: generationProvider() === 'comfyui' ? 'comfyui' : generationProvider() === 'codex' ? "ON — via your Codex plan" : "off",
+      command: ":image [comfyui|codex|off]", detail: generationProvider() === 'comfyui' ? 'images run through your configured ComfyUI API' : describeImageMode(generationProvider() === 'codex') },
     { key: "eyes", value: imageProvider, command: ":eyes [auto|local|codex]", detail: describeImageProvider(imageProvider) },
   ];
 }
@@ -4172,7 +4218,7 @@ function makeInteractiveLogger(emit, activity = {}) {
       ? `  🧭 code KB: ${e.files.toLocaleString()} files${e.buildMs >= 50 ? ` indexed in ${(e.buildMs / 1000).toFixed(1)}s` : " ready"} — \`query\` answers defines/symbols/deps/flow\n`
       : e.tooLarge
         ? noteKbTooLarge(e)
-        : "  🧭 code KB: off — the `query` action has no tools behind it (--ground enables it)\n");
+        : "  🧭 code KB: off — repository lookup is unavailable (--ground enables it); image generation remains independent.\n");
   } else if (e.type === "skills_used") {
       // Once per skill per run: explains why the model suddenly knows an approach.
       out(`  ${dim(`recalling skill: ${e.skills.join(", ")}`)}`);
@@ -4182,7 +4228,7 @@ function makeInteractiveLogger(emit, activity = {}) {
       // A malformed action costs a silent retry otherwise — say so (observed: minutes of
       // heartbeats while truncated big-write JSON was re-generated with no visible reason).
       if (e.kind === "output_limit") {
-        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""} — steering to smaller incremental edits`)}`);
+        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : " — steering to smaller incremental edits"}`)}`);
       } else {
         out(`  ${paint("33", "✗ malformed action, retrying")}${e.error ? dim(` — ${String(e.error).slice(0, 90)}`) : ""}`);
       }
@@ -4279,6 +4325,10 @@ async function repl() {
   // a broken run.
   async function maybeAttendantReply(question) {
     if (attendantBusy || !attendantRun || model.codex || model.apiMode || model.deepseek) return;
+    const run = attendantRun;
+    const task = lastUserQuestion;
+    const isCurrentRun = () => running && attendantRun === run && !aborted;
+    attendantBusy = true; // Own single-flight before the asynchronous slot probe.
     try {
       if (attendantSlots == null) {
         try {
@@ -4286,16 +4336,15 @@ async function repl() {
           attendantSlots = r.ok ? (await r.json()).length : 1;
         } catch { attendantSlots = 1; }
       }
-      if (attendantSlots < 2) return;
-      attendantBusy = true;
+      if (attendantSlots < 2 || !isCurrentRun()) return;
       if (attendantPersona === undefined) {
         try { attendantPersona = fs.readFileSync(path.join(os.homedir(), ".bantam", "attendant-voice.md"), "utf8").trim() || null; }
         catch { attendantPersona = null; }
       }
-      const prompt = buildAttendantPrompt({ task: lastUserQuestion, turns: attendantRun.turns, question, persona: attendantPersona });
+      const prompt = buildAttendantPrompt({ task, turns: run.turns, question, persona: attendantPersona });
       const res = await model.complete(prompt, { nPredict: 160, temperature: 0.2, stop: ["<|im_end|>"] });
       const text = String(res?.content ?? "").trim();
-      if (text) {
+      if (text && isCurrentRun()) {
         for (const line of text.split("\n")) if (line.trim()) emit(`  ⚡ ${line.trim()}`);
         // Close the loop: the worker hears what its own voice said, clearly
         // framed as its voice — one agent, two hands, no confusion.
@@ -4339,6 +4388,41 @@ async function repl() {
   };
   const activity = { label: null, detail: null };
   const logger = makeInteractiveLogger(emit, activity);
+  const previewedImages = new Set();
+  const showImagePreview = (file) => {
+    if (!imagePreview || previewedImages.has(file) || !/\.(png|jpe?g|webp)$/i.test(file)) return;
+    previewedImages.add(file);
+    try {
+      const absolute = path.resolve(workspace, file);
+      const preview = previewTerminalImage(absolute, { columns: process.stdout.columns, env: process.env });
+      if (preview.output) {
+        emit(`  image preview (${preview.protocol})\n${preview.output}`);
+      } else if (preview.reason) {
+        emit(`  image preview unavailable: ${preview.reason}.`);
+      }
+    } catch (error) {
+      emit(`  image preview unavailable: ${error.message}`);
+    }
+  };
+  const imageJobs = new ComfyImageJobs(workspace, { onEvent: e => {
+    emit(`  ${e.message}`);
+    if (e.artifacts?.length && ['completed', 'failed', 'cancelled', 'recovery_required'].includes(e.state)) {
+      for (const file of e.artifacts) {
+        emit(`  ${file}`);
+        if (e.state === 'completed') showImagePreview(file);
+      }
+    }
+    if (e.shared) {
+      activity.label = ['completed', 'failed', 'cancelled'].includes(e.state) ? 'generating' : 'local image generation';
+      activity.detail = e.state;
+    }
+    if (['completed', 'failed', 'cancelled', 'recovery_required'].includes(e.state)) imageInput.finished();
+    if (['completed', 'failed', 'cancelled'].includes(e.state) && running) {
+      injections.push({ kind: 'image', text: imageJobs.status() });
+    }
+  } });
+  const imageInput = new ImageSleepInput(imageJobs, { emit,
+    queue: text => { if (running) injections.push(text); else pending.push(text); } });
 
   // Paste detection: buffer lines that arrive in rapid succession (within 150ms)
   // so a multi-line paste is treated as one request, not many separate ones.
@@ -4380,6 +4464,13 @@ async function repl() {
     });
   }
   function handleInputLine(s) {
+    if (/^:image\s+(status|cancel|recover)\s*$/i.test(s)) {
+      const command = s.trim().split(/\s+/)[1].toLowerCase();
+      if (command === 'status') emit(imageJobs.status());
+      else void imageJobs[command]().then(emit, e => emit(`  ${e.message}`));
+      return;
+    }
+    if (imageInput.handle(s)) return;
     // Belt and braces: a line that reaches the paste/flush path while a prompt
     // is pending is still an answer. routeInputLine already catches the direct
     // path; this covers a flush that was scheduled before the prompt appeared.
@@ -4388,6 +4479,8 @@ async function repl() {
       q.resolve(String(s ?? "").trim());
       return;
     }
+    // Session settings are harness commands, never steering for either model.
+    if (running && tty && handleMaxTurnsCommand(s)) return;
     if (running && tty) {                     // typed mid-run on a terminal -> steer
       if (s) {
         // "how's it coming?" — the operator's status poke, in 100+ of their
@@ -4415,7 +4508,7 @@ async function repl() {
           // Preserve earlier steering as later top-level work, put this request
           // first, and stop the current run at its existing abort boundary.
           if (injections.length) {
-            pending.push(...injections);
+            pending.push(...pendingOperatorRequests(injections));
             injections = [];
           }
           pending.unshift(s);
@@ -4442,6 +4535,7 @@ async function repl() {
     else if (s || lastProposedNext) pending.push(s);   // buffered pipe input; empty lines count only with a pending next
   }
   rl.on("line", (line) => {
+    if (imageInput.awaiting) { handleInputLine(line); return; }
     const routed = routeInputLine(line, { awaitingAnswer: Boolean(operatorQuestion) });
     // An approval prompt owns this line — including an empty Enter, which is the
     // bracketed default. It must never fall through to the steering path.
@@ -4463,6 +4557,10 @@ async function repl() {
     schedulePasteFlush();
   });
   rl.on("SIGINT", () => {
+    if (imageJobs.interrupt()) {
+      imageInput.finished();
+      return;
+    }
     // Ctrl-C at an approval prompt declines it, so the paused run can end
     // instead of hanging on a promise nothing will settle.
     if (operatorQuestion) { const q = operatorQuestion; operatorQuestion = null; q.resolve("deny"); }
@@ -4509,7 +4607,7 @@ async function repl() {
   // person, default No, and only if `:image` was never set by hand. The Codex
   // probe spawns `codex login status` (~50 ms) and runs only after the cheap
   // checks pass, so a session that has already answered pays nothing.
-  if (interactiveCard && shouldOfferImageOnboarding({
+  if (generationProvider() !== 'comfyui' && interactiveCard && shouldOfferImageOnboarding({
     settings: loadUserSettings(), imageSource: imageModeState.source, env: process.env, tty,
     codex: () => detectCodex(codexProbes()),
   })) {
@@ -4530,6 +4628,48 @@ async function repl() {
     console.log("");
   }
   const sessionLog = [];
+  // Offer saved project-local chat context before starting a fresh conversation.
+  if (tty) {
+    const savedRuns = listSavedChatRuns(workspace);
+    const pageSize = 3;
+    const runColors = [C.comb, C.plume, C.beak, C.good, "38;2;190;130;225", "38;2;100;180;220"];
+    if (savedRuns.length) {
+      let page = 0;
+      let chosen = null;
+      while (!chosen) {
+        const start = page * pageSize;
+        const pageRuns = savedRuns.slice(start, start + pageSize);
+        const pageCount = Math.ceil(savedRuns.length / pageSize);
+        console.log(`\n${paint(`1;${C.paper}`, "Previous runs in this folder")} ${paint(C.dim, `(page ${page + 1}/${pageCount})`)}`);
+        console.log(`  ${paint(C.good, "0) New run")}`);
+        console.log(`  ${paint(C.rule, "─".repeat(68))}`);
+        pageRuns.forEach((run, i) => {
+          const number = start + i + 1;
+          console.log(`  ${paint(runColors[number - 1] || C.paper, `${number})`)} ${describeSavedChatRun(run)}`);
+        });
+        console.log(`  ${paint(C.rule, "─".repeat(68))}`);
+        if (page > 0) console.log(`  ${paint(C.beak, "b)")} Back`);
+        if (start + pageSize < savedRuns.length) console.log(`  ${paint(C.beak, "c)")} Continue to the next 3`);
+        const answer = await new Promise((resolve) => rl.question("Choose a run [0]: ", resolve));
+        const input = answer.trim().toLowerCase();
+        if (input === "c" && start + pageSize < savedRuns.length) { page += 1; continue; }
+        if (input === "b" && page > 0) { page -= 1; continue; }
+        const selected = Number.parseInt(input, 10);
+        if (selected === 0 || input === "") break;
+        if (Number.isInteger(selected) && selected > start && selected <= start + pageRuns.length) {
+          chosen = savedRuns[selected - 1];
+        }
+      }
+      if (chosen) {
+        const artifact = chosen.artifact;
+        sessionLog.push({ request: artifact.request, summary: artifact.summary || artifact.disposition || "previous run" });
+        for (const turn of artifact.turns) {
+          if (turn?.request && turn.request !== artifact.request) sessionLog.push({ request: turn.request, summary: turn.summary || "prior turn" });
+        }
+        console.log(`Resuming context from ${path.basename(chosen.path)}.\n`);
+      }
+    }
+  }
   let lastProposedNext = null;   // the agent's own Next proposal, made pressable
   let lastRunStartedAt = null;   // for instant status answers
   let trioSession = null;
@@ -4934,12 +5074,31 @@ async function repl() {
     return false;
   }
 
+  function handleMaxTurnsCommand(input) {
+    const match = String(input).trim().match(/^:max-turns(?:\s+(.*))?$/i);
+    if (!match) return false;
+    const value = (match[1] || "").trim();
+    if (value) {
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) {
+        emit("  Usage: :max-turns [N] — N must be a positive integer; omit N to show the limit.");
+        return true;
+      }
+      args["max-turns"] = Number(value);
+    }
+    const fallback = teamSession || trioSession ? 30 : (Number(process.env.BANTAM_MAX_TURNS) || 60);
+    const limit = args["max-turns"] ? Number(args["max-turns"]) : fallback;
+    emit(`  max-turns: ${limit} per request${value ? " (this session; applies to the next request, including keep going; current run unchanged)" : ""}`);
+    return true;
+  }
+
   for (;;) {
     const raw = await nextRequest();
     if (raw === null) break;                    // EOF / Ctrl-C at the prompt
     const request = String(raw).trim();
     if (!request) continue;
     if (["exit", "quit", ":q"].includes(request.toLowerCase())) break;
+
+    if (handleMaxTurnsCommand(request)) continue;
 
     // `:help` / `/help` / `?` — the in-session command list.
     if (/^(?::help|\/help|:h|help|\?)$/i.test(request)) { printReplHelp(); continue; }
@@ -5057,6 +5216,14 @@ async function repl() {
       }
       console.log(`  usage reporting: ${usageDisplayEnabled ? "on" : "off"}`);
       console.log(`  ${formatUsage(model.usageSummary(), { cumulative: true })}`);
+      continue;
+    }
+
+    // `:jev` — Jev mode: a live DiffusionGemma System One decision engine and its
+    // Jev-compatible API, alongside this session's worker. See JEV_MODE.md.
+    if (/^:jev\b/i.test(request)) {
+      const { handleJevCommand } = await import("../src/jev/commands.js");
+      await handleJevCommand(request.replace(/^:jev\b\s*/i, ""), { model, ask: async (question) => { console.log(question); return wizardPrompt("jev"); } });
       continue;
     }
 
@@ -5335,23 +5502,50 @@ async function repl() {
       continue;
     }
 
-    // `:image [on|off]` — offer generate_image to the model. The tool registry is
-    // rebuilt per request, so this lands on the next message.
+    // Generation is independent of :eyes (image interpretation).
     if (/^:image\b/i.test(request)) {
-      const arg = request.replace(/^:image\b\s*/i, "").trim().toLowerCase();
-      if (arg === "on" || arg === "off") {
-        applyImageMode(arg === "on");
-        const saved = saveUserSetting("imageMode", imageModeState.on);
-        console.log(paint(imageModeState.on ? "33" : "2",
-          `  image: ${imageModeState.on ? "ON" : "off"} — ${describeImageMode(imageModeState.on)}${saved ? " (remembered)" : ""}`));
-        if (imageModeState.on) {
-          console.log(paint("33", "  generate_image runs on your signed-in Codex plan (no per-image charge) — `bantam governor status` shows BANTAM's own caps."));
+      const arg = request.replace(/^:image\b\s*/i, "").trim();
+      try {
+        if (imageJobs.busy && !/^(status|cancel)$/i.test(arg)) {
+          console.log('  An image job is active. Use :image status or :image cancel first.');
+        } else if (/^preview\s+(on|off|auto|ansi|kitty|iterm|sixel)$/i.test(arg)) {
+          const choice = arg.split(/\s+/)[1].toLowerCase();
+          if (choice === 'off') {
+            applyImagePreview(false);
+            console.log('  image preview: off (remembered).');
+          } else {
+            const protocol = choice === 'on' ? imagePreviewProtocol : choice;
+            applyImagePreview(true, protocol);
+            console.log(`  image preview: on (${imagePreviewProtocol}, remembered).`);
+          }
+        } else if (/^(on|off|codex(?:\s+on|\s+off)?|comfyui(?:\s+on|\s+off)?)$/i.test(arg)) {
+          const selected = arg.toLowerCase().replace(/\s+/g, ' ');
+          const provider = selected === 'on' || selected === 'codex' || selected === 'codex on'
+            ? 'codex'
+            : selected === 'comfyui' || selected === 'comfyui on' ? 'comfyui' : 'off';
+          if (provider === 'comfyui') readComfyConfig(workspace);
+          applyGenerationProvider(provider);
+          console.log(`  image: ${provider} (remembered). Takes effect on your next request.`);
+        } else if (arg === 'sizes') {
+          const config = readComfyConfig(workspace);
+          console.log(`  Krea image sizes: ${formatComfySizeChoices(config)}`);
+          console.log('  Use :image generate <prompt> --size landscape, --size 1280x720, or --aspect 16:9.');
+        } else if (arg === 'check') {
+          const config = readComfyConfig(workspace);
+          await new ComfyClient(config).check();
+          console.log(`  ComfyUI ready: ${config.url}. Workflow nodes and model choices are available.`);
+        } else if (/^generate\s+/i.test(arg)) {
+          if (generationProvider() !== 'comfyui') throw Error('Select :image comfyui before direct ComfyUI generation');
+          console.log(await imageJobs.generate(arg.replace(/^generate\s+/i, ''), { model, background: true }));
+        } else if (arg === 'cancel') console.log(await imageJobs.cancel());
+        else if (arg === 'recover') console.log(await imageJobs.recover());
+        else if (arg === 'status') console.log(imageJobs.status());
+        else {
+          console.log(`  image: ${generationProvider()}`);
+          console.log(`  preview: ${imagePreview ? `on (${imagePreviewProtocol})` : 'off'}`);
+          console.log('  :image comfyui [on|off] | codex [on|off] · :image sizes · :image preview on|off|auto|kitty|iterm|sixel|ansi · :image check · :image generate <prompt> [--size … | --aspect W:H] · :image status | cancel | recover');
         }
-        console.log(paint("2", "  takes effect on your next request."));
-      } else {
-        console.log(paint("2", `  image: ${imageModeState.on ? "ON" : "off"} — ${describeImageMode(imageModeState.on)}`));
-        console.log(paint("2", "  :image on   ·   :image off"));
-      }
+      } catch (e) { console.log(`  Image: ${e.message}`); }
       continue;
     }
 
@@ -5530,10 +5724,12 @@ async function repl() {
           onEvent: makeSelfImproveEventLogger(emit, logger),
         });
       } else if (teamSession) {
+        if (args["max-turns"]) teamSession.engine.maxTurns = Number(args["max-turns"]);
         teamOutcome = await teamSession.runTask(request, {
           signal: activeRunController.signal,
         });
       } else if (trioSession) {
+        if (args["max-turns"]) trioSession.maxTurns = Number(args["max-turns"]);
         trioOutcome = await trioSession.runTurn(request, {
           signal: activeRunController.signal,
         });
@@ -5574,6 +5770,7 @@ async function repl() {
             }
           }
         }
+        await imageJobs.prepareLocalModel(model);
         // Deep research (opt-in): the A/B-winning proactive trigger — elicit
         // the model's own gap list, shelve sources for it, answer with inks.
         if (deepResearch) {
@@ -5630,8 +5827,10 @@ async function repl() {
           localSlot: !usingCodex && (!usingApi || isLoopbackUrl(model?.apiUrl) || Boolean(model?.chatSessions)),
         });
         if (requestMode.applied) Object.assign(process.env, contextModeEnv(requestMode.mode));
+        // Jev mode's decide tool, when the operator turned it on (:jev tool on).
+        const jevDecide = (await import("../src/jev/commands.js")).jevDecideTool();
         res = await runAgent({
-          task, workspace, model,
+          task, workspace, model, imageJobs, jevDecide,
           profileText: operatorProfile?.text ?? null,
           // Net access is OFF by default. --dangerously-allow-net grants it
           // outright (no prompts); otherwise a classified internet fetch pauses
@@ -5743,14 +5942,16 @@ async function repl() {
         readline.clearLine(process.stdout, 0);
       }
       activeRunController = null;
+      attendantRun = null; // Late sibling replies belong to this completed run only.
       running = false;
     }
 
     // A line typed near completion, interruption, or an infrastructure pause may not have reached
     // runAgent's between-turn drain. Keep the promise made by the "queued" acknowledgement: treat
-    // every undelivered line as the next request instead of silently dropping it.
+    // every undelivered operator line as the next request instead of silently dropping it.
+    // Attendant replies and internal status are not new operator requests.
     if (injections.length) {
-      pending.splice(0, 0, ...injections);
+      pending.splice(0, 0, ...pendingOperatorRequests(injections));
       injections = [];
     }
 
@@ -5853,6 +6054,10 @@ async function repl() {
     } else if (verdict.kind === "blocked") {
       console.log(`\n${paint("33", "⏸ blocked")} ${res.summary || "The environment cannot perform that action safely."} ${meta}\n`);
       sessionLog.push({ request, summary: String(res.summary || "(infrastructure blocked)").replace(/\s+/g, " ").slice(0, 220) });
+    } else if (verdict.kind === "model_error") {
+      const reason = res.modelFailure.message || "The model request failed.";
+      console.log(`\n${paint("31", "✗ model error")} ${reason} ${meta}\n`);
+      sessionLog.push({ request, summary: `(model error) ${reason}`.slice(0, 220) });
     } else if (verdict.kind === "verification_failed") {
       console.log(`\n${paint("31", "✗ verification failed")} ${res.summary || "workspace changes did not pass"} ${meta}`);
       for (const line of verificationDetailLines(res.verification?.detail)) {
@@ -5873,7 +6078,7 @@ async function repl() {
       sessionLog.push({ request, summary: String(res.summary).replace(/\s+/g, " ").slice(0, 220) });
     } else if (verdict.kind === "paused") {
       const verified = verdict.externallyVerified ? " Verifier passed." : "";
-      console.log(`\n${paint("33", "⏸")} Paused at the ${res.metrics.turns}-turn limit${res.summary ? " — " + res.summary : ""}.${verified} ${paint("2", 'Say "keep going" to continue, or raise --max-turns.')} ${meta}`);
+      console.log(`\n${paint("33", "⏸")} Paused at the ${res.metrics.turns}-turn limit${res.summary ? " — " + res.summary : ""}.${verified} ${paint("2", 'Say "keep going" to continue, or set :max-turns N then say "keep going".')} ${meta}`);
       // The pause is not a shrug: show what already exists so the person can
       // decide with their eyes open (the typewriter PWA pause hid a four-stage
       // flow and a service worker behind a bare limit notice).
@@ -5928,6 +6133,7 @@ async function repl() {
     // pending is empty and closed is set, which ends the loop cleanly.
     if (closed && !pending.length) break;
   }
+  await imageJobs.close();
   teamSession?.close();
   trioSession?.close();
   model.close();
@@ -6512,12 +6718,14 @@ For autonomous runs, use --ground or BANTAM_GROUND=1 to enable the query socket.
 Common model flags: [--endpoint URL] [--profile qwen|gemma|generic] [--think auto|off|always] [--temperature N] [--act-temperature N] [--top-p N] [--top-k N]
 More run flags: [--tui] [--title "..."] [--plan] [--skills [path]] [--lang X] [--no-pregate] [--no-ground] [--no-edit]
 Usage display: [--usage] [--no-usage] (or BANTAM_USAGE=on|off); in chat use :usage [on|off|reset]
-Images:        [--ground is on by default] BANTAM_CODEX_IMAGE=1 or :image on — offers generate_image and
-               edit_image to the model, brokered through the signed-in Codex account (included with the
-               plan, no per-image charge; announced in the startup modes line). The first interactive launch
-               that finds a signed-in Codex asks once whether to turn this on (BANTAM_NO_ONBOARDING=1 skips). :eyes [auto|local|codex] chooses which model READS an
-               image; the local mmproj wins by default whenever a projector is loaded. Concurrency falls to
-               3 at >=2 Mpx or --quality high (BANTAM_CODEX_IMAGE_CONCURRENCY overrides).
+Images:        :image codex | comfyui | off selects the generation provider. ComfyUI uses the local
+               API workflow in .bantam/comfyui.json; :image check verifies it, :image sizes lists Krea dimensions,
+               and :image status | cancel |
+               recover controls jobs. Shared local GPUs put llama.cpp to sleep during generation; hosted
+               sessions keep chatting. BANTAM saves generated assets and timing-based ETAs under the workspace.
+               :image preview on|off toggles a saved terminal preview. Use :image preview kitty, iterm, or sixel
+               to force the terminal's native image protocol when automatic detection is unavailable.
+               :eyes [auto|local|codex] separately selects the model that READS an image.
 
 Chat transport: [--chat-transport] (or BANTAM_CHAT_TRANSPORT=1) — send turns as chat messages so the
                server checkpoints at every user-message boundary (3x less prefill at depth). Opt-in and

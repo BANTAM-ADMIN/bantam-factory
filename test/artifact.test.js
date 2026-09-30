@@ -69,6 +69,19 @@ function baseInput(overrides = {}) {
 }
 
 describe("artifact construction", () => {
+  it("preserves post-execution assertion review without promoting it to execution evidence", () => {
+    const review = { schema: 1, executionEvidence: false, sourceSha256: "a".repeat(64),
+      review: { verdict: "revise", authority: "assertion-site-only", executionEvidence: false } };
+    const input = baseInput();
+    input.result.turns = [{ action: { a: "shell", c: "node check.cjs" },
+      failedAssertionReview: review, shellExecution: { exitCode: 1 } },
+    { action: { a: "read_file", p: "check.cjs" }, failedAssertionReview: null }];
+    const film = buildArtifact(input), expected = structuredClone(review);
+    review.review.verdict = "grounded";
+    assert.deepEqual(film.turns[0].failedAssertionReview, expected);
+    assert.equal(film.turns[0].shellExecution.exitCode, 1);
+    assert.equal(film.turns[1].failedAssertionReview, null);
+  });
   it("preserves bounded terminal model-failure evidence", () => {
     const artifact = buildArtifact(baseInput({
       result: {

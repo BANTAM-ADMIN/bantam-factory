@@ -173,7 +173,6 @@ async function ask(model, promptText, schema, maxTokens) {
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: promptText }],
-      temperature: 0,
       max_tokens: maxTokens,
       chat_template_kwargs: { enable_thinking: false },
       guided_json: schema,
@@ -414,7 +413,7 @@ async function main() {
     kind: "bantam.factory-live-decomposition-evidence",
     generatedAt: new Date().toISOString(),
     sources: [path.relative(REPOSITORY_ROOT, RUNS), "scripts/live-decomposition-cohort.mjs"],
-    worker: { model, endpoint: ENDPOINT, temperature: 0, guidedJson: true, thinking: false },
+    worker: { model, endpoint: ENDPOINT, sampler: "diffusion-server-schedule", guidedJson: "sent-not-enforced", thinking: false },
     experiment: {
       job: "map six JavaScript functions to their unhandled edge cases; the product is the complete mapping",
       scoring: "job-level: every row must be right, because a mapping with one wrong row is a wrong mapping",

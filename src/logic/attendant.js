@@ -13,6 +13,17 @@
 // injection queue exactly as before. The attendant answers from the observer
 // seat and says so.
 
+/** Only operator messages may outlive a run as new top-level requests.
+ * Internal replies/status remain run-scoped, never stringified as user work.
+ */
+export function pendingOperatorRequests(messages) {
+  return messages.flatMap((message) => {
+    if (typeof message === "string") return [message];
+    if (message?.kind === "user" && typeof message.text === "string") return [message.text];
+    return [];
+  });
+}
+
 export function makeAttendantState() {
   return { turns: [], lastAction: null };
 }

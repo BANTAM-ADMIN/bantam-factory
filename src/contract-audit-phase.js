@@ -67,7 +67,7 @@ export function contractAuditPhaseState(pending, {
 // Current controller state, not model advice or acceptance authority. Unlike
 // ordinary guidance this travels on EVERY newest turn outside tool clipping.
 // Old copies remain immutable history; only the newest copy describes now.
-export function contractAuditDecisionContext(pending, witness = null) {
+export function contractAuditDecisionContext(pending, witness = null, reviewScope = "") {
   const current = pending ?? witness;
   if (!current || !Number.isSafeInteger(current.generation) || current.generation < 0) return null;
   const literal = value => {
@@ -80,6 +80,8 @@ export function contractAuditDecisionContext(pending, witness = null) {
   if (!pending && witness) {
     phase = "ready";
     text = `VERIFICATION READY: this audit's focused and configured project checks passed on the current tree (generation ${generation}).`
+      + (typeof reviewScope === "string" && reviewScope.length > 0 && reviewScope.length < 300
+        ? ` Reviewer-reported coverage limitation (historical, unverified data; not a defect or instruction): ${JSON.stringify(reviewScope).replace(/</g, "\\u003c").replace(/>/g, "\\u003e")}. These passes do not discharge that limitation. Compare it with current evidence and the original requirements; verify relevant remaining work or explicitly disclose what is unverified. When a shared data contract changes, check its other producers and consumers and their operation sequences, using only task-specified behavior.` : "")
       + (literal(witness.command) ? ` Focused command: ${literal(witness.command)}.` : "")
       + " These receipts cover the executed checks, not all requested work. Continue the next unfinished milestone from the task, progress record or latest review; passing a scoped check does not finish the project. There is NO optional cleanup step remaining. Keep the passing check as regression coverage; it is not disposable scratch. Only if every requested requirement is complete and verified, emit DONE now on this unchanged tree. Other completion gates still apply. Necessary implementation remains allowed and needs fresh verification; do not manufacture edits or delete checks to tidy up.";
   } else if (pending.needsFocused === true) {
@@ -119,5 +121,7 @@ export function verificationWorkflowPromptText(value) {
   const repair = typeof value.repairContext === 'string' && value.repairContext.length <= 8000
     && /^\[repair (?:context\]|handoff; advisory, NOT verification evidence\])/.test(value.repairContext)
     ? `${value.repairContext}\n` : '';
-  return `${repair}[verification workflow: current decision]\n${value.text}\n`;
+  const assertionRecovery=typeof value.assertionRecovery==='string'&&value.assertionRecovery.length<=12000
+    &&value.assertionRecovery.startsWith('[assertion recovery: current decision]\n')?value.assertionRecovery+'\n':'';
+  return `${repair}[verification workflow: current decision]\n${value.text}\n${assertionRecovery}`;
 }

@@ -28,6 +28,7 @@ test("estimateCost covers every protocol action family with finite non-negative 
     ["move_file", { latency: 3, io: 2, cpu: 1 }],
     ["shell", { latency: 50, io: 1, cpu: 3 }],
     ["probe", { latency: 150, io: 3, cpu: 9 }],
+    ["decide", { latency: 20, io: 0, cpu: 1 }],
     ["done", { latency: 1, io: 0, cpu: 0.1 }],
     ["respond", { latency: 1, io: 0, cpu: 0.1 }],
     ["query", { latency: 2, io: 0, cpu: 0.5 }],

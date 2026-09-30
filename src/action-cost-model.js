@@ -33,6 +33,9 @@ const BASE_COSTS = {
   shell: { latency: 50, io: 1, cpu: 3 },
   // Unmeasured conservative prior: one probe can run three isolated shells.
   probe: { latency: 150, io: 3, cpu: 9 },
+  // Jev mode's decide: one local structured read (about 40 ms measured), more
+  // when the engine thinks or has to swap in (up to about 7 s).
+  decide: { latency: 20, io: 0, cpu: 1 },
   inspect: { latency: 8, io: 3, cpu: 2 },
   query: { latency: 2, io: 0, cpu: 0.5 },
   done: { latency: 1, io: 0, cpu: 0.1 },

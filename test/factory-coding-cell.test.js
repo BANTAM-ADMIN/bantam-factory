@@ -56,6 +56,32 @@ function sink() {
 }
 
 describe("BANTAMFACTORY isolated coding cell", () => {
+  it("defaults worker reasoning to auto and honors explicit reasoning modes", async () => {
+    for (const [thinkMode, expected] of [[undefined, 'auto'], ['off', 'off'], ['always', 'always'], ['AUTO', 'auto']]) {
+      const { workspace, factoryRoot } = fixture();
+      const worker = successfulAgent();
+      let received;
+      await runFactoryCodingCell({ workspace, root: factoryRoot, task: "change old to new",
+        verificationScript: "node verify.js", ...(thinkMode === undefined ? {} : { thinkMode }),
+        runAgentFn: async options => { received = options.thinkMode; return worker(options); },
+        verifier: async () => ({ pass: true, status: "pass" }),
+      });
+      assert.equal(received, expected);
+    }
+  });
+  it("gives the worker a verification command even without an explicit focused verifier", async () => {
+    for (const focusedVerificationScript of [null, "node focused.js"]) {
+      const { workspace, factoryRoot } = fixture();
+      let received;
+      const worker = successfulAgent();
+      await runFactoryCodingCell({ workspace, root: factoryRoot, task: "change old to new",
+        verificationScript: "node verify.js", focusedVerificationScript,
+        runAgentFn: async options => { received = options.verificationScript; assert.equal(options.assertionGrounding, true); return worker(options); },
+        verifier: async () => ({ pass: true, status: "pass" }),
+      });
+      assert.equal(received, focusedVerificationScript ?? "node verify.js");
+    }
+  });
   it("contains typed and legacy controller stops even when completion and verification claim success", async () => {
     const cases = [
       { controllerStop: { kind: "progress-gate", turn: 12 } },
@@ -322,5 +348,43 @@ describe("BANTAMFACTORY isolated coding cell", () => {
     ], { cwd: workspace, stdout: output, stderr: errors }), 0);
     assert.equal(fs.readFileSync(path.join(workspace, "value.txt"), "utf8"), "new\n");
     assert.match(output.text(), /APPLIED/);
+  });
+
+  it("forwards explicit CLI reasoning modes and rejects missing or invalid values", async () => {
+    for (const mode of ['off', 'auto', 'always']) {
+      const { workspace, factoryRoot } = fixture();
+      const output = sink(), errors = sink(), worker = successfulAgent();
+      let received;
+      const status = await runFactoryCommand(['factory', 'build', 'change old to new',
+        '--verify', 'node verify.js', '--factory-home', factoryRoot, '--think', mode], {
+        cwd: workspace, stdout: output, stderr: errors,
+        runAgentFn: async options => { received = options.thinkMode; return worker(options); },
+        verifier: async () => ({ pass: true, status: 'pass' }),
+      });
+      assert.equal(status, 0, errors.text());
+      assert.equal(received, mode);
+    }
+    for (const argumentsAfterThink of [[], ['sometimes'], ['0'], ['--json']]) {
+      const { workspace, factoryRoot } = fixture();
+      const errors = sink();
+      const status = await runFactoryCommand(['factory', 'build', 'change old to new',
+        '--verify', 'node verify.js', '--factory-home', factoryRoot, '--think', ...argumentsAfterThink], {
+        cwd: workspace, stdout: sink(), stderr: errors,
+        runAgentFn: async () => { assert.fail('Invalid reasoning options must not launch a worker'); },
+      });
+      assert.equal(status, 2);
+      assert.match(errors.text(), /--think requires auto, always, or off/);
+    }
+    const { workspace, factoryRoot } = fixture(), errors = sink();
+    assert.equal(await runFactoryCommand(['factory', 'build', 'change old to new',
+      '--verify', 'node verify.js', '--factory-home', factoryRoot,
+      '--cell', 'keyed-lifecycle', '--think', 'off'], {
+      cwd: workspace, stdout: sink(), stderr: errors,
+      runAgentFn: async () => { assert.fail('An unsupported cell cannot silently ignore an explicit mode'); },
+    }), 2);
+    assert.match(errors.text(), /--think is supported by the general coding cell/);
+    const help = sink();
+    assert.equal(await runFactoryCommand(['factory', '--help'], { stdout: help, stderr: sink() }), 0);
+    assert.match(help.text(), /--think auto\|always\|off \(general cell; default auto\)/);
   });
 });

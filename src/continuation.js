@@ -61,10 +61,21 @@ export function buildSessionTask({ request, sessionLog = [] }) {
     .map((s) => `- you asked: "${s.request}" → I: ${s.summary}`).join("\n");
   const last = sessionLog[sessionLog.length - 1];
   const lastReport = last.fullSummary ?? last.summary ?? "";
+  const lastTurns = Array.isArray(last.turns) ? last.turns.slice(-12) : [];
   const parts = [
     `Session so far (context only; the workspace already reflects this work):\n${recent}`,
     lastReport ? `Your last report, in full:\n${lastReport}` : "",
   ];
+  if (lastTurns.length) {
+    const transcript = lastTurns
+      .map((t) => {
+        const action = typeof t.action === "string" ? t.action : (t.action ? JSON.stringify(t.action) : "");
+        const obs = String(t.observation ?? "").slice(0, 400);
+        return `[turn ${t.i ?? "?"}]${action ? ` action: ${action}` : ""}${obs ? `\n  obs: ${obs}` : ""}`;
+      })
+      .join("\n");
+    parts.push(`Your previous agent turns (for continuity — do not re-do these):\n${transcript}`);
+  }
   if (isAffirmation(req)) {
     parts.push(
       `The user said: "${req || "(pressed Enter)"}" — that is consent to CONTINUE your own previous work, not a new task.`

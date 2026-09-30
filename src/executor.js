@@ -11,6 +11,7 @@ import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
 import { runProcess } from "./process-runner.js";
+import { startLocalLlmBridge } from "./local-llm-bridge.js";
 import { clipText, OBS_MAX } from "./clip.js";
 import { clipReadObservation } from "./read-observation.js";
 
@@ -109,6 +110,7 @@ export class Executor {
       opts.readOnlyWorkspacePaths,
     );
     this.shellEnvOverrides = opts.shellEnvOverrides ?? null;
+    this.localLlm = opts.localLlm ?? null;
     // Net-access approval (operator ask, 2026-08-25): network stays OFF by
     // default. When the interactive harness provides this hook, a classified
     // internet fetch pauses and asks the OPERATOR instead of flatly refusing:
@@ -137,6 +139,8 @@ export class Executor {
     this.dockerImage = opts.dockerImage ?? process.env.BANTAM_DOCKER_IMAGE ?? DEFAULT_SANDBOX_IMAGE;
     this.processRunner = opts.processRunner;
     this.probeEnabled = opts.probeEnabled ?? envEnabled(process.env.BANTAM_PROBE);
+    // Jev mode's decide tool: async (action) => observation text, or null when off.
+    this.jevDecide = typeof opts.jevDecide === "function" ? opts.jevDecide : null;
     this.renameFile = opts.renameFile ?? fs.renameSync;
     this.editConfirmations = opts.editConfirmations === true;
     this._reviewedWrites = new Map();
@@ -317,7 +321,7 @@ export class Executor {
     });
     try {
       let observation = operation();
-      if (this.editConfirmations && ["write_file", "write_batch"].includes(action.a)
+      if (this.editConfirmations && ["write_file", "write_batch", "replace"].includes(action.a)
           && pending.outcome?.reason === "confirmation_required") {
         const encoded = JSON.stringify(action);
         // Keep only bounded, in-memory proposals. The ordinary identical-edit
@@ -327,6 +331,12 @@ export class Executor {
           const id = crypto.createHash("sha256").update(JSON.stringify([targets, encoded])).digest("hex");
           if (this._reviewedWrites.size >= 8) this._reviewedWrites.delete(this._reviewedWrites.keys().next().value);
           this._reviewedWrites.set(id, { targets, action: JSON.parse(encoded) });
+          // Once exact bytes are retained, do not simultaneously instruct the
+          // model to regenerate the whole edit. Changed proposals restart review.
+          observation = observation.replace(
+            "If intentional, reissue the identical edit to confirm this exact before/after transition; confirmation permits the edit, not a correctness claim.",
+            "If intentional, use the confirm_edit receipt below; confirmation permits the edit, not a correctness claim. Submit a different edit only to correct the proposal, not to confirm it.",
+          );
           observation += `\n[edit-confirmation] To accept this reviewed write, use ${JSON.stringify({a:"confirm_edit",id})}. The factory retains the exact proposed bytes; do not regenerate them. A changed target invalidates this receipt.`;
         }
       }
@@ -439,6 +449,10 @@ export class Executor {
         case "probe": {
           if (!this.probeEnabled) return { observation: "ERROR: probe is disabled; enable BANTAM_PROBE=1 for this experimental action.", shellExecution: null, verificationEvidence: null };
           return await runProbe(this.workspace, action, { signal, dockerImage: this.dockerImage, processRunner: this.processRunner });
+        }
+        case "decide": {
+          if (!this.jevDecide) return { observation: "ERROR: decide needs Jev mode (:jev on, then :jev tool on)." };
+          return { observation: await this.jevDecide(action, { signal }) };
         }
         case "done": return { observation: "", done: true, summary: action.summary };
         case "respond": return { observation: "", done: true, summary: action.text, responded: true };
@@ -1323,6 +1337,7 @@ export class Executor {
       shellNetwork: this.shellNetwork || netGrantOnce,
       dockerImage: this.dockerImage,
       envOverrides: this.shellEnvOverrides,
+      localLlm: this.localLlm,
       readOnlyWorkspacePaths: this.readOnlyWorkspacePaths,
       signal,
       onOutput: this.onShellOutput,
@@ -1913,6 +1928,7 @@ export async function runShellProcess(workspace, command, {
   signal = null,
   onOutput = null,
   processRunner = runProcess,
+  localLlm = null,
 } = {}) {
   if (!["docker", "host"].includes(shellSandbox)) {
     throw new Error(`Unknown shell sandbox: ${shellSandbox}; expected docker or explicit host mode.`);
@@ -1934,32 +1950,39 @@ export async function runShellProcess(workspace, command, {
     }
   }
   const explicitEnv = normalizeShellEnvOverrides(envOverrides);
-  const runner = shellSandbox === "docker"
-    ? dockerShellRunner(realWorkspace, dockerImage, command, {
-        network: shellNetwork,
-        envOverrides: explicitEnv,
-        workspaceReadOnly,
-        readOnlyWorkspacePaths: normalizeReadOnlyWorkspacePaths(readOnlyWorkspacePaths),
-        readOnlyHostFiles,
-        fixtureScratch,
-        pipefail,
-      })
-    : hostShellRunner(realWorkspace, command, explicitEnv, { pipefail });
-  const res = await processRunner(runner.file, runner.args, {
-    cwd: realWorkspace,
-    timeoutMs,
-    env: runner.env,
-    signal,
-    onOutput,
-  });
-  if (runner.cleanupName && (res.timedOut || res.bufferExceeded || res.aborted)) {
-    // Cleanup must outlive the canceled signal; otherwise an interrupted `docker
-    // run` can leave its named container consuming resources after the REPL returns.
-    await processRunner("docker", ["rm", "-f", runner.cleanupName], { timeoutMs: 5000 });
+  const bridge = shellSandbox === "docker" && localLlm
+    ? await startLocalLlmBridge(localLlm.endpoint, { apiKey: localLlm.apiKey }) : null;
+  try {
+    const runner = shellSandbox === "docker"
+      ? dockerShellRunner(realWorkspace, dockerImage, command, {
+          network: shellNetwork,
+          envOverrides: explicitEnv,
+          workspaceReadOnly,
+          readOnlyWorkspacePaths: normalizeReadOnlyWorkspacePaths(readOnlyWorkspacePaths),
+          readOnlyHostFiles,
+          fixtureScratch,
+          pipefail,
+          llmBridge: bridge,
+        })
+      : hostShellRunner(realWorkspace, command, explicitEnv, { pipefail });
+    const res = await processRunner(runner.file, runner.args, {
+      cwd: realWorkspace,
+      timeoutMs,
+      env: runner.env,
+      signal,
+      onOutput,
+    });
+    if (runner.cleanupName && (res.timedOut || res.bufferExceeded || res.aborted)) {
+      // Cleanup must outlive the canceled signal; otherwise an interrupted `docker
+      // run` can leave its named container consuming resources after the REPL returns.
+      await processRunner("docker", ["rm", "-f", runner.cleanupName], { timeoutMs: 5000 });
+    }
+    return { ...res, sandbox: runner.sandbox, pipefail: pipefail === true,
+      cwd: realWorkspace, executedCommand: command,
+      scratchDirectory: runner.scratchDirectory ?? null };
+  } finally {
+    await bridge?.close();
   }
-  return { ...res, sandbox: runner.sandbox, pipefail: pipefail === true,
-    cwd: realWorkspace, executedCommand: command,
-    scratchDirectory: runner.scratchDirectory ?? null };
 }
 
 export function scratchMountArgs(workspace, env = process.env) {
@@ -2043,6 +2066,7 @@ function dockerShellRunner(workspace, image, command, {
   readOnlyHostFiles = [],
   fixtureScratch = null,
   pipefail = false,
+  llmBridge = null,
 } = {}) {
   const name = `bantam-shell-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const rust = rustSandboxExtras();
@@ -2089,6 +2113,10 @@ function dockerShellRunner(workspace, image, command, {
       ...Object.entries(envOverrides).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
       ...rust.env,
       ...mounts,
+      ...(llmBridge ? [
+        "-v", `${llmBridge.directory}:/run/bantam-llm:ro`,
+        "-e", "BANTAM_LLM_SOCKET=/run/bantam-llm/api.sock",
+      ] : []),
       "-w", containerWorkspace,
       image,
       ...(pipefail

@@ -35,3 +35,22 @@ test("run checkpoints preserve workspace coherence needed for safe resume", (t) 
   const saved = JSON.parse(fs.readFileSync(destination, "utf8"));
   assert.deepEqual(saved.turns[0].workspaceCoherence, workspaceCoherence);
 });
+
+test("checkpoints retain the exact post-execution assertion review separately from failed execution", t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-review-checkpoint-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const destination = path.join(directory, "partial.json");
+  const checkpoint = new RunCheckpoint({ dest: destination, autosaveEvery: 0 });
+  const failedAssertionReview = { schema: 1, executionEvidence: false,
+    sourceSha256: "a".repeat(64), site: { start: 50, end: 75, expression: "assert.equal(read(), 'x')" },
+    review: { verdict: "revise", reason: "Reset should return empty bytes.", executionEvidence: false } };
+  checkpoint.note({ type: "action", action: { a: "shell", c: "node check-reset.cjs" } });
+  checkpoint.note({ type: "observation", observation: "assertion failed",
+    failedAssertionReview, shellExecution: { exitCode: 1 } });
+  const expected = structuredClone(failedAssertionReview);
+  failedAssertionReview.review.verdict = "grounded";
+  assert.equal(checkpoint.flush("test"), true);
+  const saved = JSON.parse(fs.readFileSync(destination, "utf8"));
+  assert.deepEqual(saved.turns[0].failedAssertionReview, expected);
+  assert.equal(saved.turns[0].shellExecution.exitCode, 1);
+});

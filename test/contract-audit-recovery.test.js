@@ -21,6 +21,25 @@ const check = (command = "node --test test/edge.test.js", generation = 1, execut
 };
 const project = () => check("npm test");
 
+test('grounding can select a replacement assertion without invalidating an existing same-tree execution pair', () => {
+  const turns=[audit,check('node check-first.js'),project(),check('node check-revised.js')];
+  assert.equal(currentFocusedAuditWitness(turns,options).command,'node check-first.js');
+  assert.equal(currentFocusedAuditWitness(turns,{...options,latestFocused:true}).command,'node check-revised.js');
+  assert.equal(pendingContractAudit(turns,options),null);
+  assert.equal(currentFocusedAuditWitness([...turns,check('node check-failed.js',1,{exitCode:1})],{...options,latestFocused:true}),null);
+});
+
+test("a configured standalone suite and its leading-dot alias cannot discharge focused audit recovery", () => {
+  const configuredCommand = "node in/cart-ui/src/cartState.test.js";
+  for (const command of [configuredCommand, "node ./in/cart-ui/src/cartState.test.js"]) {
+    assert.equal(isFocusedAuditCommand(command, configuredCommand), false);
+    const pending = pendingContractAudit([audit, check(command)], { generation: 1, configuredCommand });
+    assert.equal(pending.needsFocused, true);
+  }
+  assert.equal(isFocusedAuditCommand("node check-coupon.js", configuredCommand), true);
+  assert.equal(isFocusedAuditCommand("node -e 'const assert=require(\"assert\"); assert.equal(1,1)'", configuredCommand), true);
+});
+
 function orderedCheck(row, turn) {
   row = JSON.parse(JSON.stringify(row));
   return { ...row, verificationReceipts: { schema: VERIFICATION_RECEIPTS_SCHEMA,

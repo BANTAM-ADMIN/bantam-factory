@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { parseArgs } from "./cli-args.js";
 import { ModelClient } from "./model.js";
+import { normalizeThinkMode, THINK_MODES } from "./thinking.js";
 import { FactoryStore } from "./factory/store.js";
 import { auditFactoryTraveler, factoryFrameAt, projectFactorySupervisor } from "./factory/traveler.js";
 import { formatFactoryFloor, formatFactoryLiveness, projectFactoryLiveness } from "./factory/supervisor.js";
@@ -65,7 +66,7 @@ export async function runFactoryCommand(argv, {
   }
   const unknown = Object.keys(args).find((key) => !new Set([
     "_", "help", "json", "yes", "once", "codex", "factory-home", "at", "timeline", "output",
-    "workspace", "verify", "focused-verify", "max-turns", "verify-timeout", "job-id",
+    "workspace", "verify", "focused-verify", "max-turns", "verify-timeout", "job-id", "think",
     "interval", "idle-after", "port",
     "cell", "public-verify", "editable", "diagnosis-turns", "mutation-turns", "rework-cycles",
     "model", "effort", "endpoint", "profile", "id", "order", "timeout",
@@ -480,6 +481,13 @@ export async function runFactoryCommand(argv, {
       stderr.write("factory: build requires --verify COMMAND\n");
       return 2;
     }
+    const requestedThink = args.think === undefined ? 'auto'
+      : typeof args.think === 'string' ? args.think.toLowerCase() : null;
+    if (!THINK_MODES.has(requestedThink)) {
+      stderr.write('factory: --think requires auto, always, or off\n');
+      return 2;
+    }
+    const thinkMode = normalizeThinkMode(requestedThink);
     const maxTurns = positiveIntegerOption(args["max-turns"], 30, "--max-turns");
     const verificationTimeoutMs = positiveIntegerOption(args["verify-timeout"], 120_000, "--verify-timeout");
     const diagnosisTurns = positiveIntegerOption(args["diagnosis-turns"], 12, "--diagnosis-turns");
@@ -493,6 +501,10 @@ export async function runFactoryCommand(argv, {
       const selectedCell = typeof args.cell === "string" ? args.cell.toLowerCase() : "general";
       if (!new Set(["general", "keyed-lifecycle"]).has(selectedCell)) {
         stderr.write("factory: --cell must be general or keyed-lifecycle\n");
+        return 2;
+      }
+      if (selectedCell !== 'general' && args.think !== undefined) {
+        stderr.write('factory: --think is supported by the general coding cell\n');
         return 2;
       }
       if (selectedCell === "keyed-lifecycle" && (typeof args["public-verify"] !== "string" || !args["public-verify"].trim())) {
@@ -540,6 +552,7 @@ export async function runFactoryCommand(argv, {
           })
           : await runFactoryCodingCell({
             ...common,
+            thinkMode,
             focusedVerificationScript: typeof args["focused-verify"] === "string" ? args["focused-verify"] : null,
             maxTurns: maxTurns.value,
           });
@@ -815,7 +828,7 @@ export function resolveFactoryHome({ cwd = process.cwd(), env = process.env, exp
 export function factoryUsage() {
   return `bantam factory engineer <job-id> [--json]
 bantam factory claims [--verify] [--require C0..C6] [--ladder FILE] [--json]
-bantam factory build "<task>" --verify "<command>" [--cell general|keyed-lifecycle] [--focused-verify "<command>"] [--public-verify "<command>"] [--codex --model terra|sol --effort LEVEL] [--workspace DIR] [--max-turns N] [--job-id ID] [--factory-home DIR] [--json]
+bantam factory build "<task>" --verify "<command>" [--cell general|keyed-lifecycle] [--think auto|always|off (general cell; default auto)] [--focused-verify "<command>"] [--public-verify "<command>"] [--codex --model terra|sol --effort LEVEL] [--workspace DIR] [--max-turns N] [--job-id ID] [--factory-home DIR] [--json]
 bantam factory cohort run <fixture-dir> --yes [--id ID] [--model terra|sol] [--effort LEVEL] [--order native,bantam,factory] [--factory-home DIR] [--json]
 bantam factory cohort show <cohort-id> [--factory-home DIR] [--json]
 bantam factory workers list [--factory-home DIR] [--json]

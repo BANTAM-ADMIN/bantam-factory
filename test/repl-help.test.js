@@ -7,6 +7,7 @@ test('quick help fits small terminals and keeps everyday descriptions together a
     const help = renderReplHelp({ cols });
     for (const line of help.split('\n')) assert.ok(line.length < cols, `${cols}: ${line}`);
     assert.match(help, /:context \[mode\]/);
+    assert.match(help, /:max-turns \[N\]/);
     assert.match(help, /:self-improve \[plan\]/);
     assert.match(help, /BANTAM FACTORY/);
   }

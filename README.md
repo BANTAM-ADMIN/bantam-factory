@@ -108,6 +108,45 @@ Recorded generation speeds: **82.6–105.2 tokens/second**.
 Selected recorded fights; both contenders passed each job. Hermes' saving is
 at least 69% because one of its 19 requests lacks token counters.
 
+## New in 2.0: Jev mode. A decision engine on your own GPU.
+
+Turn on **DiffusionGemma 26B-A4B** next to whatever runs the factory. It answers
+typed questions (yes/no, choice, score) with calibrated probabilities, usually in
+**tens of milliseconds**. It speaks **Jev's wire API**, so TypeSafe's SDK, OpenJev
+clients, and the Decision Index kit work unchanged.
+
+```bash
+bantam jev setup                     # use your DiffusionGemma vLLM server, or install one (asks first)
+bantam jev serve                     # Jev API on http://127.0.0.1:8090
+bantam jev ask "Is 91 a prime number?"
+#   no (P(yes) = 0.094)
+```
+
+Inside a session:
+
+```
+:jev on              start DiffusionGemma and serve the API
+:jev ask Which planet is largest? | Mars | Jupiter | Venus | Earth
+  Jupiter (confidence 0.464; Jupiter 0.779, Earth 0.103, Mars 0.093)  · 46 ms
+:jev tool on         let your working agent call Jev mid-task (the decide tool)
+```
+
+- **Runs alongside your worker.** With Codex or an API model, both run at once.
+  With a local Qwen on the same GPU, BANTAM swaps the two in and out of VRAM
+  automatically (about 6–7 s to swap in, then normal speed for the burst).
+- **Exact where it can be.** Code runs in a sandbox, tool calls are checked
+  against their schema, and state changes are derived. The model read is the fallback.
+- **More than Jev.** Per-answer evidence, abstention below a confidence you choose,
+  batches, NDJSON streaming, and a gauge listing, all opt-in. Plain Jev clients never see them.
+- **Measured.** 56.2 on a full Decision Index run, median 0.98 s per row. The best
+  published DiffusionGemma entry is 49.5, and TypeSafe's Jev scores 57.9.
+
+Needs an NVIDIA GPU with about 22 GB free and vLLM with structured reads (PR #57250).
+Setup checks your server before saving anything, and never downloads without your consent.
+
+**[Jev mode guide, API, and real captures →](JEV_MODE.md)** ·
+[How DiffusionGemma fits in BANTAM](DIFFUSIONGEMMA_IN_BANTAM.md)
+
 ## Get started
 
 <a id="quick-start"></a><a id="platforms"></a><a id="start-with-what-you-already-have"></a>
@@ -133,6 +172,9 @@ bantamfactory --codex --model gpt-6-astra
 Then ask for the work. Your existing Codex account works here; no local GPU is
 needed for Astra. Sol and Terra are supported too.
 
+In a session, `:help` lists the session commands; `:max-turns 100` raises the
+turn limit for later requests.
+
 [Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md)
 
 ## Bring your harness. Put it in the ring.
@@ -142,4 +184,4 @@ Register Codex, Hermes, OpenCode, Pi, or DeepSeek Harness and run your own fight
 
 **[Run your own cage match →](docs/BRING-YOUR-OWN-COMPARISONS.md)**
 
-[Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)
+[Jev mode](JEV_MODE.md) · [Contribute](CONTRIBUTING.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE) · [Business inquiries](mailto:bantamfactory@gmail.com)

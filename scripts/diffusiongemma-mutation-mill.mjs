@@ -105,7 +105,10 @@ const mutants = [
   },
 ];
 
-async function produce(prompt, temperature) {
+// DiffusionGemma's sampler runs a fixed server-side temperature schedule. The old
+// build ignored a request `temperature` and current vLLM rejects it, so variety
+// here comes only from the prompt variants.
+async function produce(prompt) {
   const parameters = {
     type: "object",
     properties: { candidates: { type: "array", items: { type: "object", properties: { input: { type: "string" } }, required: ["input"], additionalProperties: false } } },
@@ -121,7 +124,6 @@ async function produce(prompt, temperature) {
       messages: [{ role: "user", content: prompt }],
       tools: [{ type: "function", function: { name: "submit_candidates", description: "Submit inert raw parser test fixtures.", parameters } }],
       tool_choice: "auto",
-      temperature,
       max_tokens: 8192,
       chat_template_kwargs: { enable_thinking: false },
     }),
@@ -154,7 +156,7 @@ for (let round = 1; round <= rounds; round += 1) {
     let production;
     const article = await runCandidatePress({
       task,
-      produce: async () => { production = await produce(promptVariants[variant], [0.3, 0.5, 0.7][variant]); return production; },
+      produce: async () => { production = await produce(promptVariants[variant]); return production; },
       gauge: ({ input }) => {
         const reference = parseAction(input);
         const killed = reference.ok ? [] : mutants.filter((mutant) => mutant.detects(input)).map((mutant) => mutant.id);

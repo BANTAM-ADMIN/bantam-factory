@@ -62,6 +62,8 @@ export const WRITE_BATCH_FEATURE = "write_batch";
 export const LINE_EDIT_FEATURE = "line_edit";
 export const FILE_OPS_FEATURE = "file_ops";
 export const PROBE_ACTION_FEATURE = "probe";
+// The live Jev decision engine (Jev mode, `:jev tool on`); see JEV_MODE.md.
+export const JEV_DECIDE_FEATURE = "jev_decide";
 export const EDIT_CONFIRMATION_FEATURE = "confirm_edit";
 
 // How many read-only ops one `inspect` may batch.
@@ -209,7 +211,7 @@ export const ACTION_DEFINITIONS = deepFreeze([
   }),
   define("confirm_edit", [string("id")], {
     example: { a: "confirm_edit", id: "receipt from edit review" },
-    help: " apply a reviewed write_file or write_batch without regenerating it",
+    help: " apply a reviewed write_file, write_batch, or replace without regenerating it",
   }, { feature: EDIT_CONFIRMATION_FEATURE }),
   define("write_batch", [
     recordArray("files", {
@@ -295,6 +297,19 @@ export const ACTION_DEFINITIONS = deepFreeze([
     rules: [
       'Use "probe" for an uncertain assumption: setup prepares the case, witness asserts that the intended case exists, check asserts the behavior. A failed setup or witness skips later stages; a printout alone is not an assertion. The witness is your assertion, not independent semantic proof.',
       'Each probe uses fresh offline Docker isolation, separate from the workspace. List 0-16 exact input files; immutable copies appear under subject/ with their relative paths. All three commands start in /probe. Fixture files AND /tmp persist between its stages; shell variables, working-directory changes, and processes do not. A NEW probe starts empty. Import the copied subject instead of retyping it. A probe result is scoped evidence, NEVER whole-task verification; run the ordinary project verifier separately.',
+    ],
+  }),
+  define("decide", [
+    string("q"),
+    string("state", { optional: true, allowEmpty: true }),
+    string("options", { optional: true, allowEmpty: true }),
+  ], {
+    example: { a: "decide", q: "Did the test suite pass?", state: "11 passed, 1 failed (test_login_timeout)", options: "" },
+    help: "   ask the live Jev decision engine a quick question about some text (yes/no, or options \"a | b | c\")",
+  }, {
+    feature: JEV_DECIDE_FEATURE,
+    rules: [
+      'Use "decide" for a quick judgment about text you already have (a log, an error, a message): put the text in state and the question in q. Leave options empty for yes/no, or list choices as "a | b | c". The answer is a calibrated probability from a fast local model, not verification: confirm anything that matters with the real check.',
     ],
   }),
   define("done", [

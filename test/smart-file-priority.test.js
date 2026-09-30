@@ -231,8 +231,9 @@ describe('SmartFilePriority', () => {
     });
 
     it('returns 1 for brand new files', () => {
+      // The scorer reads the clock again, so a millisecond may have passed.
       const score = priority._scoreRecency(Date.now());
-      expect(score).to.equal(1);
+      expect(score).to.be.greaterThan(0.999999);
     });
 
     it('returns 0 for very old files', () => {

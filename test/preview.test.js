@@ -180,7 +180,7 @@ test("preview accepts an asynchronous Codex-style screenshot describer", { skip:
   });
 
   const answer = await tool.answer("preview index.html --interact");
-  assert.ok(screenshotPath && fs.existsSync(screenshotPath));
+  assert.ok(screenshotPath && fs.existsSync(screenshotPath), `no screenshot reached the describer; the preview said:\n${answer}`);
   assert.match(answer, /WHAT THE PAGE LOOKS LIKE.*visible constellation heading/is);
   assert.equal(tool.lastResult.status, "pass");
   assert.equal(tool.lastResult.mode, "interact");

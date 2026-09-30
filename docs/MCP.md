@@ -71,11 +71,12 @@ How a job flows:
 
 1. The workspace is captured (respecting `.gitignore`; `.bantam`, `.crew`, `.git`,
    `node_modules` and `exclude` are left out) and copied twice, into a baseline and a working copy. The
-   live folder is never touched. Folders over 20 000 files or 512 MiB are refused.
+   live folder is never touched. Folders over 20 000 files or 512 MiB are refused, and so are
+   symbolic links and unreadable files: results are applied file by file, so exclude them.
 2. The worker runs in the copy. `job_steer` sends it guidance through BANTAM's
    supervisor mailbox, which it reads between actions. The guidance is framed as peer guidance for its
    current task, not a new task. `job_status` shows when it is delivered.
-3. When it exits, the result is captured and, if `verify` was given, **the verifier runs again on a
+3. When it exits (state `finishing`: no more steering or cancelling), the result is captured and, if `verify` was given, **the verifier runs again on a
    fresh copy of the result** (the worker's own claim is not enough). The
    job's creator gets a room message.
 4. `job_result(job, diff: true)` shows the changes. `job_apply(job)` runs the verifier on the
@@ -85,8 +86,9 @@ How a job flows:
    explicitly.
 
 Job state lives in `<room>/.crew/runtime/jobs/<id>/` (`job.json`, `worker.log`,
-`baseline/`, `ws/`, `candidate/`). A job that was running when the server stopped is
-marked `interrupted` and never silently re-run.
+`baseline/`, `ws/`, `candidate/`, `transactions/`). A job that was running when the server
+stopped is marked `interrupted` and never silently re-run. An apply cut off by a crash is
+rolled back from its journal on the next start. Applies to one folder run one at a time.
 
 ## 4. Jev
 
@@ -98,7 +100,10 @@ marked `interrupted` and never silently re-run.
  "tension": {"type": "score",  "instructions": "How tense is the scene?", "criteria": ["flat", "some", "gripping"]}}
 ```
 
-It needs Jev mode set up (`bantamfactory jev setup`). The engine starts on the first question, which can
+It needs Jev mode set up (`bantamfactory jev setup`). Under the swap policy Jev waits for the
+local llama.cpp model to idle-sleep before it takes the GPU, for up to `gpu.sleepTimeoutMs` in
+`~/.bantam/jev.json`, so that must exceed llama-server's `--sleep-idle-seconds`. Jev
+expects about 5 s; with a longer idle window, raise the timeout to match. The engine starts on the first question, which can
 take minutes, and is turned off when the server stops, unless it was already running
 before. It shares the GPU with the local worker through Jev mode's swap policy. While a local
 job runs, each answer hands the GPU straight back.
@@ -111,6 +116,11 @@ job runs, each answer hands the GPU straight back.
   `bantam` is reserved, and `operator` is accepted only from the `mcp` CLI.
 - Workers run in copies with BANTAM's normal sandboxing. Only `job_apply` writes to the live
   folder, and only through the verified transaction.
+
+Trust model: this is built for one operator on one machine. The token proves local
+access; agent names are declarations. Anyone holding the token can speak as any agent, so
+the independent-verification rule on tasks guards against mistakes, not against a hostile
+client.
 
 ## 6. Options
 

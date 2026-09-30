@@ -81,6 +81,17 @@ describe("room messages", () => {
     assert.deepEqual(texts(room.inbox("claude")), ["after the client left"]);
   });
 
+  it("lets a newer wait by the same agent replace an older one, so nothing is swallowed", async () => {
+    const room = open(tempLog());
+    const stale = room.wait("claude", { timeoutMs: 5000 });
+    const current = room.wait("claude", { timeoutMs: 5000 });
+    const old = await stale;
+    assert.equal(old.superseded, true);
+    assert.deepEqual(old.messages, []);
+    room.post("bantam", { to: ["claude"], kind: "event", text: "for the live call" });
+    assert.deepEqual(texts(await current), ["for the live call"]);
+  });
+
   it("ignores messages not addressed to the waiter", async () => {
     const room = open(tempLog());
     const waiting = room.wait("claude", { timeoutMs: 100 });

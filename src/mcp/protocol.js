@@ -45,6 +45,11 @@ export function toolResult(value) {
  */
 export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool, serverInfo, instructions = null, log = () => {} }) {
   const expected = () => (typeof token === "function" ? token() : token);
+  // Clients cancel a call with notifications/cancelled, often without closing
+  // the HTTP request (the TypeScript SDK does this on Esc and on its own
+  // timeouts). Abort the matching call so a cancelled room_wait lets go.
+  const inflight = new Map();
+  const key = (caller, id) => `${caller}\u0000${JSON.stringify(id)}`;
 
   async function dispatch(message, caller, signal) {
     const { id, method, params = {} } = message;
@@ -62,7 +67,8 @@ export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool,
       return { tools: listTools().map(({ name, title, description, inputSchema, annotations }) => ({ name, ...(title ? { title } : {}), description, inputSchema, ...(annotations ? { annotations } : {}) })) };
     }
     if (method === "tools/call") {
-      const tool = listTools().find((t) => t.name === params?.name);
+      if (!params || typeof params !== "object" || typeof params.name !== "string") return { error: rpcError(id, -32602, "tools/call needs params.name") };
+      const tool = listTools().find((t) => t.name === params.name);
       if (!tool) return { error: rpcError(id, -32602, `unknown tool: ${String(params?.name)}`) };
       const args = params.arguments ?? {};
       const problem = validateArgs(tool.inputSchema, args);
@@ -79,6 +85,14 @@ export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool,
   }
 
   return function handle(req, res) {
+    try { route(req, res); }
+    catch (error) {
+      log({ event: "rpc_crash", error: error?.stack ?? String(error) });
+      send(res, 400, { error: "bad request" });
+    }
+  };
+
+  function route(req, res) {
     const url = new URL(req.url, "http://localhost");
     const match = /^\/mcp\/([^/]+)\/?$/.exec(url.pathname);
     if (!match) return send(res, 404, { error: "not found" });
@@ -86,7 +100,8 @@ export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool,
     const auth = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "");
     if (!auth || !sameToken(auth[1].trim(), expected())) return send(res, 401, { error: "missing or wrong bearer token" });
     if (req.headers.origin && !LOCAL_ORIGIN.test(req.headers.origin)) return send(res, 403, { error: "origin not allowed" });
-    const caller = decodeURIComponent(match[1]);
+    // Agent names never need percent-encoding; the raw segment must match.
+    const caller = match[1];
     if (!AGENT.test(caller) || !resolveAgent(caller, req)) return send(res, 404, { error: `unknown agent: ${caller}` });
 
     const chunks = [];
@@ -106,8 +121,13 @@ export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool,
         return send(res, 400, rpcError(message?.id, -32600, "invalid request"));
       }
       // Notifications and client responses carry no id: acknowledge, nothing to return.
-      if (message.id === undefined) return send(res, 202);
+      if (message.id === undefined) {
+        if (message.method === "notifications/cancelled") inflight.get(key(caller, message.params?.requestId))?.abort();
+        return send(res, 202);
+      }
       const controller = new AbortController();
+      const k = key(caller, message.id);
+      inflight.set(k, controller);
       res.on("close", () => { if (!res.writableFinished) controller.abort(); });
       try {
         const result = await dispatch(message, caller, controller.signal);
@@ -116,7 +136,9 @@ export function createMcpHttpHandler({ token, resolveAgent, listTools, callTool,
       } catch (error) {
         log({ event: "rpc_crash", method: message.method, error: error?.stack ?? String(error) });
         send(res, 200, rpcError(message.id, -32603, "internal error"));
+      } finally {
+        if (inflight.get(k) === controller) inflight.delete(k);
       }
     });
-  };
+  }
 }

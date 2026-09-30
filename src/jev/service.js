@@ -198,24 +198,30 @@ export function createJevService({ config, worker = null, engine = createJevEngi
     if (policy() === "swap") {
       // A cold start or a wake needs the GPU the local worker is holding: wait
       // for it to sleep first, or vLLM cannot allocate and exits while loading.
-      let took = false;
-      if (!lease) {
+      // Queued behind any decide in flight; nothing to do while Jev already
+      // holds the GPU (the engine is awake in its burst window).
+      const bringUp = async () => {
+        if (lease) return;
         onProgress("waiting for the local model to go idle and release the GPU");
+        let took = false;
         try { took = await takeGpu("starting"); }
         catch (error) {
           releaseLease();
           if (error instanceof JevBusy) throw error;
           throw new JevUnavailable(`could not take the GPU from the local worker: ${error.message}`);
         }
-      }
-      try {
-        await engine.start({ onProgress });
-        if (!primed) onProgress("priming sleep mode once (the first sleep copies the weights to host memory; later swaps take about a second)");
-        await engine.sleep();
-        primed = true;
-      } finally {
-        if (took) releaseLease();
-      }
+        try {
+          await engine.start({ onProgress });
+          if (!primed) onProgress("priming sleep mode once (the first sleep copies the weights to host memory; later swaps take about a second)");
+          await engine.sleep();
+          primed = true;
+        } finally {
+          if (took) releaseLease();
+        }
+      };
+      const next = queue.then(bringUp, bringUp);
+      queue = next.catch(() => {});
+      await next;
     } else await engine.start({ onProgress });
     if (policy() !== "swap") await ensureDecider();
     stats.startedAt = new Date(now()).toISOString();

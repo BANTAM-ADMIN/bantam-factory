@@ -131,6 +131,34 @@ describe("MCP protocol", () => {
   });
 });
 
+describe("MCP protocol: cancellation and hostile input", () => {
+  it("aborts a call when the client sends notifications/cancelled on another request", async () => {
+    lastSignal = null;
+    const pending = rpc({ jsonrpc: "2.0", id: "wait-1", method: "tools/call", params: { name: "hang", arguments: {} } });
+    for (let i = 0; i < 100 && !lastSignal; i++) await new Promise((r) => setTimeout(r, 10));
+    const signal = lastSignal;
+    assert.equal(signal.aborted, false);
+    // Another agent cannot cancel claude's call.
+    await rpc({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: "wait-1" } }, { agent: "operator", headers: { "x-bantam-operator": "1" } });
+    assert.equal(signal.aborted, false);
+    const res = await rpc({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: "wait-1", reason: "user pressed Esc" } });
+    assert.equal(res.status, 202);
+    assert.equal(signal.aborted, true);
+    assert.deepEqual((await (await pending).json()).result.structuredContent, { aborted: true });
+  });
+
+  it("answers a malformed path with 404 instead of crashing", async () => {
+    const res = await fetch(`${base}/mcp/%E0`, { method: "POST", headers: { authorization: `Bearer ${TOKEN}` }, body: "{}" });
+    assert.equal(res.status, 404);
+    assert.equal((await rpc({ jsonrpc: "2.0", id: 1, method: "ping" })).status, 200, "still serving");
+  });
+
+  it("rejects tools/call without params as invalid params", async () => {
+    const body = await (await rpc({ jsonrpc: "2.0", id: 2, method: "tools/call", params: null })).json();
+    assert.equal(body.error.code, -32602);
+  });
+});
+
 describe("validateArgs", () => {
   it("checks the declared schema subset", () => {
     const schema = { type: "object", additionalProperties: false, required: ["a"], properties: {

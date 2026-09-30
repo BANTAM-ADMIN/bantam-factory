@@ -108,10 +108,12 @@ silently skipped).
   own messages, with `seq` > its cursor.
 - `room_inbox({limit})` returns unread messages (oldest first, ≤ 50) and advances the cursor
   past what it returned.
-- `room_wait({timeout_s = 240, kinds?})` returns immediately if unread messages exist;
+- `room_wait({timeout_s = 240})` returns immediately if unread messages exist;
   otherwise blocks until one arrives or the timeout (max 600 s) and then behaves like
   `room_inbox`. Timeout returns `{messages: [], timedOut: true}`. A cancelled HTTP request
-  (client gone) releases the waiter without moving the cursor.
+  (client gone, or `notifications/cancelled` for that request id) releases the waiter
+  without moving the cursor. A newer `room_wait` by the same agent replaces an older one,
+  which returns `superseded: true` without taking messages.
 - `room_post({to, kind, text, task?, reply_to?, artifacts?})` → `{id, seq}`.
 - `room_ack({message})` records an acknowledgment; `room_history({since_seq?, limit?})`
   reads the full log without moving the cursor.
@@ -122,8 +124,9 @@ States: `ready → claimed → working → review → verified → done`, plus `
 non-terminal state and `ready` again on release. Transitions are validated in code.
 
 - `task_create({title, detail?})` → task in `ready`.
-- `task_claim({task})` succeeds only from `ready` (or `blocked` if the caller owns it). Two
-  claims race on one process and one in-memory map; the first append wins.
+- `task_claim({task})` succeeds only from `ready` (an owner resumes its own blocked task with
+  `task_update` → working). Two claims race on one process and one in-memory map; the first
+  append wins.
 - `task_update({task, state, note?})` only by the owner, except `review → verified` which
   must be done by someone **other** than the owner (independent verification).
 - `task_list({state?})`.
@@ -145,7 +148,9 @@ llama.cpp server has one slot.
 
 `job_start({worker, task, workspace, verify?, model?, effort?, max_turns?, exclude?})`:
 
-1. `workspace` must be an existing absolute directory. It is captured into a per-room
+1. `workspace` must be an existing absolute directory outside the room's `.crew/`, holding
+   only regular, readable files (links and special files are refused up front with a
+   suggested `exclude`, because results are applied file by file). It is captured into a per-room
    `WorkspaceStore` (`runtime/store`), excluding `.bantam`, `.crew`, `node_modules`, `.git`
    and `exclude`. Captures over 20 000 files or 512 MiB are refused (point the job at a
    focused folder).
@@ -157,13 +162,18 @@ llama.cpp server has one slot.
 6. While running, poll `feedback.json` every second: record the latest action/observation
    for `job_status`; when `steeringRead` advances, record delivery of those steering
    messages (their state becomes `delivered`).
-7. On exit: read `run.json` (disposition, verification, summary) when present; compute
+7. On exit the job is `finishing` (it can no longer be steered or cancelled): read `run.json` (disposition, verification, summary) when present; compute
    changed files with `planWorkspaceTransaction(baseline, ws)`; capture the candidate commit.
    State `succeeded` (exit 0 and, when `verify` was given, verification passed), otherwise
    `failed`. Post an `event` message to the job's creator with the outcome and changed files.
 
 Job records are written to `jobs/<id>/job.json` atomically on every transition. On server
-start, jobs found `running` or `queued` are marked `interrupted` (never silently re-run).
+start, jobs found `queued`, `running` or `finishing` are marked `interrupted` (never silently
+re-run), and an apply cut off mid-way is recovered from its journal in
+`jobs/<id>/transactions` (rolled back, or committed if it had been promoted). A failed job
+setup removes its directory; ids skip any directory left behind. On stop, the server
+interrupts queued jobs, terminates workers, aborts running verifiers, and waits for every
+job and apply to settle before releasing the room.
 
 ### 6.3 Steering
 
@@ -193,7 +203,8 @@ The worker-control 32-message cap and 8000-character cap surface as tool errors.
   `WorkspaceTransaction` (`prepare` rejects files changed in the live tree since the
   baseline) → `apply` → live `verify` → `commit`, or `rollback` on failure. A job with no
   verifier must pass `verify: "true"` explicitly; the record keeps that choice. Applied once
-  only.
+  only. Applies to the same live folder run one at a time. A rollback that cannot complete
+  is recorded as `conflict` for the operator to inspect.
 - `job_list({state?})`.
 
 ## 7. Jev
@@ -239,7 +250,15 @@ on a tiny workspace against the running 27B server, steers it mid-run, receives 
 completion through `room_wait`, and applies the result; Jev answers one question if its
 engine is available on this machine.
 
-## 10. Later toolsets (each gets its own short spec)
+## 10. Trust model and known limits
+
+- One operator on one machine. The token proves local access; agent names in the URL and the
+  `operator` header are declarations, not authentication. Anyone holding the token can speak
+  as any agent, so "verified by someone other than the owner" guards against mistakes, not
+  a hostile client. Per-agent tokens are the upgrade path.
+- Workspace capture is synchronous; a large capture briefly delays other requests.
+
+## 11. Later toolsets (each gets its own short spec)
 
 `diagnose`, `facts` (claim ledger), `compare`/`fight`, `runlens`/`replay`, `forecast`,
 factory cards; Claude Code channels push; a BANTAM `team_message` action.

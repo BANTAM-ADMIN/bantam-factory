@@ -116,6 +116,24 @@ describe("jev GPU policy", () => {
     assert.deepEqual(engine.calls, []);
   });
 
+  it("a second on() while Jev holds the GPU leaves the awake engine alone", async () => {
+    const llama = fakeLlama({ awakePolls: 0 });
+    const engine = fakeEngine("stopped");
+    const service = createJevService({ config: configWith("swap"), worker: { endpoint: llama.endpoint }, engine, fetchImpl: llama.fetch });
+    await withLeaseDir(async () => {
+      await service.on({ serve: false });
+      // A decide takes the GPU and keeps it for its burst window. The decision
+      // itself fails here (no model), which is fine: the lease is what matters.
+      await service.decide({ profile: { options: {} }, state: "s", questions: { q: { type: "noul" } }, seed: 1 }).catch(() => {});
+      assert.equal((await service.status()).gpuLease.held, true);
+      engine.calls.length = 0;
+      await service.on({ serve: false });
+      assert.deepEqual(engine.calls, [], "no start and no sleep under a held lease");
+      assert.equal(engine.state, "awake");
+      await service.off({ keepEngine: true });
+    });
+  });
+
   it("off() stops the engine unless asked to keep it", async () => {
     const engine = fakeEngine();
     const service = createJevService({ config: configWith("alongside"), engine });

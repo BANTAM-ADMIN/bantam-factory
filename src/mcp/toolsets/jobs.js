@@ -19,7 +19,7 @@ import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from "..
 import { parseCodexJsonl } from "../../codex-delegate.js";
 import { runProcess } from "../../process-runner.js";
 import { listWorkspaceFiles, WorkspaceStore } from "../../workspace-store.js";
-import { planWorkspaceTransaction, WorkspaceTransaction } from "../../workspace-transaction.js";
+import { planWorkspaceTransaction, recoverWorkspaceTransactions, WorkspaceTransaction } from "../../workspace-transaction.js";
 import { ToolError } from "../protocol.js";
 
 const BANTAM_BIN = fileURLToPath(new URL("../../../bin/bantam.js", import.meta.url));
@@ -73,10 +73,10 @@ function childEnv(extra) {
   return { ...env, ...extra };
 }
 
-async function runVerifier(cwd, command, timeoutMs = 600_000) {
+async function runVerifier(cwd, command, { timeoutMs = 600_000, signal = null } = {}) {
   const started = Date.now();
-  const result = await runProcess("/bin/bash", ["-o", "pipefail", "-c", command], { cwd, timeoutMs, maxBuffer: 8 * 1024 * 1024, env: childEnv({}) });
-  const status = result.timedOut ? "timeout" : result.error ? "error" : result.code === 0 ? "pass" : "fail";
+  const result = await runProcess("/bin/bash", ["-o", "pipefail", "-c", command], { cwd, timeoutMs, signal, maxBuffer: 8 * 1024 * 1024, env: childEnv({}) });
+  const status = result.timedOut ? "timeout" : result.aborted ? "interrupted" : result.error ? "error" : result.code === 0 ? "pass" : "fail";
   const tail = (text) => (text ?? "").slice(-2000);
   return { command, status, pass: status === "pass", exitCode: result.code ?? null, ms: Date.now() - started, stdout: tail(result.stdout), stderr: tail(result.stderr) };
 }
@@ -99,13 +99,18 @@ export function createJobsToolset({
   let ctx = null, store = null, jobsDir = null, stopping = false;
   const jobs = new Map();
   const queues = { local: [], codex: [] };
-  const running = new Map(); // id → { child, timer, poll, cancel }
+  const running = new Map(); // id → { child, timer, poll, cancelled, timedOut, exited }
+  const launches = new Map(); // id → the promise that settles the job
+  const applies = new Set(); // in-flight job_apply promises
+  const applyLocks = new Map(); // live workspace → tail of its apply chain
+  const halt = new AbortController(); // aborts verifiers when the server stops
 
   const dirOf = (id) => path.join(jobsDir, id);
   const paths = (id) => {
     const dir = dirOf(id);
     return { dir, ws: path.join(dir, "ws"), control: path.join(dir, "control"), baseline: path.join(dir, "baseline"),
-      candidate: path.join(dir, "candidate"), runFile: path.join(dir, "run.json"), log: path.join(dir, "worker.log") };
+      candidate: path.join(dir, "candidate"), runFile: path.join(dir, "run.json"), log: path.join(dir, "worker.log"),
+      transactions: path.join(dir, "transactions") };
   };
   const persist = (job) => writeJsonAtomic(path.join(dirOf(job.id), "job.json"), job);
   const log = (job, detail = null) => ctx.log({ event: "job", job: job.id, state: job.state, detail });
@@ -135,13 +140,35 @@ export function createJobsToolset({
         persist(job);
         notify(job, `Job ${job.id} (${job.worker}) was interrupted when the BANTAM MCP server stopped. It was not re-run; start a new job if it is still needed. Its copy is kept at ${paths(job.id).ws}.`);
       }
+      recoverApply(job);
       jobs.set(job.id, job);
     }
   }
 
+  // An apply cut off mid-way (crash, kill) is rolled back from its journal,
+  // or committed if it had already been promoted.
+  function recoverApply(job) {
+    const root = paths(job.id).transactions;
+    if (!fs.existsSync(root) || !fs.readdirSync(root).length) return;
+    let outcome;
+    try {
+      const recovered = recoverWorkspaceTransactions({ workspace: job.workspace, transactionRoot: root });
+      if (!recovered.length) return;
+      outcome = recovered.some((r) => r.action === "committed")
+        ? { state: "applied", at: new Date().toISOString(), note: "completed during recovery after the server stopped" }
+        : { state: "rolled_back", at: new Date().toISOString(), note: "the server stopped during apply; the live folder was restored" };
+    } catch (error) {
+      outcome = { state: "conflict", at: new Date().toISOString(), error: error.message };
+    }
+    job.apply = { ...job.apply, ...outcome };
+    persist(job);
+    notify(job, `Job ${job.id}'s interrupted apply was recovered: ${outcome.state}${outcome.error ? ` (${outcome.error}; inspect ${job.workspace} by hand)` : ""}.`);
+  }
+
+  // Directory names count too: a setup that failed leaves no job.json behind.
   function nextId() {
     let max = 0;
-    for (const id of jobs.keys()) max = Math.max(max, Number(id.slice(1)) || 0);
+    for (const id of [...jobs.keys(), ...fs.readdirSync(jobsDir)]) if (/^j\d+$/.test(id)) max = Math.max(max, Number(id.slice(1)));
     return `j${max + 1}`;
   }
 
@@ -150,7 +177,14 @@ export function createJobsToolset({
     if (files.length > limits.maxFiles) throw new ToolError(`${workspace} has ${files.length} files (limit ${limits.maxFiles}); point the job at a focused folder or add exclude paths`);
     let bytes = 0;
     for (const rel of files) {
-      try { bytes += fs.lstatSync(path.join(workspace, rel)).size; } catch { /* vanished */ }
+      let stat;
+      try { stat = fs.lstatSync(path.join(workspace, rel)); } catch { continue; /* vanished */ }
+      // Results are applied file by file; a link or device cannot be, so say
+      // so now rather than after the worker has spent its run.
+      if (!stat.isFile()) throw new ToolError(`${rel} is ${stat.isSymbolicLink() ? "a symbolic link" : "not a regular file"}; job results can only be applied to plain files. Add it to exclude (exclude: [${JSON.stringify(rel)}]) or point the job at a folder without links`);
+      try { fs.accessSync(path.join(workspace, rel), fs.constants.R_OK); }
+      catch { throw new ToolError(`${rel} is not readable; fix its permissions or add it to exclude`); }
+      bytes += stat.size;
       if (bytes > limits.maxBytes) throw new ToolError(`${workspace} holds more than ${Math.round(limits.maxBytes / 1048576)} MiB; point the job at a focused folder or add exclude paths`);
     }
     return files.length;
@@ -162,8 +196,8 @@ export function createJobsToolset({
     const workspace = path.resolve(a.workspace);
     if (!path.isAbsolute(a.workspace)) throw new ToolError("workspace must be an absolute path");
     if (!fs.statSync(workspace, { throwIfNoEntry: false })?.isDirectory()) throw new ToolError(`workspace is not a directory: ${workspace}`);
-    const runtime = path.resolve(ctx.runtimeDir);
-    if (workspace === runtime || workspace.startsWith(runtime + path.sep)) throw new ToolError("workspace cannot be inside the room's runtime directory");
+    const runtime = path.resolve(ctx.runtimeDir), crew = path.dirname(runtime);
+    if (workspace === crew || workspace.startsWith(crew + path.sep)) throw new ToolError("workspace cannot be inside the room's .crew directory");
     const exclude = (a.exclude ?? []).map((rel) => {
       if (path.isAbsolute(rel) || rel.split(/[\\/]/).includes("..")) throw new ToolError(`exclude paths are relative to the workspace: ${rel}`);
       return rel;
@@ -173,12 +207,18 @@ export function createJobsToolset({
     const files = checkSize(workspace, exclude);
     const id = nextId();
     const p = paths(id);
-    fs.mkdirSync(p.dir, { recursive: true, mode: 0o700 });
-    fs.mkdirSync(p.control, { mode: 0o700 });
-    const baseline = store.capture(workspace, { message: `mcp job ${id} baseline`, excludePaths: [...exclusions(workspace, exclude), runtime] });
-    store.materialize(baseline.commit, p.baseline);
-    store.materialize(baseline.commit, p.ws);
-    if (spec.steerable) createWorkerControl(p.control, p.ws);
+    let baseline;
+    try {
+      fs.mkdirSync(p.dir, { recursive: true, mode: 0o700 });
+      fs.mkdirSync(p.control, { mode: 0o700 });
+      baseline = store.capture(workspace, { message: `mcp job ${id} baseline`, excludePaths: [...exclusions(workspace, exclude), runtime] });
+      store.materialize(baseline.commit, p.baseline);
+      store.materialize(baseline.commit, p.ws);
+      if (spec.steerable) createWorkerControl(p.control, p.ws);
+    } catch (error) {
+      fs.rmSync(p.dir, { recursive: true, force: true });
+      throw new ToolError(`could not prepare ${id}'s copy of ${workspace}: ${error.message}`);
+    }
     const job = {
       schema: 1, id, worker: a.worker, lane: spec.lane, steerable: spec.steerable,
       task: a.task, workspace, verify: a.verify ?? null, model: a.model ?? null, effort: a.effort ?? null,
@@ -201,7 +241,8 @@ export function createJobsToolset({
     const active = [...running.keys()].filter((id) => jobs.get(id).lane === lane).length;
     if (active >= (lanes[lane] ?? 1) || !queues[lane].length) return;
     const id = queues[lane].shift();
-    launch(jobs.get(id)).catch((error) => finishWithError(jobs.get(id), error));
+    const done = launch(jobs.get(id)).catch((error) => finishWithError(jobs.get(id), error)).finally(() => launches.delete(id));
+    launches.set(id, done);
   }
 
   async function launch(job) {
@@ -226,6 +267,10 @@ export function createJobsToolset({
     clearInterval(entry.poll);
     clearTimeout(entry.timer);
     clearTimeout(entry.kill);
+    // The process is gone; from here the result is captured and checked.
+    entry.exited = true;
+    job.state = "finishing";
+    persist(job);
     try { await settle(job, entry, exit); }
     finally {
       running.delete(job.id);
@@ -272,10 +317,10 @@ export function createJobsToolset({
       const scratch = fs.mkdtempSync(path.join(os.tmpdir(), `bantam-mcp-verify-${job.id}-`));
       try {
         store.materialize(candidate.commit, path.join(scratch, "ws"));
-        job.verification = await runVerifier(path.join(scratch, "ws"), job.verify);
+        job.verification = await runVerifier(path.join(scratch, "ws"), job.verify, { signal: halt.signal });
       } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
     }
-    if (entry.cancelled) job.state = stopping ? "interrupted" : "cancelled";
+    if (entry.cancelled || stopping) job.state = stopping ? "interrupted" : "cancelled";
     else if (entry.timedOut) { job.state = "failed"; job.error = `timed out after ${Math.round(job.timeoutMs / 60_000)} min`; }
     else if (exit.code === 0 && job.outcome?.reachedDone === false) {
       job.state = "failed";
@@ -345,9 +390,11 @@ export function createJobsToolset({
       job.finishedAt = new Date().toISOString();
       persist(job);
       log(job);
+      notify(job, `Job ${job.id} (${job.worker}) was cancelled before it started.`);
       return { job: id, state: job.state };
     }
     const entry = running.get(id);
+    if (entry?.exited) throw new ToolError(`${id} has already finished running and its result is being checked; wait for its room message`);
     if (entry && !entry.cancelled) { entry.cancelled = true; terminate(entry); }
     return { job: id, state: "cancelling", note: "You will get a room message when it stops." };
   }
@@ -376,7 +423,21 @@ export function createJobsToolset({
     return Buffer.byteLength(text) <= limits.diffBytes ? text : `${text.slice(0, limits.diffBytes)}\n[diff truncated at ${limits.diffBytes} bytes; the full candidate is at ${paths(id).candidate}]`;
   }
 
-  async function apply(caller, id, verifyOverride) {
+  // One apply at a time per live folder, so one job's live check never runs
+  // over another job's unverified files. The server waits for these on stop.
+  function apply(caller, id, verifyOverride) {
+    const job = requireJob(id);
+    const previous = applyLocks.get(job.workspace) ?? Promise.resolve();
+    const run = previous.then(() => applyNow(caller, id, verifyOverride));
+    const tail = run.catch(() => {});
+    applyLocks.set(job.workspace, tail);
+    applies.add(tail);
+    tail.finally(() => { applies.delete(tail); if (applyLocks.get(job.workspace) === tail) applyLocks.delete(job.workspace); });
+    return run;
+  }
+
+  async function applyNow(caller, id, verifyOverride) {
+    if (stopping) throw new ToolError("the server is stopping");
     const job = requireJob(id);
     if (job.state !== "succeeded") throw new ToolError(`${id} is ${job.state}; only a succeeded job can be applied`);
     if (job.apply?.state === "applied") throw new ToolError(`${id} was already applied at ${job.apply.at}`);
@@ -387,17 +448,22 @@ export function createJobsToolset({
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), `bantam-mcp-apply-${id}-`));
     try {
       store.materialize(job.candidateCommit, path.join(scratch, "ws"));
-      const candidateCheck = await runVerifier(path.join(scratch, "ws"), verify);
+      const candidateCheck = await runVerifier(path.join(scratch, "ws"), verify, { signal: halt.signal });
       if (!candidateCheck.pass) throw new ToolError(`apply refused: the verifier ${candidateCheck.status} on the candidate.\n${candidateCheck.stderr || candidateCheck.stdout}`);
       const transaction = new WorkspaceTransaction({ workspace: job.workspace, baselineRoot: p.baseline, candidateRoot: p.candidate,
-        transactionRoot: path.join(ctx.runtimeDir, "transactions"), id: `apply-${id}-${crypto.randomBytes(6).toString("hex")}`,
+        transactionRoot: p.transactions, id: `apply-${id}-${crypto.randomBytes(6).toString("hex")}`,
         metadata: { kind: "bantam-mcp-job-apply", job: id, by: caller } });
       try { transaction.prepare(); }
       catch (error) { throw new ToolError(`apply refused, nothing written: ${error.message}. Someone changed that file after ${id} started; start a new job from the current files.`); }
       transaction.apply();
-      const liveCheck = await runVerifier(job.workspace, verify);
+      const liveCheck = await runVerifier(job.workspace, verify, { signal: halt.signal });
       if (!liveCheck.pass) {
-        transaction.rollback({ reason: `live verifier ${liveCheck.status}` });
+        try { transaction.rollback({ reason: `live verifier ${liveCheck.status}` }); }
+        catch (error) {
+          job.apply = { state: "conflict", at: new Date().toISOString(), by: caller, verify, verification: liveCheck, error: error.message };
+          persist(job);
+          throw new ToolError(`apply failed its live check (${liveCheck.status}) and could not be rolled back cleanly: ${error.message}. Inspect ${job.workspace} by hand; the transaction record is under ${p.transactions}.`);
+        }
         job.apply = { state: "rolled_back", at: new Date().toISOString(), by: caller, verify, verification: liveCheck };
         persist(job);
         throw new ToolError(`apply rolled back: the verifier ${liveCheck.status} on the live files after applying.\n${liveCheck.stderr || liveCheck.stdout}`);
@@ -428,20 +494,24 @@ export function createJobsToolset({
     },
     async stop() {
       stopping = true;
-      for (const id of Object.values(queues).flat()) {
-        const job = jobs.get(id);
-        job.state = "interrupted";
-        job.error = "the MCP server stopped before this job started";
-        job.finishedAt = new Date().toISOString();
-        persist(job);
+      for (const lane of Object.values(queues)) {
+        for (const id of lane.splice(0)) {
+          const job = jobs.get(id);
+          job.state = "interrupted";
+          job.error = "the MCP server stopped before this job started";
+          job.finishedAt = new Date().toISOString();
+          persist(job);
+          notify(job, `Job ${job.id} (${job.worker}) was interrupted: the BANTAM MCP server stopped before it started.`);
+        }
       }
-      const exits = [...running.values()].map((entry) => new Promise((resolve) => {
-        entry.child.once("exit", resolve);
+      for (const entry of running.values()) {
         entry.cancelled = true;
-        terminate(entry);
-      }));
-      await Promise.all(exits);
-      for (let i = 0; i < 200 && running.size; i++) await new Promise((r) => setTimeout(r, 25));
+        if (!entry.exited) terminate(entry);
+      }
+      // Verifiers (on a result or inside an apply) are cut short; an apply
+      // whose live check is interrupted rolls itself back.
+      halt.abort();
+      await Promise.all([...launches.values(), ...applies]);
     },
     tools: [
       {
@@ -497,7 +567,7 @@ export function createJobsToolset({
       {
         name: "job_list",
         description: "List jobs, optionally by state.",
-        inputSchema: { type: "object", additionalProperties: false, properties: { state: { type: "string", enum: ["queued", "running", "succeeded", "failed", "cancelled", "interrupted"] } } },
+        inputSchema: { type: "object", additionalProperties: false, properties: { state: { type: "string", enum: ["queued", "running", "finishing", "succeeded", "failed", "cancelled", "interrupted"] } } },
         handler: async (a) => listJobs(a.state ?? null),
       },
     ],

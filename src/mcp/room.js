@@ -27,6 +27,7 @@ export class Room {
     this.cursors = new Map();
     this.acks = new Map();
     this.tasks = new Map();
+    this.waiters = new Map(); // agent → release() of its current room_wait
     for (const record of store.records()) this.apply(record);
     store.onAppend((record) => this.apply(record));
   }
@@ -79,24 +80,33 @@ export class Room {
     if (this.unread(agent).length) return Promise.resolve({ ...this.inbox(agent), timedOut: false });
     const limit = Math.max(0, Math.min(timeoutMs, MAX_WAIT_MS));
     return new Promise((resolve) => {
-      let timer = null, stop = null;
-      const finish = (value) => {
+      let timer = null, stop = null, done = false;
+      const finish = (take) => {
+        if (done) return;
+        done = true;
         clearTimeout(timer);
         stop?.();
+        if (this.waiters.get(agent) === release) this.waiters.delete(agent);
         signal?.removeEventListener("abort", onAbort);
-        resolve(value);
+        // Only a live, current waiter takes messages (moves the cursor).
+        resolve(take());
       };
+      const empty = (extra) => () => ({ messages: [], remaining: this.unread(agent).length, timedOut: false, ...extra });
       // Released without taking anything: the messages stay unread for the next call.
-      const onAbort = () => finish({ messages: [], remaining: this.unread(agent).length, timedOut: false, aborted: true });
+      const onAbort = () => finish(empty({ aborted: true }));
+      const release = () => finish(empty({ superseded: true }));
       if (signal?.aborted) return onAbort();
       signal?.addEventListener("abort", onAbort, { once: true });
+      // A newer wait by the same agent replaces this one: a client that gave up
+      // on an old call without cancelling it must not have it swallow messages.
+      this.waiters.get(agent)?.();
+      this.waiters.set(agent, release);
       stop = this.store.onAppend((record) => {
         if (record.type !== "message" || !this.addressedTo(agent, record)) return;
         // Let the append finish (other listeners) before reading the cursor forward.
-        // A second wait by the same agent may have taken it already; keep waiting then.
-        queueMicrotask(() => { if (!signal?.aborted && this.unread(agent).length) finish({ ...this.inbox(agent), timedOut: false }); });
+        queueMicrotask(() => { if (!done && !signal?.aborted && this.unread(agent).length) finish(() => ({ ...this.inbox(agent), timedOut: false })); });
       });
-      timer = setTimeout(() => finish({ messages: [], remaining: 0, timedOut: true }), limit);
+      timer = setTimeout(() => finish(() => ({ messages: [], remaining: 0, timedOut: true })), limit);
     });
   }
 

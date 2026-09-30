@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, it } from "node:test";
 
 import { createJobsToolset, workerCommand } from "../src/mcp/toolsets/jobs.js";
+import { WorkspaceTransaction } from "../src/workspace-transaction.js";
 import { Room } from "../src/mcp/room.js";
 import { RoomStore } from "../src/mcp/room-store.js";
 
@@ -167,6 +168,7 @@ describe("jobs", () => {
     await call("job_start", { worker: "local", task: "mode:hang", workspace: ws });
     await call("job_start", { worker: "local", task: "x", workspace: ws });
     assert.deepEqual(await call("job_cancel", { job: "j2" }), { job: "j2", state: "cancelled" });
+    assert.match(room.inbox("claude").messages.at(-1).text, /Job j2 \(local\) was cancelled before it started/);
     await new Promise((r) => setTimeout(r, 100));
     assert.equal((await call("job_cancel", { job: "j1" })).state, "cancelling");
     assert.equal((await finished(call, "j1")).state, "cancelled");
@@ -179,7 +181,8 @@ describe("jobs", () => {
     const ws = sourceWorkspace();
     await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: "relative/path" }), /absolute/);
     await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: path.join(ws, "missing") }), /not a directory/);
-    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: runtimeDir }), /runtime directory/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: runtimeDir }), /\.crew directory/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: path.dirname(runtimeDir) }), /\.crew directory/);
     await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, effort: "high" }), /Codex workers only/);
     await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, exclude: ["../etc"] }), /relative to the workspace/);
     await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, room_task: "t9" }), /no task t9/);
@@ -209,6 +212,72 @@ describe("jobs", () => {
     assert.match(status.error, /not re-run/);
     assert.match(second.room.inbox("claude").messages.at(-1).text, /Job j1 \(local\) was interrupted/);
     assert.equal((await second.call("job_start", { worker: "local", task: "x", workspace: ws })).job, "j2");
+  });
+});
+
+describe("jobs: review regressions", () => {
+  it("refuses links and unreadable files up front, and a refused setup does not block later jobs", async () => {
+    const { call, runtimeDir } = setup();
+    const ws = sourceWorkspace();
+    fs.symlinkSync("story.txt", path.join(ws, "link"));
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws }), /link is a symbolic link; .*exclude: \["link"\]/);
+    fs.rmSync(path.join(ws, "link"));
+    fs.writeFileSync(path.join(ws, "secret.txt"), "x", { mode: 0o000 });
+    if (process.getuid?.() !== 0) await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws }), /secret\.txt is not readable/);
+    fs.chmodSync(path.join(ws, "secret.txt"), 0o644);
+    fs.mkdirSync(path.join(runtimeDir, "jobs", "j1")); // left behind by a crash mid-setup
+    assert.equal((await call("job_start", { worker: "local", task: "x", workspace: ws })).job, "j2");
+    assert.equal((await finished(call, "j2")).state, "succeeded");
+  });
+
+  it("stops promptly while a finished job's verifier is still running", async () => {
+    const { call, toolset } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "x", workspace: ws, verify: "sleep 20" });
+    for (let i = 0; i < 400 && (await call("job_status", { job: "j1" })).state !== "finishing"; i++) await new Promise((r) => setTimeout(r, 25));
+    assert.equal((await call("job_status", { job: "j1" })).state, "finishing");
+    await assert.rejects(call("job_cancel", { job: "j1" }), /already finished running/);
+    await assert.rejects(call("job_steer", { job: "j1", text: "late" }), /j1 is finishing/);
+    const started = Date.now();
+    await toolsets.pop().stop();
+    assert.ok(Date.now() - started < 5000, `stop took ${Date.now() - started} ms`);
+    assert.equal((await call("job_status", { job: "j1" })).state, "interrupted");
+  });
+
+  it("rolls back an apply that a crash left half-done, on the next start", async () => {
+    const roomDir = temp("bantam-mcp-jobs-room-");
+    const first = setup({ roomDir });
+    const ws = sourceWorkspace();
+    await first.call("job_start", { worker: "local", task: "x", workspace: ws });
+    await finished(first.call, "j1");
+    await toolsets.pop().stop();
+    // Crash after the files were written, before the live check finished.
+    const dir = path.join(first.runtimeDir, "jobs", "j1");
+    const transaction = new WorkspaceTransaction({ workspace: ws, baselineRoot: path.join(dir, "baseline"), candidateRoot: path.join(dir, "candidate"),
+      transactionRoot: path.join(dir, "transactions"), id: "apply-j1-crashed" });
+    transaction.prepare();
+    transaction.apply();
+    assert.ok(fs.existsSync(path.join(ws, "new-note.md")));
+    const second = setup({ roomDir });
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\n");
+    assert.equal(fs.existsSync(path.join(ws, "new-note.md")), false);
+    assert.equal((await second.call("job_status", { job: "j1" })).apply.state, "rolled_back");
+    assert.match(second.room.inbox("claude").messages.at(-1).text, /j1's interrupted apply was recovered: rolled_back/);
+  });
+
+  it("applies one job at a time per live folder", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "x", workspace: ws });
+    await call("job_start", { worker: "codex", task: "x", workspace: ws });
+    await finished(call, "j1");
+    await finished(call, "j2");
+    // Both changed story.txt. Serialized, the second finds the first's change
+    // and is refused cleanly instead of verifying over half-applied files.
+    const [a, b] = await Promise.allSettled([call("job_apply", { job: "j1", verify: "sleep 0.3" }), call("job_apply", { job: "j2", verify: "true" })]);
+    assert.equal(a.status, "fulfilled");
+    assert.match(b.reason.message, /apply refused, nothing written: live workspace changed since baseline/);
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\nedited by worker\n");
   });
 });
 

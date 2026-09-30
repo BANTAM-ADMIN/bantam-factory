@@ -412,6 +412,8 @@ export function createJobsToolset({
       jobsDir = path.join(ctx.runtimeDir, "jobs");
       fs.mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
       store = new WorkspaceStore(path.join(ctx.runtimeDir, "store"));
+      // Jev hands the GPU straight back while the local model has work.
+      ctx.localJobRunning = () => [...running.keys()].some((id) => jobs.get(id)?.lane === "local");
       recoverJobs();
     },
     async stop() {

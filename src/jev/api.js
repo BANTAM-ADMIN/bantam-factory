@@ -108,13 +108,13 @@ export function planQuestions(questions, { maxQuestions }) {
 }
 
 /** Jev's answer shapes, exactly: score legends carry the criteria as given. */
-function normalizeAnswer(question, answer) {
+export function normalizeAnswer(question, answer) {
   if (question.type === "noul") return { type: "noul", noul: answer.noul };
   if (question.type === "choice") return { type: "choice", choice: answer.choice, probabilities: answer.probabilities, confidence: answer.confidence };
   return { type: "score", score: answer.score, legend: Object.fromEntries(question.criteria.map((c, i) => [String(i), c])), probabilities: answer.probabilities, confidence: answer.confidence };
 }
 
-function answerConfidence(answer) {
+export function answerConfidence(answer) {
   if (answer.type === "noul") return Math.abs(answer.noul - 0.5) * 2;
   return answer.confidence;
 }

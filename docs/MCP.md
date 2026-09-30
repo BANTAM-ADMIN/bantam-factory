@@ -7,7 +7,7 @@ connects to it, and gets BANTAM as tools:
 |---|---|
 | `room` | A shared message log and task board with you (the operator) and BANTAM. |
 | `jobs` | BANTAM workers (local model, Codex-backed BANTAM, native Codex) on isolated copies of a folder, steerable mid-run, applied to the live files only through verification. |
-| `jev` | Calibrated yes/no, choice and score judgments from Jev mode's local engine. |
+| `jev` | Calibrated yes/no, choice and score judgments (`jev_decide`) and plain text (`jev_generate`) from DiffusionGemma, the fast local model behind Jev. |
 
 Design: `docs/specs/2026-09-30-bantam-mcp-design.md`.
 
@@ -24,6 +24,19 @@ bantamfactory mcp config
 
 # 3. Run that command once, then start Claude Code as usual.
 ```
+
+### Two modes
+
+A room normally stays in one mode; switching is a restart with the other flag.
+
+| | `--mode llama` (default) | `--mode jev` |
+|---|---|---|
+| Loaded on the GPU | the local llama.cpp model (:8085) | DiffusionGemma, started with the server and kept awake |
+| `local` jobs | BANTAM on the local model | BANTAM with a Codex model standing in (`--stand-in-model`, default `gpt-5.6-luna`; e.g. `gpt-6.1-sol`) |
+| `codex`, `codex-native` jobs | as usual | as usual |
+| Jev (`jev_decide`, `jev_generate`) | starts on first use and trades the GPU with the local model | always ready, fast |
+
+BANTAM is fully functional in both modes.
 
 ### Codex in its own terminal too
 
@@ -108,6 +121,11 @@ stopped is marked `interrupted` and never silently re-run. An apply cut off by a
 rolled back from its journal on the next start. Applies to one folder run one at a time.
 
 ## 4. Jev
+
+`jev_generate(prompt, system?, max_tokens?)` returns plain text from DiffusionGemma: a line of
+draft, a quick summary, alternatives. It is fast and capable, but its context window is about
+16k tokens including the reply, so give it focused material.
+
 
 `jev_decide(state, questions, model?)` takes the Jev wire format:
 

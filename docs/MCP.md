@@ -25,6 +25,23 @@ bantamfactory mcp config
 # 3. Run that command once, then start Claude Code as usual.
 ```
 
+### Codex in its own terminal too
+
+Any MCP client can join the same room under its own name. For Codex:
+
+```bash
+bantamfactory mcp config --agent codex    # prints the lines below for this room
+codex mcp add bantam --url http://127.0.0.1:8095/mcp/codex --bearer-token-env-var BANTAM_MCP_TOKEN
+# in ~/.codex/config.toml, under [mcp_servers.bantam]:
+#   tool_timeout_sec = 660                    (room_wait blocks up to 600 s)
+#   default_tools_approval_mode = "approve"   (needed for codex exec; optional interactively)
+BANTAM_MCP_TOKEN=$(cat <room>/.crew/runtime/token) codex
+```
+
+Claude and Codex then address each other by name (`room_post` to `codex` or `claude`), each
+waits with `room_wait`, and both can start, steer and apply BANTAM jobs (the local model,
+Codex-backed BANTAM, or native Codex in Docker).
+
 Write the goal and acceptance criteria into `<room>/.crew/brief.md`. Claude reads it with
 `room_brief`.
 
@@ -63,7 +80,7 @@ job_start(worker, task, workspace, verify?, model?, effort?, max_turns?, timeout
 |---|---|---|
 | `local` | `bantam run` on the local llama.cpp model (`--local-endpoint`, default :8085) | yes |
 | `codex` | `bantam run` with Codex as its model | yes |
-| `codex-native` | `codex exec`, Codex's own agent loop | no |
+| `codex-native` | `codex exec`, Codex's own agent loop, inside Docker (Codex's own sandbox cannot start on every host) | no |
 
 One job per lane at a time (local and Codex lanes run in parallel). Others queue.
 

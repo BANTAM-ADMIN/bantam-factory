@@ -111,5 +111,10 @@ describe("MCP server", () => {
     const config = [];
     await runMcpCli(["config", "--room", roomDir], { out: (l) => config.push(l) });
     assert.match(config[0], new RegExp(`claude mcp add --transport http bantam ${server.url.replace(/\./g, "\\.")}/mcp/claude --header "Authorization: Bearer ${server.token}"`));
+    const codex = [];
+    await runMcpCli(["config", "--room", roomDir, "--agent", "codex"], { out: (l) => codex.push(l) });
+    assert.equal(codex[0], `codex mcp add bantam --url ${server.url}/mcp/codex --bearer-token-env-var BANTAM_MCP_TOKEN`);
+    assert.doesNotMatch(codex.join("\n"), new RegExp(server.token), "the token stays out of Codex's config lines");
+    assert.match(codex.at(-1), /BANTAM_MCP_TOKEN=\$\(cat .*token"\) codex/);
   });
 });

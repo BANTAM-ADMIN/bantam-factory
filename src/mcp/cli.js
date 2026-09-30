@@ -99,6 +99,13 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       const info = runningServer(roomDir);
       const agent = flags.agent ?? "claude";
       const url = `${info?.url ?? `http://127.0.0.1:${flags.port ?? DEFAULT_PORT}`}/mcp/${agent}`;
+      if (agent === "codex") {
+        // Codex reads the token from an environment variable, never from its config file.
+        out(`codex mcp add bantam --url ${url} --bearer-token-env-var BANTAM_MCP_TOKEN`);
+        out(`\n# then in ~/.codex/config.toml under [mcp_servers.bantam]:\ntool_timeout_sec = 660                 # room_wait blocks up to 600 s\ndefault_tools_approval_mode = "approve" # needed for codex exec; optional interactively`);
+        out(`\n# start Codex in the room with the token:\nBANTAM_MCP_TOKEN=$(cat ${JSON.stringify(path.join(roomPaths(roomDir).runtime, "token"))}) codex`);
+        return 0;
+      }
       out(`claude mcp add --transport http bantam ${url} --header "Authorization: Bearer ${readToken(roomDir)}"`);
       out(`\n# or in .mcp.json:\n${JSON.stringify({ mcpServers: { bantam: { type: "http", url, headers: { Authorization: `Bearer ${readToken(roomDir)}` } } } }, null, 2)}`);
       return 0;

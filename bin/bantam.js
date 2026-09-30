@@ -671,6 +671,12 @@ if (cmd === "chat-transport") {
   }
   process.exit(v.ok ? 0 : 1);
 }
+if (cmd === "mcp") {
+  // `bantam mcp …` — BANTAM as an MCP server: a room, worker jobs and Jev for
+  // Claude Code. See docs/MCP.md.
+  const { runMcpCli } = await import("../src/mcp/cli.js");
+  process.exit(await runMcpCli(process.argv.slice(process.argv.indexOf("mcp") + 1)));
+}
 if (cmd === "jev") {
   // `bantamfactory jev …` — Jev mode: serve DiffusionGemma System One behind a
   // Jev-compatible API, and control its engine. See docs/JEV-MODE.md.

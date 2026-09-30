@@ -17,12 +17,13 @@ import { RoomStore } from "./room-store.js";
 import { createRoomToolset } from "./toolsets/room.js";
 
 export const DEFAULT_PORT = 8095;
-export const DEFAULT_TOOLSETS = Object.freeze(["room", "jobs", "jev"]);
+export const DEFAULT_TOOLSETS = Object.freeze(["room", "jobs", "jev", "writer"]);
 
 export const TOOLSET_FACTORIES = Object.freeze({
   room: async () => createRoomToolset(),
   jobs: async (options) => (await import("./toolsets/jobs.js")).createJobsToolset(options),
   jev: async (options) => (await import("./toolsets/jev.js")).createJevToolset(options),
+  writer: async (options) => (await import("./toolsets/writer.js")).createWriterToolset(options),
 });
 
 const PROTOCOL_MD = `# Room protocol
@@ -44,7 +45,7 @@ const BRIEF_MD = `# Brief
 (The operator writes the shared goal, constraints and acceptance criteria here.)
 `;
 
-export const SERVER_INSTRUCTIONS = "BANTAM room: a shared message log and task board with the operator (the human) and BANTAM, plus BANTAM worker jobs (local model and Codex) that run on isolated copies and apply only through verification. Start with room_brief. When waiting on a job or a reply, call room_wait rather than polling.";
+export const SERVER_INSTRUCTIONS = "BANTAM room: a shared message log and task board with the operator (the human) and BANTAM, plus BANTAM worker jobs (local model and Codex) that run on isolated copies and apply only through verification. Books are written with the writer_* tools under an enforced process: the writer drafts, a different agent critiques, BANTAM checks every draft. Start with room_brief. When waiting on a job, a check or a reply, call room_wait rather than polling.";
 
 export function roomPaths(roomDir) {
   const root = path.resolve(roomDir);

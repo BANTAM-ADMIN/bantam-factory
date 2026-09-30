@@ -91,8 +91,8 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       };
       const server = await startMcpServer({ roomDir, port, toolsets, log, mode,
         toolsetOptions: mode === "jev"
-          ? { jobs: { standInModel }, jev: { localEndpoint: null, eager: true } }
-          : { jobs: { localEndpoint }, jev: { localEndpoint } } });
+          ? { jobs: { standInModel }, jev: { localEndpoint: null, eager: true }, writer: {} }
+          : { jobs: { localEndpoint }, jev: { localEndpoint }, writer: { localEndpoint } } });
       out(`  BANTAM MCP serving ${server.url}/mcp/<agent>  room ${roomDir}`);
       out(mode === "jev" ? `  mode: jev · DiffusionGemma stays awake · local jobs run on ${standInModel} (stand-in)` : `  mode: llama · local jobs on ${localEndpoint} · Jev on demand`);
       out(`  toolsets: ${server.toolsets.join(", ") || "(none)"} · ${server.tools.length} tools`);

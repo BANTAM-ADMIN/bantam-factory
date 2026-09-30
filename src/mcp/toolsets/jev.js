@@ -85,6 +85,8 @@ export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", eage
     name: "jev",
     start(context) {
       ctx = context;
+      // The writer's checker asks Jev in Jev mode.
+      ctx.jevDecide = (request) => decide(request);
       // Jev mode: bring the engine up with the server so the first question is fast.
       if (eager) ensure().then(() => ctx.log({ event: "jev_ready" }), (error) => ctx.log({ event: "jev_start_failed", error: error.message }));
     },

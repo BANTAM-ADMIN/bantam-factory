@@ -208,6 +208,14 @@ describe("writer: checkers", () => {
     assert.equal(sent.body.response_format.type, "json_schema");
     assert.deepEqual([out.status, out.engine, out.flags.length], ["done", "llama.cpp", 1]);
   });
+  it("asks for medium reasoning and explains a model that reasons past its budget", async () => {
+    let sent;
+    const reply = (choice) => async (_url, init) => { sent = JSON.parse(init.body); return new Response(JSON.stringify({ choices: [choice] })); };
+    await llamaChecker({ fetchImpl: reply({ finish_reason: "stop", message: { content: '{"flags":[]}' } }) })(input);
+    assert.deepEqual([sent.max_tokens, sent.chat_template_kwargs], [16000, { reasoning_effort: "medium" }]);
+    await assert.rejects(llamaChecker({ fetchImpl: reply({ finish_reason: "length", message: { content: "" } }) })(input), /spent its 16000-token budget reasoning/);
+    await assert.rejects(llamaChecker({ fetchImpl: reply({ finish_reason: "stop", message: { content: "no json" } }) })(input), /not the JSON asked for/);
+  });
   it("asks Jev one yes/no per fact and rule in Jev mode", async () => {
     let asked;
     const check = jevChecker(async (req) => { asked = req; return { answers: { c1v1k1: { noul: 0.9 }, r1: { noul: 0.1 } } }; });

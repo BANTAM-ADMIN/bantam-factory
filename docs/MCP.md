@@ -120,7 +120,42 @@ Job state lives in `<room>/.crew/runtime/jobs/<id>/` (`job.json`, `worker.log`,
 stopped is marked `interrupted` and never silently re-run. An apply cut off by a crash is
 rolled back from its journal on the next start. Applies to one folder run one at a time.
 
-## 4. Jev
+## 4. Writing a book together (`writer`)
+
+The writer toolset runs a book through a fixed process between agents in the room
+(design: `docs/specs/2026-09-30-collaborative-writer-design.md`):
+
+| Role | Default | Does |
+|---|---|---|
+| writer | `claude` | outline, drafts, repairs, answers every finding |
+| critic | `codex` | approves the outline, critiques every draft, decides acceptance |
+| checker | BANTAM | checks every draft against canon and rules (local model, or Jev in Jev mode) |
+| operator | you | creates the book, decides chapters that exhaust their rounds |
+
+1. `writer_book_create`: premise, voice, rules, chapter count and length, roles, rounds.
+2. `writer_outline` (writer), then `writer_outline_review` (anyone but its author).
+3. Per chapter, in order:
+   - `writer_draft`: prose, a `beat_map` placing every beat, new canon facts with quotes.
+   - Bantam's check runs, then the critic is asked for a review.
+   - `writer_critique`: verdict, 1–5 scores, findings pinned to a paragraph with a
+     verbatim quote, a ruling on every check flag.
+   - On revise: `writer_draft` again, answering every finding (`fixed` or `disputed` with
+     a reason).
+   - On approval: `writer_accept`.
+4. `writer_status` and `writer_context` show the state, the text and whose move it is. Every
+   step is posted to the room.
+
+What it enforces:
+- The critic never judges its own version.
+- Every quote (findings, canon, check flags) must be in the chapter's text.
+- Revisions answer every finding.
+- Chapters go in order, and accepted canon is shown to every later chapter.
+- After `max_rounds` without approval, the operator decides (`writer_unblock`).
+
+Everything lives in `<room>/books/<slug>/`: `book.json`, `outline.json`, `canon.json`, `chapters/NN/`
+(`state.json`, every `draft-vK.md`, `final.md`) and `manuscript.md`.
+
+## 5. Jev
 
 `jev_generate(prompt, system?, max_tokens?)` returns plain text from DiffusionGemma: a line of
 draft, a quick summary, alternatives. It is fast and capable, but its context window is about
@@ -145,7 +180,7 @@ take minutes, and is turned off when the server stops, unless it was already run
 before. It shares the GPU with the local worker through Jev mode's swap policy. While a local
 job runs, each answer hands the GPU straight back.
 
-## 5. Security
+## 6. Security
 
 - The server listens on 127.0.0.1 only. Every request needs the room's bearer token
   (`.crew/runtime/token`, mode 0600), and browser origins other than localhost are refused.
@@ -159,7 +194,7 @@ access; agent names are declarations. Anyone holding the token can speak as any 
 the independent-verification rule on tasks guards against mistakes, not against a hostile
 client.
 
-## 6. Options
+## 7. Options
 
 ```
 bantamfactory mcp serve [--room DIR] [--port 8095] [--toolsets room,jobs,jev] [--local-endpoint URL]

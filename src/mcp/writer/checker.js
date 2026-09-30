@@ -23,8 +23,13 @@ export function checkPrompt({ rules, canon, plan, paras }) {
   ].join("\n");
 }
 
-/** The local llama.cpp model through its OpenAI-compatible endpoint. */
-export function llamaChecker({ endpoint = "http://127.0.0.1:8085", timeoutMs = 300_000, fetchImpl = fetch } = {}) {
+/**
+ * The local llama.cpp model through its OpenAI-compatible endpoint. A reasoning
+ * model reasons before it answers: measured on a 930-word chapter with the
+ * 27B, its server default (xhigh) used a 4000-token budget without answering,
+ * "low" looped past 16000, "medium" answered in about 6000 tokens (97 s).
+ */
+export function llamaChecker({ endpoint = "http://127.0.0.1:8085", timeoutMs = 420_000, maxTokens = 16_000, reasoningEffort = "medium", fetchImpl = fetch } = {}) {
   return async (input, { signal = null } = {}) => {
     const started = Date.now();
     const res = await fetchImpl(`${endpoint.replace(/\/+$/, "")}/v1/chat/completions`, {
@@ -35,13 +40,20 @@ export function llamaChecker({ endpoint = "http://127.0.0.1:8085", timeoutMs = 3
           { role: "system", content: "You check fiction chapters for continuity. You report only real contradictions with the given canon and rules, each backed by a verbatim quote." },
           { role: "user", content: checkPrompt(input) },
         ],
-        temperature: 0.2, max_tokens: 4000,
+        temperature: 0.2, max_tokens: maxTokens,
+        ...(reasoningEffort ? { chat_template_kwargs: { reasoning_effort: reasoningEffort } } : {}),
         response_format: { type: "json_schema", json_schema: { name: "check", schema: SCHEMA } },
       }),
     });
     if (!res.ok) throw new Error(`local model: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
     const body = await res.json();
-    const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}");
+    const choice = body.choices?.[0];
+    if (choice?.finish_reason === "length" && !choice.message?.content?.trim()) {
+      throw new Error(`the local model spent its ${maxTokens}-token budget reasoning and did not answer`);
+    }
+    let parsed;
+    try { parsed = JSON.parse(choice?.message?.content ?? ""); }
+    catch { throw new Error(`the local model's answer was not the JSON asked for: ${String(choice?.message?.content ?? "").slice(0, 120)}`); }
     return { status: "done", engine: "llama.cpp", ms: Date.now() - started, flags: Array.isArray(parsed.flags) ? parsed.flags : [] };
   };
 }

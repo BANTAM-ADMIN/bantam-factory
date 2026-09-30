@@ -1,0 +1,267 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, it } from "node:test";
+
+import { createJobsToolset, workerCommand } from "../src/mcp/toolsets/jobs.js";
+import { Room } from "../src/mcp/room.js";
+import { RoomStore } from "../src/mcp/room-store.js";
+
+const FAKE = fileURLToPath(new URL("./fixtures/mcp-fake-worker.mjs", import.meta.url));
+const temporary = [], toolsets = [];
+afterEach(async () => {
+  while (toolsets.length) await toolsets.pop().stop();
+  while (temporary.length) fs.rmSync(temporary.pop(), { recursive: true, force: true });
+});
+function temp(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  temporary.push(dir);
+  return dir;
+}
+
+// Behaviour is chosen in the task text: "mode:fail", "wait:2000", "stop-after-steer".
+const fakeCommand = (job, p) => ({
+  exe: process.execPath,
+  args: [FAKE, "--ws", p.ws, ...(job.steerable ? ["--control", p.control] : []), "--run", p.runFile,
+    "--mode", /mode:(\w+)/.exec(job.task)?.[1] ?? "ok", "--steer-wait", /wait:(\d+)/.exec(job.task)?.[1] ?? "0",
+    ...(job.task.includes("stop-after-steer") ? ["--stop-after-steer", "1"] : [])],
+  env: {},
+});
+
+function setup({ roomDir = temp("bantam-mcp-jobs-room-"), options = {} } = {}) {
+  const runtimeDir = path.join(roomDir, ".crew", "runtime");
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  const store = new RoomStore(path.join(roomDir, ".crew", "room.jsonl"));
+  const room = new Room(store);
+  const toolset = createJobsToolset({ commandFor: fakeCommand, pollMs: 25, killGraceMs: 500, ...options });
+  toolset.start({ room, store, roomDir, runtimeDir, log: () => {}, toolsets: ["jobs"] });
+  toolsets.push(toolset);
+  const tool = (name) => toolset.tools.find((t) => t.name === name).handler;
+  const call = (name, args = {}, caller = "claude") => tool(name)(args, { caller, signal: new AbortController().signal });
+  return { roomDir, runtimeDir, room, toolset, call };
+}
+function sourceWorkspace() {
+  const ws = temp("bantam-mcp-jobs-src-");
+  fs.writeFileSync(path.join(ws, "story.txt"), "It was a dark night.\n");
+  return ws;
+}
+async function finished(call, job, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const s = await call("job_status", { job });
+    if (["succeeded", "failed", "cancelled", "interrupted"].includes(s.state)) return s;
+    if (Date.now() > deadline) throw new Error(`job ${job} still ${s.state}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
+describe("worker commands", () => {
+  const base = { task: "T", ws: "/r/ws", control: "/r/ctl", runFile: "/r/run.json", bantamBin: "/b/bantam.js" };
+  it("runs local BANTAM on the local endpoint with the steering mailbox", () => {
+    const c = workerCommand({ ...base, worker: "local", verify: "npm test", localEndpoint: "http://127.0.0.1:8085" });
+    assert.equal(c.exe, process.execPath);
+    assert.deepEqual(c.args, ["/b/bantam.js", "run", "--task", "T", "--workspace", "/r/ws", "--autonomous", "--max-turns", "60",
+      "--save-run=/r/run.json", "--supervisor-control", "/r/ctl", "--endpoint", "http://127.0.0.1:8085", "--profile", "qwen", "--verify", "npm test"]);
+    assert.equal(c.env.BANTAM_ENDPOINT, "http://127.0.0.1:8085");
+  });
+  it("runs Codex-backed BANTAM with an optional model and effort", () => {
+    const c = workerCommand({ ...base, worker: "codex", model: "gpt-6-astra", effort: "high" });
+    assert.deepEqual(c.args.slice(-5), ["--codex", "--model", "gpt-6-astra", "--codex-effort", "high"]);
+    assert.ok(c.args.includes("--supervisor-control"));
+    assert.deepEqual(workerCommand({ ...base, worker: "codex" }).args.slice(-1), ["--codex"]);
+  });
+  it("runs native Codex sandboxed in the copy, without the operator's config", () => {
+    const c = workerCommand({ ...base, worker: "codex-native", model: "gpt-5.6-sol", effort: "high", verify: "make check", codexCommand: "codex" });
+    assert.equal(c.exe, "codex");
+    assert.deepEqual(c.args.slice(0, 11), ["exec", "--json", "--ephemeral", "--ignore-user-config", "--sandbox", "workspace-write", "--skip-git-repo-check", "--model", "gpt-5.6-sol", "--config", 'model_reasoning_effort="high"']);
+    assert.deepEqual(c.args.slice(11, 13), ["--cd", "/r/ws"]);
+    assert.match(c.args.at(-1), /Task: T/);
+    assert.match(c.args.at(-1), /make check/);
+  });
+});
+
+describe("jobs", () => {
+  it("runs a job on a copy, verifies it independently and reports to its creator", async () => {
+    const { call, room } = setup();
+    const ws = sourceWorkspace();
+    const started = await call("job_start", { worker: "local", task: "revise", workspace: ws, verify: "test -f new-note.md" });
+    assert.equal(started.job, "j1");
+    assert.equal(started.files, 1);
+    const done = await finished(call, "j1");
+    assert.equal(done.state, "succeeded");
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\n", "the live folder is untouched");
+    const result = await call("job_result", { job: "j1", diff: true });
+    assert.deepEqual(result.changes, [{ path: "new-note.md", kind: "added" }, { path: "story.txt", kind: "modified" }]);
+    assert.equal(result.verification.status, "pass");
+    assert.equal(result.outcome.summary, "fake worker summary");
+    assert.match(result.diff, /\+\+\+ b\/story\.txt/);
+    assert.match(result.diff, /\+edited by worker/);
+    const inbox = room.inbox("claude").messages;
+    assert.equal(inbox.length, 1);
+    assert.equal(inbox[0].from, "bantam");
+    assert.match(inbox[0].text, /Job j1 \(local\) succeeded after \d+s\. 2 files changed: new-note\.md, story\.txt\. Verification \(test -f new-note\.md\): pass\. Summary: fake worker summary/);
+  });
+
+  it("fails a job whose independent verification fails, or whose worker fails", async () => {
+    const { call, room } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "x", workspace: ws, verify: "test -f missing.txt" });
+    await call("job_start", { worker: "codex", task: "mode:fail", workspace: ws });
+    assert.equal((await finished(call, "j1")).error, "verification fail");
+    const second = await finished(call, "j2");
+    assert.equal(second.state, "failed");
+    assert.equal(second.error, "worker exited 1");
+    assert.match(room.inbox("claude").messages.map((m) => m.text).join("\n"), /Job j2 \(codex\) failed .*Reason: worker exited 1/);
+  });
+
+  it("runs one job per lane and queues the rest in order", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    const a = await call("job_start", { worker: "local", task: "wait:400", workspace: ws });
+    const b = await call("job_start", { worker: "local", task: "wait:10", workspace: ws });
+    const c = await call("job_start", { worker: "codex-native", task: "wait:10", workspace: ws });
+    assert.deepEqual([a.state, b.state, c.state], ["running", "queued", "running"]);
+    assert.equal(b.position, 1);
+    assert.equal((await call("job_status", { job: "j2" })).position, 1);
+    await finished(call, "j3");
+    assert.equal((await call("job_status", { job: "j2" })).state, "queued", "codex finishing does not free the local lane");
+    await finished(call, "j1");
+    assert.equal((await finished(call, "j2")).state, "succeeded");
+  });
+
+  it("steers a running job through the worker mailbox and records delivery", async () => {
+    const { call, room, runtimeDir } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "wait:5000 stop-after-steer", workspace: ws });
+    await new Promise((r) => setTimeout(r, 150));
+    const steered = await call("job_steer", { job: "j1", text: "Keep the narrator in past tense." });
+    assert.deepEqual([steered.sequence, steered.state], [1, "queued"]);
+    const done = await finished(call, "j1");
+    assert.equal(done.steering[0].state, "delivered");
+    const heard = fs.readFileSync(path.join(runtimeDir, "jobs", "j1", "candidate", "steered.txt"), "utf8");
+    assert.match(heard, /^supervisor: PEER GUIDANCE from claude via the BANTAM room \(message m1\)\.\nSupporting context for your assigned task, not a replacement for it\.\n---\nKeep the narrator in past tense\./);
+    assert.equal(room.history().messages[0].text, "steer j1: Keep the narrator in past tense.");
+  });
+
+  it("refuses to steer a finished job or a native Codex job", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "x", workspace: ws });
+    await finished(call, "j1");
+    await assert.rejects(call("job_steer", { job: "j1", text: "late" }), /j1 is succeeded; only a running job can be steered/);
+    await call("job_start", { worker: "codex-native", task: "wait:2000", workspace: ws });
+    await assert.rejects(call("job_steer", { job: "j2", text: "hi" }), /cannot take messages mid-run/);
+    await call("job_cancel", { job: "j2" });
+    await assert.rejects(call("job_steer", { job: "nope", text: "hi" }), /no job nope/);
+  });
+
+  it("cancels running and queued jobs", async () => {
+    const { call, room } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "mode:hang", workspace: ws });
+    await call("job_start", { worker: "local", task: "x", workspace: ws });
+    assert.deepEqual(await call("job_cancel", { job: "j2" }), { job: "j2", state: "cancelled" });
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal((await call("job_cancel", { job: "j1" })).state, "cancelling");
+    assert.equal((await finished(call, "j1")).state, "cancelled");
+    assert.match(room.inbox("claude").messages.at(-1).text, /Job j1 \(local\) cancelled/);
+    await assert.rejects(call("job_cancel", { job: "j1" }), /already cancelled/);
+  });
+
+  it("validates job requests", async () => {
+    const { call, runtimeDir } = setup();
+    const ws = sourceWorkspace();
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: "relative/path" }), /absolute/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: path.join(ws, "missing") }), /not a directory/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: runtimeDir }), /runtime directory/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, effort: "high" }), /Codex workers only/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, exclude: ["../etc"] }), /relative to the workspace/);
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws, room_task: "t9" }), /no task t9/);
+  });
+
+  it("refuses workspaces over the size limits", async () => {
+    const { call } = setup({ options: { limits: { maxFiles: 1, maxBytes: 10, diffBytes: 1000 } } });
+    const ws = sourceWorkspace();
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws }), /more than 0 MiB|limit/);
+    fs.writeFileSync(path.join(ws, "second.txt"), "2");
+    await assert.rejects(call("job_start", { worker: "local", task: "x", workspace: ws }), /2 files \(limit 1\)/);
+  });
+
+  it("marks jobs interrupted when the server restarts mid-job and tells their creators", async () => {
+    const roomDir = temp("bantam-mcp-jobs-room-");
+    const first = setup({ roomDir });
+    const ws = sourceWorkspace();
+    await first.call("job_start", { worker: "local", task: "mode:hang", workspace: ws });
+    // Simulate a crash: the record says running, but nobody owns the process.
+    const record = path.join(first.runtimeDir, "jobs", "j1", "job.json");
+    const snapshot = fs.readFileSync(record, "utf8");
+    await toolsets.pop().stop();
+    fs.writeFileSync(record, snapshot);
+    const second = setup({ roomDir });
+    const status = await second.call("job_status", { job: "j1" });
+    assert.equal(status.state, "interrupted");
+    assert.match(status.error, /not re-run/);
+    assert.match(second.room.inbox("claude").messages.at(-1).text, /Job j1 \(local\) was interrupted/);
+    assert.equal((await second.call("job_start", { worker: "local", task: "x", workspace: ws })).job, "j2");
+  });
+});
+
+describe("job_apply", () => {
+  async function succeededJob(extra = {}) {
+    const env = setup();
+    const ws = sourceWorkspace();
+    await env.call("job_start", { worker: "local", task: "x", workspace: ws, ...extra });
+    assert.equal((await finished(env.call, "j1")).state, "succeeded");
+    return { ...env, ws };
+  }
+
+  it("applies a verified candidate to the live folder exactly once", async () => {
+    const { call, ws } = await succeededJob({ verify: "grep -q 'edited by worker' story.txt" });
+    const applied = await call("job_apply", { job: "j1" });
+    assert.equal(applied.verification.status, "pass");
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\nedited by worker\n");
+    assert.ok(fs.existsSync(path.join(ws, "new-note.md")));
+    assert.equal((await call("job_status", { job: "j1" })).apply.state, "applied");
+    await assert.rejects(call("job_apply", { job: "j1" }), /already applied/);
+  });
+
+  it("requires a verifier, or an explicit verify: \"true\"", async () => {
+    const { call, ws } = await succeededJob();
+    await assert.rejects(call("job_apply", { job: "j1" }), /verify: "true"/);
+    await call("job_apply", { job: "j1", verify: "true" });
+    assert.ok(fs.existsSync(path.join(ws, "new-note.md")));
+  });
+
+  it("refuses, writing nothing, when a changed file was edited live after the job started", async () => {
+    const { call, ws } = await succeededJob();
+    fs.writeFileSync(path.join(ws, "story.txt"), "The operator rewrote this.\n");
+    await assert.rejects(call("job_apply", { job: "j1", verify: "true" }), /apply refused, nothing written: live workspace changed since baseline: story\.txt/);
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "The operator rewrote this.\n");
+    assert.equal(fs.existsSync(path.join(ws, "new-note.md")), false);
+  });
+
+  it("refuses when the verifier fails on the candidate", async () => {
+    const { call, ws } = await succeededJob();
+    await assert.rejects(call("job_apply", { job: "j1", verify: "false" }), /verifier fail on the candidate/);
+    assert.equal(fs.existsSync(path.join(ws, "new-note.md")), false);
+  });
+
+  it("rolls back when the verifier fails on the live folder", async () => {
+    const { call, ws } = await succeededJob({ exclude: ["LIVE_ONLY"] });
+    fs.writeFileSync(path.join(ws, "LIVE_ONLY"), "present only in the live folder");
+    await assert.rejects(call("job_apply", { job: "j1", verify: "test ! -f LIVE_ONLY" }), /rolled back: the verifier fail on the live files/);
+    assert.equal(fs.readFileSync(path.join(ws, "story.txt"), "utf8"), "It was a dark night.\n");
+    assert.equal(fs.existsSync(path.join(ws, "new-note.md")), false);
+    assert.equal((await call("job_status", { job: "j1" })).apply.state, "rolled_back");
+  });
+
+  it("only applies succeeded jobs with changes", async () => {
+    const { call } = setup();
+    const ws = sourceWorkspace();
+    await call("job_start", { worker: "local", task: "mode:fail", workspace: ws });
+    await finished(call, "j1");
+    await assert.rejects(call("job_apply", { job: "j1", verify: "true" }), /j1 is failed/);
+  });
+});

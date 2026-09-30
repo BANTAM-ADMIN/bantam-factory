@@ -23,6 +23,9 @@ import { planWorkspaceTransaction, recoverWorkspaceTransactions, WorkspaceTransa
 import { ToolError } from "../protocol.js";
 
 const BANTAM_BIN = fileURLToPath(new URL("../../../bin/bantam.js", import.meta.url));
+// Native Codex inside an outer Docker boundary, for hosts where its own
+// bubblewrap sandbox cannot start (the same launcher the fight harness uses).
+const CODEX_CONTAINER = fileURLToPath(new URL("../../../scripts/astra-container-cli.mjs", import.meta.url));
 export const WORKERS = Object.freeze({
   local: { lane: "local", steerable: true },
   codex: { lane: "codex", steerable: true },
@@ -45,14 +48,21 @@ export function nativeCodexPrompt(task, verify) {
 
 /** The exact process a job runs. Pure: no filesystem access. */
 export function workerCommand({ worker, task, ws, control, runFile, verify = null, model = null, effort = null, maxTurns = 60,
-  localEndpoint = "http://127.0.0.1:8085", bantamBin = BANTAM_BIN, codexCommand = "codex" }) {
+  localEndpoint = "http://127.0.0.1:8085", bantamBin = BANTAM_BIN, codexCommand = "codex", codexSandbox = "docker",
+  containerDir = null, codexContainer = CODEX_CONTAINER }) {
   if (worker === "codex-native") {
-    return { exe: codexCommand, env: {}, args: [
-      "exec", "--json", "--ephemeral", "--ignore-user-config", "--sandbox", "workspace-write", "--skip-git-repo-check",
+    const exec = [
+      "exec", "--json", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
       ...(model ? ["--model", model] : []),
       ...(effort ? ["--config", `model_reasoning_effort="${effort}"`] : []),
       "--cd", ws, nativeCodexPrompt(task, verify),
-    ] };
+    ];
+    if (codexSandbox === "host") return { exe: codexCommand, env: {}, args: [...exec.slice(0, 4), "--sandbox", "workspace-write", ...exec.slice(4)] };
+    // Docker is the boundary; the launcher mounts only the copy (read-write),
+    // Codex's auth (read-only) and its runtime. The job's own timeout governs.
+    if (!containerDir) throw new Error("codex-native in Docker needs a container directory");
+    return { exe: process.execPath, args: [codexContainer, ...exec.slice(0, 4), "--dangerously-bypass-approvals-and-sandbox", ...exec.slice(4)],
+      env: { ASTRA_CONTAINER_CID_DIR: containerDir, ASTRA_CONTAINER_TIMEOUT_SECONDS: "0" } };
   }
   const args = [bantamBin, "run", "--task", task, "--workspace", ws, "--autonomous", "--max-turns", String(maxTurns),
     `--save-run=${runFile}`, "--supervisor-control", control];
@@ -90,6 +100,7 @@ export function createJobsToolset({
   localEndpoint = "http://127.0.0.1:8085",
   bantamBin = BANTAM_BIN,
   codexCommand = "codex",
+  codexSandbox = "docker",
   commandFor = null,
   lanes = { local: 1, codex: 1 },
   pollMs = 1000,
@@ -110,7 +121,7 @@ export function createJobsToolset({
     const dir = dirOf(id);
     return { dir, ws: path.join(dir, "ws"), control: path.join(dir, "control"), baseline: path.join(dir, "baseline"),
       candidate: path.join(dir, "candidate"), runFile: path.join(dir, "run.json"), log: path.join(dir, "worker.log"),
-      transactions: path.join(dir, "transactions") };
+      transactions: path.join(dir, "transactions"), containers: path.join(dir, "containers") };
   };
   const persist = (job) => writeJsonAtomic(path.join(dirOf(job.id), "job.json"), job);
   const log = (job, detail = null) => ctx.log({ event: "job", job: job.id, state: job.state, detail });
@@ -248,7 +259,9 @@ export function createJobsToolset({
   async function launch(job) {
     const p = paths(job.id);
     const command = commandFor ? commandFor(job, p) : workerCommand({ worker: job.worker, task: job.task, ws: p.ws, control: p.control,
-      runFile: p.runFile, verify: job.verify, model: job.model, effort: job.effort, maxTurns: job.maxTurns, localEndpoint, bantamBin, codexCommand });
+      runFile: p.runFile, verify: job.verify, model: job.model, effort: job.effort, maxTurns: job.maxTurns, localEndpoint, bantamBin, codexCommand,
+      codexSandbox, containerDir: p.containers });
+    if (job.worker === "codex-native" && codexSandbox !== "host") fs.mkdirSync(p.containers, { recursive: true, mode: 0o700 });
     const out = fs.openSync(p.log, "a", 0o600);
     job.state = "running";
     job.startedAt = new Date().toISOString();

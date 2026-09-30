@@ -73,13 +73,20 @@ describe("worker commands", () => {
     assert.ok(c.args.includes("--supervisor-control"));
     assert.deepEqual(workerCommand({ ...base, worker: "codex" }).args.slice(-1), ["--codex"]);
   });
-  it("runs native Codex sandboxed in the copy, without the operator's config", () => {
-    const c = workerCommand({ ...base, worker: "codex-native", model: "gpt-5.6-sol", effort: "high", verify: "make check", codexCommand: "codex" });
-    assert.equal(c.exe, "codex");
-    assert.deepEqual(c.args.slice(0, 11), ["exec", "--json", "--ephemeral", "--ignore-user-config", "--sandbox", "workspace-write", "--skip-git-repo-check", "--model", "gpt-5.6-sol", "--config", 'model_reasoning_effort="high"']);
-    assert.deepEqual(c.args.slice(11, 13), ["--cd", "/r/ws"]);
+  it("runs native Codex in the copy inside Docker by default, without the operator's config", () => {
+    const c = workerCommand({ ...base, worker: "codex-native", model: "gpt-5.6-sol", effort: "high", verify: "make check", containerDir: "/r/containers", codexContainer: "/b/launcher.mjs" });
+    assert.equal(c.exe, process.execPath);
+    assert.deepEqual(c.args.slice(0, 12), ["/b/launcher.mjs", "exec", "--json", "--ephemeral", "--ignore-user-config", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", "--model", "gpt-5.6-sol", "--config", 'model_reasoning_effort="high"', "--cd"]);
+    assert.equal(c.args[12], "/r/ws");
     assert.match(c.args.at(-1), /Task: T/);
     assert.match(c.args.at(-1), /make check/);
+    assert.deepEqual(c.env, { ASTRA_CONTAINER_CID_DIR: "/r/containers", ASTRA_CONTAINER_TIMEOUT_SECONDS: "0" });
+    assert.throws(() => workerCommand({ ...base, worker: "codex-native" }), /container directory/);
+  });
+  it("can run native Codex with its own host sandbox where bubblewrap works", () => {
+    const c = workerCommand({ ...base, worker: "codex-native", codexSandbox: "host", codexCommand: "codex" });
+    assert.equal(c.exe, "codex");
+    assert.deepEqual(c.args.slice(0, 7), ["exec", "--json", "--ephemeral", "--ignore-user-config", "--sandbox", "workspace-write", "--skip-git-repo-check"]);
   });
 });
 

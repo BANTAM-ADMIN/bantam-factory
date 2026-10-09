@@ -26,7 +26,12 @@ jobs:
       - run: npm ci
       # The shell sandbox pulls its base image on first use; do it here so a
       # registry hiccup is a named step rather than 9 mystery test failures.
-      - run: docker pull alpine:3
+      - name: Prepare shell sandbox image
+        run: |
+          if ! docker pull alpine:3; then
+            docker pull public.ecr.aws/docker/library/alpine:3
+            docker tag public.ecr.aws/docker/library/alpine:3 alpine:3
+          fi
       # Several files launch real Chromium processes. Bound file concurrency
       # so shared runners can capture screenshots within the tool's deadlines.
       - run: node --import ./test/gpu-test-isolation.mjs --test --test-concurrency=2 test/*.test.js

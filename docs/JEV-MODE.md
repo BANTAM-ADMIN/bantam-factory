@@ -22,9 +22,8 @@ while leaving chat available. Changing the chat model releases the primary engin
 through the GPU handoff system.
 
 The 16,384-token deployment uses an early working budget: compact assembled input
-at **8,192 tokens**, aim for **6,144** after trimming, and enforce an input ceiling
-of **11,264**. Plain generation defaults to **2,048**; coding actions use the **4,096**-token
-reserve. Thinking and the answer share that generation allowance, with a further
+at **5,376 tokens**, aim for **4,032** after trimming, and enforce an input ceiling
+of **7,168**. Both chat and coding allow up to **8,192** generated tokens. Thinking and the answer share that generation allowance, with a further
 **1,024** tokens of safety margin. The server's
 tokenizer counts the complete request, including instructions, tools and history.
 Oversized input is refused before generation. If the current task and required
@@ -34,13 +33,20 @@ trimming retains recent turns and the current task/controller state, rather than
 claiming to preserve every detail through a model-generated summary. This mode
 defaults to 12 agent turns and is intended for chat and light work.
 
+The primary prompt omits the JSON tutorial and duplicate tool manual. Legal tools
+and their descriptions are supplied only when Jev selects an operation; argument
+generation receives only the selected field instruction, task/results, and operator
+preferences. This keeps the fixed system overhead small without deleting the
+current user request or verification evidence. Selection uses its own small output
+canvas; its exact input plus canvas is checked against the context limit.
+
 Tool use in this mode uses **Jev selection and CPU assembly**. The existing
 structured reader selects issued handles for the currently allowed action,
 registered query tool, known path, and source lines. The CPU maps those choices
 back to exact values and serializes the validated action for the ordinary
 dispatcher. Existing source is copied by the CPU for exact-match edits; the model
 generates only new strings such as replacement code, commands, new filenames,
-and replies. Source generation uses a closed literal block and shares the 4K
+and replies. Source generation uses a closed literal block and shares the 8K
 generation reserve across the fields of a turn. Truncated blocks and source that
 changes during selection are discarded before execution.
 

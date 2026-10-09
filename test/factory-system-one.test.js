@@ -105,13 +105,18 @@ describe("factory System One structured reads", () => {
 
   it('budgets and cancels a tool selection before submitting its structured read', async () => {
     let generations = 0;
-    const reader = createStructuredReader({ baseUrl: 'http://fixture', model: 'm', fetchImpl: fakeServer({ onChat: () => generations++ }) });
+    const reader = createStructuredReader({ baseUrl: 'http://fixture', model: 'm', fetchImpl: fakeServer({ slotLogprobs: { 51: -0.02, 50: -6 }, onChat: () => generations++ }) });
     const compiled = await reader.compileLabels({ lead: 'q1: [', tail: ']', labels: ['TNF', 'VRDR'] });
     await assert.rejects(reader.read({ system: 's', user: 'u', compiled, maxInputTokens: 2 }), { code: 'context_overflow' });
     assert.equal(generations, 0);
+    // The input fits, but its exact six-token output canvas does not.
+    await assert.rejects(reader.read({ system: 's', user: 'u', compiled, maxContextTokens: 8 }), { code: 'context_overflow' });
+    assert.equal(generations, 0);
+    await reader.read({ system: 's', user: 'u', compiled, maxContextTokens: 13 });
+    assert.equal(generations, 1);
     const controller = new AbortController(); controller.abort();
     await assert.rejects(reader.read({ system: 's', user: 'u', compiled, maxInputTokens: 100, signal: controller.signal }), { name: 'AbortError' });
-    assert.equal(generations, 0);
+    assert.equal(generations, 1);
   });
 
   it("finds the slot where labels differ when the lead's trailing space folds into the label", async () => {

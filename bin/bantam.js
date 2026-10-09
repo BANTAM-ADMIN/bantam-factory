@@ -5033,7 +5033,8 @@ async function repl() {
       try {
         await (await import('../src/diffusiongemma-primary.js')).selectDiffusionGemma(model, { out: text => process.stdout.write(text) });
         saveModelPreference({ kind: 'diffusiongemma', name: 'diffusiongemma' });
-        console.log('  Small working context: compact near 8K input; up to 4K generation. Best for chat and short tasks.');
+        const budget = model.contextBudget;
+        console.log(`  Lean working context: compact near ${budget.compactAtTokens} input tokens; up to ${budget.generationTokens} for thinking + output. Best for chat and short tasks.`);
       } catch (error) { console.log(`  DiffusionGemma: ${error.message}`); }
       return;
     }
@@ -5696,7 +5697,7 @@ async function repl() {
     // say 'keep going' to have all that held"). Every request carries the
     // recent asks and the last report in full; bare consent — including an
     // empty Enter — is disambiguated into an explicit continue.
-    let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog, maxHistoryChars: model.diffusionGemma ? 6000 : null });
+    let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog, maxHistoryChars: model.diffusionGemma ? Math.min(4000, model.contextBudget.historyChars) : null });
 
     running = true; aborted = false; injections = [];
     lastRunStartedAt = Date.now();

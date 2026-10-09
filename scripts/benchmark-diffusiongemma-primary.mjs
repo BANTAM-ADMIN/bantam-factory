@@ -42,7 +42,7 @@ try {
     assert.equal(found?.dialect, 'diffusiongemma'); assert.equal(found.contextTokens, model.contextWindowTokens); return found;
   });
   for (let i = 0; i < 3; i++) await step(`short chat ${i + 1}`, () => chat('In two sentences, explain why compacting chat history leaves room for an answer.'));
-  await step('thinking within 4K generation reserve', () => chat('A shop discounts a $120 item by 25%, then adds 10% tax. What is the final price? Explain briefly.', { thinking: true, nPredict: 4096 }));
+  await step('thinking within 8K generation reserve', () => chat('A shop discounts a $120 item by 25%, then adds 10% tax. What is the final price? Explain briefly.', { thinking: true, nPredict: 8192 }));
   await step('streaming chat hides thought channels', async () => {
     const progress = [];
     const result = await chat('Say HELLO in your final answer.', { thinking: true, nPredict: 512, onProgress: event => progress.push(event.content) });

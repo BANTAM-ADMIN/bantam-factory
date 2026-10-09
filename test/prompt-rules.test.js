@@ -2,6 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { activeCandidateRules, composeRulesBlock, promptVersion, BASE_RULES, CANDIDATE_RULES } from "../src/prompt-rules.js";
 
+test('diffusion CPU rules are lean, attributable, and retain explicit operator rules', () => {
+  const mode = { diffusionTools: true };
+  const lean = composeRulesBlock({}, mode);
+  assert.ok(lean.length < 400);
+  assert.match(lean, /actual result/);
+  assert.doesNotMatch(lean, /Batch independent reads|Your objective/);
+  const env = { BANTAM_RULES: 'fable.report-shape' };
+  assert.match(composeRulesBlock(env, mode), /verification evidence/);
+  assert.notEqual(promptVersion({}, mode), promptVersion(env, mode));
+  assert.notEqual(promptVersion({}, mode), promptVersion({}, { compact: true }));
+  assert.equal(composeRulesBlock({ ...env, BANTAM_RULES_OFF: 'fable.report-shape' }, mode), lean);
+});
+
 test('compact wording keeps each obligation and explicitly selected candidate attributable', () => {
   const baseline = { BANTAM_RULES: 'fable.visual-composition' };
   const compact = { ...baseline, BANTAM_COMPACT_RULES: '1' };

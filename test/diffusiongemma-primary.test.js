@@ -12,6 +12,20 @@ import { loadJevConfig } from '../src/jev/config.js';
 import { runAgent } from '../src/agent.js';
 import { discoverRunningDiffusionGemma } from '../src/diffusiongemma-primary.js';
 import { diffusionGemmaFinalText, parseDiffusionGemmaAction, diffusionGemmaActionSystem, completedDiffusionGemmaAction, completedDiffusionGemmaValue } from '../src/diffusiongemma-output.js';
+import { buildPrompt } from '../src/prompt.js';
+
+test('lean primary head preserves task, preferences and evidence without duplicate tool instructions', () => {
+  const options = { task: 'CURRENT USER REQUEST: preserve every clause.', env: 'src/code.js', turns: [
+    { i: 0, action: { a: 'shell', c: 'node test.js' }, observation: 'ACTUAL TEST RESULT: 6 passed' }],
+    profileText: 'USER PREFERENCE: metric units.', interactive: true, maxTurns: 12,
+    toolsText: 'REGISTERED TOOL DOCUMENTATION '.repeat(200), contractText: 'CURRENT CONTRACT: do not edit tests.' };
+  const lean = buildPrompt({ ...options, diffusionTools: true });
+  const regular = buildPrompt({ ...options, compactRules: true });
+  assert.ok(lean.length < regular.length / 2, 'prompt overhead substantially reduced');
+  for (const anchor of ['CURRENT USER REQUEST', 'USER PREFERENCE', 'ACTUAL TEST RESULT', 'CURRENT CONTRACT', 'src/code.js']) assert.ok(lean.includes(anchor));
+  assert.doesNotMatch(lean, /REGISTERED TOOL DOCUMENTATION|Actions \(emit exactly one/);
+  assert.match(regular, /REGISTERED TOOL DOCUMENTATION|Actions \(emit exactly one/);
+});
 
 test('file blocks preserve literal source while rejecting incomplete or ambiguous actions', () => {
   const source = '<!DOCTYPE html>\n<canvas id="tetris"></canvas>\n<script>const s = "quoted"; const pattern = /\\w+/;</script>';
@@ -98,10 +112,10 @@ test('startup adopts the awake configured engine, without starting a stopped or 
 
 test('16K deployment reserves generation and compacts with hysteresis', () => {
   const b = diffusionGemmaBudget();
-  assert.equal(b.compactAtTokens, 8192); assert.equal(b.compactToTokens, 6144);
+  assert.equal(b.compactAtTokens, 5376); assert.equal(b.compactToTokens, 4032);
   assert.equal(b.hardInputTokens + b.generationTokens + b.marginTokens, 16384);
-  assert.equal(diffusionGemmaOutputTokens(null, b), 2048);
-  assert.equal(diffusionGemmaOutputTokens(16000, b), 4096);
+  assert.equal(diffusionGemmaOutputTokens(null, b), 8192);
+  assert.equal(diffusionGemmaOutputTokens(16000, b), 8192);
   assert.throws(() => diffusionGemmaOutputTokens(0, b));
   for (const ctx of [4096, 8192, 16384, 32768]) {
     const small = diffusionGemmaBudget(ctx);
@@ -111,7 +125,7 @@ test('16K deployment reserves generation and compacts with hysteresis', () => {
 });
 
 test('exact server tokenizer counts the assembled prompt and blocks an over-budget generation', async t => {
-  let count = 8192, blanks = 0, clippedThought = false; const calls = [];
+  let count = 5376, blanks = 0, clippedThought = false; const calls = [];
   const server = http.createServer(async (req, res) => {
     let text = ''; for await (const chunk of req) text += chunk;
     const body = text ? JSON.parse(text) : null; calls.push({ path: req.url, body });
@@ -127,13 +141,13 @@ test('exact server tokenizer counts the assembled prompt and blocks an over-budg
   t.after(() => model.close());
   const prompt = model.probePrompt('A complete user request.');
   const receipt = await model.inspectContext(prompt);
-  assert.equal(receipt.inputTokens, 8192); assert.equal(receipt.shouldCompact, true);
-  assert.equal(modelOutputTokenCap(model), 2048);
-  assert.equal(modelOutputTokenCap(model, { action: true }), 4096);
+  assert.equal(receipt.inputTokens, 5376); assert.equal(receipt.shouldCompact, true);
+  assert.equal(modelOutputTokenCap(model), 8192);
+  assert.equal(modelOutputTokenCap(model, { action: true }), 8192);
   assert.equal((await model.complete(prompt)).content, 'OK');
   assert.equal(calls.filter(c => c.path === '/tokenize').length, 1, 'reuse only an identical tokenized request');
   const body = calls.find(c => c.path === '/v1/chat/completions').body;
-  assert.equal(body.max_tokens, 2048); assert.equal(body.chat_template_kwargs.enable_thinking, false);
+  assert.equal(body.max_tokens, 8192); assert.equal(body.chat_template_kwargs.enable_thinking, false);
   assert.equal(body.skip_special_tokens, false);
   assert.equal(body.response_format, undefined, 'diffusion decoder does not support AR output grammar');
   for (const key of ['temperature', 'min_p', 'seed']) assert.equal(body[key], undefined);
@@ -150,9 +164,9 @@ test('exact server tokenizer counts the assembled prompt and blocks an over-budg
   await assert.rejects(model.complete(model.probePrompt('Bound reasoning that exhausts the output reserve.'), { thinking: true }), { code: 'generation_budget_exhausted' });
   assert.equal(calls.filter(c => c.path === '/v1/chat/completions').length, 7, 'a clipped thought must not repeat the same expensive generation');
   const thinking = JSON.parse(model.buildRequest(prompt, { thinking: true, nPredict: 5000 }).body);
-  assert.equal(thinking.max_tokens, 4096); assert.equal(thinking.chat_template_kwargs.enable_thinking, true);
+  assert.equal(thinking.max_tokens, 5000); assert.equal(thinking.chat_template_kwargs.enable_thinking, true);
   const action = JSON.parse(model.buildRequest(prompt, { agentAction: true }).body);
-  assert.equal(action.max_tokens, 4096); assert.match(action.messages[0].content, /literal file contents/);
+  assert.equal(action.max_tokens, 8192); assert.match(action.messages[0].content, /literal file contents/);
   assert.equal(action.stream, true); assert.deepEqual(action.stream_options, { include_usage: true });
   assert.ok(!action.stop?.includes('\n```\n'), 'a bare opening fence must not trigger a server stop');
   model.switchToApi({ url: 'https://example.com/v1', model: 'other', dialect: 'chat' });
@@ -182,14 +196,14 @@ test('primary requests wake without a broker, serialize, and Jev off keeps chat 
   await service.off(); assert.equal(state, 'stopped');
 });
 
-test('agent trims early to the 6K target while keeping the current task', async t => {
+test('agent trims early to the 4K target while keeping the current task', async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-compact-'));
   t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
   fs.writeFileSync(path.join(workspace, 'package.json'), '{"private":true}');
-  const events = [], prompts = [], budgets = [9000, 7500, 5800];
+  const events = [], prompts = [], budgets = [6000, 4800, 3900];
   const b = diffusionGemmaBudget();
   const model = { diffusionGemma: true, contextWindowTokens: 16384, contextBudget: b, assistantPrefill: '',
-    inspectContext: async prompt => { prompts.push(prompt); const inputTokens = budgets.shift() ?? 5800; return { ...b, inputTokens, shouldCompact: inputTokens >= b.compactAtTokens }; },
+    inspectContext: async prompt => { prompts.push(prompt); const inputTokens = budgets.shift() ?? 3900; return { ...b, inputTokens, shouldCompact: inputTokens >= b.compactAtTokens }; },
     complete: async () => ({ content: JSON.stringify({ a: 'done', summary: 'Finished.' }), tokens: 1, stoppedEos: true, timings: {} }),
   };
   await runAgent({ workspace, task: 'Keep this exact current task anchor.', model, maxTurns: 10, useGrammar: false, shellSandbox: 'host', stateAudit: 'off', contractStateAudit: 'off',
@@ -198,7 +212,7 @@ test('agent trims early to the 6K target while keeping the current task', async 
   });
   assert.equal(events.filter(e => e.type === 'context_trim' && e.cause === 'diffusiongemma_soft_limit').length, 2);
   assert.ok(prompts.every(p => p.includes('Keep this exact current task anchor.')));
-  assert.ok(events.some(e => e.type === 'context_budget' && e.inputTokens === 5800));
+  assert.ok(events.some(e => e.type === 'context_budget' && e.inputTokens === 3900));
 });
 
 for (const [label, fence, language, source, fieldOnly] of [

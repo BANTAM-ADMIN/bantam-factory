@@ -371,7 +371,7 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
     return Object.freeze({ ...result.reads[0], seed, elapsedMs: result.elapsedMs, promptTokens: result.promptTokens });
   }
 
-  async function read({ system, user, compiled, seed = 0, head: headOverride = null, maxInputTokens = null, signal }) {
+  async function read({ system, user, compiled, seed = 0, head: headOverride = null, maxInputTokens = null, maxContextTokens = null, signal }) {
     signal?.throwIfAborted();
     let { templateIds, slot } = compiled;
     if (headOverride) {
@@ -395,13 +395,14 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
       chat_template_kwargs: { enable_thinking: false },
       vllm_xargs: { diffusion_seed_canvas: canvas, diffusion_canvas_length: width, diffusion_max_steps: 1, diffusion_read_only: true },
     };
-    if (maxInputTokens !== null) {
+    if (maxInputTokens !== null || maxContextTokens !== null) {
       const receipt = await postJson(fetchImpl, `${root}/tokenize`, {
         model, messages: body.messages, add_generation_prompt: true, chat_template_kwargs: body.chat_template_kwargs,
       }, signal);
       const count = receipt.count ?? receipt.tokens?.length;
       if (!Number.isSafeInteger(count) || count < 0) throw new Error('Structured tool read has no valid prompt token receipt');
-      if (count > maxInputTokens) throw Object.assign(new Error(`Structured tool read uses ${count} input tokens; limit is ${maxInputTokens}`), { code: 'context_overflow' });
+      if (maxInputTokens !== null && count > maxInputTokens) throw Object.assign(new Error(`Structured tool read uses ${count} input tokens; limit is ${maxInputTokens}`), { code: 'context_overflow' });
+      if (maxContextTokens !== null && count + body.max_tokens > maxContextTokens) throw Object.assign(new Error(`Structured tool read needs ${count + body.max_tokens} context tokens; limit is ${maxContextTokens}`), { code: 'context_overflow' });
     }
     signal?.throwIfAborted();
     const envelope = await postJson(fetchImpl, `${root}/v1/chat/completions`, body, signal);

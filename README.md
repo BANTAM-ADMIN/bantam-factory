@@ -133,8 +133,10 @@ In a session:
   local Qwen on the same GPU, BANTAM swaps the two in and out of VRAM automatically.
 - **Also available for chat and light coding.** Select `:model diffusiongemma` after
   setup to share the engine between regular work and Jev. The 16K deployment uses
-  early context trimming, Jev tool selection with CPU action assembly, and a
-  separate generation reserve. Local model switches
+  a lean system prompt without a duplicate tool manual, Jev tool selection with
+  CPU action assembly, and an 8,192-token reserve shared by thinking and output.
+  Input is capped at 7,168 tokens; history trims near 5,376 toward 4,032 while
+  preserving the current request. Local model switches
   and image jobs use a RAM-budgeted GPU handoff; see [local setup](docs/FIRST-RUN-SETUP.md).
 - **Exact where it can be.** Code runs in a sandbox, tool calls are checked against their
   schema, and state changes are derived. The model read is the fallback.

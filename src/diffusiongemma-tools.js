@@ -100,7 +100,7 @@ export async function diffusionGemmaToolTurn({ state, context, choose, generate,
     if (field.type !== 'string') throw new Error(`Unsupported required tool field ${field.key}`);
     action[field.key] = await text(`Generate ONLY the literal value of ${field.key} for ${action.a}, with parameters ${JSON.stringify(action)}. ${field.key === 'content' ? 'Create a small complete working file, at most 100 lines. Return one closed four-backtick literal code block.' : 'No JSON wrapping, action object, or explanation outside the requested value.'}`, {
       code: field.key === 'content', singleLine: ['id', 'c'].includes(field.key),
-      maxTokens: field.key === 'content' ? context.generationTokens : ['summary', 'text'].includes(field.key) ? 2048 : 512, allowEmpty: field.allowEmpty,
+      maxTokens: ['content', 'summary', 'text'].includes(field.key) ? context.generationTokens : 512, allowEmpty: field.allowEmpty,
       field: field.key,
     });
   }

@@ -78,6 +78,42 @@ test('Jev selects a tool and exact source lines; CPU assembles the edit through 
   assert.equal(model.usageTotals.requests, 9);
   assert.equal(result.summary, 'Updated the string.');
   assert.ok(generations.every(row => !row.body.response_format));
+  assert.ok(generations.every(row => row.body.max_tokens === 8192), 'replacement and response get the full thinking/output reserve');
+  const selections = requests.filter(row => row.body.vllm_xargs);
+  assert.ok(selections.every(row => !row.body.messages[1].content.includes('Actions (emit exactly one')), 'no duplicate JSON tutorial in real agent requests');
+});
+
+test('a primary response retains operator preferences and an 8K thinking reserve', async t => {
+  const { model, requests } = await fixture(t, () => 0, ['A complete response.']);
+  const { buildPrompt } = await import('../src/prompt.js');
+  const prompt = buildPrompt({ diffusionTools: true, task: 'Explain this carefully.', env: '', turns: [],
+    profileText: 'Prefer metric measurements. Describe a single JSON object when asked.', toolsText: 'DUPLICATE TOOL MANUAL', template: model.template,
+    assistantPrefill: model.assistantPrefill });
+  const response = await model.complete(prompt, { agentAction: true, thinking: true,
+    diffusionTools: { verbs: ['respond'], paths: [], queryTools: [] } });
+  assert.equal(JSON.parse(response.content).text, 'A complete response.');
+  const generation = requests.find(row => row.path.endsWith('/chat/completions') && !row.body.vllm_xargs).body;
+  assert.equal(generation.max_tokens, 8192);
+  assert.equal(generation.chat_template_kwargs.enable_thinking, true);
+  assert.match(generation.messages[1].content, /Prefer metric measurements\./);
+  assert.match(generation.messages[1].content, /Describe a single JSON object when asked\./);
+  assert.match(generation.messages[1].content, /Explain this carefully\./);
+  assert.doesNotMatch(generation.messages[1].content, /DUPLICATE TOOL MANUAL|Actions \(emit exactly one|literal file contents/);
+});
+
+test('a complete payload larger than 4K uses the shared 8K reserve', async () => {
+  const caps = [];
+  const result = await diffusionGemmaToolTurn({ state: 'Create a working file.',
+    context: { verbs: ['write_file'], paths: [], generationTokens: 8192 },
+    choose: async () => ({ index: 0, usage: {} }),
+    generate: async ({ maxTokens }) => {
+      caps.push(maxTokens);
+      return caps.length === 1 ? { content: 'large.js', tokens: 16, usage: {} }
+        : { content: '````js\nexport const value = 42;\n````', tokens: 6000, usage: { outputTokens: 6000 } };
+    } });
+  assert.deepEqual(caps, [128, 8176], 'new path and payload share the turn reserve');
+  assert.equal(result.tokens, 6016);
+  assert.deepEqual(JSON.parse(result.content), { a: 'write_file', p: 'large.js', content: 'export const value = 42;' });
 });
 
 test('generated literal HTML gets CPU JSON escaping and reaches the real file executor', async t => {

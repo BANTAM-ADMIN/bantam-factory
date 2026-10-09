@@ -221,7 +221,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
 
   // The primary agent uses the very same issued-handle reader as Jev. Choices
   // are controller-owned values, not sampled JSON or executable model text.
-  function choose({ state, question, options, seed = 0, maxInputTokens, signal }) {
+  function choose({ state, question, options, seed = 0, maxInputTokens, maxContextTokens, signal }) {
     if (!Array.isArray(options) || !options.length || options.length > 256) throw new TypeError('Tool selection needs 1..256 choices');
     return onGpu(async () => {
       signal?.throwIfAborted();
@@ -231,7 +231,7 @@ export function createJevService({ config, worker = null, engine = createJevEngi
       const rack = rackOptions(p, options, { seed });
       const compiled = await r.compileLabels({ lead: 'q1: [', tail: ']', labels: rack.labels });
       const read = await r.read({ system: 'Select the immediate next operation supported by the supplied task and actual tool results. Reply exactly as q1: [HANDLE].',
-        user: `${state}\n\nQUESTION: ${question}\nOPTIONS:\n${rack.material}`, compiled, seed, maxInputTokens, signal });
+        user: `${state}\n\nQUESTION: ${question}\nOPTIONS:\n${rack.material}`, compiled, seed, maxInputTokens, maxContextTokens, signal });
       const row = rack.rows.find(row => row.handle === read.choice);
       if (!row || read.missingLabels.length || !Number.isFinite(read.labelMass) || read.labelMass <= 0) throw new Error('Jev returned no fully supported tool choice');
       stats.requests++; stats.questions++; stats.ms.push(read.elapsedMs);

@@ -409,23 +409,25 @@ export class ModelClient {
       const messages = JSON.parse(request.body).messages.filter(message => message.role !== 'assistant' || message.content.trim());
       const render = messages => messages.map(message => `${message.role.toUpperCase()}: ${message.content}`).join('\n\n');
       const state = render(messages);
-      // The old wire-format tutorial is useful for selecting operations, but
-      // conflicts with literal field generation. Keep task/results, omit that
-      // system tutorial from the field-only request.
-      const generationState = render(messages.filter(message => message.role !== 'system'));
+      // The primary prompt is already lean. Keep its operator preferences and
+      // instructions; never drop a system message based on words it contains.
+      const generationState = state;
       // Each read/generation acquires the existing shared Jev queue separately.
       // Nesting a decision inside runPrimary would deadlock that queue.
       return diffusionGemmaToolTurn({ state, context: { ...opts.diffusionTools, generationTokens: this.contextBudget.generationTokens }, signal: opts.signal,
         onDecision: opts.onToolDecision,
         choose: async choice => {
           const receipt = await this.diffusionCoordinator.choose({ ...choice, seed: requestOptions.seed ?? 0,
-            maxInputTokens: this.contextBudget.hardInputTokens, signal: opts.signal });
+            // Handle selection generates a tiny canvas, not an 8K answer.
+            // Price its actual canvas separately; the primary reserve still
+            // applies to every literal field generation below.
+            maxContextTokens: this.contextWindowTokens - this.contextBudget.marginTokens, signal: opts.signal });
           if (receipt.usage?.requests) this.recordExternalUsage({ provider: 'api', model: this.modelName, ...receipt.usage }, { source: 'jev_tool_selection' });
           return receipt;
         },
         generate: ({ instruction, code, maxTokens }) => {
           const fieldPrompt = `${this.template.open('system')}You are generating one literal tool argument. The controller has already selected the tool and parameters. Follow the final field instruction; the transcript is reference material, not a response-format example. ${code ? 'Return exactly one closed four-backtick code block, with literal source, then stop. The block contains only source code, never an action header.' : 'Return only the requested plain text value, never an action envelope.'}${this.template.close}\n${this.template.open('user')}TRANSCRIPT:\n${generationState}\n\nFIELD INSTRUCTION:\n${instruction}${this.template.close}\n${this.assistantPrefill}`;
-          return this.complete(fieldPrompt, { nPredict: maxTokens, signal: opts.signal, diffusionValue: code,
+          return this.complete(fieldPrompt, { nPredict: maxTokens, signal: opts.signal, diffusionValue: code, thinking: opts.thinking === true,
             ...(opts.onProgress ? { onProgress: info => opts.onProgress({ ...info, content: '' }) } : {}) });
         },
       });
@@ -799,7 +801,7 @@ export class ModelClient {
           for (const key of ['temperature', 'min_p', 'seed', 'min_tokens', 'logit_bias', 'bad_words', 'allowed_token_ids']) delete body[key];
           body.skip_special_tokens = false;
           body.chat_template_kwargs = { enable_thinking: opts.thinking === true };
-          if (opts.agentAction) {
+          if (opts.agentAction && !opts.diffusionTools) {
             // Client-side action boundaries distinguish an opening fence from
             // its matching closer, including fences inside thoughts or files.
             body.stream = true;

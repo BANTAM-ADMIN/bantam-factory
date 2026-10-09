@@ -41,7 +41,14 @@ const REASONING_EFFORT_TEXT = {
   low: "Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion without unnecessary elaboration.",
 };
 
-export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedShell = true, outputTokenCap = null, reasoningEffort = null, compactRules } = {}) {
+export function systemPrompt({ actionFeatures = [], maxTurns = null, sandboxedShell = true, outputTokenCap = null, reasoningEffort = null, compactRules, diffusionTools = false } = {}) {
+  if (diffusionTools) {
+    // Jev receives the legal choices at selection time; the CPU owns JSON,
+    // schema validation and tool dispatch. Do not teach that wire format twice.
+    return composeRulesBlock(process.env, { diffusionTools: true }).replace(/^- /, '')
+      + (sandboxedShell ? ' Each shell call uses a fresh offline sandbox; only workspace files persist. Start and check a server in the same call. For local inference use $BANTAM_LLM_SOCKET when available.' : '')
+      + (Number.isInteger(maxTurns) && maxTurns > 0 ? ` You have ${maxTurns} tool turns.` : '');
+  }
   const featureRules = actionPromptRules({ features: actionFeatures });
   // Real physics of the default docker executor (see dockerShellRunner: `docker
   // run --rm` per action). Without this line the model reasons from normal Unix
@@ -450,6 +457,7 @@ export const FROZEN_STABLE_END = Symbol.for("bantam.frozenStableEnd");
 
 export function buildPrompt({
   compactRules,
+  diffusionTools = false,
   readObservationMaxChars = OBS_MAX,
   maxTurns = null,
   profileText = null,
@@ -531,7 +539,9 @@ export function buildPrompt({
     }
     return text;
   };
-  const interactiveNote = interactive
+  const interactiveNote = interactive && diffusionTools
+    ? '\nBe concise and responsive. End a completed work summary with Next: and a useful next step, or nothing pressing.'
+    : interactive
     ? "\n\nYou are in an INTERACTIVE session: a person is here and steering. Be responsive and concise. Investigate briefly, then act — make the change they asked for, or answer them with \"respond\". Favor acting over exhaustive investigation; they can always give you the next instruction."
       + " ALWAYS end your done summary with a line of the form \"Next: <one concrete step>\" — the single most valuable way to continue or improve from exactly here (a feature to add, a weakness to fix, a test worth writing, a check worth running). Never invent make-work: if the truly best next step is to stop, write \"Next: nothing pressing — this is a good stopping point.\" The person can accept your proposal by just pressing Enter, so make it something you are ready to do."
     : "";
@@ -540,10 +550,10 @@ export function buildPrompt({
   // they are tired of restating, which is exactly why they go in by default.
   const profileBlock = profileText ? `\n\nOperator preferences (standing — apply unless the task says otherwise):\n${scrub(profileText)}` : "";
   const systemFlag = thinkEnabled ? (template.systemFlag ?? "") : "";
-  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort, compactRules })}${interactiveNote}${profileBlock}\n${template.close}`;
+  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort, compactRules, diffusionTools })}${interactiveNote}${profileBlock}\n${template.close}`;
   const planBlock = planText ? `\n\n${scrub(planText)}` : "";
   const skillsBlock = skillsText ? `\n\n${scrub(skillsText)}` : "";
-  const toolsBlock = toolsText ? `\n\n${scrub(toolsText)}` : "";
+  const toolsBlock = toolsText && !diffusionTools ? `\n\n${scrub(toolsText)}` : "";
   // A task-derived contract is immutable for the run. Keep it in the initial
   // cached prefix rather than re-injecting it as volatile per-turn guidance.
   const streamGuide = !interactive ? streamContractGuidance(task) : '';

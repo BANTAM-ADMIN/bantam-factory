@@ -22,7 +22,7 @@
 
 > **"You provide the task; I provide the process."**
 
-Bantam is a bantamweight local-model coding agent harness designed to turn raw model intelligence into reliable, verifiable software. Every action is grammar-constrained, observable, and verifiable.
+Bantam is a bantamweight local-model coding agent harness designed to turn raw model intelligence into reliable, verifiable software. Actions are validated, observable, and verifiable.
 
 ---
 
@@ -131,6 +131,11 @@ In a session:
 
 - **Runs alongside your worker.** With Codex or an API model, both run at once. With a
   local Qwen on the same GPU, BANTAM swaps the two in and out of VRAM automatically.
+- **Also available for chat and light coding.** Select `:model diffusiongemma` after
+  setup to share the engine between regular work and Jev. The 16K deployment uses
+  early context trimming, Jev tool selection with CPU action assembly, and a
+  separate generation reserve. Local model switches
+  and image jobs use a RAM-budgeted GPU handoff; see [local setup](docs/FIRST-RUN-SETUP.md).
 - **Exact where it can be.** Code runs in a sandbox, tool calls are checked against their
   schema, and state changes are derived. The model read is the fallback.
 - **More than Jev.** Per-answer evidence, abstention below a confidence you set, batches,

@@ -5,7 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ComfyClient, readComfyConfig, renderWorkflow } from './comfyui-client.js';
 import { ensureComfyStarted } from './comfyui-start.js';
 import { extractImageOptions, parseImageRequest } from './codex-image.js';
-import { acquireImageLease, recoverOrphanedImageLease, gpuPlan, ImageGpuRuntime, imageLeases, localModelEndpoint } from '../image-gpu.js';
+import { acquireImageLease, recoverOrphanedImageLease, gpuPlan, ImageGpuRuntime, imageLeases, localModelEndpoint, endpointKey } from '../image-gpu.js';
 import { ImageProgress, timingKey, imageTimingEstimate, saveImageTiming } from './image-progress.js';
 
 const terminal = new Set(['completed', 'failed', 'cancelled', 'recovery_required']);
@@ -177,8 +177,11 @@ export class ComfyImageJobs {
       renderWorkflow(config, { prompt: job.prompt, width, height });
       job.client = this.clientFactory(config);
       job.runtime = this.runtimeFactory(plan, config);
+      const { yieldGpuOwner } = await import('../gpu-handoff.js');
+      await yieldGpuOwner('jev');
       job.lease = acquireImageLease(config, { id: job.id, workspace: this.workspace, endpoint: plan.endpoint,
-        mode: plan.mode, shared: plan.shared, state: job.state, promptId: null }, this.leaseDirectory);
+        mode: plan.mode, diffusionGemma: plan.diffusionGemma === true, primaryEndpoint: plan.diffusionGemma ? plan.endpoint : null,
+        shared: plan.shared, state: job.state, promptId: null }, this.leaseDirectory);
     } catch (error) {
       job.error = String(error.message || error);
       this.emit(job, job.controller.signal.aborted ? 'cancelled' : 'failed', job.error);
@@ -198,6 +201,14 @@ export class ComfyImageJobs {
     const signal = AbortSignal.any([job.controller.signal, AbortSignal.timeout(config.timeoutMs)]);
     let touched = false;
     try {
+      const { gpuHandoffConfig, prepareGpuFor } = await import('../gpu-handoff.js');
+      const managed = gpuHandoffConfig();
+      if (managed && config.gpu?.mode !== 'none' && endpointKey(managed.comfyUrl) === endpointKey(config.url)) {
+        job.managedEndpoint = managed.llamaEndpoint;
+        job.lease.update({ endpoint: endpointKey(managed.llamaEndpoint), mode: 'llamacpp' });
+        touched = true;
+        await prepareGpuFor('comfy');
+      }
       this.emit(job, 'checking', 'Checking ComfyUI workflow and available models…');
       // Check connectivity before changing the LLM state. If offline, sleep the
       // local model first, then verify VRAM and launch the configured install.
@@ -341,6 +352,12 @@ export class ComfyImageJobs {
     }
     this.emit(job, 'waking', job.plan.mode === 'none' ? 'ComfyUI GPU memory released.' : 'Waking the local LLM…');
     await job.runtime.wake(signal);
+    if (job.managedEndpoint && job.plan.mode === 'none') await (await import('../gpu-handoff.js')).restoreLocalModel(job.managedEndpoint);
+    if (!offline && job.comfyReady !== false) {
+      const { gpuHandoffConfig, parkComfyModels } = await import('../gpu-handoff.js');
+      const managed = gpuHandoffConfig();
+      if (managed && endpointKey(managed.comfyUrl) === endpointKey(job.config.url)) await parkComfyModels();
+    }
   }
 
   // First Ctrl-C cancels; a second stops waiting for cleanup, preserving the
@@ -366,7 +383,13 @@ export class ComfyImageJobs {
   }
   async recoverOrphan(config) {
     return recoverOrphanedImageLease(config, async (record, lease) => {
-      const plan = { mode: record.mode, endpoint: record.endpoint, shared: record.shared };
+      if (['jev', 'llama'].includes(record.kind)) {
+        await (await import('../gpu-handoff.js')).recoverManagedGpu(record);
+        return;
+      }
+      const plan = record.diffusionGemma
+        ? { mode: 'vllm', endpoint: record.primaryEndpoint, shared: record.shared, diffusionGemma: true }
+        : { mode: record.mode, endpoint: record.endpoint, shared: record.shared };
       this.onEvent({ type: 'comfyui_image', state: 'restoring',
         message: 'Recovering an image reservation left by a closed BANTAM session…' });
       await this.restore({ ...record, config, plan, lease, artifacts: [],
@@ -377,7 +400,7 @@ export class ComfyImageJobs {
     const endpoint = localModelEndpoint(model);
     if (!endpoint || !imageLeases(this.leaseDirectory).some(l => l.endpoint === endpoint)) return;
     const config = readComfyConfig(this.workspace, env);
-    if (!imageLeases(this.leaseDirectory).some(l => l.endpoint === endpoint && l.url === config.url)) return;
+    if (!imageLeases(this.leaseDirectory).some(l => l.endpoint === endpoint && (l.url === config.url || ['jev', 'llama'].includes(l.kind)))) return;
     await this.recoverOrphan(config);
   }
   async recover(env = process.env) {
@@ -390,7 +413,9 @@ export class ComfyImageJobs {
       let alive = true;
       try { process.kill(record.pid, 0); } catch (e) { alive = e.code === 'EPERM'; }
       if (alive) throw Error('The image job still belongs to a running BANTAM process');
-      const plan = { mode: record.mode, endpoint: record.endpoint, shared: record.shared };
+      const plan = record.diffusionGemma
+        ? { mode: 'vllm', endpoint: record.primaryEndpoint, shared: record.shared, diffusionGemma: true }
+        : { mode: record.mode, endpoint: record.endpoint, shared: record.shared };
       this.job = { ...record, state: 'recovery_required', config, plan, artifacts: [],
         client: this.clientFactory(config), runtime: this.runtimeFactory(plan, config),
         lease: { update(fields) { Object.assign(record, fields); fs.writeFileSync(record.file, JSON.stringify(record)); },

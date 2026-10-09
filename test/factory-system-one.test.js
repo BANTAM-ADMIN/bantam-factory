@@ -103,6 +103,17 @@ describe("factory System One structured reads", () => {
     assert.equal(sent.chat_template_kwargs.enable_thinking, false);
   });
 
+  it('budgets and cancels a tool selection before submitting its structured read', async () => {
+    let generations = 0;
+    const reader = createStructuredReader({ baseUrl: 'http://fixture', model: 'm', fetchImpl: fakeServer({ onChat: () => generations++ }) });
+    const compiled = await reader.compileLabels({ lead: 'q1: [', tail: ']', labels: ['TNF', 'VRDR'] });
+    await assert.rejects(reader.read({ system: 's', user: 'u', compiled, maxInputTokens: 2 }), { code: 'context_overflow' });
+    assert.equal(generations, 0);
+    const controller = new AbortController(); controller.abort();
+    await assert.rejects(reader.read({ system: 's', user: 'u', compiled, maxInputTokens: 100, signal: controller.signal }), { name: 'AbortError' });
+    assert.equal(generations, 0);
+  });
+
   it("finds the slot where labels differ when the lead's trailing space folds into the label", async () => {
     // "q1: " alone ends in a space token; "q1: yes" folds the space into " yes".
     const vocab = { "q1: ": [10, 11, 12, 20], "q1: yes": [10, 11, 12, 30], "q1: no": [10, 11, 12, 31] };
@@ -400,6 +411,7 @@ describe("factory System One structured reads", () => {
       let payload;
       if (url.endsWith("/tokenize")) payload = { tokens: body.messages ? Array.from({ length: promptLength }, () => 7) : [9] };
       else {
+        assert.equal(Object.hasOwn(body, "seed"), false, "diffusion vLLM rejects the standard sampling seed");
         asked.push(body.max_tokens);
         payload = { choices: [{ text: "", finish_reason: "length", logprobs: { tokens: [] } }], usage: { prompt_tokens: promptLength } };
       }

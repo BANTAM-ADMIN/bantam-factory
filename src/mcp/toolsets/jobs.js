@@ -265,12 +265,14 @@ export function createJobsToolset({
   }
 
   function pump(lane) {
-    if (stopping) return;
-    const active = [...running.keys()].filter((id) => jobs.get(id).lane === lane).length;
-    if (active >= (lanes[lane] ?? 1) || !queues[lane].length) return;
-    const id = queues[lane].shift();
-    const done = launch(jobs.get(id)).catch((error) => finishWithError(jobs.get(id), error)).finally(() => launches.delete(id));
-    launches.set(id, done);
+    // Fill every free slot in the lane (with --codex-lanes N, queued jobs start N at a time).
+    while (!stopping && queues[lane].length) {
+      const active = [...running.keys(), ...launches.keys()].filter((id) => jobs.get(id).lane === lane && !jobs.get(id).finishedAt);
+      if (new Set(active).size >= (lanes[lane] ?? 1)) return;
+      const id = queues[lane].shift();
+      const done = launch(jobs.get(id)).catch((error) => finishWithError(jobs.get(id), error)).finally(() => launches.delete(id));
+      launches.set(id, done);
+    }
   }
 
   async function launch(job) {

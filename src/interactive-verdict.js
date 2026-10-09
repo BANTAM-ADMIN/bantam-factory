@@ -17,6 +17,7 @@ export function classifyInteractiveResult(result) {
     return verdict("verification_unverified", res, { externallyVerified: false });
   }
   if (res.responded) return verdict("response", res, { externallyVerified });
+  if (res.controllerStop?.kind === 'invalid-output') return verdict('invalid_output', res, { externallyVerified });
   if (!res.reachedDone) return verdict("paused", res, { externallyVerified });
 
   const warnings = (res.warnings ?? []).filter((warning) => (

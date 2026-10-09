@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 
 import { authorityOf, JevBusy, startJevHttpServer, validateSystemOne } from "../src/jev/api.js";
@@ -6,6 +7,7 @@ import { modelList, resolveProfile } from "../src/jev/profiles.js";
 
 // A fake decider: choice -> first key at 0.8, noul -> 0.9, score -> level 1.
 const decided = [];
+const ranked = [];
 async function fakeDecide({ profile, questions, seed, thought }) {
   decided.push({ profile: profile.name, ids: Object.keys(questions), seed, thought });
   const answers = {};
@@ -30,7 +32,11 @@ const ok = { model: "bantam-jev", state: "a customer was charged twice", questio
 
 describe("jev api (Jev wire contract)", () => {
   before(async () => {
-    server = await startJevHttpServer({ decide: fakeDecide, gauges: [{ name: "exec" }], status: async () => ({ engine: "awake" }), maxQuestions: 5, maxBodyBytes: 10_000 }, { port: 0 });
+    server = await startJevHttpServer({ decide: fakeDecide, rank: async request => {
+      ranked.push(request);
+      if (request.state === "busy") throw new JevBusy("ranking queue busy");
+      return { ranking: Object.keys(request.questions).map(id => ({ id, score: 0.7 })), scoreMeaning: "ranking_utility", usage: { inputTokens: 19, outputTokens: 0 } };
+    }, gauges: [{ name: "exec" }], status: async () => ({ engine: "awake" }), maxQuestions: 5, maxBodyBytes: 10_000 }, { port: 0 });
     base = `http://127.0.0.1:${server.address().port}`;
   });
   after(() => server.close());
@@ -54,6 +60,38 @@ describe("jev api (Jev wire contract)", () => {
     assert.deepEqual(body.usage, { input_tokens: 42, output_tokens: 0 });
   });
 
+  it("serves explicit ranking utilities without turning them into decision probabilities", async () => {
+    const question = { type: "choice", criteria: { yes: "relevant", no: "irrelevant" }, instructions: { candidate: "A full tool description" } };
+    const request = { state: { query: "Find a tool" }, questions: { alpha: question, beta: question } };
+    const response = await post("/v1/bantam/rank", request);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("server-timing"), /model;dur=/);
+    const body = await response.json();
+    assert.deepEqual(body.ranking.map(r => r.id), ["alpha", "beta"]);
+    assert.equal(body.scoreMeaning, "ranking_utility");
+    assert.equal(body.answers, undefined);
+    assert.deepEqual(body.usage, { input_tokens: 19, output_tokens: 0 });
+    const seed = createHash("sha256").update(JSON.stringify([request.state, request.questions])).digest().readUInt32BE(0) % 1_000_000;
+    assert.deepEqual(ranked.at(-1), { ...request, seed });
+    const busy = await post("/v1/bantam/rank", { ...request, state: "busy" });
+    assert.equal(busy.status, 529);
+  });
+
+  it("validates ranking inputs before invoking the ranker", async () => {
+    const count = ranked.length;
+    const candidate = { type: "choice", criteria: { yes: "relevant", no: "irrelevant" }, instructions: { candidate: "tool" } };
+    for (const question of [
+      { type: "noul", instructions: { candidate: "tool" } },
+      { ...candidate, criteria: { only: "tool" } },
+      { ...candidate, instructions: { candidate: "" } },
+    ]) {
+      assert.equal((await post("/v1/bantam/rank", { state: "query", questions: { q: question } })).status, 400);
+    }
+    assert.equal((await post("/v1/bantam/rank", { questions: { q: candidate } })).status, 422);
+    assert.equal((await post("/v1/bantam/rank", { state: "query", questions: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [i, candidate])) })).status, 400);
+    assert.equal(ranked.length, count);
+  });
+
   it("answers single-option questions without a read, in Jev's forced shapes", async () => {
     decided.length = 0;
     const body = await (await post("/v1/systemone", { model: "bantam-jev", state: {}, questions: { only: { type: "choice", criteria: { a: "x" } }, lvl: { type: "score", criteria: ["low"] } } })).json();
@@ -70,6 +108,8 @@ describe("jev api (Jev wire contract)", () => {
     assert.equal(one.model, "bantam-jev", "an alias answers as its profile");
     await post("/v1/systemone", req);
     assert.equal(decided.at(-1).seed, decided.at(-2).seed);
+    const benchmarkSeed = createHash("sha256").update(JSON.stringify([req.state, req.questions])).digest().readUInt32BE(0) % 1_000_000;
+    assert.equal(decided.at(-1).seed, benchmarkSeed, "retain the historical benchmark's option ordering and noise seed");
   });
 
   it("returns Jev's error shapes", async () => {
@@ -151,6 +191,12 @@ describe("jev profiles", () => {
   it("resolves profiles and aliases, and lists them", () => {
     assert.equal(resolveProfile("openjev-latest").name, "bantam-jev");
     assert.equal(resolveProfile("bantam-jev-fast").options.gate, 0, "the fast profile never thinks");
+    assert.equal(resolveProfile("bantam-jev").options.workflowFocus, true);
+    assert.equal(resolveProfile("bantam-jev-fast").options.workflowFocus, false);
+    assert.equal(resolveProfile("bantam-jev").options.inferenceThink, true);
+    assert.equal(resolveProfile("bantam-jev-fast").options.inferenceThink, false);
+    assert.equal(resolveProfile("bantam-jev").options.chordFocus, true);
+    assert.equal(resolveProfile("bantam-jev-fast").options.chordFocus, false);
     assert.equal(resolveProfile("nope"), null);
     assert.ok(modelList().length >= 4);
     assert.deepEqual(validateSystemOne({ model: "m", state: "s", questions: { q: { type: "noul" } } }), { fieldErrors: [], unknownType: false });

@@ -6,13 +6,14 @@ import { fileURLToPath } from "node:url";
 
 import { jevConfigLabel, jevConfigPath, loadJevConfig, saveJevConfig } from "./config.js";
 import { createJevService, effectivePolicy } from "./service.js";
+import { gpuHandoffConfig } from '../gpu-handoff.js';
 
 const POLICIES = ["auto", "alongside", "swap", "off"];
 
 export const JEV_USAGE = [
   "  :jev setup              choose your own DiffusionGemma server, or install one (asks first)",
   "  :jev on [port]          start DiffusionGemma and serve the Jev API (default port 8090)",
-  "  :jev off                stop serving and stop DiffusionGemma (:jev off keep = keep it loaded)",
+  "  :jev off                stop Jev; keep selected DiffusionGemma chat (:jev off keep = keep sidecar loaded)",
   "  :jev status             engine, GPU policy, API address, requests served",
   "  :jev sleep | wake       move DiffusionGemma out of / back into VRAM",
   "  :jev policy <p>         auto | alongside | swap | off (saved to ~/.bantam/jev.json)",
@@ -30,6 +31,7 @@ function current(worker) {
   } else if (worker) session.service.setWorker(worker);
   return session;
 }
+export function jevSessionFor(worker) { return current(worker); }
 
 function describeStatus(s) {
   const lines = [
@@ -163,8 +165,12 @@ export async function handleJevCommand(arg, { model = null, out = console.log, a
     const { setupWizard } = await import("./setup.js");
     const configured = await setupWizard({ ask, out });
     if (!configured) return false;
+    const wasPrimary = model?.diffusionGemma === true;
+    await model?.releasePrimary?.();
+    await service.off({ keepEngine: true });
     session = null;
     ({ service, config } = current(model));
+    if (wasPrimary) await (await import('../diffusiongemma-primary.js')).selectDiffusionGemma(model, { out });
     return true;
   };
   try {
@@ -296,10 +302,17 @@ async function runJevCliUnsafe(argv, { out, ask }) {
       return done ? 0 : 1;
     }
     case "status": out(describeStatus(await service.status())); return 0;
-    case "start": await (await import("./engine.js")).createJevEngine(config).start({ onProgress: (l) => out(`  ${l}`) }); out("  DiffusionGemma is awake."); return 0;
+    case "start":
+      if (gpuHandoffConfig()) { await service.on({ serve: false, onProgress: l => out(`  ${l}`) }); await service.off({ keepEngine: true }); out('  DiffusionGemma is ready; the local worker has the GPU back.'); }
+      else { await (await import("./engine.js")).createJevEngine(config).start({ onProgress: l => out(`  ${l}`) }); out('  DiffusionGemma is awake.'); }
+      return 0;
     case "stop": await service.off(); out("  DiffusionGemma stopped."); return 0;
     case "sleep": await service.sleep(); out("  DiffusionGemma is asleep."); return 0;
-    case "wake": await service.wake(); out("  DiffusionGemma is awake."); return 0;
+    case "wake":
+      await service.wake();
+      if (gpuHandoffConfig()) { await service.off({ keepEngine: true }); out('  DiffusionGemma is ready; the local worker has the GPU back.'); }
+      else out('  DiffusionGemma is awake.');
+      return 0;
     case "policy": {
       const policy = rest[0];
       if (!POLICIES.includes(policy)) { out(`  Usage: bantamfactory jev policy ${POLICIES.join("|")}`); return 2; }

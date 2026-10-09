@@ -25,6 +25,11 @@ import { modelList, resolveProfile } from "./profiles.js";
 export class JevBusy extends Error {}
 export class JevUnavailable extends Error {}
 
+/** Shared historical seed mapping for HTTP and MCP structured reads. */
+export function jevRequestSeed(state, questions) {
+  return crypto.createHash("sha256").update(JSON.stringify([state, questions])).digest().readUInt32BE(0) % 1_000_000;
+}
+
 const TYPES = new Set(["noul", "choice", "score"]);
 const MAX_CHOICES = 255;
 const MAX_SCORE_LEVELS = 10;
@@ -124,7 +129,7 @@ export function answerConfidence(answer) {
  * returns {answers, usage: {inputTokens, outputTokens}, evidence}. `status()`
  * feeds /v1/bantam/status. `gauges` lists the exact gauges.
  */
-export function createJevApi({ decide, status = async () => ({}), gauges = [], token = null, maxQuestions = 256, maxBodyBytes = 64 * 1024 * 1024, log = () => {} }) {
+export function createJevApi({ decide, rank = null, status = async () => ({}), gauges = [], token = null, maxQuestions = 256, maxBodyBytes = 64 * 1024 * 1024, log = () => {} }) {
   const jsonHeaders = (rid, extra = {}) => ({ "content-type": "application/json", "x-typesafe-request-id": rid, "x-request-id": rid, ...extra });
 
   function send(res, status, body, rid, { started, modelNs = 0n, headers = {} } = {}) {
@@ -189,8 +194,9 @@ export function createJevApi({ decide, status = async () => ({}), gauges = [], t
     let evidence = {};
     const t0 = process.hrtime.bigint();
     if (Object.keys(plan.toRead).length) {
-      // Same request, same noise draws: answers are reproducible (as in OpenJev).
-      const seed = crypto.createHash("sha256").update(JSON.stringify([body.state, body.questions])).digest().readUInt32BE(0);
+      // Preserve the original benchmark server's structured-read seed mapping.
+      // Multi-step thinking still uses the diffusion backend's random sampling.
+      const seed = jevRequestSeed(body.state, body.questions);
       const decided = await decide({ profile, state: body.state, questions: plan.toRead, seed, thought: typeof ext.thought === "string" ? ext.thought : null });
       for (const [id, q] of Object.entries(plan.toRead)) answers[id] = normalizeAnswer(q, decided.answers[id]);
       usage = { input_tokens: decided.usage?.inputTokens ?? 0, output_tokens: decided.usage?.outputTokens ?? 0 };
@@ -232,11 +238,31 @@ export function createJevApi({ decide, status = async () => ({}), gauges = [], t
       if (req.method === "GET" && url.pathname === "/v1/models") return send(res, 200, { models: modelList() }, rid, { started });
       if (req.method === "GET" && url.pathname === "/v1/gauges") return send(res, 200, { gauges }, rid, { started });
       if (req.method === "GET" && url.pathname === "/v1/bantam/status") return send(res, 200, await status(), rid, { started });
-      if (req.method === "POST" && (url.pathname === "/v1/systemone" || url.pathname === "/v1/systemone/batch")) {
+      const ranking = url.pathname === "/v1/bantam/rank" && typeof rank === "function";
+      if (req.method === "POST" && (url.pathname === "/v1/systemone" || url.pathname === "/v1/systemone/batch" || ranking)) {
         const read = await readBody(req);
         if (read.tooBig) return send(res, 413, usageError(`request body is larger than ${maxBodyBytes} bytes`), rid, { started });
         const parsed = parseJson(read.text);
         if (parsed.error) return send(res, 422, parsed.error, rid, { started });
+        if (ranking) {
+          const body = parsed.body;
+          const { fieldErrors, unknownType } = validateSystemOne(body && typeof body === "object" && !Array.isArray(body) ? { ...body, model: "bantam-jev-fast" } : body);
+          if (unknownType) return send(res, 400, usageError("Invalid request."), rid, { started });
+          if (fieldErrors.length) return send(res, 422, { detail: fieldErrors }, rid, { started });
+          if (Object.keys(body.questions).length > maxQuestions) return send(res, 400, usageError(`at most ${maxQuestions} questions per request`), rid, { started });
+          for (const q of Object.values(body.questions)) {
+            if (q.type !== "choice" || Object.keys(q.criteria).length !== 2 || !Object.hasOwn(q.criteria, "yes") || !Object.hasOwn(q.criteria, "no")
+                || typeof q.instructions?.candidate !== "string" || !q.instructions.candidate.trim()) {
+              return send(res, 400, usageError("Ranking needs yes/no choice questions with full tool text in instructions.candidate."), rid, { started });
+            }
+          }
+          const seed = jevRequestSeed(body.state, body.questions);
+          const t0 = process.hrtime.bigint();
+          const result = await rank({ state: body.state, questions: body.questions, seed });
+          const out = { ...result, usage: { input_tokens: result.usage?.inputTokens ?? 0, output_tokens: result.usage?.outputTokens ?? 0 } };
+          log({ rid, status: 200, method: "rank", questions: Object.keys(body.questions).length, ms: Number(process.hrtime.bigint() - started) / 1e6 });
+          return send(res, 200, out, rid, { started, modelNs: process.hrtime.bigint() - t0 });
+        }
         if (url.pathname === "/v1/systemone") {
           const [status, body, modelNs] = await decideRow(parsed.body);
           log({ rid, status, model: parsed.body?.model, questions: Object.keys(parsed.body?.questions ?? {}).length, ms: Number(process.hrtime.bigint() - started) / 1e6 });

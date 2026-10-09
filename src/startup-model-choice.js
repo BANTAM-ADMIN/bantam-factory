@@ -12,6 +12,15 @@
 // machine with no local models still falls back to the cloud default, because
 // with nothing registered that genuinely IS the right first move.
 import { codexModelOptions } from "./codex-models.js";
+import { endpointKey } from "./image-gpu.js";
+
+/** Opening chat uses an available local server first, then Codex. */
+export function startupCodexFallback({ automaticChatStartup, detectedLocalReady, detectedApiReady, rememberedConnection } = {}) {
+  if (!automaticChatStartup || detectedLocalReady || detectedApiReady) return null;
+  return rememberedConnection?.kind === "codex"
+    ? { model: rememberedConnection.model, effort: rememberedConnection.effort || "medium" }
+    : { model: "gpt-5.6-terra", effort: "medium" };
+}
 
 /**
  * What separates one local profile from another. On a single-GPU rig every
@@ -165,7 +174,7 @@ export function startupChoiceNeeded({ canOffer, detectedLocalReady, detectedApiR
 export function withDetectedLocal(models, detected) {
   const list = Array.isArray(models) ? models : [];
   if (!detected?.endpoint) return list;
-  const norm = (endpoint) => String(endpoint ?? "").replace(/\/$/, "");
+  const norm = (endpoint) => endpoint ? endpointKey(endpoint) : null;
   if (list.some((m) => norm(m?.endpoint) === norm(detected.endpoint))) return list;
   return [{
     name: "local",

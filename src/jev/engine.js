@@ -15,6 +15,7 @@
 //   unconfigured  nothing yet; every action points to `bantamfactory jev setup`.
 import { execFile } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import { checkpointSleepingEngine, restoreCheckpointedEngine, liveCheckpoint, forgetCheckpoint } from './cuda-checkpoint.js';
 
 function dockerCli(args, { timeoutMs = 120_000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -111,18 +112,23 @@ export function createJevEngine(config, { docker = dockerCli, fetchImpl = fetch,
     if (mode !== "managed") return status();
     const current = await status();
     if (current.state === "missing" || current.state === "stopped") return current;
-    await docker(["stop", config.container], { timeoutMs: 120_000 });
+    if (liveCheckpoint(config)) await docker(['kill', config.container], { timeoutMs: 120_000 });
+    else await docker(["stop", config.container], { timeoutMs: 120_000 });
+    forgetCheckpoint(config);
     return status();
   }
 
   async function sleep() {
     requireSetup();
+    if ((await serverState()).sleeping) { await checkpointSleepingEngine(config, docker); return; }
     await http("/sleep?level=1", { method: "POST", timeoutMs: config.gpu.sleepTimeoutMs });
     if ((await http("/is_sleeping"))?.is_sleeping !== true) throw new Error("DiffusionGemma did not enter sleep mode");
+    await checkpointSleepingEngine(config, docker);
   }
 
   async function wake() {
     requireSetup();
+    await restoreCheckpointedEngine(config, docker);
     await http("/wake_up", { method: "POST", timeoutMs: config.gpu.sleepTimeoutMs });
     if ((await http("/is_sleeping"))?.is_sleeping !== false) throw new Error("DiffusionGemma did not wake");
   }

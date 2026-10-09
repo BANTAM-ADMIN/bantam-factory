@@ -107,7 +107,10 @@ describe("jev setup: installing", () => {
     } finally { delete process.env.BANTAM_JEV_CONFIG; }
   });
 
-  it("changes nothing when the user declines", async () => {
+  it("changes nothing when the user declines", async t => {
+    // This tests refusal after a viable install plan, independently of how
+    // much free space the developer happens to have on the test filesystem.
+    t.mock.method(fs, 'statfsSync', () => ({ bavail: 128 * 1024 * 1024, bsize: 1024 }));
     process.env.BANTAM_JEV_CONFIG = path.join(tmp, "declined.json");
     try {
       runs.length = 0;

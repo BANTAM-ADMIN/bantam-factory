@@ -6,13 +6,15 @@
 const FULL = Object.freeze({
   gate: 0.95, thinkBudget: 8192, binaryDebias: true, quantGate: true, temperature: 3,
   thinkStyle: "concise", truncatedThought: "keep-fast", rowThinkLimit: 6,
-  toolGauge: true, preferenceGauge: true, stateGauge: true, thinkBlend: 0.75, estimateBlend: 0.5,
+  toolGauge: true, preferenceGauge: true, stateGauge: true, thinkBlend: 0.75, estimateBlend: 0.5, workflowFocus: true, inferenceThink: true, chordFocus: true,
 });
 
 const FAST = Object.freeze({
   ...FULL,
   // A gate of 0 never thinks; the calculator path also thinks, so it is off.
   gate: 0, quantGate: false, rowThinkLimit: 0,
+  // Workflow context was validated against the full profile; keep fast unchanged.
+  workflowFocus: false, inferenceThink: false, chordFocus: false,
 });
 
 export const JEV_PROFILES = Object.freeze({

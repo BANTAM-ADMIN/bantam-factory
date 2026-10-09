@@ -18,6 +18,9 @@ import { CodexAppServer, normalizeCodexStructuredContent } from "./codex-transpo
 import { activeProfile, recordSample } from "./logic/model-cards.js";
 import { formatLunaReserveNotice, lunaReserveModel, shouldOfferLunaReserve } from "./logic/luna-reserve.js";
 import { buildChatBody, chatTransportFidelity, decomposeRenderedPrompt } from "./chat-transport.js";
+import { diffusionGemmaBudget, diffusionGemmaOutputTokens } from './diffusiongemma-budget.js';
+import { diffusionGemmaFinalText, diffusionGemmaActionSystem, completedDiffusionGemmaAction, completedDiffusionGemmaValue } from './diffusiongemma-output.js';
+import { diffusionGemmaToolTurn } from './diffusiongemma-tools.js';
 
 const FALLBACK_ENDPOINT = "http://localhost:8085";
 const MAX_DETERMINISTIC_SEED = 0xFFFFFFFE;
@@ -52,7 +55,7 @@ export function retryDelayMs(error, index) {
 }
 
 function isChatDialect(dialect) {
-  return String(dialect ?? process.env.BANTAM_API_DIALECT ?? "").trim().toLowerCase() === "chat";
+  return ['chat', 'diffusiongemma'].includes(String(dialect ?? process.env.BANTAM_API_DIALECT ?? "").trim().toLowerCase());
 }
 
 // Native llama.cpp revisions may emit stop_type instead of stopped_limit.
@@ -140,8 +143,9 @@ export function timingsTokensPerSecond(timings) {
 // The app-server does not take nPredict on turn/start. Its worker still has a
 // generic local profile, but that profile's sampling cap is not a Codex limit.
 // Only advertise (or infer truncation from) a cap this transport actually sends.
-export function modelOutputTokenCap(model) {
+export function modelOutputTokenCap(model, { action = false } = {}) {
   if (model?.codex === true) return null;
+  if (model?.diffusionGemma) return action ? model.contextBudget.generationTokens : model.contextBudget.defaultGenerationTokens;
   const cap = Number(model?.nPredict);
   return Number.isFinite(cap) && cap > 0 ? cap : null;
 }
@@ -197,6 +201,9 @@ export class ModelClient {
     // dialect from the grammar field name, so renaming the encoding silently
     // rewrote a remembered vLLM server as llama.cpp.
     this.apiDialect = String(opts.apiDialect ?? process.env.BANTAM_API_DIALECT ?? "").trim().toLowerCase() || null;
+    this.diffusionGemma = this.apiDialect === 'diffusiongemma';
+    this.diffusionCoordinator = null;
+    this.lastContextBudget = null;
     this.grammarField = grammarFieldFor(this.apiDialect);
     // Usable context window reported by an OpenAI-compatible server. Seeded by
     // startup discovery (which already read /v1/models) and refreshed by health().
@@ -383,7 +390,7 @@ export class ModelClient {
   }
 
   async complete(prompt, opts = {}) {
-    await waitForImageGpu(localModelEndpoint(this), opts.signal);
+    if (!this.diffusionGemma) await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const requestOptions = { ...opts };
     if (requestOptions.signal?.aborted) throw interruptedError();
     if (opts.seed !== undefined) requestOptions.seed = normalizeSeed(opts.seed);
@@ -397,6 +404,32 @@ export class ModelClient {
       await this.ensureChatTransport(prompt, { out: (t) => process.stderr.write(t) });
     }
     const request = this.buildRequest(prompt, requestOptions);
+    if (this.diffusionGemma && opts.diffusionTools) {
+      await this.ensureDiffusionGemma();
+      const messages = JSON.parse(request.body).messages.filter(message => message.role !== 'assistant' || message.content.trim());
+      const render = messages => messages.map(message => `${message.role.toUpperCase()}: ${message.content}`).join('\n\n');
+      const state = render(messages);
+      // The old wire-format tutorial is useful for selecting operations, but
+      // conflicts with literal field generation. Keep task/results, omit that
+      // system tutorial from the field-only request.
+      const generationState = render(messages.filter(message => message.role !== 'system'));
+      // Each read/generation acquires the existing shared Jev queue separately.
+      // Nesting a decision inside runPrimary would deadlock that queue.
+      return diffusionGemmaToolTurn({ state, context: { ...opts.diffusionTools, generationTokens: this.contextBudget.generationTokens }, signal: opts.signal,
+        onDecision: opts.onToolDecision,
+        choose: async choice => {
+          const receipt = await this.diffusionCoordinator.choose({ ...choice, seed: requestOptions.seed ?? 0,
+            maxInputTokens: this.contextBudget.hardInputTokens, signal: opts.signal });
+          if (receipt.usage?.requests) this.recordExternalUsage({ provider: 'api', model: this.modelName, ...receipt.usage }, { source: 'jev_tool_selection' });
+          return receipt;
+        },
+        generate: ({ instruction, code, maxTokens }) => {
+          const fieldPrompt = `${this.template.open('system')}You are generating one literal tool argument. The controller has already selected the tool and parameters. Follow the final field instruction; the transcript is reference material, not a response-format example. ${code ? 'Return exactly one closed four-backtick code block, with literal source, then stop. The block contains only source code, never an action header.' : 'Return only the requested plain text value, never an action envelope.'}${this.template.close}\n${this.template.open('user')}TRANSCRIPT:\n${generationState}\n\nFIELD INSTRUCTION:\n${instruction}${this.template.close}\n${this.assistantPrefill}`;
+          return this.complete(fieldPrompt, { nPredict: maxTokens, signal: opts.signal, diffusionValue: code,
+            ...(opts.onProgress ? { onProgress: info => opts.onProgress({ ...info, content: '' }) } : {}) });
+        },
+      });
+    }
     // A held-open chat session can vanish server-side (409 session_unavailable);
     // the retry must then carry the full transcript on a new id, not the delta.
     if (this.chatSessions) request.rebuild = () => this.buildRequest(prompt, requestOptions);
@@ -430,7 +463,54 @@ export class ModelClient {
     if (this.codex) return this.codexRuntime?.contextWindowFor?.(this.modelName) ?? null;
     // An OpenAI-compatible server states its own window on /v1/models; health()
     // records it there, and startup discovery can supply it without a probe.
-    return this.apiContextWindow ?? null;
+    return this.apiContextWindow ?? (this.diffusionGemma ? 16384 : null);
+  }
+
+  get contextBudget() { return this.diffusionGemma ? diffusionGemmaBudget(this.contextWindowTokens) : null; }
+
+  async ensureDiffusionGemma() {
+    if (!this.diffusionGemma) return;
+    await this.pendingBackendRelease;
+    this.diffusionCoordinator ??= (await import('./diffusiongemma-primary.js')).primaryCoordinatorFor(this);
+    await this.diffusionCoordinator.run(async () => {});
+  }
+
+  async releasePrimary() {
+    const coordinator = this.diffusionCoordinator; this.diffusionCoordinator = null;
+    if (coordinator) await coordinator.release();
+  }
+
+  _leaveDiffusionGemma() {
+    if (this.diffusionCoordinator) this.pendingBackendRelease = this.releasePrimary();
+    this.pendingBackendRelease?.catch(() => {});
+    this.diffusionGemma = false;
+    this.lastContextBudget = null;
+  }
+
+  async _inspectDiffusionRequest(request, signal) {
+    const body = JSON.parse(request.body);
+    const key = sha256(JSON.stringify([this.apiUrl, this.modelName, body.messages, body.chat_template_kwargs]));
+    let count = this._diffusionTokenReceipt?.key === key ? this._diffusionTokenReceipt.count : null;
+    if (count == null) {
+      const response = await fetch(`${this.apiUrl.replace(/\/v1\/?$/, '')}/tokenize`, { method: 'POST',
+        headers: { 'content-type': 'application/json', ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}) },
+        body: JSON.stringify({ model: this.modelName, messages: body.messages, add_generation_prompt: true, chat_template_kwargs: body.chat_template_kwargs }),
+        signal: AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]) });
+      if (!response.ok) throw Error(`Cannot verify DiffusionGemma's prompt budget: tokenizer HTTP ${response.status}`);
+      const tokenized = await response.json(); count = tokenized.count ?? tokenized.tokens?.length;
+      if (!Number.isSafeInteger(count) || count < 0) throw Error('DiffusionGemma tokenizer returned no valid token count');
+      this._diffusionTokenReceipt = { key, count };
+    }
+    const budget = this.contextBudget;
+    this.lastContextBudget = { ...budget, inputTokens: count, outputTokens: body.max_tokens,
+      shouldCompact: count >= budget.compactAtTokens, exceedsHardLimit: count > budget.hardInputTokens };
+    return this.lastContextBudget;
+  }
+
+  async inspectContext(prompt, opts = {}) {
+    if (!this.diffusionGemma) return null;
+    await this.ensureDiffusionGemma();
+    return this.diffusionCoordinator.run(() => this._inspectDiffusionRequest(this.buildRequest(prompt, opts), opts.signal));
   }
 
   /**
@@ -466,7 +546,7 @@ export class ModelClient {
 
   /** Send a request captured by buildRequest()/requestLog() without reconstructing its body. */
   async completeRequest(recordedRequest, opts = {}) {
-    await waitForImageGpu(localModelEndpoint(this), opts.signal);
+    if (!this.diffusionGemma) await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const request = normalizeExactRequest(recordedRequest);
     if (!request) throw new Error("recorded completion request needs url, method, headers, and a serialized body");
     // Stored evidence carries a redacted Authorization header; the live key
@@ -514,6 +594,31 @@ export class ModelClient {
   }
 
   async _executeRequest(initialRequest, requestOptions) {
+    await this.pendingBackendRelease;
+    if (this.diffusionGemma && !requestOptions.diffusionGpuHeld) {
+      await this.ensureDiffusionGemma();
+      return this.diffusionCoordinator.run(async () => {
+        const budget = await this._inspectDiffusionRequest(initialRequest, requestOptions.signal);
+        if (budget.exceedsHardLimit || !Number.isSafeInteger(budget.outputTokens) || budget.outputTokens <= 0
+          || budget.outputTokens > budget.generationTokens || budget.inputTokens + budget.outputTokens + budget.marginTokens > budget.contextTokens) {
+          const error = Error(`DiffusionGemma input uses ${budget.inputTokens} tokens; compact below ${budget.hardInputTokens} to retain generation headroom`);
+          error.code = 'context_overflow'; throw error;
+        }
+        const onProgress = requestOptions.onProgress
+          ? info => requestOptions.onProgress({ ...info, content: diffusionGemmaFinalText(info.content) }) : undefined;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await this._executeRequest(initialRequest, { ...requestOptions, onProgress, diffusionGpuHeld: true });
+          const content = diffusionGemmaFinalText(result.content);
+          if (content.trim()) return { ...result, content };
+          if (result.stoppedLimit) {
+            const error = Error(`DiffusionGemma exhausted its ${budget.outputTokens}-token generation budget without a final answer; narrow the task or reduce thinking.`);
+            error.code = 'generation_budget_exhausted'; error.retryable = false; throw error;
+          }
+        }
+        const error = Error('DiffusionGemma returned no final text after three generations');
+        error.code = 'empty_completion'; error.retryable = false; throw error;
+      });
+    }
     let request = initialRequest;
     if (requestOptions.signal?.aborted) throw interruptedError();
     const record = this._beginRequestRecord(request, requestOptions);
@@ -626,13 +731,13 @@ export class ModelClient {
   buildRequest(prompt, opts = {}) {
     const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
     const temperature = opts.temperature ?? this.temperature;
-    const nPredict = opts.nPredict ?? this.nPredict;
+    const nPredict = this.diffusionGemma ? diffusionGemmaOutputTokens(opts.nPredict ?? (opts.agentAction ? this.contextBudget.generationTokens : null), this.contextBudget) : opts.nPredict ?? this.nPredict;
     const stop = opts.stop ?? this.stop;
     const seed = (opts.seed !== null && opts.seed !== undefined) ? opts.seed : undefined;
     // Frontier workers can emit the ordinary action protocol without forcing
     // every unrelated action field through one nullable sampling schema. The
     // runtime parser and checkpoint authority still validate the actual action.
-    const unconstrainedAction = (this.codex || this.codexBacked)
+    const unconstrainedAction = (this.codex || this.codexBacked || this.diffusionGemma)
       && process.env.BANTAM_CODEX_ACTION_SCHEMA !== 'on'
       && Array.isArray(opts.jsonSchema?.properties?.a?.enum);
 
@@ -687,6 +792,24 @@ export class ModelClient {
           messages: plan?.messages ?? null,
           sessionId: plan?.sessionId ?? null,
         });
+        if (this.diffusionGemma) {
+          delete body.response_format;
+          // The pinned vLLM diffusion decoder uses its own denoising sampler.
+          // Generic local-model defaults can make otherwise valid requests 400.
+          for (const key of ['temperature', 'min_p', 'seed', 'min_tokens', 'logit_bias', 'bad_words', 'allowed_token_ids']) delete body[key];
+          body.skip_special_tokens = false;
+          body.chat_template_kwargs = { enable_thinking: opts.thinking === true };
+          if (opts.agentAction) {
+            // Client-side action boundaries distinguish an opening fence from
+            // its matching closer, including fences inside thoughts or files.
+            body.stream = true;
+            body.stream_options = { include_usage: true };
+            const system = body.messages.find(message => message.role === 'system');
+            if (system) system.content = diffusionGemmaActionSystem(system.content);
+            else body.messages.unshift({ role: 'system', content: diffusionGemmaActionSystem('') });
+          }
+          if (opts.diffusionValue) { body.stream = true; body.stream_options = { include_usage: true }; }
+        }
         if (plan) {
           // The bridge's conversational persona conflicts with an agent loop.
           // Preserve an explicit operator override; this is a bridge extension.
@@ -771,11 +894,13 @@ export class ModelClient {
       stop: Array.isArray(stop) ? [...stop] : stop,
       cachePrompt: Boolean(body.cache_prompt),
       stream: Boolean(body.stream),
+      ...(this.diffusionGemma && opts.agentAction ? { diffusionAction: true } : {}),
+      ...(this.diffusionGemma && opts.diffusionValue ? { diffusionValue: true } : {}),
     };
   }
 
   async _completeOnce(request, opts = {}, exchange = {}) {
-    await waitForImageGpu(localModelEndpoint(this), opts.signal);
+    if (!this.diffusionGemma) await waitForImageGpu(localModelEndpoint(this), opts.signal);
     const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
     // Wall-clock origin for the client-side timings fallback. Set before any
     // network work so a server that reports nothing still yields a real rate.
@@ -870,8 +995,9 @@ export class ModelClient {
         if (res.status === 409 && /session_unavailable/.test(text)) err.code = "session_unavailable";
         throw err;
       }
-      if (onProgress) {
-        const streamed = await this._readStream(res, onProgress, requestStartedAt);
+      if (onProgress || request.stream) {
+        const streamed = await this._readStream(res, onProgress ?? (() => {}), requestStartedAt,
+          request.diffusionAction || request.diffusionValue ? { finishContent: request.diffusionValue ? completedDiffusionGemmaValue : completedDiffusionGemmaAction, signal: externalSignal } : {});
         if (request.chatSession) streamed.result.content = normalizeCodexStructuredContent(
           streamed.result.content, request.actionSchema ?? JSON.parse(request.body).response_format?.json_schema?.schema);
         exchange.response = responseRecord(res, streamed.rawBody, streamed.result);
@@ -931,7 +1057,7 @@ export class ModelClient {
   // Accumulate a llama.cpp SSE stream ("data: {json}\n\n" events; the final event carries
   // stop=true with tokens_predicted/timings). onProgress is throttled to ~2 calls/sec with the
   // content accumulated SO FAR, so the caller can show what is being generated as it grows.
-  async _readStream(res, onProgress, startedAt = nowMs()) {
+  async _readStream(res, onProgress, startedAt = nowMs(), { finishContent = null, signal } = {}) {
     const decoder = new TextDecoder();
     let buffered = "";
     let raw = "";
@@ -947,7 +1073,9 @@ export class ModelClient {
     // those is the usage frame plus teardown, which on a 12-token action is a
     // real fraction of the response and must not be charged to generation time.
     let lastTokenAt = null;
-    for await (const part of res.body) {
+    let completedAction = false;
+    let receivedContent = null;
+    stream: for await (const part of res.body) {
       const text = decoder.decode(part, { stream: true });
       raw += text;
       buffered += text;
@@ -975,11 +1103,43 @@ export class ModelClient {
         chunks++;
         if (evt.usage) usageEvent = evt;
         if (isStreamDone(evt)) final = evt;
+        if (finishContent) {
+          const completed = finishContent(content);
+          if (completed !== null) {
+            receivedContent = content;
+            content = completed;
+            completedAction = true;
+            // Breaking the body iterator cancels the HTTP stream, allowing
+            // vLLM to abort the remaining generation rather than buffer it.
+            break stream;
+          }
+        }
         const now = Date.now();
         if (now - lastReport > 300) {
           lastReport = now;
           try { onProgress({ tokens: streamedTokenCount(), content }); } catch { /* progress is advisory */ }
         }
+      }
+    }
+    let tokensSource = null;
+    if (completedAction) {
+      // Early cancellation has no final usage frame. Count received text with
+      // the server tokenizer; do not label SSE frame counts as model tokens or
+      // pretend these are the server's total compute/billing usage.
+      try {
+        const response = await fetch(`${this.apiUrl.replace(/\/v1\/?$/, '')}/tokenize`, {
+          method: 'POST', headers: { 'content-type': 'application/json', ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}) },
+          body: JSON.stringify({ model: this.modelName, prompt: receivedContent, add_special_tokens: false }),
+          signal: AbortSignal.any([AbortSignal.timeout(2500), ...(signal ? [signal] : [])]),
+        });
+        if (!response.ok) throw Error('Tokenizer unavailable');
+        const data = await response.json(), count = data.count ?? data.tokens?.length;
+        if (!Number.isSafeInteger(count) || count < 0) throw Error('Invalid token count');
+        usageEvent = { model: this.modelName, usage: { prompt_tokens: this.lastContextBudget?.inputTokens ?? 0, completion_tokens: count } };
+        tokensSource = 'server_tokenizer_received_text';
+      } catch {
+        usageEvent = { usage: { prompt_tokens: this.lastContextBudget?.inputTokens ?? 0, completion_tokens: 0 } };
+        tokensSource = 'unavailable';
       }
     }
     // An OpenAI-compatible server reports SSE frames, not tokens: vLLM packed 5
@@ -1002,7 +1162,7 @@ export class ModelClient {
         return {
           rawBody: raw,
           result: {
-            content: extractCompletionText(data),
+            content: finishContent?.(extractCompletionText(data)) ?? extractCompletionText(data),
             tokens: data.tokens_predicted ?? data.usage?.completion_tokens ?? 0,
             stoppedEos: Boolean(data.stopped_eos),
             stoppedLimit: stoppedLimitOf(data),
@@ -1028,6 +1188,7 @@ export class ModelClient {
       rawBody: raw,
       result: {
         content,
+        ...(completedAction ? { completionBoundary: 'validated_action', tokensSource } : {}),
         tokens: streamedTokenCount(),
         stoppedEos: Boolean(final?.stopped_eos),
         stoppedLimit: stoppedLimitOf(final),
@@ -1158,6 +1319,7 @@ export class ModelClient {
   }
 
   async health() {
+    if (this.diffusionGemma) await this.ensureDiffusionGemma();
     if (this.codex) {
       if (this.codexRuntime) return this.codexRuntime.health();
       // Health gets a short control-plane budget, but completion turns retain
@@ -1194,7 +1356,7 @@ export class ModelClient {
           // omits the field simply teaches nothing and the constant still applies.
           try {
             const listing = await res.json();
-            const windows = (listing?.data ?? [])
+            const windows = (listing?.data ?? []).filter(m => !this.diffusionGemma || m.id === this.modelName)
               .map((m) => Number(m?.max_model_len))
               .filter((n) => Number.isFinite(n) && n > 0);
             if (windows.length) this.apiContextWindow = Math.max(...windows);
@@ -1233,6 +1395,7 @@ export class ModelClient {
    * `--profile` on the command line still outranks it.
    */
   switchTo(endpoint, { profile = null, modelId = null } = {}) {
+    this._leaveDiffusionGemma();
     this.codexRuntime?.close();
     this.codexRuntime = null;
     this.codex = false;
@@ -1271,6 +1434,7 @@ export class ModelClient {
   }
 
   switchToApi({ url, model, key = null, deepseek = false, dialect } = {}) {
+    this._leaveDiffusionGemma();
     this.sealActionPrefill = false;
     this.codexRuntime?.close();
     this.codexRuntime = null;
@@ -1292,10 +1456,12 @@ export class ModelClient {
     }
     this.grammarField = grammarFieldFor(dialect);
     this.apiDialect = String(dialect ?? "").trim().toLowerCase() || null;
+    this.diffusionGemma = this.apiDialect === 'diffusiongemma';
     return this.apiUrl;
   }
 
   switchToCodex({ model = "gpt-5.6-sol", effort = "high" } = {}) {
+    this._leaveDiffusionGemma();
     this.sealActionPrefill = false;
     this.codexRuntime?.close();
     this.codexRuntime = null;
@@ -1371,6 +1537,7 @@ export class ModelClient {
   close() {
     this.codexRuntime?.close();
     this.codexRuntime = null;
+    const released = this.releasePrimary(); released.catch(error => { this.primaryCloseError = error; }); return released;
   }
 
   metadata() {
@@ -1506,8 +1673,10 @@ export async function detectEndpoint(opts = {}) {
   if (explicit) return explicit.replace(/\/$/, "");
   const list = process.env.BANTAM_ENDPOINTS
     ? process.env.BANTAM_ENDPOINTS.split(",")
-    : ["http://localhost:8085", "http://localhost:18086"];
-  const candidates = list.map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
+    : ["http://localhost:8085", "http://localhost:18086", ...(await import('./model-launcher.js')).readModelRegistry().map(entry => entry.endpoint).filter(endpoint => {
+        try { return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(endpoint).hostname); } catch { return false; }
+      })];
+  const candidates = [...new Set(list.map((s) => s.trim().replace(/\/$/, "")).filter(Boolean))];
   for (const ep of candidates) {
     try {
       const res = await fetch(`${ep}/health`, { method: "GET", signal: AbortSignal.timeout(1500) });

@@ -44,7 +44,7 @@ test("live capture reads the process argv, probes, and records", (t) => {
     if (cmd === "nvidia-smi") return "4242, 22884";
     throw new Error(`unexpected ${cmd}`);
   };
-  const got = captureLiveLoadout({ exec, probeSlots: () => ({ slots: 4, ctx: 140032 }), file });
+  const got = captureLiveLoadout({ exec, readArgv: () => ['/usr/bin/llama-server', '-m', 'big.gguf', '--ctx-size', '140000'], probeSlots: () => ({ slots: 4, ctx: 140032 }), file });
   assert.equal(got.vramMb, 22884);
   const rec = listLoadouts({ file })[0];
   assert.equal(rec.slots, 4);

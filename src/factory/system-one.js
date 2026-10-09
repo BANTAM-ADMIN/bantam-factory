@@ -26,6 +26,9 @@
 import { formatCalcResults, runCalcSetup } from "./calc-gauge.js";
 import { execGaugeChoice } from "./exec-gauge.js";
 import { checkToolCalls, formatToolCallNotes } from "./tool-call-gauge.js";
+import { toolWorkflowContext } from "./tool-workflow-context.js";
+import { isTextualInference } from "./inference-context.js";
+import { chordContext } from "./chord-context.js";
 import { palettePreferenceChoice } from "./preference-gauge.js";
 import { derivedAfterChoice, entityTable, isChangeQuestion, noopChanges, parseChanges } from "./state-gauge.js";
 import { claimCheckNote } from "./claim-gauge.js";
@@ -101,8 +104,8 @@ export function readSlotDistribution({ logprobs, labels }) {
   });
 }
 
-async function postJson(fetchImpl, url, body) {
-  const response = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+async function postJson(fetchImpl, url, body, signal) {
+  const response = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), ...(signal ? { signal } : {}) });
   const text = await response.text();
   if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}: ${text.slice(0, 400)}`), { status: response.status });
   return JSON.parse(text);
@@ -253,7 +256,9 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
    * later read continues from (`readAfter`). `budget` caps the thought, and
    * the thought is also clamped to the room the context leaves after the
    * prompt (with space kept for the answer read), so a long budget on a long
-   * prompt is cut off instead of failing.
+   * prompt is cut off instead of failing. Diffusion vLLM rejects the standard
+   * sampling seed; multi-step thinking uses backend randomness even when the
+   * following structured read has a fixed canvas seed.
    */
   async function think({ system, user, budget = 512 }) {
     const prompt = await postJson(fetchImpl, `${root}/tokenize`, {
@@ -321,12 +326,13 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
   }
 
   /** Plain generation with thinking off, for setups a gauge will check. */
-  async function complete({ system, user, maxTokens = 400 }) {
+  async function complete({ system, user, maxTokens = 400, temperature }) {
     const started = performance.now();
     const envelope = await postJson(fetchImpl, `${root}/v1/chat/completions`, {
       model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       max_tokens: maxTokens,
+      ...(temperature === undefined ? {} : { temperature }),
       chat_template_kwargs: { enable_thinking: false },
     });
     return Object.freeze({
@@ -365,7 +371,8 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
     return Object.freeze({ ...result.reads[0], seed, elapsedMs: result.elapsedMs, promptTokens: result.promptTokens });
   }
 
-  async function read({ system, user, compiled, seed = 0, head: headOverride = null }) {
+  async function read({ system, user, compiled, seed = 0, head: headOverride = null, maxInputTokens = null, signal }) {
+    signal?.throwIfAborted();
     let { templateIds, slot } = compiled;
     if (headOverride) {
       // Diagnostic only: prepend an explicit canvas head, e.g. to measure a
@@ -377,7 +384,7 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
     const { canvas, width } = buildReadCanvas({ templateIds, slot, seed, vocabularySize });
     const labelIds = compiled.labels.map((row) => row.tokenId);
     const started = performance.now();
-    const envelope = await postJson(fetchImpl, `${root}/v1/chat/completions`, {
+    const body = {
       model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       max_tokens: templateIds.length + 1,
@@ -387,7 +394,17 @@ export function createStructuredReader({ baseUrl, model, vocabularySize = 262144
       return_tokens_as_token_ids: true,
       chat_template_kwargs: { enable_thinking: false },
       vllm_xargs: { diffusion_seed_canvas: canvas, diffusion_canvas_length: width, diffusion_max_steps: 1, diffusion_read_only: true },
-    });
+    };
+    if (maxInputTokens !== null) {
+      const receipt = await postJson(fetchImpl, `${root}/tokenize`, {
+        model, messages: body.messages, add_generation_prompt: true, chat_template_kwargs: body.chat_template_kwargs,
+      }, signal);
+      const count = receipt.count ?? receipt.tokens?.length;
+      if (!Number.isSafeInteger(count) || count < 0) throw new Error('Structured tool read has no valid prompt token receipt');
+      if (count > maxInputTokens) throw Object.assign(new Error(`Structured tool read uses ${count} input tokens; limit is ${maxInputTokens}`), { code: 'context_overflow' });
+    }
+    signal?.throwIfAborted();
+    const envelope = await postJson(fetchImpl, `${root}/v1/chat/completions`, body, signal);
     const elapsedMs = performance.now() - started;
     const rows = envelope.choices?.[0]?.logprobs?.content;
     if (!Array.isArray(rows) || !rows[slot]) throw new Error("read returned no logprobs at the label slot");
@@ -753,7 +770,7 @@ export async function decideJevAdaptive(args) {
  *   jointSelect   select-all groups (see selectAllGroup) are decided jointly:
  *                 fast reads per candidate, one count read, top-k are yes
  */
-async function decideJevAdaptiveCore({ reader, pool, state, questions, seed = 0, gate = 0.95, thinkBudget = 1024, binaryDebias = false, quantGate = false, temperature = 1, jointSelect = false, heavyQuestionLimit = 4, debiasGate = "confidence", thinkStyle = "full", truncatedThought = "read", rowThinkLimit = Infinity, execCell = null, toolGauge = false, rowThought = false, rowThoughtMin = 5, rowThoughtMaxChars = 36000, estimateBlend = null, thinkBlend = 1, hideKeys = false, preferenceGauge = false, stateGauge = false, evidenceFirst = false, extraNotes = [], claimGauge = false, thinkMinOptions = Infinity, selectAllFraming = false, stanceFraming = false, digestFirst = false, borrowedThought = null }) {
+async function decideJevAdaptiveCore({ reader, pool, state, questions, seed = 0, gate = 0.95, thinkBudget = 1024, binaryDebias = false, quantGate = false, temperature = 1, jointSelect = false, heavyQuestionLimit = 4, debiasGate = "confidence", thinkStyle = "full", truncatedThought = "read", rowThinkLimit = Infinity, execCell = null, toolGauge = false, rowThought = false, rowThoughtMin = 5, rowThoughtMaxChars = 36000, estimateBlend = null, thinkBlend = 1, hideKeys = false, preferenceGauge = false, stateGauge = false, evidenceFirst = false, extraNotes = [], claimGauge = false, thinkMinOptions = Infinity, selectAllFraming = false, stanceFraming = false, digestFirst = false, borrowedThought = null, workflowFocus = false, inferenceThink = false, chordFocus = false }) {
   const stateText = typeof state === "string" ? state : JSON.stringify(state);
   const answers = {};
   const evidence = {};
@@ -853,6 +870,8 @@ async function decideJevAdaptiveCore({ reader, pool, state, questions, seed = 0,
     const noops = stateGauge && isChangeQuestion(question) ? noopChanges(entities, question) : [];
     const notes = [
       ...extraNotes,
+      ...(workflowFocus ? [toolWorkflowContext(state, question)].filter(Boolean) : []),
+      ...(chordFocus ? [chordContext(state, question)].filter(Boolean) : []),
       ...(digest ? [digest] : []),
       ...(claimNote ? [claimNote] : []),
       ...(selectAllNote && selectAll.ids.includes(id) ? [selectAllNote] : []),
@@ -900,7 +919,12 @@ async function decideJevAdaptiveCore({ reader, pool, state, questions, seed = 0,
     // Questions that always think: a claim with unsourced details (its fast
     // read passes them confidently), and questions of many options, where a
     // finished thought helped at every fast-read confidence.
-    const force = Boolean(claimNote) || options.length >= thinkMinOptions;
+    // Textual inference can be confidently wrong about relation direction or
+    // missing evidence. Keep its semantics explicit without trusting the fast
+    // read's confidence as a reason to skip reasoning.
+    const inference = inferenceThink && isTextualInference(question);
+    if (inference) steps.push({ step: "inferencecheck", forceThink: true });
+    const force = Boolean(claimNote) || options.length >= thinkMinOptions || inference;
     pending.push({ id, question, options, instructions, rack, compiled, userFor, toOptions, material, probabilities, fast: probabilities, firstOrder, secondOrder, steps, force });
   }
   // A thought cut off by the budget measured worse than no thought: on the

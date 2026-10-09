@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { bantamConfigDirectory } from '../config-directory.js';
 
 // The vLLM serve arguments measured on a 24 GB RTX 4090 with the AWQ-INT4
 // model: structured reads need vLLM with PR #57250 (commit 1b3b88e, as pinned
@@ -57,7 +58,7 @@ export const DEFAULT_JEV_CONFIG = Object.freeze({
 });
 
 export function jevConfigPath() {
-  return process.env.BANTAM_JEV_CONFIG || path.join(os.homedir(), ".bantam", "jev.json");
+  return process.env.BANTAM_JEV_CONFIG || path.join(bantamConfigDirectory(), "jev.json");
 }
 
 /** The config file's path for messages, with the home directory as `~`. */

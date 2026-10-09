@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { managedRegistryPath } from './stock-model.js';
+import { userModelRegistryPath } from './model-capture.js';
 
 // No built-in models: a fresh machine must register its own (via
 // `bantam doctor`, `BANTAM_MODELS`, or the repository's .bantam/models.json). Hardcoding one
@@ -44,11 +45,14 @@ function loadRegistry() {
   }
   // 3) Resolve repo root from the script's own location (works from any cwd)
   const src = defaultModelRegistryPath();
-  let local=DEFAULT_MODELS,managed=[];
+  let local=DEFAULT_MODELS,managed=[],captured=[];
   try { if (fs.existsSync(src)) local=JSON.parse(fs.readFileSync(src, "utf8")); } catch { /* fall back */ }
   try { managed=JSON.parse(fs.readFileSync(managedRegistryPath(),'utf8')); }catch{}
+  try { captured=JSON.parse(fs.readFileSync(userModelRegistryPath(),'utf8')); }catch{}
   if(!Array.isArray(local))local=[];
-  return [...local,...(Array.isArray(managed)?managed:[]).filter(m=>!local.some(x=>x.name===m.name))];
+  const result=[...local];
+  for(const m of [...(Array.isArray(managed)?managed:[]),...(Array.isArray(captured)?captured:[])]) if(!result.some(x=>x.name===m.name))result.push(m);
+  return result;
 }
 
 /**
@@ -137,13 +141,15 @@ export function listModels() {
 
 /** Registered models annotated with live `running` (and `sleeping`) status. */
 export async function modelStatus() {
-  return Promise.all(listModels().map(async (m) => {
+  return Promise.all(readModelRegistry().filter(m => m.name && m.endpoint).map(async (m) => {
     const { reachable, sleeping } = await serverState(m.endpoint);
+    const resident = reachable && !sleeping ? await verifyResidentProfile(m) : null;
     // `sleeping` is surfaced rather than folded into `running`: a sleeping
     // server is reachable and will wake on demand, and an operator staring at
     // an ○ deserves to know the difference between "nothing there" and "the
     // model stepped out and left the port answering".
-    return { ...m, running: reachable && !sleeping, sleeping: reachable && sleeping };
+    const missingFiles = [m.script, ...(m.files || [])].filter(file => typeof file !== 'string' || !fs.existsSync(file));
+    return { ...m, running: reachable && !sleeping && resident.ok, sleeping: reachable && sleeping, missingFiles };
   }));
 }
 
@@ -227,6 +233,8 @@ export async function verifyResidentProfile(target) {
  * it when health returns, nothing new was launched and this is a failure.
  */
 async function startAndWait(target, waitMs, out) {
+  const missing = [target.script, ...(target.files || [])].filter(file => !fs.existsSync(file));
+  if (missing.length) { out(`Missing local model files: ${missing.join(', ')}. Update its path or connect to its running API endpoint.\n`); return false; }
   out(`Starting ${target.label} … (loading can take a minute)\n`);
   const pidBefore = portOwnerPid(target.endpoint);
   const child = spawn("bash", [target.script], { detached: true, stdio: "ignore" });
@@ -271,23 +279,12 @@ async function loadedModelId(endpoint) {
 
 /** Stop whatever llama.cpp server holds the endpoint's port, and wait for it to release. */
 async function stopServerAt(endpoint, out) {
-  const port = (String(endpoint).match(/:(\d+)/) || [])[1];
-  if (!port) return false;
+  const url = new URL(endpoint);
+  const port = url.port;
+  if (!port || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) return false;
   out(`Stopping the model on port ${port} …\n`);
-  try { execFileSync("fuser", ["-k", `${port}/tcp`], { stdio: "ignore", timeout: 6000 }); }
-  catch {
-    try {
-      const pids = execFileSync("lsof", ["-ti", `tcp:${port}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
-        .trim().split(/\s+/).filter(Boolean);
-      for (const p of pids) { try { process.kill(Number(p), "SIGTERM"); } catch { /* already gone */ } }
-    } catch { /* no killer available */ }
-  }
-  const deadline = Date.now() + 20000;
-  while (Date.now() < deadline) {
-    if (!(await isHealthy(endpoint))) return true;
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return false;
+  await (await import('./gpu-handoff.js')).stopLlamaEndpoint(endpoint);
+  return !portOwnerPid(endpoint) && !(await serverState(endpoint)).reachable;
 }
 
 /**
@@ -300,7 +297,43 @@ export async function switchToModel(model, target, {
   out = (s) => process.stderr.write(s),
   stop = stopServerAt,
   verify = verifyResidentProfile,
+  coordinated = false,
 } = {}) {
+  const handoff = await import('./gpu-handoff.js');
+  if (!coordinated) await model.releasePrimary?.();
+  if (!coordinated) await handoff.ensureGpuHandoff(target.endpoint);
+  if (!coordinated && handoff.managesLocalEndpoint(target.endpoint)) {
+    await handoff.yieldGpuOwner('jev');
+    const { acquireImageLease, recoverOrphanedImageLease } = await import('./image-gpu.js');
+    await recoverOrphanedImageLease({ url: target.endpoint }, record => handoff.recoverManagedGpu(record));
+    const { endpointKey } = await import('./image-gpu.js');
+    const lease = acquireImageLease({ url: target.endpoint }, { kind: 'llama', mode: 'llamacpp', endpoint: endpointKey(target.endpoint), state: 'switching', workspace: process.cwd() });
+    try {
+      const resident = await serverState(target.endpoint);
+      if (resident.reachable && !resident.sleeping && (await verify(target)).ok) {
+        model.switchTo(target.endpoint, { profile: target.profile });
+        await handoff.markLocalActive(target);
+        lease.release();
+        return true;
+      }
+      const missing = [target.script, ...(target.files || [])].filter(file => typeof file !== 'string' || !fs.existsSync(file));
+      if (missing.length) { out(`Missing local model files: ${missing.join(', ')}. Update its path or connect to its running API endpoint.\n`); lease.release(); return false; }
+      if (resident.reachable) await handoff.parkLocalModel(target.endpoint, { keepProcess: false });
+      await handoff.prepareGpuFor('llama', target);
+      const ok = await switchToModel(model, target, { waitMs, out, stop, verify, coordinated: true });
+      if (ok) await handoff.markLocalActive(target);
+      else { await handoff.stopLlamaEndpoint(target.endpoint); await handoff.restoreLocalModel(target.endpoint); }
+      lease.release();
+      return ok;
+    } catch (error) {
+      try {
+        await handoff.stopLlamaEndpoint(target.endpoint);
+        await handoff.restoreLocalModel(target.endpoint);
+        lease.release();
+      } catch (recovery) { lease.update({ state: 'recovery_required', error: recovery.message }); }
+      throw error;
+    }
+  }
   let ready = await serverState(target.endpoint);
   if (ready.reachable && ready.sleeping) {
     if (!(await wakeSleepingServer(target.endpoint, out))) {
@@ -362,7 +395,7 @@ export function resolveModelTarget(nameOrAlias) {
   const name = MODEL_ALIASES[String(nameOrAlias ?? "").toLowerCase()] ?? nameOrAlias;
   const wanted = String(name ?? "").toLowerCase();
   if (!wanted) return null;
-  const models = listModels();
+  const models = readModelRegistry();
   // Exact name first, then a case-insensitive match on either half of the
   // identity: a doctor-scaffolded entry's only handle is its prose label.
   return models.find((m) => m.name === name)
@@ -412,6 +445,16 @@ export async function swapModel(nameOrAlias, {
     }
   }
   const t0 = now();
+  const handoff = await import('./gpu-handoff.js');
+  await handoff.ensureGpuHandoff(target.endpoint);
+  if (handoff.managesLocalEndpoint(target.endpoint) && stop === stopServerAt && start === startRegisteredModel && verify === verifyResidentProfile) {
+    const ok = await switchToModel({ switchTo() {} }, target, { out });
+    const ms = now() - t0;
+    recordLoad(target.name, ms, { ok });
+    if (!ok) return { ok: false, error: `${target.name} did not become healthy; the previous model was restored`, ms };
+    setActiveProfile(target.name);
+    return { ok: true, name: target.name, endpoint: target.endpoint, ms };
+  }
   // Stop is a gate, not a gesture. It returns false when the port never freed,
   // and starting anyway meant the OLD model answered /health and the swap
   // reported success (measured 2026-08-22: {ok:true, ms:3} with nothing swapped).

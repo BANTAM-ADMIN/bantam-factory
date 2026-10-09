@@ -16,7 +16,7 @@ const cleanups = [];
 after(() => { for (const fn of cleanups.reverse()) { try { fn(); } catch { /* best effort */ } } });
 
 /** A server that answers /health 200 always, and /props with the given state. */
-async function server({ sleeping, propsStatus = 200 }) {
+async function server({ sleeping, propsStatus = 200, modelId }) {
   const hits = { health: 0, props: 0 };
   const s = http.createServer((req, res) => {
     if (req.url === "/health") { hits.health++; res.writeHead(200); res.end('{"status":"ok"}'); return; }
@@ -28,6 +28,7 @@ async function server({ sleeping, propsStatus = 200 }) {
       return;
     }
     if (req.url === "/slots") { res.writeHead(200, {"content-type":"application/json"}); res.end("[{}]"); return; }
+    if (req.url === "/v1/models" && modelId) { res.writeHead(200, {"content-type":"application/json"}); res.end(JSON.stringify({ data: [{ id: modelId }] })); return; }
     res.writeHead(404); res.end();
   });
   await new Promise((r) => s.listen(0, "127.0.0.1", r));
@@ -64,6 +65,17 @@ test("an awake server is running, and says it is not sleeping", async () => {
   const [m] = await modelStatus();
   assert.equal(m.running, true);
   assert.equal(m.sleeping, false);
+});
+
+test("models sharing a port are running only when their identity matches", async () => {
+  const { endpoint } = await server({ sleeping: false, modelId: "Orion-26B-A4B-v1.1" });
+  registry([
+    { name: "orion", endpoint, match: "Orion-26B-A4B", slots: 1 },
+    { name: "qwen", endpoint, match: "Qwen3.8", slots: 1 },
+  ]);
+  const [orion, qwen] = await modelStatus();
+  assert.equal(orion.running, true);
+  assert.equal(qwen.running, false);
 });
 
 test("a server with no /props at all is treated as awake, not as broken", async () => {

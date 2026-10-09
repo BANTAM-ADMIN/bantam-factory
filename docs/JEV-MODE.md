@@ -10,6 +10,66 @@ It runs **alongside whatever is doing the work in BANTAM**:
   working while Jev answers questions.
 - **With a local Qwen worker on the same GPU**, BANTAM swaps the two models in and out of
   GPU memory automatically (§5).
+- **With DiffusionGemma selected as the worker**, chat, short coding tasks and Jev
+  use the same engine. Requests are serialized on a single GPU; an image request
+  parks it in RAM and restores it afterward.
+
+To select it for ordinary work, use `:model diffusiongemma` after Jev setup.
+The model menu also offers **DiffusionGemma · chat + light work + Jev**. `:jev on`
+alone keeps your current chat backend and enables the decision service alongside it.
+When DiffusionGemma is the selected chat backend, `:jev off` stops the decision API
+while leaving chat available. Changing the chat model releases the primary engine
+through the GPU handoff system.
+
+The 16,384-token deployment uses an early working budget: compact assembled input
+at **8,192 tokens**, aim for **6,144** after trimming, and enforce an input ceiling
+of **11,264**. Plain generation defaults to **2,048**; coding actions use the **4,096**-token
+reserve. Thinking and the answer share that generation allowance, with a further
+**1,024** tokens of safety margin. The server's
+tokenizer counts the complete request, including instructions, tools and history.
+Oversized input is refused before generation. If the current task and required
+source alone exceed the ceiling, narrow the task or choose a larger-context model.
+Previous session context is bounded; the current request remains intact. History
+trimming retains recent turns and the current task/controller state, rather than
+claiming to preserve every detail through a model-generated summary. This mode
+defaults to 12 agent turns and is intended for chat and light work.
+
+Tool use in this mode uses **Jev selection and CPU assembly**. The existing
+structured reader selects issued handles for the currently allowed action,
+registered query tool, known path, and source lines. The CPU maps those choices
+back to exact values and serializes the validated action for the ordinary
+dispatcher. Existing source is copied by the CPU for exact-match edits; the model
+generates only new strings such as replacement code, commands, new filenames,
+and replies. Source generation uses a closed literal block and shares the 4K
+generation reserve across the fields of a turn. Truncated blocks and source that
+changes during selection are discarded before execution.
+
+This primary mode uses individual actions rather than sampled batch/array
+payloads, and bounds each selected edit to 32 lines. It does not require the Jev
+HTTP API to be serving, and it uses the same engine queue and GPU handoff as
+`:jev on`. Tool reads have exact prompt-budget checks and retain their probability
+and label-mass evidence. These are model judgments, not verification receipts:
+choosing a valid tool does not establish that generated code is correct.
+For visual work with `after_edit` verification, the CPU runs the browser preview
+after each applied web edit so the next selection receives actual error feedback.
+
+Run a reproducible live qualification with your own configured engine:
+
+```bash
+node scripts/benchmark-diffusiongemma-primary.mjs --live
+# Exercise a larger single-file coding request with browser checks:
+node scripts/benchmark-diffusiongemma-primary.mjs --live --tetris
+# Also test image generation and return to DiffusionGemma:
+node scripts/benchmark-diffusiongemma-primary.mjs --live --image
+```
+
+The benchmark records timings, exact prompt budgets, Jev/chat coexistence, a hard
+context rejection and a real coding task with six independently rerun checks.
+It writes private evidence under `.bantam/gpu-validation/` and stops the managed
+DiffusionGemma engine after the run. External servers remain user-owned.
+The optional Tetris check tests JavaScript syntax, browser loading and bounded
+keyboard interaction, not exhaustive gameplay. A failed coding check is retained
+as a failure and does not suppress the requested image handoff check.
 
 You can use it four ways:
 
@@ -336,6 +396,7 @@ checks: tests, verifiers, done-gates.
 | `GET /v1/models` | Jev | `{"models": [{"name", "description", "release_date"}]}` |
 | `POST /v1/systemone` | Jev | `{model, answers, usage}` |
 | `POST /v1/systemone/batch` | BANTAM | Many rows in one call; NDJSON streaming (§4.6) |
+| `POST /v1/bantam/rank` | BANTAM | Opt-in tool ranking utilities and comparison diagnostics (§4.6) |
 | `GET /v1/gauges` | BANTAM | The exact gauges and what triggers each |
 | `GET /v1/bantam/status` | BANTAM | Engine, policy, lease, requests, p50, swaps |
 
@@ -433,6 +494,24 @@ preference fit, a single-option question) and `model` when a structured read did
 - With `Accept: application/x-ndjson`, each row's result **streams as one line** as soon
   as it is decided.
 
+**Tool retrieval:** `POST /v1/bantam/rank` accepts `{state, questions}`. Each
+question must be a `choice` with exactly `yes` and `no` criteria and the full tool
+text in `instructions.candidate`, for example:
+
+```json
+{"state":{"query":"Find tomorrow's weather in Denver"},"questions":{"weather":{"type":"choice","criteria":{"no":"Not useful","yes":"Useful"},"instructions":{"candidate":"Weather API: forecasts by city and date"}},"calendar":{"type":"choice","criteria":{"no":"Not useful","yes":"Useful"},"instructions":{"candidate":"Calendar API: list and create events"}}}}
+```
+
+The endpoint uses fast relevance judgments, then compares the top eight tools in
+two shuffled orders. It blends 75% relevance with 25% comparative utility, falling
+back to fast scores when either comparison has insufficient label coverage or the
+shortlist exceeds the context budget. The response includes `scores`, ordered
+`ranking`, `baseScores`, `comparisonScores`, `shortlist`, comparison `reads`,
+`fallback`, and token `usage`.
+`scoreMeaning` is `ranking_utility`: these scores support ordering candidates;
+calibration for yes/no decisions has not been established. This is an opt-in
+endpoint; ordinary `/v1/systemone` requests continue to use their requested profile.
+
 ---
 
 ## 5. GPU policies: sharing one GPU with your worker
@@ -523,8 +602,10 @@ model on the same vLLM.
    | Calculator | Quantitative questions (in rows of up to 4 questions) | The model writes a setup; exact arithmetic is shown to its thought. |
 
 4. **Gated thinking** (`bantam-jev` only). A question whose fast read is under 95%
-   confident thinks first (up to 8192 tokens), with at most 6 thoughts per request. A
-   thought cut off by its budget is dropped, because cut-off thoughts measured worse than
+   confident thinks first (up to 8192 tokens), with at most 6 thoughts per request.
+   Three-way textual inference questions with a premise, hypothesis, and
+   entailment/neutral/contradiction choices also think when their fast read is confident.
+   A thought cut off by its budget is dropped, because cut-off thoughts measured worse than
    no thought. The read after a thought is **blended** 75/25 with the fast read (50/50 for
    probability-estimate questions), which keeps calibration and rankings intact.
 5. **Calibration.** Final probabilities are softened with temperature 3, which was tuned
@@ -670,12 +751,96 @@ The rest of this guide's captures:
 | Requests get 503 `api_error` | Policy `off` and the engine is asleep or stopped (`:jev wake`). Or, under swap, the worker's llama.cpp would not sleep: check `--sleep-idle-seconds` and `--parallel 1`. |
 | Requests get 529 | The GPU is held by an image job, or more than 64 requests are queued. Retry after the `retry-after` header. |
 | A `confidence` looks low for a right answer | The calibration softening (§6.5). Compare probabilities, not absolute confidence. |
-| The same request gives slightly different probabilities | vLLM's numerics differ with prefix-cache state. Answers are stable; probabilities move a few percent. |
+| The same request gives different answers or probabilities | Structured reads use a shared seeded canvas, but backend numerics can still change scores and rankings. Adaptive thinking also uses backend randomness; the backend does not support a standard generation seed. |
 | The agent's `decide` says it needs Jev mode | Run `:jev on`, then `:jev tool on`. |
 
 ---
 
 ## 10. Limits and caveats
+
+For tool-name choice questions with a supplied `available_tools` catalog and
+`dialogue`, the full profile appends the current exchange and last actual
+API result as workflow context. This helps select the immediate next call,
+including discovery or authentication prerequisites, rather than jumping to the
+user's eventual goal. Assistant claims alone are not treated as executed actions.
+The catalog, choices and original history remain intact. This context is model
+judgment, not an exact execution check.
+
+### ANLI reasoning change and tradeoff
+
+The full profile now reasons about three-way textual inference even when its
+initial structured read exceeds 95% confidence. The trigger requires a premise,
+a hypothesis, and exactly the entailment, neutral, and contradiction meanings;
+it does not depend on benchmark names or answer keys. The existing 8192-token
+budget, six-thought limit, truncated-thought fallback, and 75/25 blend still apply.
+The fast profile keeps its existing behavior.
+
+The ANLI review found confident mistakes about relation direction, incomplete
+lists, and requirements. Eight wrong development answers had skipped thinking
+because their initial confidence exceeded the gate. We compared clearer inference
+instructions, hiding option letters, and forced reasoning. The context rewrites
+alone did not improve development accuracy. Forced reasoning alone improved it
+from 13/28 to 16/28 and was selected before testing fresh cases. The deployed
+change therefore adds neither the experimental context note nor hidden labels.
+
+| Measurement | Before the fix | After the fix |
+|---|---:|---:|
+| Fresh independent cases correct | 37/60 (61.67%) | 48/60 (80.00%) |
+| Fresh independent macro-F1 | 0.6301 | 0.8110 |
+| Fresh independent median latency | 38 ms | 649 ms |
+| Existing ANLI chunk correct | 41/59 (69.49%) | 45/59 (76.27%) |
+| Existing ANLI chunk macro-F1 | 0.6884 | 0.7567 |
+| Existing ANLI chunk median latency | 450 ms | 679 ms |
+| Existing ANLI chunk p95 latency | 1137 ms | 1439 ms |
+
+The tradeoff is more reasoning work per question. On the fresh validation set,
+median latency increased about 17 times, or 611 ms; on the existing chunk it
+increased about 51%, or 229 ms. The fresh cases had more fast-path answers before
+the fix, which explains why the latency ratios differ. We accept this cost in
+full JEV because confidence was screening out useful reasoning. The change
+matched only the 59 ANLI questions when checked against the current 3,000-row
+sample, so that sample's other task types retain their existing policy.
+
+The fresh test used 20 cases from each ANLI round, with source premises disjoint
+from development and the existing benchmark chunk. It produced 12 corrections
+and one regression. Its paired accuracy gain was 18.33 percentage points, with
+a case-bootstrap 95% interval of 8.33 to 30.00 points. That interval excludes
+backend repeat variation. The chunk rerun produced seven corrections and three
+regressions, leaving 14 errors. All 59 requests passed payload, label,
+distribution, and native-scoring checks; 71 focused code tests passed.
+
+The current sample macro-F1 of 0.7567 exceeds published Jev's 0.7479 point
+estimate, but Jev's result covers 3,200 cases rather than these 59. This is not
+a matched-case demonstration of superiority. The published reference is
+[Jev Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index/blob/main/data/index-v0.2.1.json).
+Original runs, independent validation, and remaining errors are retained in
+`.bantam/jev-reruns/chunked-20260930T220129Z/12/optimization/fix-report.json`.
+
+### Symbolic chord context aid
+
+Full JEV recognizes chord-choice questions with supplied score notes and a
+target beat. It appends computed sounding pitch classes, the lowest sounding
+pitch, and duration totals over local windows. Target membership uses
+`start <= target < end`. These facts help focus on the requested beat while
+preserving the original score, candidate vocabulary, and request seed. The aid
+does not read hidden chord annotations, force a particular chord, or treat
+all melody pitches as chord tones. Empty or malformed note windows keep the
+existing inference policy. The fast profile is unchanged.
+
+On development cases, the aid with full reasoning improved accuracy from
+5/27 to 9/27. On 60 fresh songs disjoint from development and the benchmark
+sample, it improved from 17/60 to 21/60, with six corrections and two regressions.
+The paired gain was 6.67 percentage points; its song-bootstrap 95% interval
+was -1.67 to 16.67 points and excludes backend repeat variation. This is a
+modest observed gain, not a statistically resolved advantage. Paired median
+latency was 9.17 seconds before and 8.84 seconds with the aid; the baseline
+ran first, so prefix caching may help the candidate's timing.
+
+A fast-only version tied development accuracy at 5/27 with a 0.46-second
+median. It was not selected because the promotion criterion required an
+accuracy gain. The full aid preserves the existing reasoning budget and
+truncated-thought fallback. Validation and source checks are retained in
+`.bantam/jev-reruns/chunked-20260930T220129Z/22/optimization/`.
 
 - **No image questions yet** (Jev supports them; BANTAM returns 400).
 - **Jev's `steps`, `samples`, `think` and `sequential`** are accepted but not honoured; the

@@ -90,14 +90,14 @@ export function unresolvedPreviewObjection(
 export function taskRequiresInteractivePreview(task) {
   const text = String(task ?? "");
   const web = /\b(browser(?:-based)?|web(?:site|app|page)?|html|canvas|three(?:\.?js)?|javascript|ui)\b/i.test(text);
-  const interaction = /\b(game|playable|interactive|controls?|keyboard|mouse|click|drag|pause|resume|move|rotate|drop)\b/i.test(text);
+  const interaction = /\b(game|tetris|playable|interactive|controls?|keyboard|mouse|click|drag|pause|resume|move|rotate|drop)\b/i.test(text);
   return web && interaction;
 }
 
 /** Visual browser deliverables need a rendered checkpoint even when static. */
 export function taskRequiresVisualPreview(task) {
   const text = String(task ?? "");
-  const visual = /\b(canvas|svg|voxel|pagoda|scene|illustration|image|visual|animation|game|pixel[- ]?art)\b/i.test(text);
+  const visual = /\b(canvas|svg|voxel|pagoda|scene|illustration|image|visual|animation|game|tetris|pixel[- ]?art)\b/i.test(text);
   const web = /\b(html|canvas|svg|browser|web(?:site|app|page)?|javascript)\b/i.test(text);
   return visual && web;
 }

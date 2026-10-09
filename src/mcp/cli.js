@@ -8,12 +8,13 @@ import { MESSAGE_KINDS } from "./room.js";
 export const MCP_USAGE = `bantam mcp — BANTAM as an MCP server for Claude Code (docs/MCP.md)
 
   bantam mcp serve  [--room DIR] [--mode llama|jev] [--port ${DEFAULT_PORT}] [--toolsets ${DEFAULT_TOOLSETS.join(",")}]
-                    [--local-endpoint http://127.0.0.1:8085] [--stand-in-model gpt-5.6-luna]
+                    [--local-endpoint http://127.0.0.1:8085] [--stand-in-model gpt-5.6-luna] [--codex-lanes 1]
 
   --mode llama  (default) local jobs run BANTAM on the llama.cpp model; Jev starts on demand
                 and trades the GPU with it.
   --mode jev    DiffusionGemma starts with the server and stays awake; local jobs run BANTAM
                 with a Codex model standing in for the local one (--stand-in-model).
+  --codex-lanes how many Codex jobs run at once (1-4, default 1); each job has its own workspace.
   bantam mcp config [--room DIR] [--agent claude]   print the claude mcp add command
   bantam mcp say    [--room DIR] [--to claude] [--kind note] <text…>
   bantam mcp log    [--room DIR] [--follow] [--all]
@@ -81,6 +82,9 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       if (!["llama", "jev"].includes(mode)) throw new Error("--mode must be llama or jev");
       const localEndpoint = flags["local-endpoint"] ?? process.env.BANTAM_ENDPOINT ?? "http://127.0.0.1:8085";
       const standInModel = mode === "jev" ? (flags["stand-in-model"] ?? "gpt-5.6-luna") : null;
+      const codexLanes = flags["codex-lanes"] === undefined ? 1 : Number(flags["codex-lanes"]);
+      if (!Number.isInteger(codexLanes) || codexLanes < 1 || codexLanes > 4) throw new Error("--codex-lanes must be 1 to 4");
+      const lanes = { local: 1, codex: codexLanes };
       const log = (entry) => {
         if (entry.event === "tool_crash" || entry.event === "rpc_crash") out(`  ! ${entry.event}: ${entry.error}`);
         else if (entry.event === "toolset_skipped") out(`  ! toolset ${entry.toolset} is off: ${entry.error}`);
@@ -91,10 +95,11 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       };
       const server = await startMcpServer({ roomDir, port, toolsets, log, mode,
         toolsetOptions: mode === "jev"
-          ? { jobs: { standInModel }, jev: { localEndpoint: null, eager: true }, writer: {} }
-          : { jobs: { localEndpoint }, jev: { localEndpoint }, writer: { localEndpoint } } });
+          ? { jobs: { standInModel, lanes }, jev: { localEndpoint: null, eager: true }, writer: {} }
+          : { jobs: { localEndpoint, lanes }, jev: { localEndpoint }, writer: { localEndpoint } } });
       out(`  BANTAM MCP serving ${server.url}/mcp/<agent>  room ${roomDir}`);
       out(mode === "jev" ? `  mode: jev · DiffusionGemma stays awake · local jobs run on ${standInModel} (stand-in)` : `  mode: llama · local jobs on ${localEndpoint} · Jev on demand`);
+      out(`  codex lanes: ${codexLanes}`);
       out(`  toolsets: ${server.toolsets.join(", ") || "(none)"} · ${server.tools.length} tools`);
       out(`  connect Claude Code:  bantam mcp config --room ${JSON.stringify(roomDir)}`);
       out(`  watch the room:       bantam mcp log --follow --room ${JSON.stringify(roomDir)}`);

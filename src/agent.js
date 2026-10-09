@@ -20,6 +20,7 @@ import { formatTypeContractSmoke } from "./logic/type-contract-smoke.js";
 import { numericContractWitness, formatNumericContractWitness } from "./logic/numeric-contract-witness.js";
 import { GATE_ENGAGEMENT_METRIC } from "./logic/gate-engagement.js";
 import { ModelClient, modelOutputTokenCap } from "./model.js";
+import { parseDiffusionGemmaAction } from './diffusiongemma-output.js';
 import { canResumeWriteFile, resumableWriteFilePrefix } from "./output-limit-continuation.js";
 import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
@@ -471,7 +472,7 @@ async function runAgentCore({
   inheritedInstructionScope = null,
   workspace,
   model = new ModelClient(),
-  maxTurns = 30, // Infinity explicitly selects a long-running task without a turn deadline.
+  maxTurns = model?.diffusionGemma ? 12 : 30, // Infinity explicitly selects a long-running task without a turn deadline.
   // Total wall budget the caller will actually enforce. Without it a run can be
   // killed mid-turn with verified-green work and never emit DONE. Declaring one
   // implies the single DONE-only closure turn, otherwise the grant that the
@@ -704,7 +705,7 @@ async function runAgentCore({
   // explanations or a separate generation for each related file. Each switch
   // has an explicit rollback; local worker defaults stay independently tuned.
   compactRules = process.env.BANTAM_COMPACT_RULES === undefined
-    ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_COMPACT_RULES),
+    ? model?.codex === true || model?.codexBacked === true || model?.diffusionGemma === true : envTruthy(process.env.BANTAM_COMPACT_RULES),
   workspaceTree = process.env.BANTAM_WORKSPACE_TREE === undefined
     ? model?.codex === true || model?.codexBacked === true : envTruthy(process.env.BANTAM_WORKSPACE_TREE),
   writeBatch = process.env.BANTAM_WRITE_BATCH === undefined
@@ -881,7 +882,8 @@ async function runAgentCore({
   // Bare assistant turns are meaningful only where history is immutable and
   // replayed byte-for-byte; the rebuild panel re-renders history anyway.
   const bareHistory = extensionTrajectory && Boolean(extensionBareHistory);
-  const lineEditEnabled = /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_LINE_EDIT ?? ""));
+  const lineEditEnabled = process.env.BANTAM_LINE_EDIT === undefined
+    ? model?.diffusionGemma === true : /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_LINE_EDIT));
   // Exact-byte replay is a harness capability, not a provider capability.
   // Local models must be able to confirm retained proposals too: regenerating
   // a large refused rewrite can change its identity and restart review forever.
@@ -2182,10 +2184,10 @@ async function runAgentCore({
   const configuredContextTokens = positiveInt(process.env.BANTAM_CONTEXT_TOKENS, null);
   const configuredHistoryBudget = positiveInt(process.env.BANTAM_HISTORY_CHAR_BUDGET, null);
   const currentHistoryBudget = () => deriveHistoryCharBudget({
-    contextTokens: configuredContextTokens ?? model.contextWindowTokens,
+    contextTokens: model.diffusionGemma ? model.contextWindowTokens : configuredContextTokens ?? model.contextWindowTokens,
     extensionTrajectory,
     codexBacked: model.codexBacked === true,
-    override: configuredHistoryBudget,
+    override: model.contextBudget ? Math.min(configuredHistoryBudget ?? Infinity, model.contextBudget.historyChars) : configuredHistoryBudget,
   });
   let historyCharBudget = currentHistoryBudget();
   // Turn-level replay capture: with BANTAM_SAVE_PROMPTS=1 every turn records
@@ -2301,6 +2303,7 @@ async function runAgentCore({
     }
   };
   const safeComplete = async (makePrompt, completeOpts) => {
+    let compactingDiffusion = false;
     for (let shrink = 0; shrink < 8; shrink++) {
       try {
         const withPenalty = degeneratePenalty
@@ -2308,6 +2311,21 @@ async function runAgentCore({
           : completeOpts;
         const prompt = makePrompt();
         noteContextUpdatePrompt(prompt);
+        if (model.diffusionGemma && typeof model.inspectContext === 'function') {
+          const budget = await model.inspectContext(prompt, { ...withPenalty, signal });
+          compactingDiffusion ||= budget?.shouldCompact === true;
+          const base = Number.isFinite(historyCap) ? historyCap : turns.length + 1;
+          // Compact the history before spending generation tokens. Current task,
+          // source panels and controller facts remain in the rebuilt prompt.
+          if (compactingDiffusion && budget.inputTokens > budget.compactToTokens && base > 1 && shrink < 7) {
+            historyCap = Math.max(1, Math.floor(base / 2));
+            metrics.contextTrims = (metrics.contextTrims ?? 0) + 1;
+            onEvent({ type: 'context_trim', historyCap, cause: 'diffusiongemma_soft_limit', inputTokens: budget.inputTokens,
+              compactAtTokens: budget.compactAtTokens, hardInputTokens: budget.hardInputTokens });
+            continue;
+          }
+          onEvent({ type: 'context_budget', ...budget });
+        }
         const out = await model.complete(prompt, signal ? { ...withPenalty, signal } : withPenalty);
         // The server does not THROW when the prompt overruns the slot — it
         // silently trims the prompt to fit and returns a generation cut short,
@@ -3355,7 +3373,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -3438,7 +3456,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           lastDecisionPrompt = typeof built === "string" ? built : JSON.stringify(built);
           if (savePrompts) lastPromptForTurn = lastDecisionPrompt;
           return built;
@@ -3447,6 +3465,16 @@ async function runAgentCore({
           // A grammar rooted at a fresh JSON object cannot resume from inside
           // the content string already present in the prompt.
           ...(useGrammar && !pendingWriteFilePrefix ? { grammar: turnActionGrammar, jsonSchema: turnActionJsonSchema } : {}),
+          ...(model.diffusionGemma ? { agentAction: true,
+            diffusionTools: { verbs: legalTurnVerbs, paths: [...new Set([...workspaceListing(workspace, { depth: workspaceTree ? 1 : 0 }).split('\n').filter(entry => entry && !entry.startsWith('[') && !entry.startsWith('(')), ...openPaths, ...taskNamedPaths, ...editedPathsThisRun,
+              ...turns.flatMap(turn => turn.action?.a === 'read_file' ? [turn.action.p] : [])])],
+              queryTools: tools?.list().map(tool => ({ name: tool.name, description: tool.description })) ?? [],
+              readSource: relative => exec.safeReadText(exec.resolveExisting(relative)),
+            }, onToolDecision: decision => {
+              if (decision.evidence?.authority === 'model') metrics.structuredToolReads = (metrics.structuredToolReads ?? 0) + 1;
+              onEvent({ type: 'tool_decision', protocol: 'jev-selection-cpu-assembly', ...decision });
+            },
+          } : {}),
           temperature: model.actTemperature ?? undefined,
           // The bounded post-green audit is a terminal phase, even when it
           // finds one correction and re-verifies it. Keep exact deltas, but do
@@ -3473,7 +3501,10 @@ async function runAgentCore({
       // timeout (the 2026-08-20 gpt2 45-min death). Surface it WHILE the run is
       // going — a post-hoc metric is an autopsy. Operator/self-improve signal
       // only; never a model steer (the model cannot fix a KV-cache miss).
-      {
+      // This diffusion backend does not expose reliable prefix-cache reuse
+      // receipts. Missing usage fields cannot establish a cache failure, and
+      // the llama.cpp extension remedy does not apply to its decoder.
+      if (!model.diffusionGemma) {
         const andon = assessThroughput(out.usage, throughputAndon, { remote: Boolean(model?.chatDialect || model?.provider === "codex") });
         if (andon.andon) {
           metrics.throughputAndons++;
@@ -3489,7 +3520,7 @@ async function runAgentCore({
 
       const candidateOutput = pendingWriteFilePrefix
         ? pendingWriteFilePrefix + out.content : out.content;
-      const parsed = parseAction(candidateOutput);
+      const parsed = model.diffusionGemma ? parseDiffusionGemmaAction(candidateOutput) : parseAction(candidateOutput);
       if (parsed.ok) {
         if (pendingWriteFilePrefix) {
           onEvent({ type: "output_limit_continued", target: parsed.action.p ?? null,
@@ -3563,7 +3594,7 @@ async function runAgentCore({
         }
         rawOutput = candidateOutput;
         reasoning = turnReasoning;
-        protocolViolation = !parsed.strictJson;
+        protocolViolation = !parsed.strictJson && !parsed.fileBlock;
         if (protocolViolation) {
           metrics.protocolViolations++;
           onEvent({ type: "protocol_violation", raw: candidateOutput, repairedJson: parsed.repairedJson });
@@ -3572,7 +3603,7 @@ async function runAgentCore({
       }
 
       metrics.invalid++;
-      const outputTokenCap = modelOutputTokenCap(model);
+      const outputTokenCap = modelOutputTokenCap(model, { action: true });
       const outputLimit = parsed.kind === "unterminated_json"
         && (out.stoppedLimit === true
           || (outputTokenCap !== null
@@ -3622,7 +3653,10 @@ async function runAgentCore({
         ].join(" ");
       } else {
         pendingWriteFilePrefix = null;
-        repairObs = `Your previous output was rejected: ${parsed.error}. Emit exactly one valid action JSON object.`;
+        repairObs = `Your previous output was rejected: ${parsed.error}. ${model.diffusionGemma ? 'Emit exactly one valid action using the declared file-block format for write_file, or one JSON object for another action.' : 'Emit exactly one valid action JSON object.'}`;
+      }
+      if (model.diffusionGemma && !pendingWriteFilePrefix) {
+        repairObs += '\nFor write_file, omit content from the JSON header: {"a":"write_file","p":"filename"}, then a newline and a closed code fence with literal source. For edit_lines, use {"a":"edit_lines","p":"filename","start":12,"end":18} followed by a closed fence of literal replacement lines. Read numbered source first. Do not JSON-escape these source blocks. Keep changes small. Other actions use a single valid JSON object.';
       }
       recordRejectedPrompt(out);
       onEvent({
@@ -3638,6 +3672,10 @@ async function runAgentCore({
     }
 
     if (!action) {
+      if (!interrupted && !modelError) {
+        controllerStop = { kind: 'invalid-output', reason: 'The model repeatedly returned invalid or incomplete actions; no action from those attempts was applied.', attempts: rejectedOutputs.filter(output => output.turn === turns.length).length };
+        summary = controllerStop.reason;
+      }
       if (!interrupted) onEvent({ type: modelError ? "model_error" : "give_up", reason: modelError || "too many invalid outputs" });
       break;
     }
@@ -4484,7 +4522,10 @@ async function runAgentCore({
     }
     // Web-surface edits arm the auto-preview (shell-driven edits are out of scope v1:
     // a shell build step usually precedes a test run, not a silent done).
-    if (directEditPaths.some((p) => /\.(html?|css|js|mjs)$/i.test(p))) webEditedUnpreviewed = true;
+    if (directEditPaths.some((p) => /\.(html?|css|js|mjs)$/i.test(p))) {
+      webEditedUnpreviewed = true;
+      if (model.diffusionGemma && visualTask && verificationPolicy === 'after_edit') autoPreviewFired = false;
+    }
 
     // Where the model last wrote — the only useful locus when a delimiter it
     // opened is never closed and the parser blames EOF.
@@ -6937,7 +6978,11 @@ async function runAgentCore({
     // tested difficulty and real turn/token cost — static previews are structurally
     // blind to interaction-dependent defects. Re-promote only if an interactive preview
     // earns it. The pull-based `preview` tool itself stays available regardless.
-    if (action.a === "done" && result.done && webEditedUnpreviewed && !autoPreviewFired
+    // The small diffusion primary needs actual runtime feedback before its
+    // next selection, rather than spending the whole budget on blind edits.
+    // Keep the existing completion-only policy for other backends.
+    const diffusionEditPreview = model.diffusionGemma && visualTask && verificationPolicy === 'after_edit' && directEditSucceeded;
+    if (((action.a === "done" && result.done) || diffusionEditPreview) && webEditedUnpreviewed && !autoPreviewFired
         && tools?.get("preview")
         && (visualTask || /^(1|true|yes|on)$/i.test(String(process.env.BANTAM_AUTOPREVIEW ?? "")))) {
       autoPreviewFired = true;
@@ -6953,15 +6998,16 @@ async function runAgentCore({
         if (autoProof.status === "pass") metrics.previewPasses++;
         else metrics.previewFailures++;
       }
-      result.done = false;
-      result.summary = undefined;
-      result.observation = [
-        "You changed web files but never looked at the rendered result. The harness rendered it for you:",
+      if (!diffusionEditPreview) { result.done = false; result.summary = undefined; }
+      const previewObservation = [
+        diffusionEditPreview ? 'The CPU ran a browser check after this edit. Use this actual result to choose the next operation:'
+          : "You changed web files but never looked at the rendered result. The harness rendered it for you:",
         "",
         previewReport,
         "",
         `Fix any reported defects, then run query "${autoPreviewQuery}" on the current files. A passing preview is a bounded smoke check; finish any remaining task requirements and focused behavior checks before emitting done.`,
       ].join("\n");
+      result.observation = diffusionEditPreview ? `${result.observation}\n\n${previewObservation}` : previewObservation;
       onEvent({ type: "auto_preview" });
     }
 
@@ -7542,7 +7588,7 @@ async function runAgentCore({
 
   if (modelCallStart !== null && typeof model?.requestCursor === "function") {
     const modelCallEnd = model.requestCursor();
-    const modelRequests = Math.max(0, modelCallEnd - modelCallStart);
+    const modelRequests = Math.max(0, modelCallEnd - modelCallStart) + (metrics.structuredToolReads ?? 0);
     metrics.modelRequests = modelRequests;
     metrics.auxiliaryModelRequests = Math.max(0, modelRequests - metrics.turns);
     metrics.modelRequestsPerTurn = metrics.turns > 0

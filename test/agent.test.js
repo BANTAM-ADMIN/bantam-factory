@@ -862,7 +862,7 @@ describe('prompt-resident source recovery', () => {
     });
   }
 
-  it('automatic game preview requests the interaction evidence required by done', async (t) => {
+  for (const task of ['Make a playable HTML game.', 'Make me a single-file tetris in a HTML file right now.']) it(`automatic game preview requests the interaction evidence required by done: ${task}`, async (t) => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-auto-preview-context-'));
     t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
     const calls = [];
@@ -873,7 +873,7 @@ describe('prompt-resident source recovery', () => {
       JSON.stringify({ a: 'done', summary: 'Built the game.' }),
       JSON.stringify({ a: 'done', summary: 'Built and previewed the game.' }),
     ]);
-    const result = await runAgent({ task: 'Make a playable HTML game.', workspace, model, maxTurns: 3,
+    const result = await runAgent({ task, workspace, model, maxTurns: 3,
       useGrammar: false, grounding: true, extraTools: [preview], shellSandbox: 'host',
       verificationPolicy: 'after_edit' });
     assert.deepEqual(calls, ['interact']); // Registry consumes the leading tool verb.

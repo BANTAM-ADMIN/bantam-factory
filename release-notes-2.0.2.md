@@ -1,0 +1,27 @@
+## What's new
+
+- **Local models from the model menu.** BANTAM detects a running local llama.cpp model and saves a private restart recipe with its arguments and runtime settings. Registered offline models can be started from `:model`; a bare launch falls back to Codex when no local model is running. The public checkout contains no developer-specific model registrations.
+- **Shared GPU handoff.** Local model switches, ComfyUI images, and DiffusionGemma use a coordinated GPU reservation with at most two standby workloads, LRU eviction, and a configurable RAM reserve. llama.cpp uses a warm, reclaimable GGUF cache and its original launch settings; optional CUDA checkpointing can preserve supported processes. If a standby cannot fit in RAM, BANTAM evicts it and reloads it when needed.
+- **DiffusionGemma for chat and light coding.** After Jev setup, `:model diffusiongemma` selects the same engine for regular work and Jev. `:jev on` also works alongside Codex or another chat backend. The 16K deployment compacts early, counts the assembled request with the server tokenizer, and reserves generation space for thinking and the answer. Image jobs release the GPU and restore the selected chat engine afterward.
+- **Jev-driven DiffusionGemma tool use.** The existing structured reader selects allowed tools, known paths and source lines; CPU code assembles and validates the action. Only new text is generated, with literal source blocks and a shared 4K generation reserve. Truncated payloads and stale source selections are discarded. Repeated malformed outputs report their actual cause instead of a misleading zero-turn limit. Visual work with `after_edit` verification receives browser feedback after each applied web edit, including interaction checks for games.
+- **MCP collaboration.** A Streamable HTTP MCP server provides room messages, a task board, isolated jobs, steering, verified application of results, native Codex workers, and Jev tools. Jobs can continue from earlier results.
+- **Writer tools.** Agents can write books under an enforced process, with chapter checking and a guide for the local checker model.
+- **Factory context handling.** Additional context and retrieval helpers cover inference, tool workflows, and shared decisions.
+- **Docs and diagnostics.** Updated setup and Jev guides explain private model recipes, RAM budgets, context limits, and reproducible live qualification scripts. Unit tests explicitly disable real GPU handoff.
+
+## Validation
+
+- Full regression suite: **5,166 passed, 0 failed, 252 skipped** (5,418 tests total), run from the release checkout.
+- Live qualification on an RTX 4090 covered four registered llama.cpp models, live model switching, ComfyUI image generation and return to chat, DiffusionGemma chat and Jev coexistence, context compaction and rejection, and a small coding task checked independently.
+- Model registrations, local paths, generated images, and machine-specific qualification traces remain private. No new benchmark leaderboard score is claimed by this release.
+- DiffusionGemma remains a chat/light-work backend. Larger single-file Tetris trials did not qualify: generated code had defects or exceeded the output budget. Jev selection fixes the action transport; it does not guarantee generated-code correctness. Truncated tool payloads are refused before mutation, and completion still requires the ordinary verification gates.
+
+## Upgrade
+
+```bash
+git checkout main
+git pull --ff-only
+npm ci
+```
+
+Restart BANTAM FACTORY to load the changes. See [local model setup](https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/FIRST-RUN-SETUP.md) and the [Jev guide](https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/JEV-MODE.md) for configuration and hardware limits.

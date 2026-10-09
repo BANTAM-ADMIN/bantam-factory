@@ -93,8 +93,10 @@ import {
   resolveStartupModelChoice,
   startupModelChoices,
   startupChoiceNeeded,
+  startupCodexFallback,
   withDetectedLocal,
 } from "../src/startup-model-choice.js";
+import { endpointKey } from "../src/image-gpu.js";
 import { playAnimation, animationNames, loadAnimations, showcaseSequence } from "../src/rooster.js";
 import {
   buildArtifact,
@@ -1175,6 +1177,8 @@ const explicitCodexRequested = args.codex === true;
 const explicitApiRequested = args.deepseek === true
   || typeof args["api-url"] === "string"
   || Boolean(process.env.BANTAM_API_URL);
+const mayOfferStartupChoice = canOfferStartupChoice(cmd);
+const automaticChatStartup = mayOfferStartupChoice && (cmd === undefined || cmd === "chat");
 let modelOptions = explicitApiRequested || explicitCodexRequested
   ? cliModelOptions()
   : cliModelOptions({
@@ -1185,7 +1189,7 @@ let modelOptions = explicitApiRequested || explicitCodexRequested
       deepseek: false,
     });
 const rememberedConnection=loadConnection();
-if (!explicitApiRequested && !explicitCodexRequested && !args.endpoint && !process.env.BANTAM_ENDPOINT) {
+if (!automaticChatStartup && !explicitApiRequested && !explicitCodexRequested && !args.endpoint && !process.env.BANTAM_ENDPOINT) {
   if(rememberedConnection?.kind==='api')modelOptions={...modelOptions,apiUrl:rememberedConnection.apiUrl,apiKey:args['api-key']??process.env.BANTAM_API_KEY??rememberedConnection.apiKey,model:args.model??rememberedConnection.model,apiDialect:args['api-dialect']??rememberedConnection.dialect,deepseek:false};
   if(rememberedConnection?.kind==='codex')modelOptions={...modelOptions,codex:true,model:args.model??rememberedConnection.model,codexEffort:args['codex-effort']??rememberedConnection.effort,apiUrl:null};
 }
@@ -1213,8 +1217,11 @@ if (!modelOptions.endpoint && !usingApi && !usingCodex) {
   } catch { /* an unreachable candidate is simply not native-ready */ }
   if (nativeReady) {
     modelOptions.endpoint = candidate;
+    try { await (await import('../src/model-capture.js')).captureLocalModel(candidate); }
+    catch (error) { process.stderr.write(`Could not save this model's restart settings: ${error.message}\n`); }
   } else {
-    const [hit] = await discoverOpenAiServers();
+    const dg = await (await import('../src/diffusiongemma-primary.js')).discoverRunningDiffusionGemma();
+    const hit = dg ?? (await discoverOpenAiServers())[0];
     if (hit) {
       modelOptions = {
         ...modelOptions,
@@ -1245,7 +1252,6 @@ let model = new ModelClient(modelOptions);
 // on EVERY bare run — including one where llama.cpp was answering on :8085 — and
 // because its local list comes only from the registry it announced "No local
 // model is running" and offered cloud instead of the server that was up.
-const mayOfferStartupChoice = canOfferStartupChoice(cmd);
 const detectedLocalReady = mayOfferStartupChoice && !usingCodex && !usingApi
   && typeof modelOptions.endpoint === "string" && (await model.health());
 // An auto-attached OpenAI-compatible server is a working answer too, so it must
@@ -1257,11 +1263,25 @@ if (detectedApiReady) {
   process.stderr.write(`model: ${model.modelName} @ ${autoDetectedApi.apiUrl}`
     + ` (auto-detected ${autoDetectedApi.dialect} server; no llama.cpp answered)\n`);
 }
+const codexFallback = startupCodexFallback({ automaticChatStartup, detectedLocalReady, detectedApiReady, rememberedConnection });
+let defaultCodexReady = false;
+if (codexFallback) {
+  const codexModel = resolveCodexModelAlias(args.model || codexFallback.model);
+  const effort = args["codex-effort"] || process.env.BANTAM_CODEX_EFFORT || codexFallback.effort;
+  model.switchToCodex({ model: codexModel, effort });
+  modelOptions = { ...modelOptions, codex: true, model: codexModel, codexEffort: effort, apiUrl: null };
+  usingCodex = true;
+  usingApi = false;
+  defaultCodexReady = await model.health();
+  process.stderr.write(defaultCodexReady
+    ? `No local model is running. Using Codex ${codexModel}; :model can start a registered local model.\n`
+    : "No local model is running and Codex is unavailable. Choose a backend.\n");
+}
 // Probe the remembered backend only when it could still change the answer —
 // startupChoiceNeeded() is pure, so the health check stays lazy.
-const backendHealthy = mayOfferStartupChoice && !detectedLocalReady && !detectedApiReady && Boolean(rememberedConnection)
-  && (await model.health());
-if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, detectedApiReady, rememberedConnection, backendHealthy })) {
+const backendHealthy = defaultCodexReady || (mayOfferStartupChoice && !detectedLocalReady && !detectedApiReady && Boolean(rememberedConnection)
+  && (await model.health()));
+if (!defaultCodexReady && startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, detectedApiReady, rememberedConnection, backendHealthy })) {
   let selection = await promptStartupModelChoice(model);
   if(!selection)process.exit(0);
   while (selection) {
@@ -1296,7 +1316,8 @@ if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, d
       continue;
     }
     if (selection.kind === "local") {
-      const started = selection.model.managed?await startManagedStock(selection.model):await startRegisteredModel(selection.model);
+      const started = selection.model.managed ? await startManagedStock(selection.model)
+        : await switchToModel(model, selection.model) ? selection.model.endpoint : null;
       if (started) {
         modelOptions = {
           ...modelOptions,
@@ -1387,6 +1408,12 @@ if (startupChoiceNeeded({ canOffer: mayOfferStartupChoice, detectedLocalReady, d
 let activeModelId = usingCodex || usingApi
   ? model.modelName
   : await fetchModelId(model.endpoint, 2500).catch(() => null);
+if (!usingCodex && !usingApi) {
+  const resident = listModels().find(entry => entry.match
+    && endpointKey(entry.endpoint) === endpointKey(model.endpoint)
+    && String(activeModelId || "").toLowerCase().includes(entry.match.toLowerCase()));
+  if (resident?.profile) model.switchTo(model.endpoint, { profile: resident.profile, modelId: activeModelId });
+}
 model.applyDetectedLocalProfile(activeModelId);
 // Always announce — ESPECIALLY with an explicit --endpoint, where what's actually serving is the
 // question. A swapped GGUF on the same port makes eval numbers incomparable across sessions; this
@@ -4808,6 +4835,7 @@ async function repl() {
   }
 
   async function switchToApiPreset(name, preset) {
+    await model.releasePrimary?.();
     let key = preset.key || process.env.BANTAM_API_KEY || process.env.DEEPSEEK_API_KEY || null;
     if (!key) {
       key = await promptHidden(`API key for ${name} (hidden, used for this session): `);
@@ -4871,7 +4899,16 @@ async function repl() {
         ? model.endpoint : null;
       const candidate = currentLocal || await detectEndpoint().catch(() => null);
       const id = candidate ? await fetchModelId(candidate, 2500).catch(() => null) : null;
-      if (id) models = withDetectedLocal(models, { label: id, endpoint: candidate });
+      if (id) {
+        try { await (await import('../src/model-capture.js')).captureLocalModel(candidate); models = await modelStatus(); } catch {}
+        models = withDetectedLocal(models, { label: id, endpoint: candidate });
+      }
+      const { loadJevConfig } = await import('../src/jev/config.js');
+      const jevConfig = loadJevConfig();
+      const engine = await (await import('../src/jev/engine.js')).createJevEngine(jevConfig).status();
+      models.push({ name: 'diffusiongemma', kind: 'diffusiongemma', label: 'DiffusionGemma · chat + light work + Jev',
+        endpoint: jevConfig.endpoint, running: engine.state === 'awake', sleeping: engine.state === 'asleep',
+        needsSetup: jevConfig.engine.mode === 'unconfigured' });
     }
     const presets = { ...(cliModelOptions.__presets || {}) };
     // An auto-detected OpenAI-compatible server is serving this session without
@@ -4881,7 +4918,7 @@ async function repl() {
     const normApiUrl = (u) => String(u ?? "").replace(/\/$/, "");
     if (autoDetectedApi && !Object.hasOwn(presets, "detected")
       && !Object.values(presets).some((p) => normApiUrl(p?.url) === autoDetectedApi.apiUrl)) {
-      presets.detected = { url: autoDetectedApi.apiUrl, model: model.modelName, dialect: autoDetectedApi.dialect };
+      presets.detected = { url: autoDetectedApi.apiUrl, model: autoDetectedApi.models?.[0] ?? model.modelName, dialect: autoDetectedApi.dialect };
     }
     const presetNames = Object.keys(presets);
     let codexModels = [];
@@ -4894,7 +4931,7 @@ async function repl() {
       console.log(apiOnly ? "  API models:" : "  Models:");
       if (!apiOnly) {
         models.forEach((m, i) => console.log(
-          `    [${i + 1}] local${i === 0 ? "" : `-${i + 1}`}  ${m.label}${m.vision ? " [vision]" : ""}${m.running ? "  (running)" : m.sleeping ? "  (asleep — model unloaded)" : ""}${!model.apiMode && !model.codex && m.endpoint === model.endpoint ? "  ← current" : ""}`));
+          `    [${i + 1}] ${m.name}  ${m.label}${m.vision ? " [vision]" : ""}${m.needsSetup ? '  (setup required)' : m.running ? "  (running)" : m.sleeping ? "  (asleep — model unloaded)" : m.missingFiles?.length ? "  (missing local files)" : ""}${m.kind === 'diffusiongemma' ? model.diffusionGemma ? '  ← current' : '' : !model.apiMode && !model.codex && m.running && endpointKey(m.endpoint) === endpointKey(model.endpoint) ? "  ← current" : ""}`));
       }
       presetNames.forEach((name, presetIndex) => {
         const preset = presets[name];
@@ -4988,6 +5025,18 @@ async function repl() {
       console.log("  Reasoning levels apply only to Codex models.");
       return;
     }
+    if (target.kind === 'diffusiongemma') {
+      if (target.needsSetup) {
+        const { handleJevCommand } = await import('../src/jev/commands.js');
+        await handleJevCommand('setup', { model, ask: async question => { console.log(question); return wizardPrompt('jev'); } });
+      }
+      try {
+        await (await import('../src/diffusiongemma-primary.js')).selectDiffusionGemma(model, { out: text => process.stdout.write(text) });
+        saveModelPreference({ kind: 'diffusiongemma', name: 'diffusiongemma' });
+        console.log('  Small working context: compact near 8K input; up to 4K generation. Best for chat and short tasks.');
+      } catch (error) { console.log(`  DiffusionGemma: ${error.message}`); }
+      return;
+    }
     // A detected server is already up and operator-managed: only re-point the
     // client. switchToModel() may stop and restart, which is exactly what must
     // not happen to a server BANTAM did not start.
@@ -5038,6 +5087,7 @@ async function repl() {
   }
 
   async function switchToCodexModel(entry, effort = entry.effort) {
+    await model.releasePrimary?.();
     const previous = {
       codex: model.codex,
       codexEffort: model.codexEffort,
@@ -5646,7 +5696,7 @@ async function repl() {
     // say 'keep going' to have all that held"). Every request carries the
     // recent asks and the last report in full; bare consent — including an
     // empty Enter — is disambiguated into an explicit continue.
-    let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog });
+    let task = selfImproveRequest ? request : buildSessionTask({ request, sessionLog, maxHistoryChars: model.diffusionGemma ? 6000 : null });
 
     running = true; aborted = false; injections = [];
     lastRunStartedAt = Date.now();
@@ -5876,7 +5926,7 @@ async function repl() {
           // (2026-08-17). The prompt's budget line paces against this number, so
           // it must be one a single request should actually fit. Override with
           // --max-turns or BANTAM_MAX_TURNS; Ctrl-C interrupts.
-          maxTurns: args["max-turns"] ? Number(args["max-turns"]) : (Number(process.env.BANTAM_MAX_TURNS) || 60),
+          maxTurns: args["max-turns"] ? Number(args["max-turns"]) : (Number(process.env.BANTAM_MAX_TURNS) || (model.diffusionGemma ? 12 : 60)),
           verificationScript,
           verificationWorkspaceReadOnly: args["verify-workspace-read-only"] ? true : undefined,
           verificationOutputDirs: args["verify-output-dirs"],
@@ -6082,6 +6132,10 @@ async function repl() {
       if (streamedAnswerShown) console.log(`${meta}\n`);
       else console.log(`\n${wrapForTerminal(res.summary, 4, 100).map((l) => (l ? "  " + l : l)).join("\n")}\n  ${meta}\n`);
       sessionLog.push({ request, summary: String(res.summary).replace(/\s+/g, " ").slice(0, 220) });
+    } else if (verdict.kind === "invalid_output") {
+      console.log(`\n${paint("33", "✗ invalid model output")} ${res.summary} ${meta}`);
+      console.log(paint("2", '  Try a smaller step or select another model with :model. A higher turn limit will not fix malformed output.\n'));
+      sessionLog.push({ request, summary: '(stopped: repeated invalid model actions)' });
     } else if (verdict.kind === "paused") {
       const verified = verdict.externallyVerified ? " Verifier passed." : "";
       console.log(`\n${paint("33", "⏸")} Paused at the ${res.metrics.turns}-turn limit${res.summary ? " — " + res.summary : ""}.${verified} ${paint("2", 'Say "keep going" to continue, or set :max-turns N then say "keep going".')} ${meta}`);
@@ -6142,7 +6196,7 @@ async function repl() {
   await imageJobs.close();
   teamSession?.close();
   trioSession?.close();
-  model.close();
+  await model.close();
   rl.close();
   // The closing touch (operator order): reconcile whatever changed during the
   // session into the saved KB so the NEXT session restores instantly.

@@ -215,6 +215,18 @@ for (const failure of [null, 'ECONNREFUSED', 'ETIMEDOUT', 'wake']) test(`local c
   }
 });
 
+test('orphaned primary image restores DiffusionGemma after the physical lease endpoint was normalized', async t => {
+  const f = jobFixture(t), config = readComfyConfig(f.workspace, {});
+  const lease = acquireImageLease(config, { workspace: f.workspace, mode: 'llamacpp', endpoint: 'http://127.0.0.1:8085', shared: true,
+    diffusionGemma: true, primaryEndpoint: 'http://127.0.0.1:8001' }, f.options.leaseDirectory);
+  fs.writeFileSync(lease.file, JSON.stringify({ ...lease.record, pid: 2147483647 }));
+  let plan, woke = false;
+  const jobs = new ComfyImageJobs(f.workspace, { ...f.options, runtimeFactory: value => { plan = value; return { wake: async () => { woke = true; } }; } });
+  await jobs.recover({});
+  assert.deepEqual(plan, { mode: 'vllm', endpoint: 'http://127.0.0.1:8001', shared: true, diffusionGemma: true });
+  assert.equal(woke, true); assert.equal(fs.existsSync(lease.file), false);
+});
+
 test('orphan recovery keeps other claimants out until restoration finishes', async t => {
   const f = jobFixture(t);
   const config = readComfyConfig(f.workspace, {});

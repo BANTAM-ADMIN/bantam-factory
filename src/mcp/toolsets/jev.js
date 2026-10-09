@@ -4,9 +4,8 @@
 // The engine starts on the first question, not with the server. GPU sharing
 // with the local llama.cpp worker is Jev mode's own swap policy; while a local
 // job runs, each answer hands the GPU straight back to it.
-import crypto from "node:crypto";
 
-import { answerConfidence, JevBusy, JevUnavailable, normalizeAnswer, planQuestions, validateSystemOne } from "../../jev/api.js";
+import { answerConfidence, jevRequestSeed, JevBusy, JevUnavailable, normalizeAnswer, planQuestions, validateSystemOne } from "../../jev/api.js";
 import { resolveProfile } from "../../jev/profiles.js";
 import { ToolError } from "../protocol.js";
 
@@ -60,7 +59,7 @@ export function createJevToolset({ localEndpoint = "http://127.0.0.1:8085", eage
       let service;
       try { ({ service } = await ensure()); }
       catch (error) { throw new ToolError(`Jev is not available: ${error.message}`); }
-      const seed = crypto.createHash("sha256").update(JSON.stringify([state, questions])).digest().readUInt32BE(0);
+      const seed = jevRequestSeed(state, questions);
       let decided;
       try {
         decided = await service.decide({ profile, state, questions: plan.toRead, seed, releaseAfter: ctx.localJobRunning?.() ?? false });

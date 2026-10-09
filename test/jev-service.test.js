@@ -69,6 +69,7 @@ describe("jev GPU policy", () => {
     const engine = fakeEngine("asleep");
     const service = createJevService({ config: configWith("off"), engine });
     await assert.rejects(service.decide({ profile: { options: {} }, state: "s", questions: { q: { type: "noul" } }, seed: 1 }), JevUnavailable);
+    await assert.rejects(service.rank({ state: "s", questions: {}, seed: 1 }), JevUnavailable);
     assert.deepEqual(engine.calls, []);
   });
 
@@ -165,6 +166,42 @@ describe("jev GPU policy", () => {
 });
 
 describe("jev ask", () => {
+  it('retries blank diffusion samples without reporting an empty success', async () => {
+    const bodies = [];
+    const service = createJevService({ config: configWith('alongside'), engine: fakeEngine(), fetchImpl: async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ choices: [{ message: { content: bodies.length < 3 ? '' : 'ready' } }] }));
+    } });
+    assert.equal((await service.generate({ user: 'hello', maxTokens: 256 })).text, 'ready');
+    assert.equal(bodies.length, 3);
+    assert.equal(bodies[1].temperature, undefined, 'diffusion vLLM rejects temperature overrides, including retries');
+    assert.ok(bodies.every(body => body.max_tokens === 256));
+    await service.off({ keepEngine: true });
+  });
+
+  it('initializes structured handles after plain DiffusionGemma generation and reuses them', async () => {
+    let tokenizations = 0;
+    const fetchImpl = async (url, init) => {
+      const body = JSON.parse(init.body);
+      if (url.endsWith('/v1/chat/completions')) return new Response(JSON.stringify({ choices: [{ message: { content: 'hello' } }] }));
+      assert.ok(url.endsWith('/tokenize'));
+      tokenizations++;
+      const text = body.prompt;
+      const handle = text.match(/^q1: \[([A-Z]{2,3})\]$/)?.[1];
+      const id = handle ? 1000 + [...handle].reduce((number, ch) => number * 26 + ch.charCodeAt(0) - 65, 0) : 0;
+      return new Response(JSON.stringify({ tokens: text === 'q1: [' ? [10, 11] : text === ']' ? [12] : [10, 11, id, 12] }));
+    };
+    const service = createJevService({ config: configWith('alongside'), engine: fakeEngine(), fetchImpl });
+    assert.equal((await service.generate({ user: 'hello' })).text, 'hello');
+    const request = { profile: { options: { gate: 0, quantGate: false } }, state: 's', questions: {}, seed: 1 };
+    await service.decide(request);
+    assert.ok(tokenizations >= 258, 'plain generation must not suppress the structured handle initialization');
+    const once = tokenizations;
+    await service.decide(request);
+    assert.equal(tokenizations, once, 'handles are reused');
+    await service.off({ keepEngine: true });
+  });
+
   it("turns quick text into a yes/no or choice request", () => {
     assert.deepEqual(askRequest("Is 91 prime?").questions.answer, { type: "noul", instructions: "Is 91 prime?" });
     const choice = askRequest("Largest planet? | Mars | Jupiter").questions.answer;

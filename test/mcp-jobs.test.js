@@ -394,3 +394,19 @@ describe("job_apply", () => {
     await assert.rejects(call("job_apply", { job: "j1", verify: "true" }), /j1 is failed/);
   });
 });
+
+
+describe("codex lanes", () => {
+  it("runs as many codex jobs at once as there are codex lanes, and queues the rest", async () => {
+    const sleeper = () => ({ exe: process.execPath, args: ["-e", "setTimeout(() => {}, 1200)"], env: {} });
+    const { call } = setup({ options: { lanes: { local: 1, codex: 2 }, commandFor: sleeper } });
+    const ids = [];
+    for (let i = 0; i < 3; i++) ids.push((await call("job_start", { worker: "codex", task: `t${i}`, workspace: sourceWorkspace() })).job);
+    await new Promise((r) => setTimeout(r, 300));
+    const states = [];
+    for (const id of ids) states.push((await call("job_status", { job: id })).state);
+    assert.equal(states.filter((s) => s === "running").length, 2, `states: ${states}`);
+    assert.equal(states.filter((s) => s === "queued").length, 1, `states: ${states}`);
+    for (const id of ids) await finished(call, id);
+  });
+});

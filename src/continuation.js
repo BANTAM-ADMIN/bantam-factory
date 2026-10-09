@@ -54,7 +54,7 @@ export function extractNextStep(summary) {
  * the FRAMING differs: bare consent becomes an explicit continue instruction,
  * anything else is presented as the new request it is.
  */
-export function buildSessionTask({ request, sessionLog = [] }) {
+export function buildSessionTask({ request, sessionLog = [], maxHistoryChars = null }) {
   const req = String(request ?? "").trim();
   if (!sessionLog.length) return req;
   const recent = sessionLog.slice(-6)
@@ -75,6 +75,15 @@ export function buildSessionTask({ request, sessionLog = [] }) {
       })
       .join("\n");
     parts.push(`Your previous agent turns (for continuity — do not re-do these):\n${transcript}`);
+  }
+  if (Number.isSafeInteger(maxHistoryChars) && maxHistoryChars > 0) {
+    const history = parts.filter(Boolean).join("\n\n");
+    if (history.length > maxHistoryChars) {
+      const marker = '\n[Earlier context shortened; consult the saved transcript or workspace for details.]\n';
+      const retained = Math.max(0, maxHistoryChars - marker.length);
+      // Keep the latest request/report anchor and the most recent actions.
+      parts.splice(0, parts.length, history.slice(0, Math.floor(retained / 2)) + marker + history.slice(-Math.ceil(retained / 2)));
+    }
   }
   if (isAffirmation(req)) {
     parts.push(

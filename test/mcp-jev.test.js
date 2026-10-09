@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 
 import { createJevToolset } from "../src/mcp/toolsets/jev.js";
@@ -61,6 +62,15 @@ describe("jev toolset", () => {
     assert.equal(calls.decide[1].profile.name, "bantam-jev-fast");
     assert.equal(factoryCalls(), 1);
     assert.equal((await call("jev_status")).engine, "awake");
+  });
+
+  it("uses the historical HTTP seed mapping for the same request", async () => {
+    const { call, calls } = setup();
+    const state = { query: "find weather" };
+    const questions = { q: { type: "noul", instructions: "relevant?" } };
+    await call("jev_decide", { state, questions });
+    const seed = createHash("sha256").update(JSON.stringify([state, questions])).digest().readUInt32BE(0) % 1_000_000;
+    assert.equal(calls.decide[0].seed, seed);
   });
 
   it("answers single-option questions without the engine", async () => {

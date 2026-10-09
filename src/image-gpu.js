@@ -7,6 +7,15 @@ import { acquireExclusiveFileLock } from './exclusive-file-lock.js';
 
 const lockDir = () => path.join(os.tmpdir(), `bantam-image-gpu-${process.getuid?.() ?? 'user'}`);
 
+export function gpuResourceKey(config) {
+  if (config.gpu?.resourceKey) return config.gpu.resourceKey;
+  try {
+    const url = new URL(config.url);
+    if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) return 'gpu:local:0';
+  } catch { /* Non-HTTP resources provide their own key. */ }
+  return config.url;
+}
+
 export function endpointKey(endpoint) {
   if (!endpoint) return null;
   const url = new URL(endpoint);
@@ -26,6 +35,7 @@ export function gpuPlan(config, model) {
   const gpu = config.gpu || {};
   const local = localModelEndpoint(model);
   const mode = gpu.mode || 'auto';
+  if (model?.diffusionGemma && mode !== 'none' && local) return { mode: 'vllm', endpoint: local, shared: true, diffusionGemma: true };
   if (!['auto', 'none', 'llamacpp', 'vllm'].includes(mode)) throw Error('ComfyUI gpu.mode must be auto, none, llamacpp, or vllm');
   // Hosted/Codex sessions must not touch an unrelated dormant local server.
   if (mode === 'none' || !local) return { mode: 'none', shared: false, endpoint: null };
@@ -39,7 +49,7 @@ export function gpuPlan(config, model) {
 
 export function acquireImageLease(config, metadata, directory = lockDir()) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const key = config.gpu?.resourceKey || config.url;
+  const key = gpuResourceKey(config);
   const file = path.join(directory, `${crypto.createHash('sha256').update(key).digest('hex').slice(0, 24)}.json`);
   const record = { ...metadata, pid: process.pid, token: crypto.randomUUID(), url: config.url };
   try { fs.writeFileSync(file, JSON.stringify(record), { flag: 'wx', mode: 0o600 }); }
@@ -79,7 +89,7 @@ export function acquireImageLease(config, metadata, directory = lockDir()) {
 // A dead owner does not prove that ComfyUI stopped. Serialize recovery and
 // retain the reservation until cancellation, unloading and wake all succeed.
 export async function recoverOrphanedImageLease(config, restore, directory = lockDir()) {
-  const key = config.gpu?.resourceKey || config.url;
+  const key = gpuResourceKey(config);
   const file = path.join(directory, `${crypto.createHash('sha256').update(key).digest('hex').slice(0, 24)}.json`);
   const read = () => {
     try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -95,7 +105,7 @@ export async function recoverOrphanedImageLease(config, restore, directory = loc
   try {
     const record = read();
     if (!dead(record)) return false;
-    if (record.url !== config.url) throw Error('Orphaned image reservation uses a different ComfyUI URL; recover with its configuration');
+    if (record.url !== config.url && !['jev', 'llama'].includes(record.kind)) throw Error('Orphaned image reservation uses a different ComfyUI URL; recover with its configuration');
     const update = fields => {
       if (read()?.token !== record.token) throw Error('Image recovery reservation changed');
       Object.assign(record, fields);
@@ -139,6 +149,11 @@ export async function waitForImageGpu(endpoint, signal, directory = lockDir()) {
     signal?.throwIfAborted();
     const held = imageLeases(directory).find(lease => lease.endpoint === key);
     if (!held) return;
+    if (held.kind === 'jev' && held.pid === process.pid) {
+      const { yieldGpuOwner } = await import('./gpu-handoff.js');
+      await yieldGpuOwner('jev', { restoreLocal: true });
+      if (!imageLeases(directory).some(lease => lease.token === held.token)) continue;
+    }
     let alive = true;
     try { process.kill(held.pid, 0); } catch (e) { alive = e.code === 'EPERM'; }
     if (!alive || held.state === 'recovery_required') {
@@ -162,6 +177,19 @@ export class ImageGpuRuntime {
   }
   async sleep(signal) {
     if (this.plan.mode === 'none') return;
+    if (this.plan.diffusionGemma) {
+      signal?.throwIfAborted();
+      const { parkDiffusionGemma, gpuHandoffConfig } = await import('./gpu-handoff.js');
+      if (gpuHandoffConfig()) await parkDiffusionGemma();
+      else await (await import('./jev/engine.js')).createJevEngine((await import('./jev/config.js')).loadJevConfig()).sleep();
+      return;
+    }
+    const { managesLocalEndpoint, parkLocalModel } = await import('./gpu-handoff.js');
+    if (this.plan.mode === 'llamacpp' && managesLocalEndpoint(this.plan.endpoint)) {
+      signal?.throwIfAborted();
+      await parkLocalModel(this.plan.endpoint);
+      return;
+    }
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(this.config.gpu?.sleepTimeoutMs ?? 60_000)]);
     if (this.plan.mode === 'vllm') {
       await this.request('/sleep?level=1', { method: 'POST', signal: deadline });
@@ -181,6 +209,19 @@ export class ImageGpuRuntime {
   }
   async wake(signal) {
     if (this.plan.mode === 'none') return;
+    if (this.plan.diffusionGemma) {
+      signal?.throwIfAborted();
+      await (await import('./gpu-handoff.js')).prepareGpuFor('jev');
+      await (await import('./jev/engine.js')).createJevEngine((await import('./jev/config.js')).loadJevConfig()).ensureAwake();
+      return;
+    }
+    const { managesLocalEndpoint, restoreLocalModel } = await import('./gpu-handoff.js');
+    if (this.plan.mode === 'llamacpp' && managesLocalEndpoint(this.plan.endpoint)) {
+      signal?.throwIfAborted();
+      const restored = await restoreLocalModel(this.plan.endpoint);
+      // Preserve the single slot's KV cache when CUDA restored successfully.
+      if (restored?.checkpoint && (await this.request('/props', { signal }))?.is_sleeping === false) return;
+    }
     if (this.plan.mode === 'vllm') {
       await this.request('/wake_up', { method: 'POST', signal });
       if ((await this.request('/is_sleeping', { signal }))?.is_sleeping !== false) throw Error('vLLM did not wake');

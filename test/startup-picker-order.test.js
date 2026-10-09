@@ -13,7 +13,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded, withDetectedLocal } from "../src/startup-model-choice.js";
+import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded, startupCodexFallback, withDetectedLocal } from "../src/startup-model-choice.js";
+
+test("opening chat falls back to Codex when no local server is running", () => {
+  assert.deepEqual(startupCodexFallback({ automaticChatStartup: true }), { model: "gpt-5.6-terra", effort: "medium" });
+  assert.deepEqual(startupCodexFallback({ automaticChatStartup: true, rememberedConnection: { kind: "local", name: "orion-128k" } }),
+    { model: "gpt-5.6-terra", effort: "medium" });
+  assert.deepEqual(startupCodexFallback({ automaticChatStartup: true, rememberedConnection: { kind: "codex", model: "gpt-6-astra", effort: "high" } }),
+    { model: "gpt-6-astra", effort: "high" });
+});
+
+test("a running local server outranks remembered Codex and explicit backends stay explicit", () => {
+  const rememberedConnection = { kind: "codex", model: "gpt-6-astra", effort: "medium" };
+  assert.equal(startupCodexFallback({ automaticChatStartup: true, detectedLocalReady: true, rememberedConnection }), null);
+  assert.equal(startupCodexFallback({ automaticChatStartup: true, detectedApiReady: true, rememberedConnection }), null);
+  assert.equal(startupCodexFallback({ automaticChatStartup: false, rememberedConnection }), null);
+});
 
 const locals = [
   { name: "bantam-q4-crew", endpoint: "http://x:1", slots: 4, priority: 10,
@@ -188,4 +203,5 @@ test("the detected entry sits in front of registered models and never duplicates
   // Same endpoint (trailing slash ignored): the registry entry wins, no clone.
   const deduped = withDetectedLocal([registered], { label: "x", endpoint: "http://localhost:18086/" });
   assert.deepEqual(deduped, [registered]);
+  assert.deepEqual(withDetectedLocal([registered], { endpoint: "http://127.0.0.1:18086" }), [registered]);
 });

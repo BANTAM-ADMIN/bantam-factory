@@ -228,7 +228,7 @@ function partialActionHint(text) {
 }
 
 // Extract the first balanced {...} object, respecting JSON string quoting.
-function extractFirstJsonObject(text) {
+export function extractFirstJsonObject(text) {
   const start = text.indexOf("{");
   if (start === -1) return null;
   let depth = 0;

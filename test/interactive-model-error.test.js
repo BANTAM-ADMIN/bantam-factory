@@ -21,3 +21,16 @@ test('a GPU recovery error before inference is a model error, not a zero-turn li
   assert.equal(classifyInteractiveResult({ ...result, interrupted: true }).kind, 'interrupted');
   assert.equal(classifyInteractiveResult({ reachedDone: false, metrics: { turns: 60 } }).kind, 'paused');
 });
+
+test('exhausted malformed-action retries report invalid output instead of a zero-turn limit', async t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-invalid-output-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  let calls = 0;
+  const result = await runAgent({ workspace, task: 'Create a small HTML program.', maxTurns: 12, maxInvalidPerTurn: 1, interactive: true,
+    grounding: false, useGrammar: false, shellSandbox: 'host',
+    model: { assistantPrefill: '', async complete() { calls++; return { content: '{"a":"write_file","p":"broken.html","content":"unfinished', tokens: 100, stoppedLimit: true }; } } });
+  assert.equal(calls, 2); assert.equal(result.metrics.turns, 0);
+  assert.equal(result.controllerStop.kind, 'invalid-output'); assert.equal(result.controllerStop.attempts, 2);
+  assert.equal(classifyInteractiveResult(result).kind, 'invalid_output');
+  assert.equal(fs.existsSync(path.join(workspace, 'broken.html')), false);
+});

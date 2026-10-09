@@ -27,7 +27,9 @@ function launch(config) {
   const dir = config.startup.directory;
   const python = config.startup.python || [path.join(dir, 'venv/bin/python'), path.join(dir, '.venv/bin/python')].find(p => fs.existsSync(p)) || 'python3';
   const url = new URL(config.url);
-  const child = spawn(python, ['main.py', '--listen', '127.0.0.1', '--port', url.port || '8188'], { cwd: dir, detached: true, stdio: 'ignore' });
+  const child = config.startup.script
+    ? spawn('bash', [config.startup.script], { cwd: dir, env: { ...process.env, COMFYUI_PORT: url.port || '8188' }, detached: true, stdio: 'ignore' })
+    : spawn(python, ['main.py', '--listen', '127.0.0.1', '--port', url.port || '8188'], { cwd: dir, detached: true, stdio: 'ignore' });
   child.unref();
   return child;
 }
@@ -46,6 +48,7 @@ export async function ensureComfyStarted(config, client, { signal, probeGpu: gpu
   if (!path.isAbsolute(config.startup.directory) || !fs.existsSync(path.join(config.startup.directory, 'main.py'))) {
     throw Error(`ComfyUI startup.directory must be an absolute ComfyUI installation containing main.py: ${config.startup.directory}`);
   }
+  if (config.startup.script && (!path.isAbsolute(config.startup.script) || !fs.existsSync(config.startup.script))) throw Error('ComfyUI startup.script must name an existing absolute launch script');
   let devices;
   try { devices = parseNvidiaSmiMemory(await gpu()); }
   catch (error) { throw Error(`Cannot start ComfyUI without verified GPU headroom: ${error.message}`); }

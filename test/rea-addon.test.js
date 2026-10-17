@@ -39,7 +39,9 @@ test("REA is found by BANTAM_REA_ROOT first, then the add-on install, else repor
   const dir = addonsDir(t);
   const env = { BANTAM_ADDONS_DIR: dir };
   assert.equal(findReaRoot(env), null);
-  assert.match(reaUnavailableReason(env), /bantam addons install rea/);
+  // An unsupported Node is reported first; it blocks REA wherever it is installed.
+  const missing = nodeSupportsRea() ? /bantam addons install rea/ : /REA needs Node/;
+  assert.match(reaUnavailableReason(env), missing);
   const root = fakeInstall(dir);
   assert.equal(findReaRoot(env), root);
   assert.equal(findReaRoot({ ...env, BANTAM_REA_ROOT: "/elsewhere/rea" }), "/elsewhere/rea");
@@ -48,7 +50,7 @@ test("REA is found by BANTAM_REA_ROOT first, then the add-on install, else repor
 test("the client refuses to start without REA and says how to install it", async t => {
   const env = { ...process.env, BANTAM_ADDONS_DIR: addonsDir(t) };
   delete env.BANTAM_REA_ROOT; delete env.BANTAM_REA_MCP_ARGS;
-  await assert.rejects(startReaMcpClient({ env }), /bantam addons install rea/);
+  await assert.rejects(startReaMcpClient({ env }), nodeSupportsRea() ? /bantam addons install rea/ : /REA needs Node/);
 });
 
 test("install verifies the pinned fork tarball before npm sees it, and never runs REA's setup", async t => {

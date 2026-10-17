@@ -35,6 +35,8 @@ export class RunCheckpoint {
     this._pending = null;   // action seen, observation not yet
     this._events = evidenceRows(initialEvidence?.events); // compact control events that turns alone cannot reconstruct
     this._rejectedOutputs = evidenceRows(initialEvidence?.rejectedOutputs);
+    this._outputCheckpoints = new Map(evidenceRows(initialEvidence?.outputCheckpoints).map(entry => [entry.id, entry]));
+    this._pendingOutputCheckpoint = initialEvidence?.pendingOutputCheckpoint ?? null;
     this._modelCalls = evidenceRows(initialEvidence?.modelCalls);
     this._pendingReasoning = null;
     this._pendingProtocol = null;
@@ -54,6 +56,24 @@ export class RunCheckpoint {
   /** Feed it the agent's `onEvent` stream. Only `action`/`observation` matter. */
   note(event) {
     if (!event) return;
+    if (event.type === 'output_checkpoint_saved') {
+      const { type, ...receipt } = event;
+      this._outputCheckpoints.set(receipt.id, serializableCopy(receipt));
+      if (receipt.draftPath && receipt.stoppedLimit) {
+        this._pendingOutputCheckpoint = receipt.id;
+        this.flush('output-checkpoint');
+      }
+      return;
+    }
+    if (event.type === 'output_checkpoint_pending') {
+      this._pendingOutputCheckpoint = event.id;
+      this.flush('output-checkpoint');
+      return;
+    }
+    if (event.type === 'output_checkpoint_committed') {
+      this._pendingOutputCheckpoint = null;
+      return;
+    }
     if (event.type === 'trusted_review' && trustedReviewEvidenceEnd({action:null, observation:event.observation}) !== null) {
       this._flushPending();
       this._turns.push({i:this._turns.length, action:null, parsedAction:null, observation:event.observation});
@@ -275,6 +295,8 @@ export class RunCheckpoint {
         turns: this.turns(),
         turnCount: this._turns.length + (this._pending ? 1 : 0),
         rejectedOutputs: this._rejectedOutputs,
+        outputCheckpoints: [...this._outputCheckpoints.values()],
+        pendingOutputCheckpoint: this._pendingOutputCheckpoint,
         modelCalls: this.modelCalls(),
         events: this.events(),
         // Present from schema 3: the workspace bytes, so --resume-run can rebuild

@@ -13,6 +13,8 @@
 
 import { QWEN_ASSISTANT_PREFILL, CHATML_TEMPLATE } from "./profiles.js";
 import { clipText as clipObservation, OBS_MAX } from "./clip.js";
+import { fullObservation } from "./observation-delivery.js";
+import { ACTION_DECISION_CONTEXT } from "./thinking.js";
 import { clipReadObservation } from "./read-observation.js";
 import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 import { actionContractUpdateValid } from "./context-updates.js";
@@ -459,6 +461,7 @@ export function buildPrompt({
   compactRules,
   diffusionTools = false,
   readObservationMaxChars = OBS_MAX,
+  fullReadContext = false,
   maxTurns = null,
   profileText = null,
   // Whether shell actions run in the per-action docker sandbox (the executor's
@@ -550,7 +553,10 @@ export function buildPrompt({
   // they are tired of restating, which is exactly why they go in by default.
   const profileBlock = profileText ? `\n\nOperator preferences (standing — apply unless the task says otherwise):\n${scrub(profileText)}` : "";
   const systemFlag = thinkEnabled ? (template.systemFlag ?? "") : "";
-  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort, compactRules, diffusionTools })}${interactiveNote}${profileBlock}\n${template.close}`;
+  // Extension mode intentionally drops volatile tail reanchors. The reasoning
+  // scope is run-stable, so keep it in the system prefix on both rails.
+  const decisionContext = thinkEnabled ? `\n\n${ACTION_DECISION_CONTEXT}` : "";
+  let p = `${template.open("system")}${systemFlag}${systemPrompt({ actionFeatures, maxTurns, sandboxedShell, outputTokenCap, reasoningEffort, compactRules, diffusionTools })}${decisionContext}${interactiveNote}${profileBlock}\n${template.close}`;
   const planBlock = planText ? `\n\n${scrub(planText)}` : "";
   const skillsBlock = skillsText ? `\n\n${scrub(skillsText)}` : "";
   const toolsBlock = toolsText && !diffusionTools ? `\n\n${scrub(toolsText)}` : "";
@@ -719,7 +725,7 @@ export function buildPrompt({
       enabled: slimSuccessfulShellActions,
     });
     const reviewEnd = trustedReviewEvidenceEnd(turn, shellReplay.observation);
-    const sourceObservation = reviewEnd !== null || refreshedReads.has(sourceReadKey(turn)) ? shellReplay.observation
+    const sourceObservation = fullObservation(turn.action, fullReadContext) || reviewEnd !== null || refreshedReads.has(sourceReadKey(turn)) ? shellReplay.observation
       : compactSourceRanges(shellReplay.observation, deliveredSourceLines, recordedTurn);
     if (turn.action) {
       // Scrub the replayed action too: a prior write_file/replace whose content contains
@@ -788,7 +794,11 @@ export function buildPrompt({
     const controllerSuffix = preserveSlimmedControlAnnotations
       ? controllerAnnotationSuffix(sourceObservation)
       : "";
-    const observation = reviewEnd !== null
+    // REA owns summary and paging contracts. Character clipping here destroys
+    // JSON rows and can hide the very facts the model requested.
+    const observation = fullObservation(turn.action, fullReadContext)
+      ? sourceObservation
+      : reviewEnd !== null
       ? sourceObservation.slice(0, reviewEnd)
         + clipKeepingControllerAnnotation(sourceObservation.slice(reviewEnd), preserveSlimmedControlAnnotations)
       : rewriteSuperseded

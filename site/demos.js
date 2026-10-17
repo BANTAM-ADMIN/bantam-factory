@@ -235,6 +235,26 @@
       ],
     },
 
+    // ---------------------------------------------------------------- REA add-on
+    rea: {
+      title: 'bantam · REA reverse engineering',
+      caption: 'Recorded run, October 17, 2026: GPT-6-Luna inside BANTAM FACTORY with the REA add-on (our fork build, 6.5.0-bantam.1) on a stripped Linux executable, analysis mode. Tool results are excerpted, and the workspace path is shortened. <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/REA.md">How the add-on works</a>.',
+      end: 'pass',
+      steps: [
+        { cmd: 'bantamfactory run --rea --analysis --task "The file \'tool\' is an unknown binary…"', wait: 700 },
+        { out: ['[d]model: gpt-6-luna @ Codex · REA connected: 207 tools, 56 unavailable on this host[/]', ''], every: 200, wait: 700 },
+        { out: ['  [g]rea_tool open_binary[/] [d]~/work/tool[/]', '    [ok]format elf · executable · x86_64[/]'], every: 220, wait: 800 },
+        { out: ['  [g]rea_tool binary_overview[/]', '    [bad]provider_unavailable: Ghidra, Hopper and IDA are not installed[/]',
+          '    [d][REA availability] Tools for the open target that REA reports[/]', '    [d]usable now: … inspect_artifact, inspect_with_objdump, …[/]'], every: 160, wait: 1100 },
+        { out: ['  [g]rea_tool inspect_with_objdump file_headers[/]', '    [ok]file format elf64-x86-64 · start address 0x4330[/]'], every: 220, wait: 700 },
+        { out: ['  [g]rea_tool inspect_with_objdump private_headers[/]', '    [ok]NEEDED               libc.so.6[/]'], every: 220, wait: 700 },
+        { out: ['  [g]rea_tool inspect_with_objdump dynamic_symbols[/]', '    [ok]readdir · utimensat · fchmod · openat · unlinkat · fsync …[/]', ''], every: 220, wait: 900 },
+        { out: ['[k]respond[/]', '  [d]x86-64 ELF, entry 0x4330, links libc.so.6. Imports such as readdir,[/]',
+          '  [d]utimensat and fchmod point to a command-line file utility that[/]', '  [d]manipulates file contents and metadata; the imports alone do not[/]',
+          '  [d]establish the exact product.[/]', ''], every: 140 },
+      ],
+    },
+
     // ---------------------------------------------------------------- doctor and add-ons
     hardware: {
       title: 'bantam doctor',

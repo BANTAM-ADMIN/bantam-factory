@@ -71,6 +71,18 @@ test("taskExtractsFromImage: a UI/preview task is NOT an extraction task", () =>
   );
 });
 
+test('reviewing a generated sprite contact sheet does not turn game delivery into glyph extraction', () => {
+  const task='Build and VERIFY the playable HTML game using recovered graphics. '
+    +'Deliver index.html, README.md, results/ screenshots and a final report. '
+    +'Use assets/selected/curated_contact_sheet.png for a readable overview. '
+    +'Inspect the screenshots, repair layout defects and write the final report.';
+  assert.equal(taskExtractsFromImage(task),false);
+  assert.equal(visionUnverifiedObjection([visionTurn('assets/selected/curated_contact_sheet.png:\nRecognizable characters.')],0,{task}),null);
+  assert.equal(taskExtractsFromImage('Build a dashboard and save screenshot.png. Write README.md.'),false);
+  assert.equal(taskExtractsFromImage('Read preview.png to review layout and save the website.'),false);
+  assert.equal(taskExtractsFromImage('Transcribe scan.png into notes.txt.'),true);
+});
+
 test("objects when the answer rests on vision alone", () => {
   const turns = [visionTurn(), shellTurn('python3 -c "import chess"')];
   const msg = visionUnverifiedObjection(turns, 0, { task: TASK });

@@ -14,6 +14,8 @@
 
 const DEFAULT_THINK_MARKERS = Object.freeze({ open: "<think>\n", close: "</think>" });
 
+export const ACTION_DECISION_CONTEXT = '[action decision]\nUse the latest observation and current files to choose ONE next executable action. Resolve only the uncertainty needed for that action; this is not a rehearsal of the entire project. Put implementation code in the file-writing action, rather than drafting the full program privately and then replanning it. When the relevant source bytes are already present, use them to implement or test. If a fact is missing, choose one discriminating lookup or check. Carry confirmed facts forward; do not restart intake or restate the whole task and turn budget.';
+
 // Derive the open/close think prefills from a profile's assistant prefill.
 // The marker pair comes from the profile's template, so a family whose
 // reasoning channel is spelled differently rides the same rail:
@@ -126,6 +128,16 @@ export function inspectionCheckpointText(interval) {
   return `[work-checkpoint]\nYou have made ${interval} inspection actions without reconsidering the milestone. Briefly reconcile the user's deliverable, the current files, and your progress record. Identify what is already built, what remains, and the next small implementation milestone. Preserve necessary decisions in the task's existing progress record when needed. Then implement that milestone, or read the exact missing prerequisite. Respect mandatory prereads; do not restart an entire specification scan just because its older pages left context. This checkpoint neither verifies work nor permits early completion.`;
 }
 
+// A visual observation needs interpretation before choosing the next action.
+// Its natural-language verdict need not contain ERROR/FAIL to invalidate an
+// asset hypothesis. This schedules reasoning only, never verification credit.
+export function visualReviewBoundary(turn) {
+  const action = turn?.action ?? turn?.parsedAction;
+  return action?.a === 'query'
+    && /^(?:view_image|preview)(?:\s|$)/i.test(String(action.q ?? '').trim())
+    && Boolean(String(turn?.observation ?? '').trim());
+}
+
 /**
  * Decide whether to spend a thinking phase on this attempt.
  * @param {"off"|"auto"|"always"} mode
@@ -155,6 +167,7 @@ export function shouldThink(mode, ctx = {}) {
   if (ctx.assertionRecovery) return true;               // an unexecuted check needs reconsideration, not blind replay
   if (ctx.preEditSynthesis) return true;                // source is now present; synthesize before first mutation
   if (ctx.inspectionCheckpoint) return true;            // reconcile a long inspection sequence with its milestone
+  if (ctx.visualReview) return true;                    // interpret visual evidence before proceeding
   if (ctx.lastObservation && COMPLETION_AUDIT_RE.test(ctx.lastObservation)) return true;
   if (ctx.lastObservation && DOCUMENT_REVIEW_RE.test(ctx.lastObservation)) return true;
   if (ctx.lastObservation && FAILURE_RE.test(ctx.lastObservation)) return true; // an action failed/erred

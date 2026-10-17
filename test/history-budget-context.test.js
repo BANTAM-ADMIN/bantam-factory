@@ -59,3 +59,9 @@ test('the local BANTAM lane carries the inspected window to the agent; other lan
     assert.equal(freshCommand({...base, arm, contextTokens: 72192}).env.BANTAM_CONTEXT_TOKENS, undefined, arm);
   }
 });
+
+test('a larger output reserve reduces history while keeping room for the prompt', () => {
+  const budget = historyCharBudget({ contextTokens: 32768, extensionTrajectory: true, outputTokens: 16384 });
+  assert.ok(budget / HISTORY_CHARS_PER_TOKEN + 16384 + 2048 <= 32768);
+  assert.ok(budget < historyCharBudget({ contextTokens: 32768, extensionTrajectory: true }));
+});

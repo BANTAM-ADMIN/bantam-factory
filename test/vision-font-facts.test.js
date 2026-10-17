@@ -59,6 +59,17 @@ test("SEAM: a failed vision call still does not fabricate facts", () => {
   assert.doesNotMatch(out, /Fonts on this machine/, "no reading -> no appended facts");
 });
 
+test('local visual observations retain the complete description beyond 4000 characters', t => {
+  const root=scratch();
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(root,'frame.png'),'fixture');
+  const description='Visible frame detail. '.repeat(300)+'FINAL VISIBLE FINDING';
+  const tool=viewImageTool(root,'http://local.invalid',{describe:()=>description});
+  const result=tool.answer('view_image frame.png');
+  assert.ok(result.includes(description));
+  assert.match(result,/FINAL VISIBLE FINDING/);
+});
+
 // rep2 (2026-08-20) decoded the g5 bishop correctly, listed it in prose, then
 // hand-typed the FEN rank by rank and lost it in TRANSCRIPTION. The decode was
 // never the defect. The hint must name emit-from-structure and the arithmetic

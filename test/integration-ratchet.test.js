@@ -154,6 +154,7 @@ const REACHABILITY_EXEMPTIONS = [
   { file: "src/test-coverage.js", reason: "shelved self-improvement output" },
   { file: "src/logic/prompt-optimization.js", reason: "shelved self-improvement output" },
   { file: "src/action-efficiency.js", reason: "shelved self-improvement output" },
+  { file: "src/mcp/writer/lint.js", reason: "writer toolset chapter linter, in progress; not yet called from book.js/checker.js" },
   { file: "src/shared.js", reason: "shelved helper, candidates for deletion" },
   { file: "src/action-decision-tree.js", reason: "shelved self-improvement output" },
   { file: "src/error-handling.js", reason: "shelved helper, candidate for deletion" },

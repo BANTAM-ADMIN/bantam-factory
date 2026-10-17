@@ -69,3 +69,9 @@ test("a thrown exists() is treated as 'missing', never a crash", () => {
   const r = assessDeliverable(100, ["/app/gpt2.c"], () => { throw new Error("fs boom"); }, s);
   assert.equal(r.steer, true); // missing → steer, no crash
 });
+
+test('web entrypoints are deliverables, so the browser verifier is not mistaken for the game', () => {
+ const d=namedDeliverables('Use input/game.smc. Deliver index.html and game.css; verify with python3 tests/browser_test.py.');
+ assert.deepEqual(d,['index.html','game.css','tests/browser_test.py']);
+ assert.equal(assessDeliverable(40,d,()=>false,createDeliverableState()).target,'index.html');
+});

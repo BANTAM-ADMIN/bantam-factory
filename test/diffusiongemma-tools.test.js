@@ -188,3 +188,18 @@ test('DiffusionGemma receives CPU browser evidence after each actual visual edit
   assert.deepEqual(calls, ['interact', 'interact']); assert.equal(result.metrics.previewFailures, 1);
   assert.equal(result.metrics.previewPasses, 1); assert.equal(result.done, true);
 });
+
+test('DiffusionGemma CPU assembly continues a saved literal file after a cutoff', async t => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-tool-continue-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  const { model, requests } = await fixture(t, (question, options) => question.startsWith('Which ONE available')
+    ? options.findIndex(value => value.startsWith('write_file:')) : options.length - 1,
+  ['hello.html', { content: '````html\n<main>hello', finishReason: 'length' }, 'hello.html', '````html\n world</main>\n````']);
+  const result = await runAgent({ workspace, model, task: 'Create hello.html.', grounding: false,
+    maxTurns: 1, thinkMode: 'off', shellSandbox: 'host', stateAudit: 'off', contractStateAudit: 'off' });
+  assert.equal(fs.readFileSync(path.join(workspace, 'hello.html'), 'utf8'), '<main>hello world</main>');
+  assert.equal(result.metrics.outputLimitRecoveries, 1);
+  const finalGeneration = requests.filter(row => row.path.endsWith('/chat/completions') && !row.body.vllm_xargs).at(-1);
+  assert.match(finalGeneration.body.messages.at(-1).content, /ONLY THE MISSING SUFFIX/);
+  assert.match(finalGeneration.body.messages.at(-1).content, /<main>hello/);
+});

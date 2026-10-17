@@ -4,11 +4,12 @@ import path from "node:path";
 
 import { DEFAULT_PORT, DEFAULT_TOOLSETS, ensureRoom, readToken, roomPaths, startMcpServer } from "./server.js";
 import { MESSAGE_KINDS } from "./room.js";
+import { resolveCodexModelAlias } from "../codex-models.js";
 
 export const MCP_USAGE = `bantam mcp — BANTAM as an MCP server for Claude Code (docs/MCP.md)
 
   bantam mcp serve  [--room DIR] [--mode llama|jev] [--port ${DEFAULT_PORT}] [--toolsets ${DEFAULT_TOOLSETS.join(",")}]
-                    [--local-endpoint http://127.0.0.1:8085] [--stand-in-model gpt-5.6-luna] [--codex-lanes 1]
+                    [--local-endpoint http://127.0.0.1:8085] [--stand-in-model luna] [--codex-lanes 1]
 
   --mode llama  (default) local jobs run BANTAM on the llama.cpp model; Jev starts on demand
                 and trades the GPU with it.
@@ -81,7 +82,8 @@ export async function runMcpCli(argv, { out = console.log } = {}) {
       const mode = flags.mode ?? "llama";
       if (!["llama", "jev"].includes(mode)) throw new Error("--mode must be llama or jev");
       const localEndpoint = flags["local-endpoint"] ?? process.env.BANTAM_ENDPOINT ?? "http://127.0.0.1:8085";
-      const standInModel = mode === "jev" ? (flags["stand-in-model"] ?? "gpt-5.6-luna") : null;
+      // The current Luna (codex-models.js) unless the operator names a model.
+      const standInModel = mode === "jev" ? resolveCodexModelAlias(flags["stand-in-model"] ?? "luna") : null;
       const codexLanes = flags["codex-lanes"] === undefined ? 1 : Number(flags["codex-lanes"]);
       if (!Number.isInteger(codexLanes) || codexLanes < 1 || codexLanes > 4) throw new Error("--codex-lanes must be 1 to 4");
       const lanes = { local: 1, codex: codexLanes };

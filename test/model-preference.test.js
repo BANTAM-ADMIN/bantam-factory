@@ -50,18 +50,18 @@ test("Codex choices expose role, recommendation, and last-used state", () => {
     locals: [],
     preference: {
       kind: "codex",
-      model: "gpt-5.6-terra",
-      effort: "medium",
+      model: "gpt-6.1-sol",
+      effort: "high",
     },
   });
   assert.deepEqual(choices.slice(0, 3).map((choice) => choice.name), [
-    "codex-terra", "codex-luna", "codex-sol",
+    "codex-sol", "codex-terra", "codex-luna",
   ]);
   assert.equal(choices[0].recommended, true);
   assert.equal(choices[0].lastUsed, true);
-  assert.match(choices[0].detail, /Everyday/);
+  assert.match(choices[0].detail, /Default/);
   assert.equal(resolveStartupModelChoice(choices, "1"), choices[0]);
-  assert.equal(resolveStartupModelChoice(choices, "codex-sol").name, "codex-sol");
+  assert.equal(resolveStartupModelChoice(choices, "codex-luna").name, "codex-luna");
   assert.equal(resolveStartupModelChoice(choices, ""), null);
 });
 

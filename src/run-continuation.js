@@ -175,10 +175,13 @@ export function prepareRunContinuation(artifact, {
   );
 
   return {
+    pendingOutputCheckpoint: throughTurn == null ? artifact?.pendingOutputCheckpoint ?? null : null,
     resumeTurns: includedTurns,
     initialEvidence: {
       turns: includedTurns,
       rejectedOutputs: includedRejectedOutputs,
+      outputCheckpoints: artifact?.outputCheckpoints ?? [],
+      pendingOutputCheckpoint: throughTurn == null ? artifact?.pendingOutputCheckpoint ?? null : null,
       modelCalls: includedModelCalls,
       events: includedEvents,
     },

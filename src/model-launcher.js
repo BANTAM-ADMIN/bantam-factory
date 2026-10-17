@@ -312,6 +312,7 @@ export async function switchToModel(model, target, {
       const resident = await serverState(target.endpoint);
       if (resident.reachable && !resident.sleeping && (await verify(target)).ok) {
         model.switchTo(target.endpoint, { profile: target.profile });
+        await model.health?.();
         await handoff.markLocalActive(target);
         lease.release();
         return true;
@@ -350,6 +351,7 @@ export async function switchToModel(model, target, {
     const resident = await verify(target);
     if (resident.ok) {
       model.switchTo(target.endpoint, { profile: target.profile });
+      await model.health?.();
       out(`Now using ${target.label} @ ${target.endpoint} (already running${resident.checked && resident.unverified ? `; ${resident.unverified}` : ""})\n`);
       return true;
     }
@@ -365,6 +367,7 @@ export async function switchToModel(model, target, {
   // The profile hint travels on both paths; it used to be passed only when the
   // server was already up, so a fresh start silently lost it.
   model.switchTo(target.endpoint, { profile: target.profile });
+  await model.health?.();
   out(`Now using ${target.label} @ ${target.endpoint}${started.checked && started.unverified ? ` (${started.unverified})` : ""}\n`);
   return true;
 }

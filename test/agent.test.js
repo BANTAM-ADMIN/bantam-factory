@@ -830,7 +830,7 @@ describe('prompt-resident source recovery', () => {
         prompts.push(String(prompt));
         return prompts.length === 1
           ? { content: '{"a":"write_file","p":"game.html","content":"unfinished', tokens: 8192, stoppedLimit: true }
-          : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>' }), tokens: 20, stoppedEos: true };
+          : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>', ...(String(prompt).match(/[a-f0-9]{32}\/[a-f0-9]{32}/) ? { checkpoint: String(prompt).match(/[a-f0-9]{32}\/[a-f0-9]{32}/)[0] } : {}) }), tokens: 20, stoppedEos: true };
       } };
     await runAgent({ task: 'Build a game in one self-contained HTML file.', workspace, model, maxTurns: 1,
       useGrammar: false, grounding: false, shellSandbox: 'host', verificationPolicy: 'after_edit' });
@@ -850,7 +850,7 @@ describe('prompt-resident source recovery', () => {
           prompts.push(String(prompt));
           return prompts.length === 1
             ? { content: '{"a":"write_file","p":"game.html","content":"unfinished', tokens: 9000, stoppedLimit }
-            : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>' }), tokens: 20 };
+            : { content: JSON.stringify({ a: 'write_file', p: 'game.html', content: '<main>Game</main>', ...(String(prompt).match(/[a-f0-9]{32}\/[a-f0-9]{32}/) ? { checkpoint: String(prompt).match(/[a-f0-9]{32}\/[a-f0-9]{32}/)[0] } : {}) }), tokens: 20 };
         } };
       const result = await runAgent({ task: 'Build a game in one self-contained HTML file.', workspace, model, maxTurns: 1,
         useGrammar: false, grounding: false, shellSandbox: 'host', verificationPolicy: 'after_edit' });

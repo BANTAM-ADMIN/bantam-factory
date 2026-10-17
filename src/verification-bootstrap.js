@@ -16,13 +16,14 @@ export function pendingInitialVerifier({ command, provenance, readFile, exists, 
     if (pkg.scripts?.pretest || pkg.scripts?.posttest) return null;
     script = pkg.scripts?.test;
   }
-  // Recognize one literal Node file, without expansion, flags or shell control.
+  // Recognize one literal Node or Python file, without expansion, flags or shell control.
   // Unknown commands retain their normal scheduling.
   if (typeof script !== 'string' || /[\n\r$`;&|<>\\]/.test(script)) return null;
   const words = splitShellWords(script);
-  if (words.length !== 2 || words[0] !== 'node') return null;
+  if (words.length !== 2 || !['node', 'python', 'python3'].includes(words[0])) return null;
   const file = words[1].replace(/^\.\//, '');
-  if (!/^[\w.-]+(?:\/[\w.-]+)*\.(?:[cm]?js)$/.test(file)
+  const extension = words[0] === 'node' ? /\.[cm]?js$/ : /\.py$/;
+  if (!/^[\w.-]+(?:\/[\w.-]+)*$/.test(file) || !extension.test(file)
       || file.split('/').some(part => part === '..')
       || observedPaths.has(file)
       || !Array.isArray(provenance.initialPaths) || provenance.initialPaths.includes(file)

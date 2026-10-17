@@ -141,6 +141,11 @@ export class Executor {
     this.probeEnabled = opts.probeEnabled ?? envEnabled(process.env.BANTAM_PROBE);
     // Jev mode's decide tool: async (action) => observation text, or null when off.
     this.jevDecide = typeof opts.jevDecide === "function" ? opts.jevDecide : null;
+    this.reaMcpCall = typeof opts.reaMcpCall === "function" ? opts.reaMcpCall : null;
+    this.reaMcpDiscover = typeof opts.reaMcpDiscover === "function" ? opts.reaMcpDiscover : null;
+    this.fullReadContext = opts.fullReadContext === true;
+    // Analysis mode excludes shell; error advice must not point at it then.
+    this.shellAvailable = opts.shellAvailable !== false;
     this.renameFile = opts.renameFile ?? fs.renameSync;
     this.editConfirmations = opts.editConfirmations === true;
     this._reviewedWrites = new Map();
@@ -454,6 +459,14 @@ export class Executor {
           if (!this.jevDecide) return { observation: "ERROR: decide needs Jev mode (:jev on, then :jev tool on)." };
           return { observation: await this.jevDecide(action, { signal }) };
         }
+        case "rea_tools": {
+          if (!this.reaMcpDiscover) return { observation: "ERROR: REA MCP discovery is not enabled for this run." };
+          return { observation: await this.reaMcpDiscover(action) };
+        }
+        case "rea_tool": {
+          if (!this.reaMcpCall) return { observation: "ERROR: REA MCP is not enabled for this run." };
+          return { observation: oversizedReaResult(await this.reaMcpCall(action, { signal }), action.tool) };
+        }
         case "done": return { observation: "", done: true, summary: action.summary };
         case "respond": return { observation: "", done: true, summary: action.text, responded: true };
         default: return { observation: `unknown action: ${action.a}` };
@@ -481,7 +494,14 @@ export class Executor {
     if (size > MAX_READ_BYTES) {
       return `ERROR: ${p} is too large to read whole (${size} bytes; ${MAX_READ_BYTES}-byte cap). Read it in chunks with shell (e.g. sed -n) instead.`;
     }
-    const text = fs.readFileSync(full, "utf8");
+    const bytes = fs.readFileSync(full);
+    const sample = bytes.subarray(0, 8192);
+    if (sample.includes(0) || sample.filter(byte => byte < 32 && ![9, 10, 13].includes(byte)).length > sample.length / 10) {
+      const offending = [...sample.entries()].filter(([, byte]) => byte < 32 && ![9, 10, 13].includes(byte))
+        .slice(0, 8).map(([offset, byte]) => `0x${byte.toString(16).padStart(2, "0")} at byte ${offset}`).join(", ");
+      return `ERROR: ${JSON.stringify(p)} contains binary bytes (${offending}); read_file is a UTF-8 text tool. Valid UTF-8 can still contain NUL/control bytes. For a generated text report, inspect its textual fields for accidentally copied binary header bytes; do not rewrite an actual binary as text. ${binaryReadAdvice(Boolean(this.reaMcpDiscover), this.shellAvailable)} Do not interpret text-decoded binary as a hex dump or identify its platform from memory.`;
+    }
+    const text = bytes.toString("utf8");
     const lines = text.split("\n");
     const startLine = start ?? 1;
     if (!Number.isInteger(startLine) || startLine < 1) {
@@ -499,7 +519,7 @@ export class Executor {
     // START_WINDOW is a module const so the read-ledger veto shares one source of truth.
     const endIdx = limit
       ? Math.min(startIdx + limit, lines.length)
-      : (start ? Math.min(startIdx + START_WINDOW, lines.length) : lines.length);
+      : (start || this.fullReadContext ? Math.min(startIdx + START_WINDOW, lines.length) : lines.length);
     const shown = lines.slice(startIdx, endIdx);
     const numbered = shown.map((l, i) => `${startLine + i}\t${l}`).join("\n");
     const more = endIdx < lines.length
@@ -512,7 +532,8 @@ export class Executor {
     const rendered = `${p} (${lines.length} lines, showing ${startLine}-${endIdx}):\n${numbered}${more}`;
     const fixtureHint = this.fixtureDefaultHints && rendered.length < READ_OBS_MAX - 1000
       ? fixtureDefaultHints({ path:p, source:text, startLine, endLine:endIdx }) : '';
-    return clipReadObservation(rendered + (fixtureHint ? `\n\n${fixtureHint}` : ''), READ_OBS_MAX);
+    const output = rendered + (fixtureHint ? `\n\n${fixtureHint}` : '');
+    return this.fullReadContext ? output : clipReadObservation(output, READ_OBS_MAX);
   }
 
   listDir({ p }) {
@@ -525,7 +546,8 @@ export class Executor {
     // which re-lists the same directory in a loop (observed: 13 identical deduped inspects on an
     // empty workspace before the wrap-up mask finally broke it).
     if (!entries.length) return `${p}:\n(empty directory — no files here yet)`;
-    return clipText(`${p}:\n${entries.join("\n")}`);
+    const output = `${p}:\n${entries.join("\n")}`;
+    return this.fullReadContext ? clipFullContext(output, "list a subdirectory or search instead") : clipText(output);
   }
 
   search({ q, p, limit }) {
@@ -567,7 +589,7 @@ export class Executor {
       const notice = hits.length > max
         ? `[search limited] Showing ${max} of ${hits.length >= hitCap ? 'at least ' : ''}${hits.length} matches. Narrow q/p or increase limit to see more.\n`
         : '';
-      return clipText(notice + shown);
+      return this.fullReadContext ? notice + shown : clipText(notice + shown);
     }
     return clipText(this.searchMissDiagnosis({ q, p, re }));
   }
@@ -642,6 +664,7 @@ export class Executor {
       parts.push(`# ${i + 1} ${JSON.stringify(op)}\n${observation}`);
     }
     const joined = parts.join("\n\n");
+    if (this.fullReadContext) return joined;
     const max = this.inspectMaxChars;
     if (joined.length <= max) return joined;
     if (ops.some(op => op.a === "read_file")) return clipReadObservation(joined, max);
@@ -1552,7 +1575,7 @@ export class Executor {
     if (res.aborted) {
       out += "\n[interrupted] The user stopped this command. Do not treat its partial output as verification evidence.";
     }
-    return { observation: clipShellObservation(out, c), interrupted: res.aborted, shellExecution: this.lastShellExecution };
+    return { observation: this.fullReadContext ? clipFullContext(out, "redirect the output to a file and read it in pages") : clipShellObservation(out, c), interrupted: res.aborted, shellExecution: this.lastShellExecution };
   }
 }
 
@@ -1624,6 +1647,36 @@ function isPrintOnlyProbe(command) {
   if (!evalProbe) return false;
   const prints = command.includes("console.log(") || command.includes("print(");
   return prints && !/assert|\b(?:throw|raise|fail|reject)\b|\bprocess\s*\.\s*(?:exit|exitCode)\b|\bsys\s*\.\s*exit\b|\bos\s*\.\s*_exit\b/i.test(command);
+}
+
+// Where to get bytes when read_file refuses a binary: only routes this run has.
+function binaryReadAdvice(rea, shell) {
+  const shellRead = "bounded shell byte reads such as xxd -l 64 or Python binary mode";
+  if (rea && shell) return `Use rea_tools to discover binary/container tools and fetch the relevant schema, or use ${shellRead}.`;
+  if (rea) return "Use rea_tools to discover binary/container/byte-range tools and fetch the relevant schema; shell is not available in this run.";
+  if (shell) return `Use ${shellRead}.`;
+  return "No byte-level tool is available in this run (no shell, no REA); say so rather than guessing the contents.";
+}
+
+// Full-context mode keeps shell output and listings whole up to a ceiling far
+// above the normal clip, so a diagnostic's middle survives; past it, keep an
+// even head and tail and say how to get the rest. Unbounded output (a stray
+// `cat` of a log) would otherwise crowd every other turn out of the window.
+const FULL_CONTEXT_OUTPUT_MAX = Number(process.env.BANTAM_FULL_CONTEXT_OUTPUT_MAX) || 64_000;
+export function clipFullContext(s, advice, max = FULL_CONTEXT_OUTPUT_MAX) {
+  if (s.length <= max) return s;
+  const half = Math.floor(max / 2);
+  return `${s.slice(0, half)}\n... [${s.length - 2 * half} of ${s.length} chars omitted; ${advice}] ...\n${s.slice(-half)}`;
+}
+
+// REA results are delivered whole (src/observation-delivery.js): cutting JSON
+// rows loses their provenance. One result larger than this is refused rather
+// than clipped, and the model narrows the request with REA's paging/views.
+const REA_RESULT_MAX = Number(process.env.BANTAM_REA_RESULT_MAX_CHARS) || 200_000;
+export function oversizedReaResult(output, tool, max = REA_RESULT_MAX) {
+  const text = String(output ?? "");
+  if (text.length <= max) return text;
+  return `ERROR: REA ${tool} returned ${text.length} chars, more than one turn can hold (${max}). Nothing from it was kept. Repeat the call with a narrower request: use the tool's paging, limit, view or summary arguments from its schema (rea_tools name=${JSON.stringify(tool)}).`;
 }
 
 function clipShellObservation(s, command) {

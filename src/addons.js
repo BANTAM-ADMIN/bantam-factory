@@ -8,6 +8,7 @@ import path from "node:path";
 import os from "node:os";
 import { findLlamaServer } from "./llama-install.js";
 import { DEFAULT_REPO, DEFAULT_QUANT, QUANTS, EXTRAS, ggufName, modelsDir } from "./provision.js";
+import { REA_SOURCE, REA_VERSION, findReaRoot, reaInstalledVersion, installRea, REA_INSTALL_HINT } from "./rea-addon.js";
 
 export function addonsRoot() {
   return process.env.BANTAM_ADDONS_DIR || path.join(os.homedir(), ".bantam", "addons");
@@ -56,6 +57,20 @@ export const ADDONS = [
       return fs.existsSync(f) ? { installed: true, detail: f } : { installed: false, detail: "not installed" };
     },
     installHint: "bantam doctor --provision-extra mtp",
+  },
+  {
+    name: "rea",
+    label: `REA reverse-engineering MCP (${REA_VERSION}${REA_SOURCE.tarball ? ", BANTAM-ADMIN/rea fork" : ""}, MIT)`,
+    what: "binaries, ROMs, archives, Electron/JS apps — about 230 MB installed; enable per run with --rea or :rea on",
+    status() {
+      const root = findReaRoot();
+      return root ? { installed: true, detail: `${reaInstalledVersion(root) ?? "?"} at ${root}` } : { installed: false, detail: "not installed" };
+    },
+    installHint: REA_INSTALL_HINT,
+    async install() {
+      const { root, version } = await installRea();
+      return `REA ${version} installed at ${root}. Enable it with --rea, or :rea on inside a session.`;
+    },
   },
 ];
 

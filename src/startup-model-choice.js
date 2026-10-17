@@ -1,7 +1,7 @@
 // The startup picker — the first station of every session, and therefore the
 // one where the lit button matters most.
 //
-// It used to hardcode `recommended` to gpt-5.6-terra. On a machine carrying six
+// It used to hardcode `recommended` to a Codex model. On a machine carrying six
 // certified local profiles that put a cloud model at [1] and the local daily
 // driver at an unmarked [4], and the ordering actively contradicted what had
 // been measured: the unified-KV `crew` profile — 11x slower on alternating work
@@ -11,7 +11,7 @@
 // read; the highest-priority local is recommended and listed first, and a
 // machine with no local models still falls back to the cloud default, because
 // with nothing registered that genuinely IS the right first move.
-import { codexModelOptions } from "./codex-models.js";
+import { codexModelOptions, defaultCodexModel } from "./codex-models.js";
 import { endpointKey } from "./image-gpu.js";
 
 /** Opening chat uses an available local server first, then Codex. */
@@ -19,7 +19,7 @@ export function startupCodexFallback({ automaticChatStartup, detectedLocalReady,
   if (!automaticChatStartup || detectedLocalReady || detectedApiReady) return null;
   return rememberedConnection?.kind === "codex"
     ? { model: rememberedConnection.model, effort: rememberedConnection.effort || "medium" }
-    : { model: "gpt-5.6-terra", effort: "medium" };
+    : defaultCodexModel();
 }
 
 /**
@@ -98,7 +98,7 @@ export function startupModelChoices({
       detail: `${entry.role}: ${entry.recommendation}`,
       model: entry.model,
       effort,
-      recommended: !recommendedLocal && entry.model === "gpt-5.6-terra",
+      recommended: !recommendedLocal && entry.name === "codex-sol",
       lastUsed: preference?.kind === "codex"
         && preference.model === entry.model
         && preference.effort === effort,

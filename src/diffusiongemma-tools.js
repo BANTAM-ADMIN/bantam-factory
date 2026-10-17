@@ -6,7 +6,7 @@ import { diffusionGemmaFinalText } from './diffusiongemma-output.js';
 // Jev selects controller-issued values; the CPU owns the action envelope and
 // copies existing source. Only genuinely new strings are generated. Execution
 // still goes through the ordinary dispatcher and its scope/evidence gates.
-export async function diffusionGemmaToolTurn({ state, context, choose, generate, signal, onDecision = () => {} }) {
+export async function diffusionGemmaToolTurn({ state, context, choose, generate, signal, onDecision = () => {}, onCheckpoint = () => {} }) {
   let usage = emptyModelUsage(), generatedTokens = 0;
   const decisions = [];
   const pick = async (question, options) => {
@@ -24,10 +24,25 @@ export async function diffusionGemmaToolTurn({ state, context, choose, generate,
     signal?.throwIfAborted();
     const remaining = context.generationTokens - generatedTokens;
     if (remaining <= 0) throw Object.assign(new Error('DiffusionGemma tool payload exhausted the generation reserve; use a smaller step'), { code: 'generation_budget_exhausted' });
-    const result = await generate({ state, instruction, code, maxTokens: Math.min(maxTokens, remaining) });
+    const snapshot = (raw, stoppedLimit = false) => {
+      let prefix = diffusionGemmaFinalText(raw);
+      const block = /^(`{3,})[^\r\n]*\r?\n/.exec(prefix);
+      if (code && block) {
+        prefix = prefix.slice(block[0].length);
+        const closing = new RegExp('\\r?\\n' + block[1] + '[ \t]*$');
+        prefix = prefix.replace(closing, '');
+      }
+      const partialAction = action.a === 'write_file' && field === 'content' && block
+        ? { ...action, content: prefix } : null;
+      const receipt = { raw, stoppedLimit, partialAction };
+      onCheckpoint(receipt);
+      return receipt;
+    };
+    const result = await generate({ state, instruction, code, maxTokens: Math.min(maxTokens, remaining),
+      onProgress: info => snapshot(info.content) });
     usage = addModelUsage(usage, result.usage);
     generatedTokens += result.tokens ?? result.usage?.outputTokens ?? 0;
-    if (result.stoppedLimit) throw Object.assign(new Error('DiffusionGemma tool argument was truncated; no partial action was applied'), { code: 'generation_budget_exhausted' });
+    if (result.stoppedLimit) throw Object.assign(new Error('DiffusionGemma tool argument was truncated; no partial action was applied'), { code: 'generation_budget_exhausted', outputSnapshot: snapshot(result.content, true), tokens: generatedTokens, usage });
     let value = diffusionGemmaFinalText(result.content);
     if (code) {
       // Field generation uses a closed literal block, never a JSON string.
@@ -71,6 +86,8 @@ export async function diffusionGemmaToolTurn({ state, context, choose, generate,
   };
   for (const field of fields.filter(field => field.key === 'p' || field.key === 'from' || field.key === 'to')) action[field.key] = await pathFor(field);
 
+  if (action.a === 'write_file' && context.checkpoint?.target === action.p) action.checkpoint = context.checkpoint.id;
+
   let snapshot = null;
   if (['edit_lines', 'replace'].includes(action.a)) {
     snapshot = context.readSource?.(action.p);
@@ -98,7 +115,7 @@ export async function diffusionGemmaToolTurn({ state, context, choose, generate,
   for (const field of fields) {
     if (Object.hasOwn(action, field.key)) continue;
     if (field.type !== 'string') throw new Error(`Unsupported required tool field ${field.key}`);
-    action[field.key] = await text(`Generate ONLY the literal value of ${field.key} for ${action.a}, with parameters ${JSON.stringify(action)}. ${field.key === 'content' ? 'Create a small complete working file, at most 100 lines. Return one closed four-backtick literal code block.' : 'No JSON wrapping, action object, or explanation outside the requested value.'}`, {
+    action[field.key] = await text(`Generate ONLY the literal value of ${field.key} for ${action.a}, with parameters ${JSON.stringify(action)}. ${field.key === 'content' ? (action.checkpoint ? 'Continue the saved prefix from the transcript. Return ONLY THE MISSING SUFFIX in one closed four-backtick literal code block. Include required closing source delimiters; do not repeat the prefix.' : 'Create a small complete working file, at most 100 lines. Return one closed four-backtick literal code block.') : 'No JSON wrapping, action object, or explanation outside the requested value.'}`, {
       code: field.key === 'content', singleLine: ['id', 'c'].includes(field.key),
       maxTokens: ['content', 'summary', 'text'].includes(field.key) ? context.generationTokens : 512, allowEmpty: field.allowEmpty,
       field: field.key,

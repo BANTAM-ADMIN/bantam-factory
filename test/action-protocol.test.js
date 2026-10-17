@@ -9,6 +9,7 @@ import {
   LINE_EDIT_FEATURE,
   PATCH_ACTION_FEATURE,
   JEV_DECIDE_FEATURE,
+  REA_MCP_FEATURE,
   PROBE_ACTION_FEATURE,
   WRITE_BATCH_FEATURE,
   EDIT_CONFIRMATION_FEATURE,
@@ -49,6 +50,8 @@ const ALL_VERBS = [
   "shell",
   "probe",
   "decide",
+  "rea_tools",
+  "rea_tool",
   "done",
   "respond",
   "query",
@@ -89,7 +92,7 @@ test("feature gates enable only the requested actions in canonical order", () =>
   );
   assert.deepEqual(
     enabledActionDefinitions({
-      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE, PROBE_ACTION_FEATURE, EDIT_CONFIRMATION_FEATURE, JEV_DECIDE_FEATURE],
+      features: [FILE_OPS_FEATURE, PATCH_ACTION_FEATURE, WRITE_BATCH_FEATURE, LINE_EDIT_FEATURE, PROBE_ACTION_FEATURE, EDIT_CONFIRMATION_FEATURE, JEV_DECIDE_FEATURE, REA_MCP_FEATURE],
     }).map(({ verb }) => verb),
     ALL_VERBS,
   );

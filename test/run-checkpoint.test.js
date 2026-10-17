@@ -54,3 +54,17 @@ test("checkpoints retain the exact post-execution assertion review separately fr
   assert.deepEqual(saved.turns[0].failedAssertionReview, expected);
   assert.equal(saved.turns[0].shellExecution.exitCode, 1);
 });
+
+test('crash evidence preserves the pending output checkpoint until the file is committed', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-output-checkpoint-pointer-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const dest = path.join(directory, 'partial.json');
+  const checkpoint = new RunCheckpoint({ dest, autosaveEvery: 0 });
+  checkpoint.note({ type: 'output_checkpoint_saved', id: 'run/attempt', target: 'story.txt', draftPath: '.bantam/draft.txt', rawPath: '.bantam/raw.json', stoppedLimit: true });
+  const saved = JSON.parse(fs.readFileSync(dest));
+  assert.equal(saved.pendingOutputCheckpoint, 'run/attempt');
+  assert.equal(saved.outputCheckpoints[0].target, 'story.txt');
+  checkpoint.note({ type: 'output_checkpoint_committed', id: 'run/attempt' });
+  checkpoint.flush('test');
+  assert.equal(JSON.parse(fs.readFileSync(dest)).pendingOutputCheckpoint, null);
+});

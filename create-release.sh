@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run this with your GitHub token to create the v2.0.3 release
+# Run this with your GitHub token to create the v2.0.4 release
 # Usage: GITHUB_TOKEN=ghp_xxx ./create-release.sh
 
 if [ -z "$GITHUB_TOKEN" ]; then

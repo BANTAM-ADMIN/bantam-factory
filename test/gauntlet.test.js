@@ -30,7 +30,7 @@ test("gauntlet creates a normalized same-task local/Sol/Terra experiment", () =>
   assert.deepEqual(normalized.arms.map((arm) => arm.name), ["local", "sol", "terra"]);
   assert.deepEqual(normalized.arms[1].model, {
     runtime: "codex",
-    name: "gpt-5.6-sol",
+    name: "gpt-6.1-sol",
     effort: "high",
   });
   assert.ok(normalized.fixtures.every((fixture) => path.isAbsolute(fixture)));
@@ -102,7 +102,7 @@ test("quick selection and per-arm routing remain explicit and credential-free", 
     apiKey: null,
     deepseek: false,
     codex: true,
-    model: "gpt-5.6-sol",
+    model: "gpt-6.1-sol",
     codexEffort: "xhigh",
   });
   assert.deepEqual(parseGauntletList("local, SOL,local", ["terra"]), ["local", "sol", "local"]);

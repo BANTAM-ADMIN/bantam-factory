@@ -6,6 +6,7 @@
 // always kept; older contiguous turns fit only while the hard budget permits.
 
 import { clipText as clipObservation } from "./clip.js";
+import { fullObservation } from "./observation-delivery.js";
 import { verificationWorkflowPromptText } from "./contract-audit-phase.js";
 import { trustedReviewEvidenceEnd } from "./run-continuation.js";
 
@@ -90,7 +91,7 @@ export const HISTORY_MAX_HISTORY_TOKENS = 44000;
 export const HISTORY_MIN_CHAR_BUDGET = 4000;
 const HISTORY_WINDOW_SHARE = { extension: 0.6, panel: 0.125 };
 
-export function historyCharBudget({ contextTokens, extensionTrajectory = false, codexBacked = false, override } = {}) {
+export function historyCharBudget({ contextTokens, extensionTrajectory = false, codexBacked = false, outputTokens, override } = {}) {
   const explicit = Number(override);
   if (Number.isInteger(explicit) && explicit > 0) return explicit;
   const context = Number(contextTokens);
@@ -101,14 +102,17 @@ export function historyCharBudget({ contextTokens, extensionTrajectory = false, 
   // prompt/response headroom; unknown windows keep the conservative fallback.
   const tokens = codexBacked ? Math.floor(context * share)
     : Math.min(Math.floor(context * share), HISTORY_MAX_HISTORY_TOKENS);
-  return Math.max(HISTORY_MIN_CHAR_BUDGET, tokens * HISTORY_CHARS_PER_TOKEN);
+  const reserve = Number(outputTokens);
+  const available = Number.isFinite(reserve) && reserve > 0
+    ? Math.max(1, context - reserve - 2048) : Infinity;
+  return Math.max(HISTORY_MIN_CHAR_BUDGET, Math.min(tokens, available) * HISTORY_CHARS_PER_TOKEN);
 }
 
 export function budgetTurns(turns, { charBudget = 36000, readObservationMaxChars = 4000, ...opts } = {}) {
   return selectBudgetWindow(turns, { charBudget, readObservationMaxChars, ...opts }).window;
 }
 
-function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars = 4000, refreshedReads = new Set(), ...opts } = {}) {
+function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars = 4000, refreshedReads = new Set(), fullReadContext = false, ...opts } = {}) {
   const list = Array.isArray(turns) ? turns : [];
   if (!list.length) return { window: [], start: 0 };
   const limit = Math.max(0, Number.isFinite(Number(charBudget)) ? Math.floor(Number(charBudget)) : 36000);
@@ -119,12 +123,12 @@ function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars
   // after the budget evicted turn N. Window sizes only grow versus the
   // full-list estimate (fewer dedup hits), so slide forward until it fits.
   const pins = pinnedIndices(list, opts);
-  let start = firstKeptIndex(compactHistory(list, { refreshedReads }), limit, { pins, readObservationMaxChars });
+  let start = firstKeptIndex(compactHistory(list, { refreshedReads, fullReadContext }), limit, { pins, readObservationMaxChars, fullReadContext });
   for (;;) {
     const indices = retainedIndices(list.length, start, pins);
-    const window = compactHistory(indices.map(i => list[i]), { refreshedReads });
+    const window = compactHistory(indices.map(i => list[i]), { refreshedReads, fullReadContext });
     let total = 0;
-    for (const turn of window) total += turnSize(turn, readObservationMaxChars);
+    for (const turn of window) total += turnSize(turn, readObservationMaxChars, fullReadContext);
     if (total <= limit || indices.every(i => pins.has(i) || i === list.length - 1)) {
       // Leading anchors belong to the window independently of its suffix. In
       // particular, a second build containing only anchors plus the newest
@@ -143,7 +147,7 @@ function selectBudgetWindow(turns, { charBudget = 36000, readObservationMaxChars
 // budgetTurns' existing stateless behavior.
 export function createHistoryWindow({ charBudget = 120000, pinHead = true,
   pinLatestReview = true, retainRatio = 2 / 3, onRebase = null, readObservationMaxChars = 4000,
-  refreshedReads = new Set() } = {}) {
+  refreshedReads = new Set(), fullReadContext = false } = {}) {
   if (!Number.isFinite(retainRatio) || retainRatio <= 0 || retainRatio >= 1) {
     throw new Error("history retainRatio must be between zero and one");
   }
@@ -185,12 +189,12 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
     noteReadRefresh(list, refreshedReads);
     const selectedIndices = retainedIndices(list.length, start, pins);
     const retained = selectedIndices.map(i => list[i]);
-    let window = compactHistory(retained, { refreshedReads });
-    const beforeChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
+    let window = compactHistory(retained, { refreshedReads, fullReadContext });
+    const beforeChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars, fullReadContext), 0);
     let afterChars = beforeChars, overflow = false;
     if (beforeChars > limit) {
       overflow = true;
-      const selected = selectBudgetWindow(retained, { charBudget: target, pinHead, pinLatestReview, readObservationMaxChars, refreshedReads });
+      const selected = selectBudgetWindow(retained, { charBudget: target, pinHead, pinLatestReview, readObservationMaxChars, refreshedReads, fullReadContext });
       window = selected.window;
       // Keep the contiguous suffix boundary separate from mandatory anchors.
       // A review can be anywhere in the old history; counting it as tail would
@@ -204,7 +208,7 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
         window = compactHistory(retainedIndices(list.length, start, pins).map(i => list[i]), { refreshedReads });
       }
       cutoff = keys[start];
-      afterChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars), 0);
+      afterChars = window.reduce((total, turn) => total + turnSize(turn, readObservationMaxChars, fullReadContext), 0);
     }
     const signature = overflow ? `${newest}:${cutoff}:${afterChars}` : null;
     if (typeof onRebase === "function" && (reset || (overflow && signature !== lastOverflow))) {
@@ -230,16 +234,16 @@ export function createHistoryWindow({ charBudget = 120000, pinHead = true,
   return historyWindow;
 }
 
-function firstKeptIndex(compacted, limit, { pins = new Set(), readObservationMaxChars = 4000 } = {}) {
+function firstKeptIndex(compacted, limit, { pins = new Set(), readObservationMaxChars = 4000, fullReadContext = false } = {}) {
   // pinHead: never evict turn 0. The first turn is the task's own grounding (the
   // spec read, the repo map) and the least droppable bytes in the run; evicting
   // it both blinds the model and rewrites the prompt right after the system
   // block, which resets the slot cache to the head checkpoint. Price it first so
   // the window behind it is budgeted against what is left.
-  let total = [...pins].reduce((size, i) => size + turnSize(compacted[i], readObservationMaxChars), 0);
+  let total = [...pins].reduce((size, i) => size + turnSize(compacted[i], readObservationMaxChars, fullReadContext), 0);
   for (let i = compacted.length - 1; i >= 0; i -= 1) {
     if (pins.has(i)) continue;
-    const size = turnSize(compacted[i], readObservationMaxChars);
+    const size = turnSize(compacted[i], readObservationMaxChars, fullReadContext);
     // Always retain the newest causal turn, even under a nonsensical zero-byte
     // setting. Beyond that, the configured budget is hard: a six-turn floor
     // formerly allowed six large edit bodies to blow straight past it.
@@ -254,7 +258,7 @@ function firstKeptIndex(compacted, limit, { pins = new Set(), readObservationMax
 // identical line in a DIFFERENT observation is not (two files can share an
 // import or two commands can share an error line with different provenance).
 // The raw artifact/journal remains untouched.
-export function compactHistory(turns, { refreshedReads = new Set() } = {}) {
+export function compactHistory(turns, { refreshedReads = new Set(), fullReadContext = false } = {}) {
   const list = Array.isArray(turns) ? turns : [];
   noteReadRefresh(list, refreshedReads);
   const firstSeen = new Map();
@@ -293,6 +297,9 @@ export function compactHistory(turns, { refreshedReads = new Set() } = {}) {
   return list.map((turn, index) => {
     if (index === newestRepetition) return turn;
     if (!turn || typeof turn !== "object" || typeof turn.observation !== "string") return turn;
+    // Keep REA's complete response, including row provenance and coverage.
+    // History pressure can evict an older whole turn, never part of its JSON.
+    if (fullObservation(turn.action ?? turn.parsedAction, fullReadContext)) return turn;
     // A fresh explicit request after the same read is an attempt to recover
     // its bytes. Returning another pointer caused eight identical reads in
     // the local game run, even though the old origin technically survived.
@@ -474,7 +481,7 @@ function normalizeSourcePath(value) {
     .replace(/^\/app\//, "");
 }
 
-function turnSize(turn, readObservationMaxChars = 4000) {
+function turnSize(turn, readObservationMaxChars = 4000, fullReadContext = false) {
   if (!turn || typeof turn !== "object") return 0;
   // Use the same bounded validator/formatter as prompt.js: malformed or
   // oversized state renders nothing, and never requires serializing unchecked
@@ -489,7 +496,9 @@ function turnSize(turn, readObservationMaxChars = 4000) {
   // previously frozen fragments are also accounted separately by the caller.
   const action = turn.action ?? turn.parsedAction ?? null;
   const reviewEnd = trustedReviewEvidenceEnd(turn);
-  const observationChars = reviewEnd !== null
+  const observationChars = fullObservation(action, fullReadContext)
+    ? String(turn.observation ?? "").length
+    : reviewEnd !== null
     ? reviewEnd + clipObservation(turn.observation.slice(reviewEnd), 4000).length
     : clipObservation(turn.observation, action?.a === "read_file" || action?.a === "inspect"
       ? Math.max(4000, Math.min(24000, Number(readObservationMaxChars) || 4000)) : 4000).length;

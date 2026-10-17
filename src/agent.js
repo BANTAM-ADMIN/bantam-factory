@@ -22,6 +22,7 @@ import { GATE_ENGAGEMENT_METRIC } from "./logic/gate-engagement.js";
 import { ModelClient, modelOutputTokenCap } from "./model.js";
 import { parseDiffusionGemmaAction } from './diffusiongemma-output.js';
 import { canResumeWriteFile, resumableWriteFilePrefix } from "./output-limit-continuation.js";
+import { createOutputCheckpointStore } from './output-checkpoint.js';
 import { acquireModelLock } from "./model-lock.js";
 import { frameInjection } from "./logic/attendant.js";
 import { trustedReviewEvidenceEnd } from "./run-continuation.js";
@@ -68,6 +69,8 @@ import { continuityAnchors, renderContinuityAnchors } from "./logic/continuity-a
 import { formatFailingTestFocus, workspaceTestReader, parseTestCounts, parseTestFailures, testFailureDetail, renderFailingTests, extractTestDiagnosticContext, diagnosedImplementationPath, diagnoseFailingTest } from "./logic/test-focus.js";
 import { SELF_TEACHER_PERSONA, teacherDue, teacherFromEnv, askTeacher } from "./teacher-assist.js";
 import { localLlmEndpoint } from "./local-llm-bridge.js";
+import { acquireReaMcpClient } from "./rea-mcp-client.js";
+import { reaAwarenessText } from "./rea-addon.js";
 import { buildPrompt, clipKeepingControllerAnnotation, contextUpdatePromptText, slimSuccessfulShellReplay, SUPERSEDED_EDIT } from "./prompt.js";
 import { clipReadObservation } from "./read-observation.js";
 import { recordPagingWindow } from "./read-paging.js";
@@ -167,6 +170,7 @@ import {
   LINE_EDIT_FEATURE,
   PROBE_ACTION_FEATURE,
   JEV_DECIDE_FEATURE,
+  REA_MCP_FEATURE,
   EDIT_CONFIRMATION_FEATURE,
 } from "./action-protocol.js";
 import { decidePatchAction } from "./patch-policy.js";
@@ -181,7 +185,7 @@ import { assessBulkEdit, createBulkEditState } from "./bulk-edit-gate.js";
 import { degenerateRepairMessage, degenerateTail } from "./logic/degenerate-output.js";
 import { shellSyntaxHint } from "./logic/shell-syntax-guard.js";
 import { blastRadiusNote, dependentsOf } from "./logic/blast-radius.js";
-import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink, successfulVerificationBoundary } from "./thinking.js";
+import { compactActionReasoning, deriveThinkPrefills, inspectionCheckpointDue, inspectionCheckpointText, shouldThink, successfulVerificationBoundary, visualReviewBoundary } from "./thinking.js";
 import { progressRecordFeedback } from "./progress-record.js";
 import { RequiredReadHistory } from './required-read-history.js';
 import { requirementChecklistEnabled } from "./requirement-checklist.js";
@@ -418,6 +422,8 @@ const inspectionLeases = new WeakMap();
 
 export async function runAgent(options = {}) {
   const model = options.model ?? new ModelClient();
+  let reaMcp = options.reaMcp ?? null;
+  let ownsReaMcp = false;
   // The local model serves one slot; concurrent runs thrash its KV cache into
   // pure re-prefill. Hold the endpoint's single-flight lock for the whole run
   // (see src/model-lock.js). Codex still carries ModelClient's fallback local
@@ -449,14 +455,21 @@ export async function runAgent(options = {}) {
   } : null;
   let runToken = null;
   try {
+    if (!reaMcp && process.env.BANTAM_REA_MCP === "1") {
+      reaMcp = await acquireReaMcpClient({ workspace: options.workspace ?? process.cwd() });
+      ownsReaMcp = true;
+    }
     runToken = model.beginAgentRun?.() ?? null;
-    return await runAgentCore({ ...options, model, inspectionBoundary });
+    return await runAgentCore({ ...options, model, reaMcp, inspectionBoundary });
   } finally {
     try { await model.endAgentRun?.(runToken); }
     finally {
-      lock?.release();
-      inspectionLeases.delete(lease);
-      if (inherited) inherited.borrowed = false;
+      try { if (ownsReaMcp) await reaMcp.close(); }
+      finally {
+        lock?.release();
+        inspectionLeases.delete(lease);
+        if (inherited) inherited.borrowed = false;
+      }
     }
   }
 }
@@ -480,6 +493,7 @@ async function runAgentCore({
   wallDeadlineMs = positiveInt(process.env.BANTAM_DEADLINE_MS, null),
   terminalClosureTurns = process.env.BANTAM_TERMINAL_CLOSURE === "1" || wallDeadlineMs ? 1 : 0,
   maxInvalidPerTurn = 3,
+  resumeOutputCheckpoint = null,
   verificationScript = null,
   profileText = null,   // standing operator preferences (see src/operator-profile.js)
   // Evaluators grade the final tree unconditionally. Interactive callers can
@@ -603,6 +617,7 @@ async function runAgentCore({
   // context, but its own deliverable is still a read-only response. Do not
   // route that response through implementation-only empty/done gates.
   advisoryMode = false,
+  fullReadContext = /^(1|true|yes|on)$/i.test(process.env.BANTAM_FULL_READ_CONTEXT ?? ""),
   dedupeActions = process.env.BANTAM_NO_DEDUPE !== "1", // replay, don't re-execute, identical recon
   // Replay an exact shell result only when its prior execution made no
   // workspace change. A balanced hard-tier A/B improved strict passes from
@@ -721,6 +736,7 @@ async function runAgentCore({
   probeEnabled = envTruthy(process.env.BANTAM_PROBE),
   // Jev mode's decide tool (src/jev/commands.js jevDecideTool): null keeps the verb out of the grammar.
   jevDecide = null,
+  reaMcp = null,
   // Direct delete/move actions only for tasks that explicitly name those file
   // operations. A balanced local-Qwen A/B preserved 8/8 strict passes, used
   // both verbs with zero failures, and reduced summed task time by 3.1%.
@@ -896,6 +912,7 @@ async function runAgentCore({
     ...(fileOperationPolicy.enabled ? [FILE_OPS_FEATURE] : []),
     ...(probeEnabled ? [PROBE_ACTION_FEATURE] : []),
     ...(jevDecide ? [JEV_DECIDE_FEATURE] : []),
+    ...(reaMcp?.tools?.length && typeof reaMcp.call === "function" ? [REA_MCP_FEATURE] : []),
   ];
   // Codex places the response schema before conversation history. Changing a
   // per-turn grammar mask there invalidates the cached prefix for the entire
@@ -946,6 +963,10 @@ async function runAgentCore({
     inspectMaxChars: readObservationMaxChars,
     probeEnabled,
     jevDecide,
+    reaMcpCall: reaMcp?.call,
+    reaMcpDiscover: reaMcp?.discover,
+    fullReadContext,
+    shellAvailable: !callerExcludedActions.includes("shell"),
     noopEditGuard,
     shellSandbox,
     shellNetwork,
@@ -1103,9 +1124,9 @@ async function runAgentCore({
   const imageNudge = tools?.get("generate_image")
     ? "\nWhen the operator asks to create or generate an image, use `query generate_image <their prompt>` immediately. Do not write a workflow, launch ComfyUI, or call its HTTP API through shell; the image provider owns that work."
     : "";
-  const toolsText = tools
+  const toolsText = [tools
     ? `You can ask local retrieval and reasoning tools with the "query" action instead of reading/searching blindly. Structural tools return exact facts; ranked tools label their evidence. Menu:\n${tools.describe()}${mapNudge}${seamNudge}${imageNudge}`
-    : "";
+    : "", reaMcp?.prompt || reaAwarenessText(task)].filter(Boolean).join("\n\n");
   let map = (ground && groundingMap) ? codeMap(ground) : "";
   // Name the verification command. The harness runs it for the model
   // ("reading and reasoning is not verification, so I ran them for you") and
@@ -1385,6 +1406,18 @@ async function runAgentCore({
     ? lifecycleContractViolations({ task, workspace, paths: [...lifecycleContractPaths] })
     : [];
   const rejectedOutputs = [];
+  const outputCheckpoints = createOutputCheckpointStore(exec);
+  let outputCheckpointGuidance = '';
+  let activeOutputCheckpoint = null;
+  if (resumeOutputCheckpoint) {
+    try {
+      activeOutputCheckpoint = outputCheckpoints.restore(resumeOutputCheckpoint);
+      outputCheckpointGuidance = outputCheckpoints.guidance(activeOutputCheckpoint);
+    } catch (error) {
+      outputCheckpointGuidance = `[output-checkpoint] Previous draft could not be resumed: ${error.message}. Read the current destination and saved draft before editing.`;
+      onEvent({ type: 'output_checkpoint_failed', reason: error.message });
+    }
+  }
   const deciderEnabled = integratedDecider === true || envTruthy(integratedDecider);
   const resolvedImprovementLogPath = improvementLogPath
     ? (path.isAbsolute(improvementLogPath)
@@ -2184,8 +2217,9 @@ async function runAgentCore({
   const configuredContextTokens = positiveInt(process.env.BANTAM_CONTEXT_TOKENS, null);
   const configuredHistoryBudget = positiveInt(process.env.BANTAM_HISTORY_CHAR_BUDGET, null);
   const currentHistoryBudget = () => deriveHistoryCharBudget({
+    outputTokens: modelOutputTokenCap(model, { action: true }),
     contextTokens: model.diffusionGemma ? model.contextWindowTokens : configuredContextTokens ?? model.contextWindowTokens,
-    extensionTrajectory,
+    extensionTrajectory: extensionTrajectory || fullReadContext,
     codexBacked: model.codexBacked === true,
     override: model.contextBudget ? Math.min(configuredHistoryBudget ?? Infinity, model.contextBudget.historyChars) : configuredHistoryBudget,
   });
@@ -2206,12 +2240,12 @@ async function runAgentCore({
   // bodies remain priced after the next action makes them historical turns.
   const refreshedReads = new Set();
   const historyWindow = extensionTrajectory ? createHistoryWindow({
-    charBudget: historyCharBudget, readObservationMaxChars, pinHead: true, refreshedReads,
+    charBudget: historyCharBudget, readObservationMaxChars, fullReadContext, pinHead: true, refreshedReads,
     onRebase: receipt => {
       if (receipt.overflow) metrics.extensionHistoryRebases = (metrics.extensionHistoryRebases ?? 0) + 1;
       onEvent({ type: "extension_history_rebase", ...receipt });
     },
-  }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars, refreshedReads });
+  }) : h => budgetTurns(h, { charBudget: historyCharBudget, readObservationMaxChars, refreshedReads, fullReadContext });
   const capTurns = h => {
     const nextBudget = currentHistoryBudget();
     if (nextBudget !== historyCharBudget) {
@@ -2304,12 +2338,16 @@ async function runAgentCore({
   };
   const safeComplete = async (makePrompt, completeOpts) => {
     let compactingDiffusion = false;
+    let oversizedPrompt = null;
+    let attemptedPrompt = null;
     for (let shrink = 0; shrink < 8; shrink++) {
       try {
         const withPenalty = degeneratePenalty
           ? { ...completeOpts, presencePenalty: degeneratePenalty }
           : completeOpts;
         const prompt = makePrompt();
+        attemptedPrompt = prompt;
+        if (prompt === oversizedPrompt) return null;
         noteContextUpdatePrompt(prompt);
         if (model.diffusionGemma && typeof model.inspectContext === 'function') {
           const budget = await model.inspectContext(prompt, { ...withPenalty, signal });
@@ -2366,6 +2404,7 @@ async function runAgentCore({
           return null;
         }
         if (e.code === "context_overflow") {
+          oversizedPrompt = attemptedPrompt;
           const base = Number.isFinite(historyCap) ? historyCap : turns.length + 1;
           historyCap = Math.max(1, Math.floor(base / 2));
           metrics.contextTrims = (metrics.contextTrims ?? 0) + 1;
@@ -3008,7 +3047,7 @@ async function runAgentCore({
     };
     const completeReadPaths = [...completeOpenFiles.keys()];
     const inspectionCheckpointTurn = thinkMode === 'auto' && thinkingAvailable
-      && !advisoryMode && suppliedSpecPaths.size > 0
+      && !advisoryMode
       && inspectionCheckpointDue(turns, inspectionCheckpointAfter);
     const preEditSynthesisTurn = preEditSynthesis
       && !preEditSynthesisSpent
@@ -3038,6 +3077,26 @@ async function runAgentCore({
     }
 
     for (let attempt = 0; attempt <= (terminalClosureTurn ? 0 : maxInvalidPerTurn); attempt++) {
+      const outputSlot = outputCheckpoints.begin({ turn: turns.length, attempt });
+      let receivedOutput = '';
+      let checkpointError = null;
+      let checkpointPartialAction = null;
+      const checkpointOutput = (raw, options = {}) => {
+        receivedOutput = String(raw ?? '');
+        if (options.partialAction) checkpointPartialAction = options.partialAction;
+        try {
+          const receipt = outputCheckpoints.save(outputSlot, receivedOutput, { ...options, partialAction: options.partialAction ?? checkpointPartialAction });
+          if (receipt) checkpointError = null;
+          if (receipt && options.force) {
+            metrics.outputCheckpointsSaved = (metrics.outputCheckpointsSaved ?? 0) + 1;
+            onEvent({ type: 'output_checkpoint_saved', ...receipt });
+          }
+          return receipt;
+        } catch (error) {
+          checkpointError = error;
+          return null;
+        }
+      };
       const historyForPrompt = preservePromptAttempts ? turns : terminalClosureTurn
         ? [...turns, { observation: terminalClosureNote(maxTurns) }]
         : repairObs
@@ -3128,7 +3187,7 @@ async function runAgentCore({
             "Follow the ordering literally in the next assertion-bearing probe. In particular, capture the returned Promise, trigger abort/reset while work is blocked, and only then await the Promise.",
           ].join("\n")
         : "";
-      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor, codexActionPolicy]
+      const finalDecisionReanchor = [lifecycleContractReanchor, stateAuditReanchor, documentReviewCompleteReanchor, previewFailureReanchor, codexActionPolicy, outputCheckpointGuidance]
         .filter(Boolean)
         .join("\n\n");
       const decHintText = decHint
@@ -3347,6 +3406,7 @@ async function runAgentCore({
         lastWasInvalid: attempt > 0,
         preEditSynthesis: synthesisThisAttempt,
         inspectionCheckpoint: inspectionCheckpointTurn && attempt === 0,
+        visualReview: visualReviewBoundary(turns.at(-1)) && attempt === 0,
         assertionRecovery: assertionRecovery.length > 0 && attempt === 0,
         verifiedGreen,
       })) {
@@ -3373,7 +3433,7 @@ async function runAgentCore({
           onEvent({ type: "deep_think_grant", turn: turns.length });
         }
         const thought = await safeComplete(
-          () => buildPrompt({ diffusionTools: model.diffusionGemma === true, compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
+          () => buildPrompt({ diffusionTools: model.diffusionGemma === true, compactRules, readObservationMaxChars, fullReadContext, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill: thinkP.openThink, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }),
           { stop: [...thinkP.stop, ...model.stop], nPredict: thinkBudget({ normal: thinkNPredict, deep: thinkNPredictFirst, editCount, grant: grantedDeepThink }),
             codexAdaptiveRebase: !completionAuditEmitted,
             ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "thinking", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "thinking", detail: `${p.tokens} tokens` }); } } : {}) }
@@ -3456,7 +3516,7 @@ async function runAgentCore({
       onEvent({ type: "activity", label: "generating" });
       const out = await safeComplete(
         () => {
-          const built = gaugeExtensionPrefix(buildPrompt({ diffusionTools: model.diffusionGemma === true, compactRules, readObservationMaxChars, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
+          const built = gaugeExtensionPrefix(buildPrompt({ diffusionTools: model.diffusionGemma === true, compactRules, readObservationMaxChars, fullReadContext, refreshedReads, freezeNewest: preservePromptAttempts, pendingPromptPrelude: promptPrelude, pendingPromptAttempts: promptAttempts, onRenderedObservation: recordReadDelivery, task, env, maxTurns, profileText, sandboxedShell, turns: capTurns(historyForPrompt), assistantPrefill, historyPrefill: bareHistory ? bareTurnPrefill : model.historyPrefill, skillsText: extensionTrajectory ? extensionHeadSkillsText : skillsText, planText: extensionTrajectory ? extensionHeadPlanText : planText, contractText: taskContractText, extensionTrajectory, extensionWorkingSet, outputTokenCap: modelOutputTokenCap(model, { action: true }), reasoningEffort, reanchorText, finalReanchorText: finalDecisionReanchor, openFilesText, openPaths, readPaths: completeReadPaths, interactive, toolsText, actionFeatures: baseActionFeatures, unslimPaths: echoedPaths, repoContextTurn: repositoryTurnId, repoContextQuery: repositoryText ? repositoryState?.query : "", repositoryHeadText: extensionTrajectory ? (extensionHeadRepositoryText ?? "") : "", template: promptTemplate, thinkEnabled, slimSuccessfulShellActions: successfulShellReplaySlim, immutableHistory, everSlimmedPaths, preserveSlimmedControlAnnotations, renderCache: extensionTrajectory ? turnRenderCache : null }));
           lastDecisionPrompt = typeof built === "string" ? built : JSON.stringify(built);
           if (savePrompts) lastPromptForTurn = lastDecisionPrompt;
           return built;
@@ -3466,7 +3526,7 @@ async function runAgentCore({
           // the content string already present in the prompt.
           ...(useGrammar && !pendingWriteFilePrefix ? { grammar: turnActionGrammar, jsonSchema: turnActionJsonSchema } : {}),
           ...(model.diffusionGemma ? { agentAction: true,
-            diffusionTools: { verbs: legalTurnVerbs, paths: [...new Set([...workspaceListing(workspace, { depth: workspaceTree ? 1 : 0 }).split('\n').filter(entry => entry && !entry.startsWith('[') && !entry.startsWith('(')), ...openPaths, ...taskNamedPaths, ...editedPathsThisRun,
+            diffusionTools: { checkpoint: activeOutputCheckpoint?.draftPath ? activeOutputCheckpoint : null, verbs: legalTurnVerbs, paths: [...new Set([...workspaceListing(workspace, { depth: workspaceTree ? 1 : 0 }).split('\n').filter(entry => entry && !entry.startsWith('[') && !entry.startsWith('(')), ...openPaths, ...taskNamedPaths, ...editedPathsThisRun,
               ...turns.flatMap(turn => turn.action?.a === 'read_file' ? [turn.action.p] : [])])],
               queryTools: tools?.list().map(tool => ({ name: tool.name, description: tool.description })) ?? [],
               readSource: relative => exec.safeReadText(exec.resolveExisting(relative)),
@@ -3482,10 +3542,21 @@ async function runAgentCore({
           codexAdaptiveRebase: !completionAuditEmitted,
           // Interactive: stream so the heartbeat can say WHAT is being generated as it grows —
           // once the action head appears in the partial JSON, name the verb and target.
-          ...(interactive ? { onProgress: (p) => { onEvent({ type: "model_stream", phase: "action", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "generating", detail: describePartialAction(p) }); } } : {}),
+          onProgress: p => {
+            if (p.content) checkpointOutput(pendingWriteFilePrefix ? pendingWriteFilePrefix + p.content : p.content);
+            if (interactive) { onEvent({ type: "model_stream", phase: "action", tokens: p.tokens, content: p.content ?? "" }); onEvent({ type: "activity", label: "generating", detail: describePartialAction(p) }); }
+          },
+          onOutputCheckpoint: snapshot => {
+            const receipt = checkpointOutput(snapshot.raw, { force: snapshot.stoppedLimit === true, stoppedLimit: snapshot.stoppedLimit === true, partialAction: snapshot.partialAction });
+            if (receipt && snapshot.stoppedLimit) { activeOutputCheckpoint = receipt; outputCheckpointGuidance = outputCheckpoints.guidance(receipt); }
+          },
         }
       );
       if (!out) {
+        if (receivedOutput) {
+          const receipt = checkpointOutput(receivedOutput, { force: true });
+          if (receipt?.draftPath) { activeOutputCheckpoint = receipt; outputCheckpointGuidance = outputCheckpoints.guidance(receipt); onEvent({ type: 'output_checkpoint_pending', id: receipt.id }); }
+        }
         if (!interrupted) {
           metrics.modelErrors = (metrics.modelErrors ?? 0) + 1;
           modelError = lastCompleteError;
@@ -3522,6 +3593,7 @@ async function runAgentCore({
         ? pendingWriteFilePrefix + out.content : out.content;
       const parsed = model.diffusionGemma ? parseDiffusionGemmaAction(candidateOutput) : parseAction(candidateOutput);
       if (parsed.ok) {
+        if (outputSlot.lastChars) checkpointOutput(candidateOutput, { force: true });
         if (pendingWriteFilePrefix) {
           onEvent({ type: "output_limit_continued", target: parsed.action.p ?? null,
             recoveredChars: pendingWriteFilePrefix.length });
@@ -3586,9 +3658,22 @@ async function runAgentCore({
           recordRejectedPrompt(out);
           continue;
         }
+        if (normalizedAction.checkpoint || (activeOutputCheckpoint?.draftPath && normalizedAction.a === 'write_file' && normalizedAction.p === activeOutputCheckpoint.target)) {
+          try {
+            normalizedAction = outputCheckpoints.assemble(normalizedAction, activeOutputCheckpoint);
+            if (parsed.action.checkpoint) onEvent({ type: 'output_checkpoint_assembled', id: parsed.action.checkpoint, target: normalizedAction.p });
+          } catch (error) {
+            metrics.invalid++;
+            repairObs = error.message;
+            rejectedOutputs.push({ turn: turns.length, attempt, rawOutput: candidateOutput, error: repairObs, kind: 'output_checkpoint' });
+            onEvent({ type: 'invalid_action', error: repairObs, raw: candidateOutput });
+            recordRejectedPrompt(out);
+            continue;
+          }
+        }
         action = normalizedAction;
         editConfirmation = parsed.action.a === "confirm_edit" ? parsed.action : null;
-        if (action !== parsed.action && !editConfirmation) {
+        if (action !== parsed.action && !editConfirmation && !parsed.action.checkpoint) {
           metrics.workspaceAliasNormalizations++;
           onEvent({ type: "workspace_alias_normalized", original: parsed.action, action });
         }
@@ -3604,10 +3689,11 @@ async function runAgentCore({
 
       metrics.invalid++;
       const outputTokenCap = modelOutputTokenCap(model, { action: true });
-      const outputLimit = parsed.kind === "unterminated_json"
-        && (out.stoppedLimit === true
-          || (outputTokenCap !== null
-            && Number(out.tokens) >= Math.max(1, outputTokenCap - 8)));
+      const outputLimit = out.stoppedLimit === true
+        || (parsed.kind === "unterminated_json" && outputTokenCap !== null
+          && Number(out.tokens) >= Math.max(1, outputTokenCap - 8));
+      const checkpoint = outputLimit ? checkpointOutput(candidateOutput, { force: true, stoppedLimit: true }) : null;
+      if (checkpoint) { activeOutputCheckpoint = checkpoint; outputCheckpointGuidance = outputCheckpoints.guidance(checkpoint); }
       const target = parsed.partialAction?.path ?? null;
       const resumablePrefix = outputLimit && canResumeWriteFile(model)
         ? resumableWriteFilePrefix(candidateOutput) : null;
@@ -3623,7 +3709,13 @@ async function runAgentCore({
         stoppedLimit: Boolean(out.stoppedLimit),
         truncated: Boolean(out.truncated),
         promptTokens: out.promptTokens ?? null,
+        ...(checkpoint ? { checkpoint: checkpoint.id, checkpointPath: checkpoint.rawPath } : {}),
       });
+      if (outputLimit && checkpointError) {
+        modelError = `Could not save interrupted output: ${checkpointError.message}. The raw output remains in rejected run evidence.`;
+        onEvent({ type: 'output_checkpoint_failed', reason: modelError });
+        break;
+      }
       // A repetition loop and an oversized action both surface as unterminated
       // JSON, and they need OPPOSITE advice. Check for degeneration first:
       // telling a run that looped to "emit a smaller action" makes it loop again.
@@ -3644,9 +3736,11 @@ async function runAgentCore({
           ? resumablePrefix : null;
         const subject = target ? ` for \`${target}\`` : "";
         repairObs = pendingWriteFilePrefix ? null : [
-          `[output-limit] Your previous ${parsed.partialAction?.action || "action"}${subject} reached the model's output limit before its JSON object could close.`,
+          `[output-limit] Your previous ${parsed.partialAction?.action || "action"}${subject} reached the model's output limit before its action could finish.`,
           "Do NOT regenerate the same monolithic action: it will hit the same fixed limit again.",
-          "Emit one much smaller valid action now. For a large new program, write a compact runnable skeleton first, then extend it with bounded replace/edit_lines/patch actions. Preserve the requested delivery format: if the user requires one self-contained file, keep the program in that file; split into modules only when the task permits it.",
+          checkpoint?.draftPath ? 'Continue the saved file using the output-checkpoint instruction below.'
+            : "Emit one much smaller valid action now. Continue from the saved output instead of regenerating it. For a large program, finish a compact runnable version, then extend it with bounded replace/edit_lines/patch actions. Preserve the requested delivery format: if the user requires one self-contained file, keep the program in that file; split into modules only when the task permits it.",
+          'Preserve the requested delivery format: if the user requires one self-contained file, keep the program in that file; split into modules only when the task permits it.',
           ...(outputTokenCap === null ? [] : [
             `Keep this next action comfortably below the limit (under ~${Math.max(500, Math.floor(outputTokenCap * 0.75)).toLocaleString()} output tokens).`,
           ]),
@@ -3655,7 +3749,7 @@ async function runAgentCore({
         pendingWriteFilePrefix = null;
         repairObs = `Your previous output was rejected: ${parsed.error}. ${model.diffusionGemma ? 'Emit exactly one valid action using the declared file-block format for write_file, or one JSON object for another action.' : 'Emit exactly one valid action JSON object.'}`;
       }
-      if (model.diffusionGemma && !pendingWriteFilePrefix) {
+      if (model.diffusionGemma && !pendingWriteFilePrefix && !checkpoint?.draftPath) {
         repairObs += '\nFor write_file, omit content from the JSON header: {"a":"write_file","p":"filename"}, then a newline and a closed code fence with literal source. For edit_lines, use {"a":"edit_lines","p":"filename","start":12,"end":18} followed by a closed fence of literal replacement lines. Read numbered source first. Do not JSON-escape these source blocks. Keep changes small. Other actions use a single valid JSON object.';
       }
       recordRejectedPrompt(out);
@@ -3665,6 +3759,8 @@ async function runAgentCore({
         kind: outputLimit ? "output_limit" : parsed.kind,
         target,
         continuing: Boolean(pendingWriteFilePrefix),
+        checkpointContinuing: Boolean(checkpoint?.draftPath && !pendingWriteFilePrefix),
+        ...(checkpoint ? { checkpointPath: checkpoint.draftPath ?? checkpoint.rawPath } : {}),
         tokens: out.tokens,
         stoppedLimit: Boolean(out.stoppedLimit),
         raw: candidateOutput,
@@ -4434,6 +4530,10 @@ async function runAgentCore({
     const directEditSucceeded = !gateRejection && !interactiveStop && !duplicate && !groundReject
       && (result.editOutcome ? result.editOutcome.applied : editSucceeded(action, result.observation));
     const directEditPaths = directEditSucceeded ? editPaths(action) : [];
+    if (activeOutputCheckpoint?.target && directEditPaths.includes(activeOutputCheckpoint.target)) {
+      onEvent({ type: 'output_checkpoint_committed', id: activeOutputCheckpoint.id, target: activeOutputCheckpoint.target });
+      activeOutputCheckpoint = null; outputCheckpointGuidance = '';
+    }
     for (const p of directEditPaths.filter(p => /^(?:\.\/)?(?:PROGRESS|TODO)\.md$/i.test(p))) {
       try {
         const filename = exec.resolveExisting(p);
@@ -7612,6 +7712,8 @@ async function runAgentCore({
     plan,
     turns,
     rejectedOutputs,
+    outputCheckpoints: outputCheckpoints.receipts(),
+    pendingOutputCheckpoint: activeOutputCheckpoint?.draftPath ? activeOutputCheckpoint.id : null,
     integrity,
     metrics,
     promptVersion: promptVersion(process.env, { compact: compactRules, diffusionTools: model.diffusionGemma === true }), // exact selected rules

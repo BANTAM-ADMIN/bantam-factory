@@ -64,6 +64,7 @@ export const FILE_OPS_FEATURE = "file_ops";
 export const PROBE_ACTION_FEATURE = "probe";
 // The live Jev decision engine (Jev mode, `:jev tool on`); see docs/JEV-MODE.md.
 export const JEV_DECIDE_FEATURE = "jev_decide";
+export const REA_MCP_FEATURE = "rea_mcp";
 export const EDIT_CONFIRMATION_FEATURE = "confirm_edit";
 
 // How many read-only ops one `inspect` may batch.
@@ -204,6 +205,7 @@ export const ACTION_DEFINITIONS = deepFreeze([
   }),
   define("write_file", [
     string("p"),
+    string("checkpoint", { optional: true }),
     string("content", { allowEmpty: true }),
   ], {
     example: { a: "write_file", p: "path", content: "..." },
@@ -312,6 +314,26 @@ export const ACTION_DEFINITIONS = deepFreeze([
       'Use "decide" for a quick judgment about text you already have (a log, an error, a message): put the text in state and the question in q. Leave options empty for yes/no, or list choices as "a | b | c". The answer is a calibrated probability from a fast local model, not verification: confirm anything that matters with the real check.',
     ],
   }),
+  define("rea_tools", [
+    string("q", { optional: true, allowEmpty: true }),
+    string("name", { optional: true }),
+    positiveInteger("page", { optional: true }),
+  ], {
+    example: { a: "rea_tools", name: "open_binary" },
+    help: " search available REA tools by q, or fetch a complete schema by exact name; page starts at 1",
+  }, { feature: REA_MCP_FEATURE }),
+  define("rea_tool", [
+    string("tool"),
+    string("args"),
+  ], {
+    example: { a: "rea_tool", tool: "inspect_artifact", args: "{}" },
+    help: " call one enabled REA MCP analysis tool; args is a JSON object encoded as a string",
+  }, {
+    feature: REA_MCP_FEATURE,
+    rules: [
+      'Use rea_tools to discover relevant REA capabilities and retrieve exact tool schemas before calling rea_tool. Encode arguments as a JSON object in args. REA returns analysis evidence; preserve its stated limitations and do not claim more than the returned evidence establishes.',
+    ],
+  }),
   define("done", [
     string("summary"),
   ], {
@@ -386,7 +408,7 @@ export function actionPromptMenu(options = {}) {
   if (Number.isFinite(cap) && cap > 0) {
     const safe = Math.max(500, Math.floor(cap * 0.75));
     lines.push(`- LIMIT: one action may emit at most ~${cap.toLocaleString()} tokens in total (JSON included); an action that`
-      + ` runs past it is discarded unread and the whole generation is wasted. Keep any single write_file`
+      + ` runs past it is checkpointed for continuation, not applied as an incomplete action. Keep any single write_file`
       + ` or heredoc under ~${safe.toLocaleString()} tokens (roughly ${Math.floor(safe * 3.5 / 60)} lines of code):`
       + ` write a large program as a runnable skeleton first, then add functions with replace or separate files.`);
   }

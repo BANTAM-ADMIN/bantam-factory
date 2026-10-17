@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+test('help during an in-flight model call stays local and does not steer the task', {timeout:20000}, async t => {
+ const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-busy-help-'));
+ t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(workspace,'sample.txt'),'still on task');
+ let release=null,calls=0;
+ const server=http.createServer(async(req,res)=>{
+  let body='';for await(const part of req)body+=part;
+  res.setHeader('content-type','application/json');
+  if(req.method==='GET')return res.end('{"data":[]}');
+  if(req.method==='DELETE')return res.end('{}');
+  calls++;
+  await new Promise(resolve=>{release=resolve;});
+  res.end(JSON.stringify({choices:[{message:{role:'assistant',content:'{"a":"read_file","p":"sample.txt"}'},finish_reason:'stop'}],usage:{prompt_tokens:20,completion_tokens:10}}));
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>{release?.();server.closeAllConnections();server.close();});
+ const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('BANTAM_')));
+ const child=spawn(process.execPath,[fileURLToPath(new URL('../bin/bantam.js',import.meta.url)),'chat','--workspace',workspace,'--api-url',`http://127.0.0.1:${server.address().port}/v1`,'--api-dialect','chat','--model','fixture','--max-turns','1','--no-ground','--no-factory','--no-pregate'],{cwd:workspace,env:{...env,HOME:workspace,BANTAM_HOME:workspace,BANTAM_SKIP_GRAMMAR_CHECK:'1',BANTAM_STREAM:'0',BANTAM_CHAT_RUNS:'0',NO_COLOR:'1'}});
+ t.after(()=>child.kill());
+ let stdout='',stderr='';child.stdout.on('data',c=>stdout+=c);child.stderr.on('data',c=>stderr+=c);
+ const closed=new Promise(resolve=>child.on('close',code=>resolve(code)));
+ const wait=async condition=>{const deadline=Date.now()+10000;while(!condition()){assert.ok(Date.now()<deadline&&child.exitCode===null,`${stdout}\n${stderr}`);await new Promise(r=>setTimeout(r,20));}};
+ await wait(()=>/BANTAM|bantam/.test(stdout));
+ child.stdin.write('Read sample.txt.\n');
+ await wait(()=>release!==null);
+ const start=stdout.length;
+ child.stdin.write(':help\n');
+ await wait(()=>/:max-turns \[N\]/.test(stdout.slice(start)));
+ assert.equal(calls,1,'help must not make another model request');
+ assert.doesNotMatch(stdout.slice(start),/queued for the next step/);
+ release();
+ await wait(()=>/Paused at the 1-turn limit/.test(stdout));
+ child.stdin.write('exit\n');
+ assert.equal(await closed,0,stderr);
+ assert.equal(calls,1);
+});

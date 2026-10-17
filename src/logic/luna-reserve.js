@@ -12,7 +12,7 @@ export function isLunaReserveModel(modelId) {
 }
 
 export function lunaReserveModel() {
-  return { model: LUNA_MODEL, effort: LUNA_EFFORT, name: "codex-luna" };
+  return { model: LUNA_MODEL, effort: LUNA_EFFORT, name: "codex-reserve" };
 }
 
 export function shouldOfferLunaReserve(modelFailure) {

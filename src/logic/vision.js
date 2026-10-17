@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { inflateSync } from "node:zlib";
 import { CodexAppServer } from "../codex-transport.js";
 import { assertImageGpuAvailable } from '../image-gpu.js';
+import { prepareVisionInput } from './vision-input.js';
 
 const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
@@ -287,19 +288,21 @@ export async function describeImageWithCodex(absPath, prompt, {
  * this takes an absolute path and does no workspace containment of its own).
  * Returns the description string, or null when the model yields nothing.
  */
-export function describeImage(endpoint, absPath, { prompt = DESCRIBE, timeoutSec = 120, maxTokens = 700 } = {}) {
+export function describeImage(endpoint, absPath, { prompt = DESCRIBE, timeoutSec = 120, maxTokens = 2048 } = {}) {
   assertImageGpuAvailable(endpoint);
   const url = `${String(endpoint).replace(/\/$/, "")}/v1/chat/completions`;
   const ext = IMG_MIME[path.extname(absPath).slice(1).toLowerCase()] ?? "png";
-  const b64 = fs.readFileSync(absPath).toString("base64");
+  const prepared = prepareVisionInput(absPath);
+  const b64 = prepared.bytes.toString("base64");
   const body = {
     messages: [{ role: "user", content: [
-      { type: "text", text: prompt },
-      { type: "image_url", image_url: { url: `data:image/${ext};base64,${b64}` } }] }],
+      { type: "text", text: ["Describe only visible evidence relevant to the question. Do not name a specific product, person, character or source from resemblance alone; that requires independent metadata. State uncertainty for small or ambiguous features.", prepared.notice, prompt].filter(Boolean).join("\n\n") },
+      { type: "image_url", image_url: { url: `data:image/${prepared.resized ? "png" : ext};base64,${b64}` } }] }],
     max_tokens: maxTokens, temperature: 0.2, chat_template_kwargs: { enable_thinking: false },
   };
   const r = curlPost(url, body, timeoutSec);
-  return r?.choices?.[0]?.message?.content?.trim() || null;
+  const choice=r?.choices?.[0], content=choice?.message?.content?.trim();
+  return content ? [prepared.notice,content,choice.finish_reason==='length'?'[vision response limit] This description is incomplete. Ask a focused question or inspect an individual asset; do not treat missing details as negative evidence.':''].filter(Boolean).join("\n\n") : null;
 }
 
 export function viewImageTool(workspace, endpoint, { describe = describeImage } = {}) {
@@ -338,7 +341,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
           return `[view_image] the vision model returned no description for ${rel}.`;
         }
         tool.lastOutcome = { status: "pass", path: rel };
-        return `${rel}:\n${VISION_INTERPRETATION}\n${c.length > 4000 ? `${c.slice(0, 4000)}\n… [clipped]` : c}${deterministicImageFacts(abs, { question, description: c })}`;
+        return `${rel}:\n${VISION_INTERPRETATION}\n${c}${deterministicImageFacts(abs, { question, description: c })}`;
       } catch (e) {
         tool.lastOutcome = {
           status: "error",

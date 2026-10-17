@@ -146,7 +146,7 @@ export function timingsTokensPerSecond(timings) {
 export function modelOutputTokenCap(model, { action = false } = {}) {
   if (model?.codex === true) return null;
   if (model?.diffusionGemma) return action ? model.contextBudget.generationTokens : model.contextBudget.defaultGenerationTokens;
-  const cap = Number(model?.nPredict);
+  const cap = Number(model?.outputTokenCap ?? model?.nPredict);
   return Number.isFinite(cap) && cap > 0 ? cap : null;
 }
 
@@ -205,7 +205,7 @@ export class ModelClient {
     this.diffusionCoordinator = null;
     this.lastContextBudget = null;
     this.grammarField = grammarFieldFor(this.apiDialect);
-    // Usable context window reported by an OpenAI-compatible server. Seeded by
+    // Usable context window reported by the connected server. Seeded by
     // startup discovery (which already read /v1/models) and refreshed by health().
     this.apiContextWindow = Number.isSafeInteger(opts.apiContextWindow) && opts.apiContextWindow > 0
       ? opts.apiContextWindow : null;
@@ -414,8 +414,9 @@ export class ModelClient {
       const generationState = state;
       // Each read/generation acquires the existing shared Jev queue separately.
       // Nesting a decision inside runPrimary would deadlock that queue.
-      return diffusionGemmaToolTurn({ state, context: { ...opts.diffusionTools, generationTokens: this.contextBudget.generationTokens }, signal: opts.signal,
-        onDecision: opts.onToolDecision,
+      try {
+        return await diffusionGemmaToolTurn({ state, context: { ...opts.diffusionTools, generationTokens: this.contextBudget.generationTokens }, signal: opts.signal,
+        onDecision: opts.onToolDecision, onCheckpoint: opts.onOutputCheckpoint,
         choose: async choice => {
           const receipt = await this.diffusionCoordinator.choose({ ...choice, seed: requestOptions.seed ?? 0,
             // Handle selection generates a tiny canvas, not an 8K answer.
@@ -425,12 +426,19 @@ export class ModelClient {
           if (receipt.usage?.requests) this.recordExternalUsage({ provider: 'api', model: this.modelName, ...receipt.usage }, { source: 'jev_tool_selection' });
           return receipt;
         },
-        generate: ({ instruction, code, maxTokens }) => {
+        generate: ({ instruction, code, maxTokens, onProgress }) => {
           const fieldPrompt = `${this.template.open('system')}You are generating one literal tool argument. The controller has already selected the tool and parameters. Follow the final field instruction; the transcript is reference material, not a response-format example. ${code ? 'Return exactly one closed four-backtick code block, with literal source, then stop. The block contains only source code, never an action header.' : 'Return only the requested plain text value, never an action envelope.'}${this.template.close}\n${this.template.open('user')}TRANSCRIPT:\n${generationState}\n\nFIELD INSTRUCTION:\n${instruction}${this.template.close}\n${this.assistantPrefill}`;
           return this.complete(fieldPrompt, { nPredict: maxTokens, signal: opts.signal, diffusionValue: code, thinking: opts.thinking === true,
-            ...(opts.onProgress ? { onProgress: info => opts.onProgress({ ...info, content: '' }) } : {}) });
+            onProgress: info => { onProgress?.(info); opts.onProgress?.({ ...info, content: '' }); } });
         },
-      });
+        });
+      } catch (error) {
+        if (!error.outputSnapshot?.partialAction) throw error;
+        // Feed a DATA prefix into the regular bounded continuation loop. The
+        // intentionally open content string cannot execute as a tool action.
+        return { content: JSON.stringify(error.outputSnapshot.partialAction).slice(0, -2),
+          tokens: error.tokens, usage: error.usage, stoppedLimit: true };
+      }
     }
     // A held-open chat session can vanish server-side (409 session_unavailable);
     // the retry must then carry the full transcript on a new id, not the delta.
@@ -466,6 +474,16 @@ export class ModelClient {
     // An OpenAI-compatible server states its own window on /v1/models; health()
     // records it there, and startup discovery can supply it without a probe.
     return this.apiContextWindow ?? (this.diffusionGemma ? 16384 : null);
+  }
+
+  // A known large window can afford a longer response. Preserve operator
+  // overrides and conservative defaults for servers with no window receipt.
+  get outputTokenCap() {
+    const configured = Number(this.nPredict);
+    if (this.pinned.has('nPredict') || configured !== this.profile.nPredict) return configured;
+    const window = Number(this.contextWindowTokens);
+    if (!Number.isFinite(window) || window <= 0) return configured;
+    return Math.max(1, Math.min(window >= 32768 ? 16384 : configured, Math.floor(window / 2)));
   }
 
   get contextBudget() { return this.diffusionGemma ? diffusionGemmaBudget(this.contextWindowTokens) : null; }
@@ -614,6 +632,7 @@ export class ModelClient {
           if (content.trim()) return { ...result, content };
           if (result.stoppedLimit) {
             const error = Error(`DiffusionGemma exhausted its ${budget.outputTokens}-token generation budget without a final answer; narrow the task or reduce thinking.`);
+            requestOptions.onOutputCheckpoint?.({ raw: result.content, stoppedLimit: true });
             error.code = 'generation_budget_exhausted'; error.retryable = false; throw error;
           }
         }
@@ -733,7 +752,7 @@ export class ModelClient {
   buildRequest(prompt, opts = {}) {
     const onProgress = typeof opts.onProgress === "function" ? opts.onProgress : null;
     const temperature = opts.temperature ?? this.temperature;
-    const nPredict = this.diffusionGemma ? diffusionGemmaOutputTokens(opts.nPredict ?? (opts.agentAction ? this.contextBudget.generationTokens : null), this.contextBudget) : opts.nPredict ?? this.nPredict;
+    const nPredict = this.diffusionGemma ? diffusionGemmaOutputTokens(opts.nPredict ?? (opts.agentAction ? this.contextBudget.generationTokens : null), this.contextBudget) : opts.nPredict ?? this.outputTokenCap;
     const stop = opts.stop ?? this.stop;
     const seed = (opts.seed !== null && opts.seed !== undefined) ? opts.seed : undefined;
     // Frontier workers can emit the ordinary action protocol without forcing
@@ -1358,11 +1377,25 @@ export class ModelClient {
           // omits the field simply teaches nothing and the constant still applies.
           try {
             const listing = await res.json();
-            const windows = (listing?.data ?? []).filter(m => !this.diffusionGemma || m.id === this.modelName)
+            const cards = listing?.data ?? [];
+            const selected = cards.filter(card => card.id === this.modelName);
+            const windows = (selected.length ? selected : !this.diffusionGemma && cards.length === 1 ? cards : [])
               .map((m) => Number(m?.max_model_len))
               .filter((n) => Number.isFinite(n) && n > 0);
             if (windows.length) this.apiContextWindow = Math.max(...windows);
           } catch { /* not a model listing we can read */ }
+        }
+        if (!this.apiMode) {
+          try {
+            // /props does not wake a sleeping llama.cpp server. Its generation
+            // settings describe the usable per-slot window, not a guessed model size.
+            const props = await fetch(`${this.endpoint}/props`, { signal: AbortSignal.timeout(this.healthTimeoutMs) });
+            if (props.ok) {
+              const data = await props.json();
+              const window = Number(data.default_generation_settings?.n_ctx ?? data.n_ctx_per_seq);
+              if (Number.isSafeInteger(window) && window > 0) this.apiContextWindow = window;
+            }
+          } catch { /* Keep the conservative cap when no runtime receipt is available. */ }
         }
         await this.detectChatSessions();
       }

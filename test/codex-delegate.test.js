@@ -46,7 +46,7 @@ test("Codex delegate arguments pin native safety, model, effort, and workspace",
   assert.ok(args.includes("--ephemeral"));
   assert.ok(args.includes("--ignore-user-config"));
   assert.ok(args.includes("workspace-write"));
-  assert.ok(args.includes("gpt-5.6-sol"));
+  assert.ok(args.includes("gpt-6.1-sol"));
   assert.ok(args.includes('model_reasoning_effort="xhigh"'));
   assert.equal(args.at(-1), "fix it");
 });
@@ -64,6 +64,11 @@ test("native delegation selects exact Astra without substituting another model o
     assert.throws(() => buildCodexExecArgs({ model: "astra", effort, workspace: "/tmp/work", task: "fix it" }), /invalid delegate reasoning effort/);
   }
   assert.throws(() => buildCodexExecArgs({ model: "unrecognized-model", effort: "medium", workspace: "/tmp/work", task: "fix it" }), /unsupported delegate model/);
+  const modelFor = (model) => buildCodexExecArgs({ model, effort: "medium", workspace: "/tmp/work", task: "fix it" })
+    .join(" ").match(/--model (\S+)/)[1];
+  assert.equal(modelFor("luna"), "gpt-6-luna", "luna is the current Luna, not the reserve pool");
+  assert.equal(modelFor("reserve"), "gpt-reserve");
+  assert.equal(modelFor("codex-5.6-sol"), "gpt-5.6-sol");
 });
 
 test("Codex delegate can attach screenshots to a native visual-review pass", () => {

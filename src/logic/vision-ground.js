@@ -79,7 +79,23 @@ export function ranDeterministicDecode(turns) {
 export function taskExtractsFromImage(task) {
   const text = String(task ?? "");
   if (!IMAGE_FILE.test(text)) return false;
-  return /\b(?:write|save|output|produce|report|record|extract|transcribe|print)\b/i.test(text);
+  if (!/\b(?:write|save|output|produce|report|record|extract|transcribe|print)\b/i.test(text)) return false;
+  // A generated screenshot/contact sheet plus an unrelated "write README"
+  // directive does not make a pixel-transcription task. Require an actual data
+  // reading relationship to the named image. Keep the original board/diagram
+  // input cases, including an input declared in one sentence and its answer
+  // requested in the next. Filename periods do not split clauses.
+  const data = /\b(?:data|text|contents|characters?|glyphs?|symbols?|digits?|numbers?|values?|labels?|coordinates?|positions?|node names?|(?:best|mating|legal) move|fen|equations?|cells?|entries|matrix|puzzle|chess|sudoku)\b/i;
+  return text.split(/[.!?]\s+|[\r\n]+/).some(clause => {
+    const image = clause.match(IMAGE_FILE);
+    if (!image) return false;
+    const before = clause.slice(0,image.index), after = clause.slice(image.index+image[0].length);
+    if (/\btranscribe\b/i.test(before)) return true;
+    const reading = /\b(?:read|decode|parse|extract|interpret|solve|find|determine)\b/i.test(before);
+    const declaredInput = /\b(?:file|image|picture|diagram|board|chart)\s*$/i.test(before)
+      && /\b(?:has|shows|contains|depicts)\b/i.test(after);
+    return (reading || declaredInput) && data.test(text);
+  });
 }
 
 /** The image the task named, for a message that points at something concrete. */

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildPrompt } from "../src/prompt.js";
-import { deriveThinkPrefills } from "../src/thinking.js";
+import { ACTION_DECISION_CONTEXT, deriveThinkPrefills } from "../src/thinking.js";
 import { analyzePrompt } from "../src/prompt-telemetry.js";
 import { ModelClient } from "../src/model.js";
 import {
@@ -39,9 +39,11 @@ test("the Qwen path is byte-identical with and without an explicit template", ()
   assert.equal(implicit, explicit);
   assert.ok(implicit.startsWith("<|im_start|>system\n"));
   assert.ok(implicit.includes("<|im_end|>\n"));
-  // thinkEnabled is inert for ChatML: it has no system flag to render.
+  // ChatML has no system flag; thinkEnabled adds only the run-stable
+  // action-decision scope to the system turn.
   assert.equal(
-    buildPrompt({ ...BASE, assistantPrefill: QWEN_ASSISTANT_PREFILL, historyPrefill: QWEN_ASSISTANT_PREFILL, thinkEnabled: true }),
+    buildPrompt({ ...BASE, assistantPrefill: QWEN_ASSISTANT_PREFILL, historyPrefill: QWEN_ASSISTANT_PREFILL, thinkEnabled: true })
+      .replace(`\n\n${ACTION_DECISION_CONTEXT}`, ""),
     implicit,
   );
 });
@@ -72,7 +74,7 @@ test("the Gemma thinking flag renders only when the think rail is armed", () => 
   assert.ok(on.startsWith("<|turn>system\n<|think|>\n"), "the flag sits at the top of the FIRST system turn");
   // Only the system turn differs: the rest of the prefix is untouched, so
   // llama.cpp's reusable prefix survives across turns of the same run.
-  assert.equal(on.replace("<|think|>\n", ""), off);
+  assert.equal(on.replace("<|think|>\n", "").replace(`\n\n${ACTION_DECISION_CONTEXT}`, ""), off);
 });
 
 test("Gemma control tokens in untrusted content are neutralized", () => {

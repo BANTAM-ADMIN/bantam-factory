@@ -15,7 +15,7 @@
 // the workspace after N actions, steer it to stop probing and write the real
 // thing.
 
-const DELIVERABLE_EXT = "c|cc|cpp|cxx|h|hpp|py|js|mjs|cjs|ts|tsx|go|rs|java|rb|sh|lua|php";
+const DELIVERABLE_EXT = "c|cc|cpp|cxx|h|hpp|py|js|jsx|mjs|cjs|ts|tsx|go|rs|java|rb|sh|lua|php|html|css";
 // A path token with a source extension, optionally absolute or ./-relative.
 const PATH_RE = new RegExp(
   String.raw`(?:^|[\s"'` + "`" + String.raw`(=])((?:\/|\.{1,2}\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${DELIVERABLE_EXT}))\b`,

@@ -32,7 +32,7 @@ A room normally stays in one mode; switching is a restart with the other flag.
 | | `--mode llama` (default) | `--mode jev` |
 |---|---|---|
 | Loaded on the GPU | the local llama.cpp model (:8085) | DiffusionGemma, started with the server and kept awake |
-| `local` jobs | BANTAM on the local model | BANTAM with a Codex model standing in (`--stand-in-model`, default `gpt-5.6-luna`; e.g. `gpt-6.1-sol`) |
+| `local` jobs | BANTAM on the local model | BANTAM with a Codex model standing in (`--stand-in-model`, default the current Luna, `gpt-6-luna` today; e.g. `sol` or `gpt-6.1-sol`) |
 | `codex`, `codex-native` jobs | as usual | as usual |
 | Jev (`jev_decide`, `jev_generate`) | starts on first use and trades the GPU with the local model | always ready, fast |
 

@@ -84,6 +84,7 @@ Me:   {"a":"done","summary":"Fixed auth bug. Tests pass."}
 | `done` | Verify and finish |
 | `respond` | Talk to the user |
 | `decide` | Ask Jev for a fast, calibrated judgment (with `:jev tool on`) |
+| `rea_tools` / `rea_tool` | Find and call REA reverse-engineering tools (with `--rea`) |
 
 ---
 
@@ -149,6 +150,42 @@ Needs an NVIDIA GPU with about 22 GB free and vLLM with structured reads (PR #57
 Setup checks your server before saving anything and never downloads without your consent.
 **[Full guide →](docs/JEV-MODE.md)**
 
+Local and compatible API workers default to up to 16,384 output tokens when the
+server reports a context window of at least 32K. Smaller or unknown windows keep
+the conservative allowance; explicit output settings take precedence, and
+DiffusionGemma retains its separate 8K thinking/output reserve. Interrupted file
+writes are saved under `.bantam/output-checkpoints/` and continued from the saved
+prefix instead of discarded. The destination is updated only after a complete
+assembled action passes the normal edit checks. Other truncated actions retain
+raw output for recovery; incomplete commands are never executed.
+
+---
+
+## 🔬 REA reverse engineering (add-on)
+
+Point BANTAM at ROMs, executables, archives and Electron apps with
+[REA](https://github.com/morluto/rea), an MCP server for reverse engineering.
+It's an optional add-on and never bundled.
+
+```bash
+bantamfactory addons install rea      # pinned build of our REA fork, checked by SHA-256
+bantamfactory run --rea --analysis --task "Which libraries does ./tool link against?"
+```
+
+In a session, `:rea on` turns it on. The worker gets REA's own routing guide, sees
+which tools can't run on your machine, and is told the workspace's real path.
+REA evidence is never clipped. `--no-edit` keeps shell for quick byte reads, and
+the worker's answer is the deliverable.
+**[Full guide →](docs/REA.md)**
+
+## Codex models
+
+BANTAM reads the model list from your Codex account. The newest model in each family
+takes the short name, so `sol` means GPT-6.1-Sol, `luna` means GPT-6-Luna, `terra` means
+GPT-5.6-Terra and `astra` means GPT-6-Astra. Older versions stay available as
+`codex-5.6-sol` and so on. The **default Codex model is the current Sol**. Pick another
+with `--model luna` or `:model`.
+
 ---
 
 ## 🚀 Getting Started
@@ -180,4 +217,4 @@ See `CONTRIBUTING.md` for details.
 
 ## 🔗 More
 
-[Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md) · [Bring your own comparisons](docs/BRING-YOUR-OWN-COMPARISONS.md) · [Jev mode](docs/JEV-MODE.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE)
+[Installation help](docs/GETTING-STARTED.md) · [Local models & hardware](docs/FIRST-RUN-SETUP.md) · [Bring your own comparisons](docs/BRING-YOUR-OWN-COMPARISONS.md) · [Jev mode](docs/JEV-MODE.md) · [REA reverse engineering](docs/REA.md) · [How it works](docs/FACTORY-MODEL.md) · [Security](SECURITY.md) · [Apache-2.0](LICENSE)

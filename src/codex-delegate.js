@@ -16,26 +16,18 @@ import { runProcess } from "./process-runner.js";
 import { WorkspaceStore } from "./workspace-store.js";
 import { WorkspaceTransaction } from "./workspace-transaction.js";
 import { runPreviewSync } from "./logic/preview.js";
+import { codexModelOptions, defaultCodexModel, resolveCodexModelAlias } from "./codex-models.js";
 
 const KIND = "bantam-codex-delegate";
-const MODELS = Object.freeze({
-  astra: "gpt-6-astra",
-  "codex-astra": "gpt-6-astra",
-  "gpt-6-astra": "gpt-6-astra",
-  sol: "gpt-5.6-sol",
-  terra: "gpt-5.6-terra",
-  "gpt-5.6-sol": "gpt-5.6-sol",
-  "gpt-5.6-terra": "gpt-5.6-terra",
-  luna: "gpt-reserve",
-  "codex-luna": "gpt-reserve",
-  "gpt-reserve": "gpt-reserve",
-});
+// Luna Reserve (src/logic/luna-reserve.js) is a separate quota pool, named
+// explicitly; family names (sol, terra, luna, astra) follow codex-models.js.
+const RESERVE_ALIASES = new Set(["reserve", "codex-reserve", "gpt-reserve"]);
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 
 export async function runCodexDelegate({
   workspace,
   task,
-  model = "gpt-5.6-sol",
+  model = defaultCodexModel().model,
   effort = "high",
   verificationScript = null,
   visualReview = false,
@@ -494,8 +486,11 @@ function requireArtifact(value) {
 
 function normalizeModel(value) {
   const key = String(value ?? "").trim().toLowerCase();
-  const model = MODELS[key];
-  if (!model) throw new Error(`unsupported delegate model: ${value}; use sol, terra, luna, or astra`);
+  if (RESERVE_ALIASES.has(key)) return "gpt-reserve";
+  const model = resolveCodexModelAlias(key, { fallback: "" });
+  if (!model || !codexModelOptions([]).some((entry) => entry.model === model)) {
+    throw new Error(`unsupported delegate model: ${value}; use sol, terra, luna, astra, reserve, or an exact Codex model id`);
+  }
   return model;
 }
 

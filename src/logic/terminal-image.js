@@ -149,7 +149,7 @@ function pixelAt(pixels, width, height, x, y, outWidth, outHeight) {
   return [Math.round(pixels[i] * alpha), Math.round(pixels[i + 1] * alpha), Math.round(pixels[i + 2] * alpha)];
 }
 
-function decodePng(file) {
+export function decodePng(file) {
   let data;
   try { data = fs.readFileSync(file); } catch { return null; }
   if (data.length < 33 || !data.subarray(0, 8).equals(PNG_SIGNATURE)) return null;

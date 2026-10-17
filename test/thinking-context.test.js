@@ -79,3 +79,16 @@ test('inspection checkpoint is opt-in and resets after thought, implementation o
   assert.ok(inspectionCheckpointText(12).length < 700);
   assert.match(inspectionCheckpointText(12), /Respect mandatory prereads/);
 });
+
+test('visual evidence triggers reasoning even when an unusable asset description is not a tool error', async () => {
+ const {visualReviewBoundary}=await import('../src/thinking.js');
+ for (const q of ['view_image assets/atlas.png','preview index.html interact']) {
+  const turn={parsedAction:{a:'query',q},observation:'The image is noise, with no recognizable sprites.'};
+  const visualReview=visualReviewBoundary(turn);
+  assert.equal(visualReview,true);
+  assert.equal(shouldThink('auto',{turnIndex:40,lastObservation:turn.observation,visualReview,lean:true}),true);
+  assert.equal(shouldThink('off',{turnIndex:40,visualReview}),false);
+ }
+ assert.equal(visualReviewBoundary({action:{a:'query',q:'defines view_image'},observation:'x'}),false);
+ assert.equal(visualReviewBoundary({action:{a:'query',q:'view_image a.png'}}),false);
+});

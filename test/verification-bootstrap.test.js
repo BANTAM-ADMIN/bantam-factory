@@ -127,3 +127,16 @@ test('resuming a missing starter check permits building and restores failure gui
   assert.doesNotMatch(decision(resumed.calls[5].prompt), /was absent from the supplied starter/);
   assert.equal(resumed.result.done, false);
 });
+
+test('Python browser verifiers defer only while proven absent from the starter', () => {
+ for (const runner of ['python', 'python3']) {
+  const file='tests/browser_test.py', settings={...options, command:`${runner} ${file}`};
+  assert.equal(pendingInitialVerifier(settings),file);
+  assert.equal(pendingInitialVerifier({...settings,exists:()=>true}),null);
+  assert.equal(pendingInitialVerifier({...settings,observedPaths:new Set([file])}),null);
+  assert.equal(pendingInitialVerifier({...settings,provenance:{...baseline,initialPaths:[file]}}),null);
+ }
+ for (const command of ['python3 -m pytest','python3 ../test.py','python3 tests/browser_test.py; true','python3 tests/browser_test.js']) {
+  assert.equal(pendingInitialVerifier({...options,command}),null);
+ }
+});

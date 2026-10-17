@@ -1191,6 +1191,7 @@ if (cmd === undefined || cmd === "chat") {
         // checkpoint remains the crash-safe source while a run is incomplete.
         turns: res.turns,
         rejectedOutputs: res.rejectedOutputs,
+        outputCheckpoints: res.outputCheckpoints,
         modelCalls: checkpoint.modelCalls(),
       } : res;
       const artifactResult = mergeContinuationResult(liveArtifactResult, continuation);
@@ -2075,7 +2076,7 @@ function makeInteractiveLogger(emit, activity = {}) {
       // A malformed action costs a silent retry otherwise — say so (observed: minutes of
       // heartbeats while truncated big-write JSON was re-generated with no visible reason).
       if (e.kind === "output_limit") {
-        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : " — steering to smaller incremental edits"}`)}`);
+        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : e.checkpointContinuing ? " — draft saved; continuing the file" : " — output saved; steering to smaller incremental edits"}`)}`);
       } else {
         out(`  ${paint("33", "✗ malformed action, retrying")}${e.error ? dim(` — ${String(e.error).slice(0, 90)}`) : ""}`);
       }

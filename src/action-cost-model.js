@@ -36,6 +36,10 @@ const BASE_COSTS = {
   // Jev mode's decide: one local structured read (about 40 ms measured), more
   // when the engine thinks or has to swap in (up to about 7 s).
   decide: { latency: 20, io: 0, cpu: 1 },
+  // REA add-on: discovery is an in-memory catalog search; a tool call runs a
+  // static analysis in the REA server, seconds to minutes on large inputs.
+  rea_tools: { latency: 2, io: 0, cpu: 0.5 },
+  rea_tool: { latency: 500, io: 4, cpu: 8 },
   inspect: { latency: 8, io: 3, cpu: 2 },
   query: { latency: 2, io: 0, cpu: 0.5 },
   done: { latency: 1, io: 0, cpu: 0.1 },

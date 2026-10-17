@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { runAgent } from '../src/agent.js';
 import { QWEN_ASSISTANT_PREFILL } from '../src/profiles.js';
-import { inspectionCheckpointText } from '../src/thinking.js';
+import { ACTION_DECISION_CONTEXT, inspectionCheckpointText } from '../src/thinking.js';
 
 test('a long local inspection can reconsider and persist its next milestone without losing action access', async t => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bantam-inspection-checkpoint-'));
@@ -38,6 +38,8 @@ test('a long local inspection can reconsider and persist its next milestone with
     } }, onEvent: event => events.push(event),
   });
   assert.equal(events.filter(e => e.type === 'inspection_checkpoint').length, 1);
+  assert.ok(calls[0].prompt.includes(ACTION_DECISION_CONTEXT), 'cached extension reasoning receives the static decision scope');
+  assert.ok(calls[1].prompt.includes(ACTION_DECISION_CONTEXT), 'cached extension action receives the same stable scope');
   assert.ok(calls[0].prompt.includes(inspectionCheckpointText(12)), 'the entire checkpoint must reach the reasoning request');
   assert.ok(calls[1].prompt.includes(inspectionCheckpointText(12)), 'the action also sees the milestone review');
   assert.match(calls[0].prompt, /DESIGN\.md: all 301 lines delivered previously/);
@@ -48,4 +50,20 @@ test('a long local inspection can reconsider and persist its next milestone with
   assert.match(fs.readFileSync(path.join(workspace, 'PROGRESS.md'), 'utf8'), /Next milestone: implement the parser/);
   assert.equal(result.metrics.thinkPhases, 1, 'the write ends the inspection streak');
   assert.ok(events.some(e => e.type === 'required_read_history' && e.history.files[0].total === 301), 'compact delivery history survives when full prompt saving is off');
+});
+
+test('an explicitly requested inspection checkpoint also works for a task given directly in chat', async t => {
+ const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'bantam-inline-checkpoint-'));
+ t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(workspace,'format.cjs'),'exports.bpp=4;\n');
+ const calls=[],events=[];
+ await runAgent({workspace,task:'Build the browser reconstruction from the available format reference.',
+  resumeTurns:[0,1].map(i=>({i,action:{a:'read_file',p:'format.cjs'},observation:'format.cjs (1 lines):\n1\texports.bpp=4;'})),
+  maxTurns:3,thinkMode:'auto',inspectionCheckpointAfter:2,grounding:false,openFilesView:false,useGrammar:true,progressAwareness:false,
+  model:{assistantPrefill:QWEN_ASSISTANT_PREFILL,stop:[],async complete(prompt,opts){calls.push({prompt,opts});return {content:opts.grammar?'{"a":"write_file","p":"index.html","content":"<!doctype html><title>Milestone</title>"}':'The format reference is sufficient for the first implementation milestone.',tokens:10,stoppedEos:true,timings:{}};}},
+  onEvent:e=>events.push(e)});
+ assert.equal(events.filter(e=>e.type==='inspection_checkpoint').length,1);
+ assert.ok(calls[0].prompt.includes(inspectionCheckpointText(2)));
+ assert.ok(calls[0].prompt.includes(ACTION_DECISION_CONTEXT));
+ assert.equal(fs.existsSync(path.join(workspace,'index.html')),true);
 });

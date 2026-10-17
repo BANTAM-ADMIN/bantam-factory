@@ -533,8 +533,13 @@ const COLLECTOR = `<script id="__bantam_collector">(() => {
   }
   document.addEventListener("DOMContentLoaded", flush);
   if (INTERACT) {
-    const begin = () => queueMicrotask(runInteraction);
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", begin, { once: true });
+    // App controls may be installed by load listeners, with local image decoding
+    // beginning there as well. A DOMContentLoaded click races those listeners and
+    // reports a working Start control as inert. Yield past every load listener and
+    // give asynchronous initialization a short, bounded grace period before the
+    // smoke. This is readiness time, not a timeout retry or a successful result.
+    const begin = () => setTimeout(runInteraction, 200);
+    if (document.readyState !== "complete") window.addEventListener("load", begin, { once: true });
     else begin();
   }
   flush();

@@ -194,7 +194,7 @@ import {
 } from "../src/trajectory-comparison.js";
 import { runFactoryCommand, resolveFactoryHome } from "../src/factory-cli.js";
 import { FactoryRunTelemetry } from "../src/factory.js";
-import { classifyTaskIntent } from "../src/task-intent.js";
+import { classifyTaskIntent, ADVISORY_EXCLUDED_ACTIONS } from "../src/task-intent.js";
 
 const cliArgs = process.argv.slice(2);
 const args = parseArgs(cliArgs);
@@ -205,6 +205,12 @@ if (savedApi?.presets) {
   cliModelOptions.__presets = savedApi.presets;
 }
 const cmd = args._[0];
+if (args.rea) {
+  const { reaUnavailableReason } = await import("../src/rea-addon.js");
+  const reason = reaUnavailableReason();
+  if (reason) { console.error(`--rea: ${reason}`); process.exit(2); }
+  process.env.BANTAM_REA_MCP = "1";
+}
 if (cmd === 'foreman') {
   try {
     const { foremanCommand } = await import('../src/foreman.js');
@@ -814,7 +820,15 @@ if (cmd === "supervise") {
   process.exit(r.findings.some((f) => f.severity === "high") ? 1 : 0);
 }
 if (cmd === "addons") {
-  const { renderAddons } = await import("../src/addons.js");
+  const { renderAddons, ADDONS } = await import("../src/addons.js");
+  if (args._[1] === "install") {
+    const name = args._[2];
+    const addon = ADDONS.find(a => a.name === name);
+    if (!addon) fail(`Unknown add-on ${JSON.stringify(name ?? "")}. Available: ${ADDONS.map(a => a.name).join(", ")}`);
+    if (!addon.install) { console.log(`Install ${name} with: ${addon.installHint}`); process.exit(0); }
+    try { console.log(await addon.install()); } catch (e) { fail(`${name}: ${e.message}`); }
+    process.exit(0);
+  }
   console.log(renderAddons());
   process.exit(0);
 }
@@ -1712,6 +1726,7 @@ function sessionModeEntries({ contextMode, contextSource, stream, deepResearch, 
     { key: "image", value: generationProvider() === 'comfyui' ? 'comfyui' : generationProvider() === 'codex' ? "ON — via your Codex plan" : "off",
       command: ":image [comfyui|codex|off]", detail: generationProvider() === 'comfyui' ? 'images run through your configured ComfyUI API' : describeImageMode(generationProvider() === 'codex') },
     { key: "eyes", value: imageProvider, command: ":eyes [auto|local|codex]", detail: describeImageProvider(imageProvider) },
+    { key: "rea", value: process.env.BANTAM_REA_MCP === "1" ? "on" : "off", command: ":rea [on|off|status]", detail: "reverse-engineering add-on tools (bantam addons install rea)" },
   ];
 }
 
@@ -2459,8 +2474,11 @@ if (cmd === undefined || cmd === "chat") {
         pendingInspection = options.reason === "completion" ? review : null;
         return review ? { ...review, observation: selfReviewObservation(args.task, review.text) } : null;
       } : null,
-      supportingContext: typeof args["supporting-context-file"] === "string"
-        ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
+      supportingContext: [
+        typeof args["supporting-context-file"] === "string"
+          ? fs.readFileSync(args["supporting-context-file"], "utf8") : "",
+        args.analysis ? "Analysis mode: your deliverable is an evidence-supported answer via respond. File edits, shell, probe and done are unavailable. Source reads return every line in the selected page; without a limit, the default page is 160 lines. Use search to locate symbols and read the surrounding branch, including preceding conditions and later caller guards, before generalizing from a fragment. A helper's name alone does not prove that it handles the selected CLI subcommand. REA evidence is returned whole; use its summary/page contracts for scope. Distinguish static facts from runtime verification." : "",
+      ].filter(Boolean).join("\n\n"),
       drainInjections: workerControl || liveReview
         ? () => [...(workerControl?.drain() ?? []), ...(liveReview?.poll() ?? [])] : null,
       inheritedInstructionScope: workerControl?.instructionScope ?? null,
@@ -2479,7 +2497,16 @@ if (cmd === undefined || cmd === "chat") {
       // correct explanation AND six edit turns. runAgent has enforced
       // excludeActions all along, in the grammar and again at parse time; it was
       // simply not reachable from the CLI, so there was no way to ask.
-      excludeActions: args["no-edit"] ? [...EDIT_ACTIONS] : undefined,
+      excludeActions: args.analysis
+        ? ADVISORY_EXCLUDED_ACTIONS.filter(verb => !["rea_tool", "rea_tools"].includes(verb))
+        : args["no-edit"] ? [...EDIT_ACTIONS] : undefined,
+      // Both flags make the deliverable an answer: with edits excluded there is
+      // no implementation to finish, so `respond` must not be rejected as a
+      // disguised done (a correct ROM-header answer was discarded that way).
+      // --no-edit keeps shell for evidence; --analysis also drops it.
+      advisoryMode: Boolean(args.analysis || args["no-edit"]),
+      fullReadContext: Boolean(args.analysis || envTruthy("BANTAM_FULL_READ_CONTEXT")),
+      ...(args.analysis || args["no-edit"] ? { progressAwareness: false, verificationPolicy: "after_edit" } : {}),
       thinkMode,
       skills: skillsCfg,
       postVerifyIntegrity: skillSnapshot ? () => checkWorkspace(skillSnapshot, workspace, {}) : null,
@@ -2492,6 +2519,7 @@ if (cmd === undefined || cmd === "chat") {
       // to disable); opt-in via --ground for --autonomous so unattended defaults stay conservative.
       grounding: autonomous ? autonomousGrounding : !args["no-ground"],
       resumeTurns: laneBridge?.resumeTurns ?? continuation?.resumeTurns ?? null,
+      resumeOutputCheckpoint: continuation?.pendingOutputCheckpoint ?? null,
       signal: laneBridge ? laneRunController.signal : null,
       onEvent: captureEvent,
     });
@@ -2548,6 +2576,7 @@ if (cmd === undefined || cmd === "chat") {
         // checkpoint remains the crash-safe source while a run is incomplete.
         turns: res.turns,
         rejectedOutputs: res.rejectedOutputs,
+        outputCheckpoints: res.outputCheckpoints,
         modelCalls: checkpoint.modelCalls(),
       } : res;
       const artifactResult = mergeContinuationResult(liveArtifactResult, continuation);
@@ -4261,7 +4290,7 @@ function makeInteractiveLogger(emit, activity = {}) {
       // A malformed action costs a silent retry otherwise — say so (observed: minutes of
       // heartbeats while truncated big-write JSON was re-generated with no visible reason).
       if (e.kind === "output_limit") {
-        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : " — steering to smaller incremental edits"}`)}`);
+        out(`  ${paint("33", "✗ output limit")}${dim(`${e.target ? ` while writing ${e.target}` : ""}${e.continuing ? " — continuing the same action" : e.checkpointContinuing ? " — draft saved; continuing the file" : " — output saved; steering to smaller incremental edits"}`)}`);
       } else {
         out(`  ${paint("33", "✗ malformed action, retrying")}${e.error ? dim(` — ${String(e.error).slice(0, 90)}`) : ""}`);
       }
@@ -4512,6 +4541,9 @@ async function repl() {
       q.resolve(String(s ?? "").trim());
       return;
     }
+    // Help is a local command even while a worker is running. It must never
+    // become an instruction to abandon the current assignment and answer help.
+    if (/^(?::help|\/help|:h|help|\?)$/i.test(String(s).trim())) { printReplHelp(); return; }
     // Session settings are harness commands, never steering for either model.
     if (running && tty && handleMaxTurnsCommand(s)) return;
     if (running && tty) {                     // typed mid-run on a terminal -> steer
@@ -5043,6 +5075,7 @@ async function repl() {
     // not happen to a server BANTAM did not start.
     if (target.detected) {
       model.switchTo(target.endpoint, { profile: target.profile, modelId: target.label });
+      await model.health();
       saveModelPreference({ kind: "local", name: target.name });
       console.log(`  Now using ${target.label} @ ${target.endpoint}.`);
       return;
@@ -5273,6 +5306,25 @@ async function repl() {
       }
       console.log(`  usage reporting: ${usageDisplayEnabled ? "on" : "off"}`);
       console.log(`  ${formatUsage(model.usageSummary(), { cumulative: true })}`);
+      continue;
+    }
+
+    // `:rea` — connect requests to the REA reverse-engineering add-on (src/rea-addon.js).
+    if (/^:rea\b/i.test(request)) {
+      const { reaUnavailableReason, findReaRoot, reaInstalledVersion } = await import("../src/rea-addon.js");
+      const sub = request.replace(/^:rea\b\s*/i, "").trim().toLowerCase();
+      if (sub === "on") {
+        const reason = reaUnavailableReason();
+        if (reason) { console.log(`  ${reason}`); continue; }
+        process.env.BANTAM_REA_MCP = "1";
+        console.log(`  REA on (${findReaRoot()}); requests can use rea_tools/rea_tool.`);
+      } else if (sub === "off") {
+        delete process.env.BANTAM_REA_MCP;
+        console.log("  REA off.");
+      } else if (!sub || sub === "status") {
+        const root = findReaRoot();
+        console.log(`  REA: ${process.env.BANTAM_REA_MCP === "1" ? "on" : "off"} · ${root ? `installed ${reaInstalledVersion(root) ?? ""} at ${root}` : "not installed (bantam addons install rea)"}`);
+      } else console.log("  Usage: :rea [on|off|status]");
       continue;
     }
 
@@ -5886,8 +5938,18 @@ async function repl() {
         if (requestMode.applied) Object.assign(process.env, contextModeEnv(requestMode.mode));
         // Jev mode's decide tool, when the operator turned it on (:jev tool on).
         const jevDecide = (await import("../src/jev/commands.js")).jevDecideTool();
+        if (process.env.BANTAM_REA_MCP !== "1") {
+          const { taskSuggestsRea, findReaRoot, REA_INSTALL_HINT } = await import("../src/rea-addon.js");
+          if (taskSuggestsRea(task) && !reaHintShown) {
+            reaHintShown = true;
+            console.log(paint(C.dim, findReaRoot()
+              ? "  REA (reverse-engineering add-on) is installed but off; :rea on enables it for the next request."
+              : `  REA (reverse-engineering add-on) could help here; install it with ${REA_INSTALL_HINT}, then :rea on.`));
+          }
+        }
         res = await runAgent({
           task, workspace, model, imageJobs, jevDecide,
+          resumeOutputCheckpoint: sessionLog.at(-1)?.pendingOutputCheckpoint ?? null,
           profileText: operatorProfile?.text ?? null,
           // Net access is OFF by default. --dangerously-allow-net grants it
           // outright (no prompts); otherwise a classified internet fetch pauses
@@ -6185,6 +6247,7 @@ async function repl() {
       console.log("");
       sessionLog.push({ request, summary: String(res.summary || "done").replace(/\s+/g, " ").slice(0, 220), fullSummary: String(res.summary || "done").slice(0, 900) });
     }
+    if (res && sessionLog.length) sessionLog.at(-1).pendingOutputCheckpoint = res.pendingOutputCheckpoint ?? null;
     // closed means stdin ended (EOF or Ctrl-C at idle) — but a PIPED session
     // delivers all its lines up front and hits EOF immediately, so requests the
     // user already sent are still sitting in `pending`. Breaking here threw
@@ -6761,7 +6824,7 @@ bantam models remove <name>       unregister a model    ·    bantam models path
 bantam setup                       guided: existing server, Codex, or opt-in DavidAU 24GB stock
 bantam setup --stock-profile 72k-cpu-vision|92k-cpu-vision|72k-gpu-vision|tiel-32k-cpu-experts [--yes]
                                   managed Linux/NVIDIA profile; --yes authorizes download and launch
-bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding) with sizes — nothing optional is bundled
+bantam addons [install <name>]    list the optional add-ons (vision, speculative decoding, REA) with sizes — nothing optional is bundled
 bantam supervise [film.json] [--json]
                                   read a saved run back and draft findings with evidence (see docs/SUPERVISOR.md)
 bantam doctor --api-url URL [--api-key KEY] [--model NAME] [--api-dialect llamacpp|vllm]  use an existing OpenAI-compatible server (validates + saves it)
@@ -6777,7 +6840,9 @@ ledger). Interactive mode leaves them off so the harness just does what you ask.
 For autonomous runs, use --ground or BANTAM_GROUND=1 to enable the query socket.
 
 Common model flags: [--endpoint URL] [--profile qwen|gemma|generic] [--think auto|off|always] [--temperature N] [--act-temperature N] [--top-p N] [--top-k N]
-More run flags: [--tui] [--title "..."] [--plan] [--skills [path]] [--lang X] [--no-pregate] [--no-ground] [--no-edit]
+More run flags: [--tui] [--title "..."] [--plan] [--skills [path]] [--lang X] [--no-pregate] [--no-ground] [--no-edit] [--analysis] [--rea]
+  --analysis: inspect and answer; disable file edits, shell and done; preserve complete source read ranges.
+  --rea:      connect the REA reverse-engineering add-on (bantam addons install rea); BANTAM_REA_TOOLS narrows its tools.
 Usage display: [--usage] [--no-usage] (or BANTAM_USAGE=on|off); in chat use :usage [on|off|reset]
 Images:        :image codex | comfyui | off selects the generation provider. ComfyUI uses the local
                API workflow in .bantam/comfyui.json; :image check verifies it, :image sizes lists Krea dimensions,

@@ -16,9 +16,9 @@ import test from "node:test";
 import { startupModelChoices, resolveStartupModelChoice, startupChoiceNeeded, startupCodexFallback, withDetectedLocal } from "../src/startup-model-choice.js";
 
 test("opening chat falls back to Codex when no local server is running", () => {
-  assert.deepEqual(startupCodexFallback({ automaticChatStartup: true }), { model: "gpt-5.6-terra", effort: "medium" });
+  assert.deepEqual(startupCodexFallback({ automaticChatStartup: true }), { model: "gpt-6.1-sol", effort: "high" });
   assert.deepEqual(startupCodexFallback({ automaticChatStartup: true, rememberedConnection: { kind: "local", name: "orion-128k" } }),
-    { model: "gpt-5.6-terra", effort: "medium" });
+    { model: "gpt-6.1-sol", effort: "high" });
   assert.deepEqual(startupCodexFallback({ automaticChatStartup: true, rememberedConnection: { kind: "codex", model: "gpt-6-astra", effort: "high" } }),
     { model: "gpt-6-astra", effort: "high" });
 });
@@ -62,20 +62,20 @@ test("locals precede the cloud entries on a machine that has them", () => {
 
 test("a fresh machine with no local models still recommends the cloud default", () => {
   const c = startupModelChoices({ locals: [], catalog: [], preference: null });
-  assert.equal(c[0].name, "codex-terra");
+  assert.equal(c[0].name, "codex-sol");
   assert.equal(c[0].recommended, true, "with nothing registered, this IS the right first move");
 });
 
 test("Astra is selectable after the recommended Codex models without exposing legacy models", () => {
   const choices = startupModelChoices();
   assert.deepEqual(choices.filter((entry) => entry.kind === "codex").map((entry) => entry.name),
-    ["codex-terra", "codex-luna", "codex-sol", "codex-astra"]);
+    ["codex-sol", "codex-terra", "codex-luna", "codex-astra"]);
   const astra = choices[3];
   assert.equal(astra.model, "gpt-6-astra");
   assert.equal(astra.label, "GPT-6-Astra · medium reasoning");
   assert.equal(astra.recommended, false);
-  assert.deepEqual(choices.filter((entry) => entry.recommended).map((entry) => entry.name), ["codex-terra"]);
-  assert.equal(resolveStartupModelChoice(choices, "", { enterSelectsRecommended: true }).name, "codex-terra");
+  assert.deepEqual(choices.filter((entry) => entry.recommended).map((entry) => entry.name), ["codex-sol"]);
+  assert.equal(resolveStartupModelChoice(choices, "", { enterSelectsRecommended: true }).name, "codex-sol");
   for (const answer of ["4", "codex-astra", "gpt-6-astra"]) {
     assert.equal(resolveStartupModelChoice(choices, answer), astra);
   }

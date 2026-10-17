@@ -129,8 +129,17 @@ bantamfactory setup</pre>
       <figure class="term term--inline" data-inline></figure>
       <h2>Your hardware. Or your Codex account.</h2>
       <p>Run a local model through llama.cpp, or point the factory at a signed-in Codex CLI. Setup checks Node, Docker, and the model server, and offers a guided model download for supported NVIDIA GPUs. Vision and MTP acceleration depend on your model and server. Compatible companions are optional; nothing is bundled.</p>
+      <p>Codex models come from your own account's list. The newest Sol is the default, and <code>luna</code>, <code>terra</code> and <code>astra</code> always mean the newest of each family.</p>
       <p><a href="#codex">See Astra, Sol and Terra inside the factory ↗</a></p>
       <p class="fine">Shell commands from the model run in a Docker sandbox with the network off. An interactive session asks before it turns the network on.</p>
+    </article>
+
+    <article class="story" data-demo="rea">
+      <figure class="term term--inline" data-inline></figure>
+      <h2>Take apart what you didn't build.</h2>
+      <p>Point the factory at a ROM, an executable, an archive or an Electron app. With the optional <a href="https://github.com/morluto/rea">REA</a> add-on, the worker gets about two hundred reverse-engineering tools and REA's own guide to which one fits the input. BANTAM tells it which tools can't run on your machine and, when a heavy decompiler is missing, which lighter tools still work.</p>
+      <p><code>bantamfactory addons install rea</code>, then <code>--rea</code> or <code>:rea on</code>. <a href="https://github.com/BANTAM-ADMIN/bantam-factory/blob/main/docs/REA.md">Read the guide ↗</a></p>
+      <p class="fine">Evidence comes back whole, never clipped. When REA has no route for a format, the worker says so and uses its other tools instead of guessing. We install our <a href="https://github.com/BANTAM-ADMIN/rea/releases/tag/rea-agents-6.5.0-bantam.1">REA fork build</a>, pinned by SHA-256, which also reads stripped binaries' libraries and imports. Nothing installs without your request.</p>
     </article>
 
     <article class="story" data-demo="improve">
@@ -168,6 +177,7 @@ bantamfactory setup</pre>
     <li><b>A model.</b> Either a llama.cpp server with a capable model (the recorded cards use a 27B model at 4-bit, which wants a 24 GB GPU) or an installed, signed-in Codex CLI. Setup walks through both.</li>
     <li><b>Checks are optional, and worth it.</b> Add <code>--verify "npm test"</code> and the factory runs your tests after its edits and repairs from the failures.</li>
     <li><b>Run records stay private.</b> Saved runs can contain your code and prompts. Fight cards have a separate, reviewed public export.</li>
+    <li><b>Reverse engineering is an add-on.</b> REA needs Node 22.19 or newer and about 230 MB, and installs only when you run <code>bantamfactory addons install rea</code>.</li>
     <li><b>Self-improvement is opt-in.</b> It is experimental, runs only when you start it, and never applies a change that has not passed its checks.</li>
   </ul>
 </section>

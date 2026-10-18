@@ -2503,9 +2503,9 @@ bantambuild exec [options] "<task text>"   one-shot: run a task, verify, exit (h
 bantambuild eval [fixtureDir ...] [--save-run]
 bantambuild experiment spec.json [--output path] [--dry-run]
 bantambuild experiment spec.json --resume evidence-directory
-bantambuild gauntlet [--models local,sol,terra] [--quick] [--rounds N] [--faults]
+bantambuild gauntlet [--models local,sol,luna] [--quick] [--rounds N] [--faults]
                                   isolated same-task model comparison with hidden contracts and full usage metrics
-bantambuild trio run --task "..." [--workspace .] [--verify "npm test"] [--models local,sol,terra]
+bantambuild trio run --task "..." [--workspace .] [--verify "npm test"] [--models local,sol,luna]
                                   parallel isolated real-task comparison
 bantambuild replay <run.json> --turn N [--inject "text"]
 bantambuild replay-ab spec.json [--dry-run] [--max-calls N] [--study-root directory] [--require-new-design] [--output evidence-directory] [--endpoint URL] [--json]

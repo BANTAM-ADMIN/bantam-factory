@@ -237,6 +237,7 @@ function award(rows, key) {
 function shortModel(model) {
   const text = String(model ?? "unknown");
   if (text.includes("sol")) return "sol";
+  if (text.includes("luna")) return "luna";
   if (text.includes("terra")) return "terra";
   if (/qwen.*27b/i.test(text)) return "qwen27b";
   if (/opus/i.test(text)) return "opus";

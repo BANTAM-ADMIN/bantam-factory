@@ -1,4 +1,4 @@
-// Resolve one completed Local/Sol/Terra turn from a trio session into the exact
+// Resolve one completed Local/Sol/Luna turn from a trio session into the exact
 // artifacts consumed by teacher collaboration.
 //
 // This removes an error-prone operator step while retaining the consent
@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const TRIO_KIND = "bantam-trio-session";
-const REQUIRED_ARMS = Object.freeze(["local", "sol", "terra"]);
+// The third lane is Luna; sessions recorded before Terra was retired have Terra.
+const THIRD_ARMS = Object.freeze(["luna", "terra"]);
 
 export function loadTrioTeacherArtifacts(sessionDir, {
   turn = "latest",
@@ -22,6 +23,8 @@ export function loadTrioTeacherArtifacts(sessionDir, {
     throw new Error("invalid trio session manifest");
   }
   const record = selectTurn(manifest.turns, turn);
+  const third = THIRD_ARMS.find((arm) => record?.arms?.[arm]) ?? THIRD_ARMS[0];
+  const REQUIRED_ARMS = ["local", "sol", third];
   const paths = {};
   const artifacts = {};
   for (const arm of REQUIRED_ARMS) {

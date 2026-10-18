@@ -172,16 +172,16 @@ describe("teacher collaboration", () => {
 
     assert.equal(result.status, "complete");
     assert.deepEqual(calls.map(({ model, phase }) => [model, phase]), [
-      ["gpt-5.6-sol", "analysis"],
-      ["gpt-5.6-terra", "analysis"],
-      ["gpt-5.6-sol", "cross-review"],
-      ["gpt-5.6-terra", "cross-review"],
+      ["gpt-6.1-sol", "analysis"],
+      ["gpt-6-luna", "analysis"],
+      ["gpt-6.1-sol", "cross-review"],
+      ["gpt-6-luna", "cross-review"],
     ]);
     assert.equal(calls[0].schema, TEACHER_ANALYSIS_SCHEMA);
     assert.equal(calls[2].schema, TEACHER_REVIEW_SCHEMA);
     assert.equal(result.report.council.verdict, "strong-consensus");
     assert.equal(result.report.candidates.length, 2);
-    assert.equal(result.report.usage["gpt-5.6-sol"].requests, 2);
+    assert.equal(result.report.usage["gpt-6.1-sol"].requests, 2);
     assert.ok(result.report.candidates.every((candidate) => (
       candidate.source === "teacher-collaboration"
       && candidate.promotionEligible === false

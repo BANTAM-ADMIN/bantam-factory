@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { writeJsonAtomic } from "../atomic-file.js";
+import { resolveCodexModelAlias } from "../codex-models.js";
 import { runCodexDelegate } from "../codex-delegate.js";
 import { runContractGrader, findContractGrader } from "../contract-grader.js";
 import { runFixture, materializeFixtureRepo } from "../fixture-runner.js";
@@ -17,14 +18,15 @@ import { runLifecycleFactoryCell } from "./lifecycle-cell.js";
 
 const KIND = "bantam.factory-lifecycle-cohort";
 const ARMS = Object.freeze(["native", "bantam", "factory"]);
-const MODELS = Object.freeze({ terra: "gpt-5.6-terra", sol: "gpt-5.6-sol", "gpt-5.6-terra": "gpt-5.6-terra", "gpt-5.6-sol": "gpt-5.6-sol" });
+// Family names resolve to the newest version in the catalog; exact ids pass through.
+const FAMILIES = Object.freeze(["sol", "luna", "terra", "astra"]);
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 
 export async function runLifecycleCohort({
   fixtureDir,
   root,
   id = null,
-  model = "terra",
+  model = "sol",
   effort = "medium",
   order = ARMS,
   diagnosisMaxTurns = 8,
@@ -323,7 +325,7 @@ function normalizeOrder(value) {
   }
   return Object.freeze(rows);
 }
-function normalizeModel(value) { const model = MODELS[String(value).trim().toLowerCase()]; if (!model) throw new Error(`invalid lifecycle cohort model: ${value}`); return model; }
+function normalizeModel(value) { const key = String(value).trim().toLowerCase(); if (FAMILIES.includes(key)) return resolveCodexModelAlias(key); if (/^gpt-\d+(?:\.\d+)*-(?:sol|luna|terra|astra)$/.test(key)) return key; throw new Error(`invalid lifecycle cohort model: ${value}`); }
 function normalizeEffort(value) { const effort = String(value).trim().toLowerCase(); if (!EFFORTS.has(effort)) throw new Error(`invalid lifecycle cohort effort: ${value}`); return effort; }
 function requireDirectory(value, label) { const full = path.resolve(requireString(value, label)); if (!fs.statSync(full, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${label} is not a directory: ${full}`); return full; }
 function requireString(value, label) { const text = String(value ?? "").trim(); if (!text) throw new Error(`${label} is required`); return text; }

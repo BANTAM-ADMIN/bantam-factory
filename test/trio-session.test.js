@@ -124,7 +124,7 @@ test("trio runs arms concurrently in isolated persistent workspaces", async (t) 
 
   assert.equal(outcome.rows.length, 3);
   assert.equal(outcome.comparison.allPassed, true);
-  assert.deepEqual(outcome.comparison.rows.map((row) => row.arm), ["local", "sol", "terra"]);
+  assert.deepEqual(outcome.comparison.rows.map((row) => row.arm), ["local", "sol", "luna"]);
   assert.equal(starts.length, 3);
   assert.equal(fs.readFileSync(path.join(workspace, "source.js"), "utf8"), before);
   assert.equal(fs.existsSync(path.join(workspace, "answer.txt")), false);
@@ -140,7 +140,7 @@ test("trio runs arms concurrently in isolated persistent workspaces", async (t) 
     false,
     "inert trio evidence must not contain recursively discoverable test copies",
   );
-  for (const arm of ["local", "sol", "terra"]) {
+  for (const arm of ["local", "sol", "luna"]) {
     const lane = runningManifest.arms[arm].workspace;
     assert.equal(fs.readFileSync(path.join(lane, "answer.txt"), "utf8"), `${arm}: repair it\n`);
   }
@@ -286,14 +286,14 @@ test("trio apply verifies one arm and refuses a stale live baseline", async (t) 
   const verifierCalls = [];
   const applied = await applyTrioArm({
     sessionDir: session.directory,
-    arm: "terra",
+    arm: "luna",
     runVerifier: async (root, command) => {
       verifierCalls.push({ root, command });
       return { pass: true, status: "pass", exitCode: 0, durationMs: 1, detail: "ok" };
     },
   });
-  assert.equal(applied.arm, "terra");
-  assert.equal(fs.readFileSync(path.join(workspace, "answer.txt"), "utf8"), "terra: choose safely\n");
+  assert.equal(applied.arm, "luna");
+  assert.equal(fs.readFileSync(path.join(workspace, "answer.txt"), "utf8"), "luna: choose safely\n");
   assert.equal(verifierCalls.length, 2);
 
   const staleWorkspace = tempWorkspace();

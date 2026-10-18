@@ -92,7 +92,7 @@ test("Codex transport initializes, discovers its model, streams, and reports usa
   assert.deepEqual(progress, ['{"a":"re']);
   assert.deepEqual(result.usage, {
     provider: "codex",
-    model: "gpt-5.6-sol",
+    model: "gpt-6.1-sol",
     requests: 1,
     complete: true,
     inputTokens: 120,

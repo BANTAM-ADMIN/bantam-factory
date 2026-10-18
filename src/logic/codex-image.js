@@ -8,6 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { defaultCodexModel } from "../codex-models.js";
 import { CodexAppServer } from "../codex-transport.js";
 import { addModelUsage, emptyModelUsage } from "../model-usage.js";
 
@@ -65,7 +66,7 @@ export function codexImageTool(workspace, {
       onEvent({ type: "image_generation_started", variants, estimateMs, prompt: prompt.slice(0, 240) });
       const outputDir = path.join(workspace, "assets", "generated");
       fs.mkdirSync(outputDir, { recursive: true });
-      const model = env.BANTAM_CODEX_IMAGE_MODEL || "gpt-5.6-terra";
+      const model = env.BANTAM_CODEX_IMAGE_MODEL || defaultCodexModel().model;
       const effort = env.BANTAM_CODEX_IMAGE_EFFORT || "medium";
       const timeouts = imageWorkerTimeouts(env);
       let completedWorkers = 0;
@@ -441,7 +442,7 @@ export function codexImageEditTool(workspace, {
       onEvent({ type: "image_edit_started", variants, estimateMs, source, instruction: instruction.slice(0, 240) });
       const outputDir = path.join(workspace, "assets", "generated");
       fs.mkdirSync(outputDir, { recursive: true });
-      const model = env.BANTAM_CODEX_IMAGE_MODEL || "gpt-5.6-terra";
+      const model = env.BANTAM_CODEX_IMAGE_MODEL || defaultCodexModel().model;
       const effort = env.BANTAM_CODEX_IMAGE_EFFORT || "medium";
       const timeouts = imageWorkerTimeouts(env);
 

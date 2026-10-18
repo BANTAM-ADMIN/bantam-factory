@@ -78,7 +78,7 @@ const verifier = async () => ({
   detail: "ok",
 });
 
-test("Team runs read-only specialists concurrently, then one Terra writer", async (t) => {
+test("Team runs read-only specialists concurrently, then one Sol primary writer", async (t) => {
   const root = workspace();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const scoutStarts = [];
@@ -102,7 +102,7 @@ test("Team runs read-only specialists concurrently, then one Terra writer", asyn
         await allScouts;
         return result({ summary: `${arm} evidence`, advisory: true });
       }
-      assert.equal(arm, "terra");
+      assert.equal(arm, "primary");
       assert.doesNotMatch(options.task, /continuing BANTAM trio lane/);
       assert.equal(options.investigationActionLimit, null);
       assert.match(options.task, /Parallel specialist findings:/);
@@ -111,8 +111,8 @@ test("Team runs read-only specialists concurrently, then one Terra writer", asyn
       assert.match(options.task, /sol evidence/);
       assert.match(options.task, /requirement ledger from the ORIGINAL operator task/);
       assert.match(options.task, /green supplied test suite is necessary but not sufficient/);
-      fs.writeFileSync(path.join(options.workspace, "answer.txt"), "terra integrated\n");
-      return result({ summary: "Terra integrated and verified.", advisory: false });
+      fs.writeFileSync(path.join(options.workspace, "answer.txt"), "primary integrated\n");
+      return result({ summary: "Primary integrated and verified.", advisory: false });
     },
   });
   t.after(() => {
@@ -148,7 +148,8 @@ test("Team runs read-only specialists concurrently, then one Terra writer", asyn
   assert.match(solCall.options.task, /prioritize observed code gaps/);
   assert.match(calls.find((call) => !call.advisory).options.task, /preserve every already-compliant file/);
   assert.equal(outcome.findings.length, 3);
-  assert.equal(outcome.primary.arm, "terra");
+  assert.equal(outcome.primary.arm, "primary");
+  assert.equal(session.engine.arms.find((arm) => arm.name === "primary").source, "sol");
   assert.equal(outcome.comparison.rows.length, 4);
   assert.equal(outcome.comparison.totalCacheHitTokens, 0);
   assert.equal(outcome.comparison.totalCacheMissTokens, 0);
@@ -157,25 +158,25 @@ test("Team runs read-only specialists concurrently, then one Terra writer", asyn
     assert.equal(typeof row.cacheMissTokens, "number");
   }
   const formatted = formatTeamComparison(outcome.comparison);
-  assert.match(formatted, /terra-primary/);
+  assert.match(formatted, /\bprimary\b/);
   assert.match(formatted, /Cache hit/);
   assert.match(formatted, /Total cache hit\/miss:/);
   assert.equal(fs.existsSync(path.join(root, "answer.txt")), false);
   assert.equal(
-    fs.readFileSync(path.join(session.engine.view().arms.terra.workspace, "answer.txt"), "utf8"),
-    "terra integrated\n",
+    fs.readFileSync(path.join(session.engine.view().arms.primary.workspace, "answer.txt"), "utf8"),
+    "primary integrated\n",
   );
   for (const arm of ["local", "luna", "sol"]) {
     const state = session.engine.view().arms[arm];
-    assert.equal(fs.readFileSync(path.join(state.workspace, "answer.txt"), "utf8"), "terra integrated\n");
-    assert.equal(state.synchronizedFrom.arm, "terra");
+    assert.equal(fs.readFileSync(path.join(state.workspace, "answer.txt"), "utf8"), "primary integrated\n");
+    assert.equal(state.synchronizedFrom.arm, "primary");
   }
   assert.ok(fs.existsSync(path.join(session.directory, "team-summary.md")));
   assert.ok(fs.existsSync(path.join(session.directory, "team-report", "index.html")));
   assert.equal(loadTeamManifest(session.directory).taskCount, 1);
 });
 
-test("Team skips Local cleanly and transactionally applies only Terra", async (t) => {
+test("Team skips Local cleanly and transactionally applies only the primary", async (t) => {
   const root = workspace();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const session = new TeamSession({
@@ -187,9 +188,9 @@ test("Team skips Local cleanly and transactionally applies only Terra", async (t
     preflightVerifier: verifier,
     runAgentImpl: async (options) => {
       const advisory = Array.isArray(options.excludeActions);
-      if (!advisory) fs.writeFileSync(path.join(options.workspace, "answer.txt"), "terra only\n");
+      if (!advisory) fs.writeFileSync(path.join(options.workspace, "answer.txt"), "primary only\n");
       return result({
-        summary: advisory ? `${path.basename(options.workspace)} finding` : "Terra complete.",
+        summary: advisory ? `${path.basename(options.workspace)} finding` : "Primary complete.",
         advisory,
       });
     },
@@ -210,11 +211,11 @@ test("Team skips Local cleanly and transactionally applies only Terra", async (t
     workspace: root,
     runVerifier: verifier,
   });
-  assert.equal(applied.arm, "terra");
-  assert.equal(fs.readFileSync(path.join(root, "answer.txt"), "utf8"), "terra only\n");
+  assert.equal(applied.arm, "primary");
+  assert.equal(fs.readFileSync(path.join(root, "answer.txt"), "utf8"), "primary only\n");
 });
 
-test("Team advisory tasks keep the Terra synthesis read-only", async (t) => {
+test("Team advisory tasks keep the primary synthesis read-only", async (t) => {
   const root = workspace();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const calls = [];
@@ -256,7 +257,7 @@ test("Team advisory tasks keep the Terra synthesis read-only", async (t) => {
   );
 });
 
-test("Team substitutes grounded findings for a content-free Terra advisory synthesis", async (t) => {
+test("Team substitutes grounded findings for a content-free primary advisory synthesis", async (t) => {
   const root = workspace();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   let calls = 0;
@@ -342,7 +343,7 @@ test("Team restores every scout lane and refuses integration after any scout mut
   assert.equal(fs.existsSync(path.join(root, "scout-leak.txt")), false);
 });
 
-test("Team interruption after scouting does not launch the Terra primary", async (t) => {
+test("Team interruption after scouting does not launch the primary", async (t) => {
   const root = workspace();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const controller = new AbortController();

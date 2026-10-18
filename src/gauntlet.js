@@ -43,7 +43,7 @@ export const GAUNTLET_FIXTURES = Object.freeze([
 
 export function createGauntletSpec({
   root,
-  models = ["local", "sol", "terra"],
+  models = ["local", "sol", "luna"],
   fixtures = GAUNTLET_FIXTURES,
   rounds = 1,
   effort = null,

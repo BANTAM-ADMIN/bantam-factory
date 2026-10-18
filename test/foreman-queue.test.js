@@ -35,13 +35,13 @@ test('abort prevents queued dispatch and closes running work before returning', 
   q.submit([job('a'),job('b')]); await Promise.resolve(); await Promise.resolve();
   ac.abort(); await q.close(); assert.equal(started, 1); assert.equal(q.jobs[1].status, 'cancelled'); assert.throws(() => q.submit([job('c')]));
 });
-test('Astra, Sol and Terra share ONE Codex worker slot while the local lane stays busy', async () => {
+test('Astra, Sol and Luna share ONE Codex worker slot while the local lane stays busy', async () => {
   const active = { local: 0, codex: 0 }, peak = { local: 0, codex: 0 }, releases = new Map(), started = [];
-  const q = new ForemanQueue({ codexWorkers: ['astra','sol','terra'], execute: async j => {
+  const q = new ForemanQueue({ codexWorkers: ['astra','sol','luna'], execute: async j => {
     started.push(j.id); active[j.lane]++; peak[j.lane] = Math.max(peak[j.lane], active[j.lane]);
     await new Promise(r => releases.set(j.id, r)); active[j.lane]--; return { pass: true };
   } });
-  q.submit([{ ...job('cloud-a'), worker: 'astra' }, { ...job('cloud-b'), worker: 'sol' }, job('local-a'), { ...job('cloud-c'), worker: 'terra' }, job('local-b')]);
+  q.submit([{ ...job('cloud-a'), worker: 'astra' }, { ...job('cloud-b'), worker: 'sol' }, job('local-a'), { ...job('cloud-c'), worker: 'luna' }, job('local-b')]);
   await Promise.resolve(); await Promise.resolve();
   assert.deepEqual(started, ['cloud-a','local-a']);
   releases.get('local-a')(); await q.wait(1000); await Promise.resolve();
@@ -59,27 +59,27 @@ test('cloud workers require an operator allowlist; model-authored limits cannot 
 });
 
 test('a Codex-only queue cannot admit a local job', async () => {
-  const workers = [], q = new ForemanQueue({localEnabled:false,codexWorkers:['terra','sol'],
+  const workers = [], q = new ForemanQueue({localEnabled:false,codexWorkers:['luna','sol'],
     execute:j => {workers.push(j.worker);return {pass:true};}});
   assert.throws(() => q.submit([job('local')]), /not enabled/);
-  q.submit([{...job('cloud'),worker:'terra'}]);
+  q.submit([{...job('cloud'),worker:'luna'}]);
   while(q.pending) await q.wait(1000);
-  assert.deepEqual(workers,['terra']);
+  assert.deepEqual(workers,['luna']);
   await q.close();
 });
 test('cross-lane dependencies wait for actual completion before dispatch', async () => {
   let release; const started = [];
-  const q = new ForemanQueue({ codexWorkers: ['terra'], execute: async j => {
+  const q = new ForemanQueue({ codexWorkers: ['luna'], execute: async j => {
     started.push(j.id); if (j.id === 'implementation') await new Promise(r => { release = r; }); return { pass: true };
   } });
-  q.submit([job('implementation'), { ...job('review', ['implementation']), worker: 'terra' }]);
+  q.submit([job('implementation'), { ...job('review', ['implementation']), worker: 'luna' }]);
   await Promise.resolve(); await Promise.resolve(); assert.deepEqual(started, ['implementation']);
   release(); while (q.pending) await q.wait(1000);
   assert.deepEqual(started, ['implementation','review']);
 });
 test('cancel running local job drains it before requeue and leaves the Codex lane running', async () => {
   const starts = [], signals = {}, releases = {}; let local = 0, peak = 0;
-  const q = new ForemanQueue({ codexWorkers: ['terra'], execute: async (j, deps, signal, progress) => {
+  const q = new ForemanQueue({ codexWorkers: ['luna'], execute: async (j, deps, signal, progress) => {
     starts.push(j.id); signals[j.id] = signal;
     if (j.lane === 'local') { local++; peak = Math.max(peak,local); }
     progress('test in snapshot is stale');
@@ -87,7 +87,7 @@ test('cancel running local job drains it before requeue and leaves the Codex lan
     if (j.lane === 'local') local--;
     return { pass: true };
   } });
-  q.submit([job('old'),{...job('review'),worker:'terra'}]); await Promise.resolve(); await Promise.resolve();
+  q.submit([job('old'),{...job('review'),worker:'luna'}]); await Promise.resolve(); await Promise.resolve();
   assert.equal(q.jobs[0].progress.source,'unverified-worker-output');
   q.cancel('old'); assert.equal(signals.old.aborted,true); assert.equal(signals.review.aborted,false);
   q.submit([job('fresh')]); assert.deepEqual(starts,['old','review']);

@@ -66,7 +66,7 @@ export function clearConnection(home){
 export async function chooseFirstRun({ask,out,discover=discoverModelServers,hasCodex=codexAvailable(),advanced=false}={}){
  out('\nWelcome to BANTAM — choose how to power your factory.\n');
  out('  [1] Use an existing model server (scan this PC or enter IP/port)\n');
- out('  [2] Codex subscription · Luna / Terra / Sol / Astra (explicit opt-in)\n');
+ out('  [2] Codex subscription · Luna / Sol / Astra (explicit opt-in)\n');
  out(hasCodex?'      Codex CLI detected; uses your signed-in account and sends context to OpenAI.\n':'      Codex CLI not detected; installation/sign-in help is available. No automatic cloud use.\n');
  out('  [3] Easy mode: install stock DavidAU 27B (24GB NVIDIA GPU; confirmation required)\n');
  if(advanced)out('  [4] Advanced model menu\n');

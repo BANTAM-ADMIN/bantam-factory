@@ -3,12 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { writeJsonAtomic, writeTextAtomic } from "./atomic-file.js";
+import { resolveCodexModelAlias } from "./codex-models.js";
 import { describeImageWithCodex } from "./logic/vision.js";
 import { previewVisionPrompt, runPreviewSync } from "./logic/preview.js";
 
 const DEFAULT_MODELS = [
-  { name: "gpt-5.6-terra", effort: "medium" },
-  { name: "gpt-5.6-sol", effort: "high" },
+  { name: resolveCodexModelAlias("luna"), effort: "medium" },
+  { name: resolveCodexModelAlias("sol"), effort: "high" },
 ];
 
 // Calibration keeps the preview runner's own browser budget. Measured across

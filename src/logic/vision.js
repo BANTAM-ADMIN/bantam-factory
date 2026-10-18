@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { inflateSync } from "node:zlib";
+import { defaultCodexModel } from "../codex-models.js";
 import { CodexAppServer } from "../codex-transport.js";
 import { assertImageGpuAvailable } from '../image-gpu.js';
 import { prepareVisionInput } from './vision-input.js';
@@ -240,7 +241,7 @@ const IMG_MIME = { png: "png", jpg: "jpeg", jpeg: "jpeg", gif: "gif", webp: "web
 
 export async function describeImageWithCodex(absPath, prompt, {
   workspace,
-  model = "gpt-5.6-terra",
+  model = defaultCodexModel().model,
   effort = "medium",
   detail = "high",
   onEvent = () => {},
@@ -364,7 +365,7 @@ export function viewImageTool(workspace, endpoint, { describe = describeImage } 
  * app-server turn, and returns only the textual observation to the agent loop.
  */
 export function codexViewImageTool(workspace, {
-  model = "gpt-5.6-terra",
+  model = defaultCodexModel().model,
   effort = "medium",
   onEvent = () => {},
   onExternalUsage = () => {},

@@ -39,9 +39,9 @@ test("the checkout is discovered as a sibling of the repo or its parents", (t) =
 test("picker entries: one per recommended bridge model, marked launchable when the bridge is down", () => {
   const models = [
     { id: "gpt-5.3-codex-spark", display_name: "GPT-5.3-Codex-Spark", description: "Ultra-fast coding model.", supported_reasoning_efforts: ["low", "medium", "high"], default_reasoning_effort: "high" },
-    { id: "gpt-5.6-luna", display_name: "GPT-5.6-Luna", description: "Fast and affordable.", supported_reasoning_efforts: ["low", "medium"], default_reasoning_effort: "medium" },
+    { id: "gpt-6-luna", display_name: "GPT-6-Luna", description: "Fast and affordable.", supported_reasoning_efforts: ["low", "medium"], default_reasoning_effort: "medium" },
   ];
-  const up = codexapiChoices({ status: { reachable: true, models }, config: { url: "http://h:8787/v1", key: "k", dir: "/d" }, preference: { kind: "codexapi", model: "gpt-5.6-luna", effort: "low" } });
+  const up = codexapiChoices({ status: { reachable: true, models }, config: { url: "http://h:8787/v1", key: "k", dir: "/d" }, preference: { kind: "codexapi", model: "gpt-6-luna", effort: "low" } });
   assert.equal(up.length, 2);
   assert.equal(up[0].kind, "codexapi");
   assert.match(up[0].label, /codexapi · GPT-5\.3-Codex-Spark · low reasoning/, "spark defaults to low: dumb-fast is the point");

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {readJsonFile} from './json-file.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveCodexModelAlias } from './codex-models.js';
 import { CodexAppServer } from './codex-transport.js';
 import { driveForeman } from './foreman-controller.js';
 import { WorkspaceStore } from './workspace-store.js';
@@ -20,7 +21,8 @@ import { createWorkerControl, queueWorkerSteering, readWorkerFeedback } from './
 import { captureInstructionScope } from './instruction-guard.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MODELS = { astra: 'gpt-6-astra', sol: 'gpt-5.6-sol', terra: 'gpt-5.6-terra' };
+// Worker families resolve to the newest version in the catalog.
+const MODELS = Object.fromEntries(['astra', 'sol', 'luna'].map(w => [w, resolveCodexModelAlias(w)]));
 const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
 const clean = r => r?.code === 0 && !r.timedOut && !r.aborted && !r.bufferExceeded;
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
@@ -46,14 +48,14 @@ export function foremanWorkerReport(artifact) {
 export const FOREMAN_HELP = `BANTAM FACTORY · experimental Astra supervisor
 
 bantamfactory foreman --task "..." --verify "npm test" --endpoint http://127.0.0.1:8085
-  [--with-codex terra|sol|astra|terra,sol,astra] [--no-local] [--out NEW-DIRECTORY] [--workspace DIR]
+  [--with-codex sol|luna|astra|sol,luna,astra] [--no-local] [--out NEW-DIRECTORY] [--workspace DIR]
   [--timeout-seconds 600] [--max-jobs 12] [--max-decisions 40]
   [--max-supervisor-tokens 500000] [--dry-run] [--yes]
 
 Opt-in cloud use: Astra receives the task, selected candidate files and worker
 evidence using your installed Codex account. A requested Codex worker shares ONE
 slot across all enabled models. Every worker runs inside BANTAM. Use --no-local
-with --with-codex terra (or sol) to run entirely on Codex without a local server.
+with --with-codex sol (or luna) to run entirely on Codex without a local server.
 Docker is required; a loopback llama.cpp server is needed only for the local lane.
 No downloads, Claude requests or global settings changes. All work is in a
 private candidate; your source checkout is NOT modified. Review the candidate
@@ -69,7 +71,7 @@ export function foremanPlan(args, cwd = process.cwd()) {
   const output = path.resolve(cwd, args.out ?? path.join('.bantam', 'foreman', new Date().toISOString().replace(/[:.]/g, '-')));
   if (fs.existsSync(output)) throw Error('choose a NEW output directory');
   const codexWorkers = args['with-codex'] === undefined ? [] : String(args['with-codex']).split(',');
-  if (codexWorkers.some(w => !Object.hasOwn(MODELS, w)) || new Set(codexWorkers).size !== codexWorkers.length) throw Error('--with-codex must name astra, sol or terra without duplicates');
+  if (codexWorkers.some(w => !Object.hasOwn(MODELS, w)) || new Set(codexWorkers).size !== codexWorkers.length) throw Error('--with-codex must name astra, sol or luna without duplicates');
   const localEnabled = args['no-local'] !== true;
   if (!localEnabled && !codexWorkers.length) throw Error('--no-local requires --with-codex');
   const integer = (key, fallback, max) => { const n = Number(args[key] ?? fallback); if (!Number.isInteger(n) || n < 1 || n > max) throw Error(`invalid --${key}`); return n; };

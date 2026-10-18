@@ -23,6 +23,6 @@ test("native delegate execution is research-only and requires explicit consent",
   assert.equal(result.status, 2);
   assert.match(result.stderr, /research-only/i);
   assert.match(result.stderr, /--yes/);
-  assert.match(result.stderr, /codex-terra/);
+  assert.match(result.stderr, /codex-luna/);
   assert.equal(fs.existsSync(path.join(workspace, ".bantam")), false);
 });

@@ -14,6 +14,7 @@ import { resolveProfile } from "./profiles.js";
 import { ChatSessionPlanner } from "./chat-sessions.js";
 import { grammarFieldFor, buildOpenAiBody, buildChatCompletionsBody, buildDeepSeekBody, extractCompletionText, extractStreamDelta, isStreamDone } from "./openai-transport.js";
 import { addModelUsage, emptyModelUsage, usageFromResponse } from "./model-usage.js";
+import { defaultCodexModel } from "./codex-models.js";
 import { CodexAppServer, normalizeCodexStructuredContent } from "./codex-transport.js";
 import { activeProfile, recordSample } from "./logic/model-cards.js";
 import { formatLunaReserveNotice, lunaReserveModel, shouldOfferLunaReserve } from "./logic/luna-reserve.js";
@@ -1408,7 +1409,7 @@ export class ModelClient {
   async listCodexModels() {
     const runtime = this.codexRuntime ?? new CodexAppServer({
       cwd: process.cwd(),
-      model: this.codex ? this.modelName : "gpt-5.6-sol",
+      model: this.codex ? this.modelName : defaultCodexModel().model,
       effort: this.codex ? this.codexEffort : "high",
       timeoutMs: Math.min(this.timeoutMs, 30000),
       threadMode: this.codexThreadMode,
@@ -1495,7 +1496,7 @@ export class ModelClient {
     return this.apiUrl;
   }
 
-  switchToCodex({ model = "gpt-5.6-sol", effort = "high" } = {}) {
+  switchToCodex({ model = defaultCodexModel().model, effort = "high" } = {}) {
     this._leaveDiffusionGemma();
     this.sealActionPrefill = false;
     this.codexRuntime?.close();

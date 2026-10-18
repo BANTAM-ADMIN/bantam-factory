@@ -17,6 +17,7 @@ import {
   armPassed, findReferenceDivergence, diffSolutions, witnessReferenceGaps,
 } from "./reference-witness.js";
 import { runAgent } from "../agent.js";
+import { defaultCodexModel } from "../codex-models.js";
 import { ModelClient } from "../model.js";
 import { strictBest } from "./strict-best.js";
 import { gradeArm } from "./compare-grader.js";
@@ -39,7 +40,7 @@ const ARM_ROLES = {
 
 // A codex arm that names no model would silently fall back to the local server,
 // turning the head-to-head back into BANTAM+local vs Codex without saying so.
-const DEFAULT_COMPARE_CODEX_MODEL = "gpt-5.6-terra";
+const DEFAULT_COMPARE_CODEX_MODEL = defaultCodexModel().model;
 // Mirrors ModelClient's own Codex default. If the two ever drift, the comparison
 // silently becomes a thinking-budget comparison.
 const DEFAULT_COMPARE_CODEX_EFFORT = "medium";

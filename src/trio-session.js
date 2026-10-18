@@ -1,4 +1,4 @@
-// Parallel, isolated Local/Sol/Terra operating sessions.
+// Parallel, isolated Local/Sol/Luna operating sessions.
 //
 // Trio is deliberately additive: it snapshots one live workspace, materializes
 // one private workspace per arm, and runs the ordinary BANTAM agent in each.
@@ -27,7 +27,7 @@ import { WorkspaceTransaction } from "./workspace-transaction.js";
 
 const KIND = "bantam-trio-session";
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
-const ARM_NAMES = Object.freeze(["local", "sol", "terra"]);
+const ARM_NAMES = Object.freeze(["local", "sol", "luna"]);
 
 /**
  * Implementation-mode outcome for one arm.
@@ -801,7 +801,7 @@ function writeTrioReport(filePath, manifest) {
   const rows = latest?.rows ?? [];
   const cards = rows.map((row) => `<article><h2>${escapeHtml(row.arm)}</h2><strong>${escapeHtml(row.status)}</strong><dl><dt>Turns</dt><dd>${row.turns}</dd><dt>Requests</dt><dd>${row.requests}</dd><dt>Time</dt><dd>${formatDuration(row.durationMs)}</dd><dt>Input</dt><dd>${formatNumber(row.inputTokens)}</dd><dt>Output</dt><dd>${formatNumber(row.outputTokens)}</dd><dt>Reasoning</dt><dd>${formatNumber(row.reasoningTokens)}</dd></dl><p>${escapeHtml(row.summary)}</p><a href="../${escapeAttr(row.artifactPath)}">Run artifact</a></article>`).join("");
   const timeline = comparisons.map((comparison) => `<section><h2>Turn ${comparison.turn}</h2><p>${escapeHtml(comparison.task)}</p><table><thead><tr><th>Arm</th><th>Status</th><th>Turns</th><th>Requests</th><th>Time</th></tr></thead><tbody>${comparison.rows.map((row) => `<tr><td>${escapeHtml(row.arm)}</td><td>${escapeHtml(row.status)}</td><td>${row.turns}</td><td>${row.requests}</td><td>${formatDuration(row.durationMs)}</td></tr>`).join("")}</tbody></table></section>`).join("");
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BANTAM Trio ${escapeHtml(manifest.id)}</title><style>:root{color-scheme:dark;--bg:#07100f;--panel:#10201d;--ink:#f3f6e9;--muted:#9bb0a8;--line:#b5d8c326;--local:#c7fa62;--sol:#7db6ff;--terra:#d6a8ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,sans-serif}.shell{width:min(1120px,calc(100% - 32px));margin:auto}header{padding:72px 0 34px}h1{font-size:clamp(42px,7vw,82px);line-height:.95;letter-spacing:-.06em;margin:12px 0}header p,p{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.cards article,section{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}.cards article:nth-child(1){border-top:3px solid var(--local)}.cards article:nth-child(2){border-top:3px solid var(--sol)}.cards article:nth-child(3){border-top:3px solid var(--terra)}dl{display:grid;grid-template-columns:1fr 1fr}dt{color:var(--muted)}dd{text-align:right;margin:0}a{color:var(--sol)}section{margin:18px 0}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid var(--line);padding:8px}@media(max-width:760px){.cards{grid-template-columns:1fr}}</style></head><body><header><div class="shell"><small>ISOLATED PARALLEL MODEL SESSION</small><h1>One task.<br>Three BANTAMs.</h1><p>Local Qwen, Codex Sol, and Codex Terra operate in independent workspaces captured from tree <code>${escapeHtml(manifest.baseline.tree)}</code>. The live source workspace remains untouched until an explicit verified apply.</p></div></header><main class="shell"><div class="cards">${cards}</div>${timeline}</main></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BANTAM Trio ${escapeHtml(manifest.id)}</title><style>:root{color-scheme:dark;--bg:#07100f;--panel:#10201d;--ink:#f3f6e9;--muted:#9bb0a8;--line:#b5d8c326;--local:#c7fa62;--sol:#7db6ff;--luna:#d6a8ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,sans-serif}.shell{width:min(1120px,calc(100% - 32px));margin:auto}header{padding:72px 0 34px}h1{font-size:clamp(42px,7vw,82px);line-height:.95;letter-spacing:-.06em;margin:12px 0}header p,p{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.cards article,section{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}.cards article:nth-child(1){border-top:3px solid var(--local)}.cards article:nth-child(2){border-top:3px solid var(--sol)}.cards article:nth-child(3){border-top:3px solid var(--luna)}dl{display:grid;grid-template-columns:1fr 1fr}dt{color:var(--muted)}dd{text-align:right;margin:0}a{color:var(--sol)}section{margin:18px 0}table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid var(--line);padding:8px}@media(max-width:760px){.cards{grid-template-columns:1fr}}</style></head><body><header><div class="shell"><small>ISOLATED PARALLEL MODEL SESSION</small><h1>One task.<br>Three BANTAMs.</h1><p>Local Qwen, Codex Sol, and Codex Luna operate in independent workspaces captured from tree <code>${escapeHtml(manifest.baseline.tree)}</code>. The live source workspace remains untouched until an explicit verified apply.</p></div></header><main class="shell"><div class="cards">${cards}</div>${timeline}</main></body></html>`;
   writeTextAtomic(filePath, html);
 }
 
@@ -818,7 +818,9 @@ function normalizeArms(values, effort) {
     const name = String(input.name ?? "").toLowerCase();
     if (!name || seen.has(name)) return null;
     seen.add(name);
-    const source = GAUNTLET_MODELS[name];
+    // A lane may run a registry model under its own name (Team's primary runs Sol).
+    const sourceName = String(input.source ?? name).toLowerCase();
+    const source = GAUNTLET_MODELS[sourceName];
     if (!source) throw new Error(`unknown trio arm: ${name}`);
     const model = { ...source.model, ...(input.model ?? {}) };
     if (model.runtime === "codex") {
@@ -830,6 +832,7 @@ function normalizeArms(values, effort) {
     }
     return {
       name,
+      source: sourceName,
       description: optionalString(input.description) ?? source.description,
       role: optionalString(input.role),
       model,

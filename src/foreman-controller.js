@@ -18,7 +18,7 @@ export const FOREMAN_SCHEMA = {
   properties: {
     action: { type: 'string', enum: ['enqueue','dispatch','list','read','evidence','check','steer','cancel','wait','finish'] },
     jobs: { type: 'array', items: { type: 'object', additionalProperties: false,
-      properties: { id: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,47}$' }, worker: { type: 'string', enum: ['local','astra','sol','terra'] }, task: { type: 'string' }, context: { type: 'string' }, verify: { type: 'string' }, dependsOn: strings, resumeFrom: { type: 'string' } },
+      properties: { id: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,47}$' }, worker: { type: 'string', enum: ['local','astra','sol','luna'] }, task: { type: 'string' }, context: { type: 'string' }, verify: { type: 'string' }, dependsOn: strings, resumeFrom: { type: 'string' } },
       required: ['id','worker','task','context','verify','dependsOn','resumeFrom'] } },
     target: { type: 'string' }, text: { type: 'string' },
   }, required: ['action','jobs','target','text'],

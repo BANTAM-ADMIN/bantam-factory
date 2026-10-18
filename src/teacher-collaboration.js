@@ -1,4 +1,4 @@
-// Governed Sol/Terra collaboration over recorded BANTAM runs.
+// Governed Sol/Luna collaboration over recorded BANTAM runs.
 //
 // This is a witness, not a promotion path. A local run remains the primary
 // specimen. Stronger Codex models independently diagnose the harness-level gap,
@@ -12,15 +12,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { writeJsonAtomic } from "./atomic-file.js";
+import { resolveCodexModelAlias } from "./codex-models.js";
 import { compareTeacherTrajectories } from "./trajectory-comparison.js";
 
 export const TEACHER_REPORT_KIND = "bantam.teacher-collaboration";
 export const TEACHER_REPORT_SCHEMA = 1;
 export const TEACHER_REPORT_DIR = ".bantam/teacher-collaboration/reports";
-export const DEFAULT_TEACHER_MODELS = Object.freeze([
-  "gpt-5.6-sol",
-  "gpt-5.6-terra",
-]);
+// The current Sol and Luna in the catalog; older versions only by explicit --models.
+export const DEFAULT_TEACHER_MODELS = Object.freeze(
+  ["sol", "luna"].map((family) => resolveCodexModelAlias(family)),
+);
 
 const MAX_PACKET_CHARS = 48_000;
 const MAX_TURNS_IN_PACKET = 30;
@@ -879,6 +880,7 @@ function normalizeGrade(value) {
 function referenceGradeKey(artifact, index) {
   const model = String(artifact.modelId ?? artifact.model?.id ?? "").toLowerCase();
   if (model.includes("sol")) return "sol";
+  if (model.includes("luna")) return "luna";
   if (model.includes("terra")) return "terra";
   return `reference${index + 1}`;
 }

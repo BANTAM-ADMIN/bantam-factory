@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { parseArgs } from "./cli-args.js";
+import { resolveCodexModelAlias } from "./codex-models.js";
 import { ModelClient } from "./model.js";
 import { normalizeThinkMode, THINK_MODES } from "./thinking.js";
 import { FactoryStore } from "./factory/store.js";
@@ -320,7 +321,7 @@ export async function runFactoryCommand(argv, {
         fixtureDir: path.resolve(cwd, fixture),
         root,
         id: typeof args.id === "string" ? args.id : null,
-        model: typeof args.model === "string" ? args.model : "terra",
+        model: typeof args.model === "string" ? args.model : "sol",
         effort: typeof args.effort === "string" ? args.effort : "medium",
         order: typeof args.order === "string" ? args.order : undefined,
         diagnosisMaxTurns: diagnosisTurns.value,
@@ -828,8 +829,8 @@ export function resolveFactoryHome({ cwd = process.cwd(), env = process.env, exp
 export function factoryUsage() {
   return `bantam factory engineer <job-id> [--json]
 bantam factory claims [--verify] [--require C0..C6] [--ladder FILE] [--json]
-bantam factory build "<task>" --verify "<command>" [--cell general|keyed-lifecycle] [--think auto|always|off (general cell; default auto)] [--focused-verify "<command>"] [--public-verify "<command>"] [--codex --model terra|sol --effort LEVEL] [--workspace DIR] [--max-turns N] [--job-id ID] [--factory-home DIR] [--json]
-bantam factory cohort run <fixture-dir> --yes [--id ID] [--model terra|sol] [--effort LEVEL] [--order native,bantam,factory] [--factory-home DIR] [--json]
+bantam factory build "<task>" --verify "<command>" [--cell general|keyed-lifecycle] [--think auto|always|off (general cell; default auto)] [--focused-verify "<command>"] [--public-verify "<command>"] [--codex --model sol|luna --effort LEVEL] [--workspace DIR] [--max-turns N] [--job-id ID] [--factory-home DIR] [--json]
+bantam factory cohort run <fixture-dir> --yes [--id ID] [--model sol|luna] [--effort LEVEL] [--order native,bantam,factory] [--factory-home DIR] [--json]
 bantam factory cohort show <cohort-id> [--factory-home DIR] [--json]
 bantam factory workers list [--factory-home DIR] [--json]
 bantam factory workers onboard --endpoint URL [--profile qwen] [--slots N] [--ttl MS] --yes [--factory-home DIR] [--json]
@@ -902,9 +903,8 @@ function wait(milliseconds, signal) {
 }
 
 function normalizeCodexModel(value) {
-  const key = typeof value === "string" ? value.trim().toLowerCase() : "terra";
-  if (key === "terra") return "gpt-5.6-terra";
-  if (key === "sol") return "gpt-5.6-sol";
+  const key = typeof value === "string" ? value.trim().toLowerCase() : "sol";
+  if (["sol", "luna", "terra", "astra"].includes(key)) return resolveCodexModelAlias(key);
   if (/^gpt-[a-z0-9.-]+$/.test(key)) return key;
   throw new Error(`factory: invalid Codex model ${value}`);
 }

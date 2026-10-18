@@ -184,7 +184,9 @@ BANTAM reads the model list from your Codex account. The newest model in each fa
 takes the short name, so `sol` means GPT-6.1-Sol, `luna` means GPT-6-Luna, `terra` means
 GPT-5.6-Terra and `astra` means GPT-6-Astra. Older versions stay available as
 `codex-5.6-sol` and so on. The **default Codex model is the current Sol**. Pick another
-with `--model luna` or `:model`.
+with `--model luna` or `:model`. Team and trio modes use the current Sol and Luna:
+`:team` sends Luna and Sol scouts ahead of a Sol writer, and `:trio` runs local, Sol
+and Luna side by side. Terra runs only when you ask for it by name.
 
 ---
 

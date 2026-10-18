@@ -52,7 +52,7 @@ lines.on("line", (line) => {
   }
   if (method === "initialized") return;
   if (method === "model/list") {
-    send({ id, result: { data: [{ id: "gpt-5.6-sol", model: "gpt-5.6-sol" }] } });
+    send({ id, result: { data: [{ id: "gpt-6.1-sol", model: "gpt-6.1-sol" }, { id: "gpt-5.6-sol", model: "gpt-5.6-sol" }] } });
     return;
   }
   if (method === "thread/start") {

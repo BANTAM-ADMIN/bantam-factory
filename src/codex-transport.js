@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import readline from "node:readline";
 import { ActionSchema, parseAction } from "./actions.js";
+import { defaultCodexModel } from "./codex-models.js";
 import { CodexUsageAccumulator, emptyCodexUsage } from "./codex-usage.js";
 
 const DEFAULT_COMMAND = process.env.BANTAM_CODEX_COMMAND || "codex";
@@ -103,7 +104,7 @@ export class CodexAppServer {
     env = null,
     threadConfig = null,
     cwd = process.cwd(),
-    model = "gpt-5.6-sol",
+    model = defaultCodexModel().model,
     effort = "high",
     timeoutMs = 600000,
     idleTimeoutMs = positiveTimeout(

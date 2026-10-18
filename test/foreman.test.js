@@ -34,8 +34,8 @@ test('worker final reports are bounded, labeled and never substitute for failed 
   const report=foremanWorkerReport({result:{summary:'OBSERVED START '+ 'x'.repeat(6000)+' OBSERVED END'}});
   assert.equal(report.source,'worker-final-report');assert.equal(report.truncated,true);
   assert.ok(report.text.length<2100);assert.ok(report.text.startsWith('OBSERVED START'));assert.ok(report.text.endsWith('OBSERVED END'));
-  const m=model([action('dispatch',{jobs:[job('core','terra')]}),action('finish')]);let checks=0;
-  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:2,
+  const m=model([action('dispatch',{jobs:[job('core','luna')]}),action('finish')]);let checks=0;
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['luna'],maxDecisions:2,
     execute:async()=>({pass:false,workerReport:foremanWorkerReport({result:{summary:'Everything is complete.'}}),verification:{pass:false,code:1,stdout:'failed',stderr:''}}),
     inspect:async()=>({}),verify:async()=>{checks++;return {pass:true};}});
   assert.equal(result.pass,false);assert.equal(checks,0);assert.match(m.prompts[1],/Everything is complete/);
@@ -62,8 +62,8 @@ test('combined source reviews stay whole and oversized observations identify the
   assert.equal(r.stdout,output);
 });
 test('dispatch returns settled worker evidence without spending a model turn to say wait', async () => {
-  const m=model([action('dispatch',{jobs:[job('core','terra')]}),action('finish')]);
-  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:2,
+  const m=model([action('dispatch',{jobs:[job('core','luna')]}),action('finish')]);
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['luna'],maxDecisions:2,
     execute:async()=>{await new Promise(r=>setTimeout(r,5));return {pass:true};},
     inspect:async()=>({}),verify:async()=>({pass:true})});
   assert.equal(result.pass,true);assert.equal(result.calls.length,2);
@@ -79,9 +79,9 @@ test('dispatch failures remain visible and cannot acquire a completion receipt',
 });
 test('dispatch wakes for a live failure so Astra can steer the same worker', async () => {
   let release, corrections=0;
-  const m=model([action('dispatch',{jobs:[job('core','terra')]}),
+  const m=model([action('dispatch',{jobs:[job('core','luna')]}),
     action('steer',{target:'core',text:'Repair the demonstrated boundary.'}),action('wait'),action('finish')]);
-  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['terra'],maxDecisions:4,
+  const result=await driveForeman({task:'build',initial:{},model:m,localEnabled:false,codexWorkers:['luna'],maxDecisions:4,
     execute:async(j,deps,signal,progress)=>{
       await new Promise(r=>{release=r;progress({observation:{turn:1,text:'Shell exit 1\nboundary failed'}});});
       return {pass:true};
@@ -152,7 +152,7 @@ test('supervisor can correct a running local worker and still must verify the co
   assert.equal(checks,1);assert.equal(result.pass,false);
 });
 test('supervisor can steer each cloud worker inside BANTAM with the local lane disabled', async () => {
-  for (const worker of ['terra', 'sol']) {
+  for (const worker of ['luna', 'sol']) {
     let release, received = '';
     const m = model([action('enqueue', {jobs:[job('core', worker)]}),
       action('steer', {target:'core', text:'Assert the current state after restart, not the replaced instance.'}),
@@ -187,9 +187,9 @@ test('dependency process metadata cannot manufacture product lifecycle obligatio
   assert.ok(deriveCompletionContext({task:genuine}), 'genuine lifecycle requirements remain active');
 });
 test('two-lane supervisor drives real queue, retains evidence, and cannot finish while workers run', async () => {
-  const m = model([action('enqueue', { jobs: [job('local'), job('cloud','terra')] }), action('finish'), action('wait'), action('wait'), action('finish')]);
+  const m = model([action('enqueue', { jobs: [job('local'), job('cloud','luna')] }), action('finish'), action('wait'), action('wait'), action('finish')]);
   let active = 0, peak = 0, checks = 0;
-  const result = await driveForeman({ task: 'build', initial: {}, model: m, codexWorkers: ['terra'], maxDecisions: 6,
+  const result = await driveForeman({ task: 'build', initial: {}, model: m, codexWorkers: ['luna'], maxDecisions: 6,
     execute: async () => { active++; peak = Math.max(peak, active); await new Promise(r => setTimeout(r, 5)); active--; return { pass: true }; },
     inspect: async () => ({}), verify: async () => { checks++; return { pass: true }; } });
   assert.equal(peak, 2); assert.ok(m.prompts.some(p => p.includes('cannot finish with outstanding jobs')));
@@ -228,13 +228,13 @@ test('supervisor sees remaining decision, token and wall allowances before spend
 });
 test('usage totals count every lane, preserve unknowns, and do not invent dollar prices', () => {
   const u = { inputTokens: 100, outputTokens: 10, cacheHitTokens: 80, freshInputTokens: 20 };
-  const r = { calls: [{ usage: u }], jobs: [{ worker: 'local', startedAt: 1, result: { usage: u } }, { worker: 'terra', startedAt: 1, result: { usage: u } }] };
+  const r = { calls: [{ usage: u }], jobs: [{ worker: 'local', startedAt: 1, result: { usage: u } }, { worker: 'luna', startedAt: 1, result: { usage: u } }] };
   assert.equal(foremanUsage(r).total.inputTokens, 300); assert.equal(foremanUsage(r).costUsd, null);
   r.jobs[1].result.usage = { ...u, complete: false }; assert.equal(foremanUsage(r).total.inputTokens, null);
 });
 test('planning and declined consent never invoke a model or create output', async t => {
   const cwd = fixture(t); let runs = 0;
-  const args = { task: 'build', verify: 'npm test', out: 'result', 'with-codex': 'terra' };
+  const args = { task: 'build', verify: 'npm test', out: 'result', 'with-codex': 'luna' };
   const run = async () => { runs++; throw Error('must not run'); };
   assert.equal(await foremanCommand({ ...args, 'dry-run': true }, { cwd, log: () => {}, run }), 0);
   assert.equal(await foremanCommand(args, { cwd, log: () => {}, ask: async () => 'no', run }), 1);
@@ -246,21 +246,21 @@ test('planning and declined consent never invoke a model or create output', asyn
 test('Codex-only plans require a cloud worker and omit the local endpoint', t => {
   const cwd = fixture(t), args = {task:'build',verify:'npm test',out:'result','no-local':true};
   assert.throws(() => foremanPlan(args, cwd), /requires --with-codex/);
-  const plan = foremanPlan({...args,'with-codex':'terra,sol'}, cwd);
+  const plan = foremanPlan({...args,'with-codex':'luna,sol'}, cwd);
   assert.equal(plan.localEnabled, false);
   assert.equal(plan.endpoint, null);
 });
 
-test('Terra and Sol jobs execute the BANTAM loop with scoped context, steering and verification', t => {
+test('Luna and Sol jobs execute the BANTAM loop with scoped context, steering and verification', t => {
   const dir = fixture(t);
-  for (const worker of ['terra','sol']) {
+  for (const worker of ['luna','sol']) {
     const command = foremanWorkerCommand({task:'Complete project',job:job('build',worker),
       workspace:path.join(dir,'ws'),dir,timeoutMs:600000});
     assert.equal(command.exe, process.execPath);
     assert.match(command.args[0], /bin\/bantam\.js$/);
     assert.equal(command.args[1], 'run');
     assert.ok(command.args.includes('--codex'));
-    assert.equal(command.args[command.args.indexOf('--model')+1], `gpt-5.6-${worker}`);
+    assert.equal(command.args[command.args.indexOf('--model')+1], { luna: 'gpt-6-luna', sol: 'gpt-6.1-sol' }[worker]);
     assert.equal(command.args[command.args.indexOf('--codex-effort')+1], 'medium');
     assert.equal(command.args[command.args.indexOf('--verify')+1], 'npm test');
     assert.equal(command.args[command.args.indexOf('--supervisor-control')+1], dir);

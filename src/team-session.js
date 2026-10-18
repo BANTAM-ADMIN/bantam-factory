@@ -1,8 +1,8 @@
 // Explicit-only collaborative BANTAM sessions.
 //
 // Team mode runs a parallel, read-only specialist phase in isolated workspaces,
-// then gives bounded findings to one Terra primary. Only the Terra lane may
-// write, and the live workspace remains untouched until an explicit verified
+// then gives bounded findings to one primary lane running the current Sol.
+// Only the primary lane may write, and the live workspace remains untouched until an explicit verified
 // transactional apply through the underlying TrioSession machinery.
 
 import fs from "node:fs";
@@ -16,6 +16,8 @@ import {
 } from "./trio-session.js";
 
 const TEAM_KIND = "bantam-team-session";
+// The sole writer lane; it runs the current Sol (see teamArms).
+const PRIMARY = "primary";
 // Contract and adversarial ledgers routinely contain 15-30 independent
 // obligations. The old 2k-character cap silently kept only the first few,
 // defeating the purpose of exhaustive scouting. This still bounds three
@@ -82,7 +84,7 @@ export class TeamSession {
       sourceWorkspace: this.workspace,
       engineManifest: "manifest.json",
       includeLocal: this.includeLocal,
-      primary: "terra",
+      primary: PRIMARY,
       scoutMaxTurns: this.scoutMaxTurns,
       primaryAdvisoryInvestigationLimit: this.primaryAdvisoryInvestigationLimit,
       specialists: this.arms.map((arm) => ({
@@ -119,12 +121,12 @@ export class TeamSession {
     this.team.tasks.push(record);
     this.persist();
 
-    // Terra is the accountable primary, not a second copy of the planning
+    // The primary is accountable for the answer, not a second copy of the planning
     // scout. Giving it a disposable scout turn duplicated repository reads and
     // then threw that native/BANTAM history away at the phase boundary. Keep
     // the independent roles genuinely complementary: Local maps the checkout,
-    // Luna audits the written contract, Sol attacks it, and Terra integrates.
-    const scoutArms = this.arms.filter((arm) => arm.name !== "terra");
+    // Luna audits the written contract, Sol attacks it, and the primary integrates.
+    const scoutArms = this.arms.filter((arm) => arm.name !== PRIMARY);
     const scoutCheckpoints = Object.fromEntries(
       scoutArms.map((arm) => [arm.name, this.engine.checkpointArm(arm.name)]),
     );
@@ -183,7 +185,7 @@ export class TeamSession {
       row.diff?.status !== "captured" || row.diff.fileCount !== 0
     ));
     // Scouts are disposable observations, never candidate ancestors. Restore
-    // every lane (including Terra) before deciding whether integration may run.
+    // every lane (including the primary) before deciding whether integration may run.
     // This also removes scout-only lane history from the primary's prompt.
     restoreScoutLanes(this.engine, scoutCheckpoints);
     if (unsafeScouts.length) {
@@ -210,9 +212,9 @@ export class TeamSession {
 
     const primary = await this.engine.runTurn(request, {
       signal,
-      arms: ["terra"],
+      arms: [PRIMARY],
       armTasks: {
-        terra: primaryPrompt(request, intent, record.findings),
+        [PRIMARY]: primaryPrompt(request, intent, record.findings),
       },
       intent,
       investigationActionLimit: intent === "advisory"
@@ -233,8 +235,8 @@ export class TeamSession {
     if (intent === "implementation"
         && primaryRow
         && !["error", "interrupted", "model-error"].includes(primaryRow.status)) {
-      this.engine.synchronizeArmsFrom("terra", {
-        targets: this.arms.map((arm) => arm.name).filter((name) => name !== "terra"),
+      this.engine.synchronizeArmsFrom(PRIMARY, {
+        targets: this.arms.map((arm) => arm.name).filter((name) => name !== PRIMARY),
       });
       record.synchronizedFromPrimary = true;
     }
@@ -284,17 +286,18 @@ export async function applyTeamPrimary({
   if (!team.tasks.length) throw new Error("team apply requires a completed task");
   const latest = team.tasks.at(-1);
   if (!latest.completedAt || !latest.primaryTurn) {
-    throw new Error("team apply requires a completed Terra primary");
+    throw new Error("team apply requires a completed primary");
   }
   if (latest.intent !== "implementation") {
     throw new Error("team apply requires an implementation task");
   }
   if (latest.comparison?.pass !== true) {
-    throw new Error("team apply requires a verified passing Terra primary");
+    throw new Error("team apply requires a verified passing primary");
   }
   return applyTrioArm({
     sessionDir: directory,
-    arm: "terra",
+    // Sessions recorded before the primary lane replaced Terra still apply.
+    arm: team.primary ?? "terra",
     workspace,
     verificationScript,
     timeoutMs,
@@ -341,7 +344,7 @@ export function formatTeamComparison(comparison) {
   lines.push(
     "",
     `Parallel scout wall time: ${formatDuration(comparison.scoutWallMs)}`,
-    `Terra integration time: ${formatDuration(comparison.primaryDurationMs)}`,
+    `Primary integration time: ${formatDuration(comparison.primaryDurationMs)}`,
     `Total team wall time: ${formatDuration(comparison.wallMs)}`,
     `Total model requests: ${formatNumber(comparison.totalRequests)}`,
     `Total input/output/reasoning: ${formatNumber(comparison.totalInputTokens)} / ${formatNumber(comparison.totalOutputTokens)} / ${formatNumber(comparison.totalReasoningTokens)}`,
@@ -373,10 +376,11 @@ function teamArms(includeLocal) {
       description: "Sol high read-only adversarial reviewer",
     },
     {
-      name: "terra",
+      name: PRIMARY,
+      source: "sol",
       role: "accountable primary",
       effort: "medium",
-      description: "Terra medium sole answer synthesizer and integration writer",
+      description: "Sol medium sole answer synthesizer and integration writer",
     },
   );
   return arms;
@@ -401,7 +405,7 @@ function specialistPrompt(name, task) {
       "Return only a risk-ranked ADVERSARIAL CHECKS list with concrete counterexamples or probes.",
       "Keep the complete list under 8,000 characters and prioritize observed code gaps over hypothetical rewrites.",
     ],
-    terra: [
+    [PRIMARY]: [
       "Act as the read-only primary planner.",
       "Develop the smallest complete implementation approach and identify the files and verification sequence.",
       "Return a concise integration plan grounded in repository evidence.",
@@ -423,7 +427,7 @@ function primaryPrompt(task, intent, findings) {
     finding.summary || "(no usable finding)",
   ].join("\n")).join("\n\n");
   return [
-    "You are the Terra primary for an explicit BANTAM Team task.",
+    "You are the primary for an explicit BANTAM Team task.",
     intent === "implementation"
       ? "You are the sole writer. Implement the operator's task completely in this isolated candidate workspace and verify it."
       : "Answer the operator's question directly and completely. This is advisory: do not modify the workspace.",
@@ -472,7 +476,7 @@ function inadequateAdvisorySummary(summary) {
 function advisoryFallback(task, findings) {
   const usable = findings.filter((finding) => String(finding.summary ?? "").trim());
   return [
-    "Team findings (the Terra synthesis was content-free, so BANTAM preserved the grounded specialist evidence):",
+    "Team findings (the primary synthesis was content-free, so BANTAM preserved the grounded specialist evidence):",
     "",
     ...usable.map((finding) => [
       `### ${finding.arm} — ${finding.role}`,
@@ -503,7 +507,7 @@ function buildTeamComparison(record, primary) {
   ];
   if (primary) {
     rows.push({
-      member: "terra-primary",
+      member: "primary",
       role: record.intent === "implementation" ? "integration writer" : "answer synthesizer",
       status: primary?.status ?? "error",
       turns: primary?.turns ?? 0,
@@ -570,7 +574,7 @@ function writeTeamReport(filePath, team) {
     const cards = task.comparison.rows.map((row) => `<article><h3>${escapeHtml(row.member)}</h3><p>${escapeHtml(row.role)}</p><strong>${escapeHtml(row.status)}</strong><dl><dt>Turns</dt><dd>${row.turns}</dd><dt>Requests</dt><dd>${row.requests}</dd><dt>Input</dt><dd>${formatNumber(row.inputTokens)}</dd><dt>Cache hit</dt><dd>${formatNumber(row.cacheHitTokens)}</dd><dt>Cache miss</dt><dd>${formatNumber(row.cacheMissTokens)}</dd><dt>Output</dt><dd>${formatNumber(row.outputTokens)}</dd><dt>Time</dt><dd>${formatDuration(row.durationMs)}</dd></dl>${row.artifactPath ? `<a href="../${escapeHtml(row.artifactPath)}">Run artifact</a>` : ""}</article>`).join("");
     return `<section><h2>Task ${task.task}</h2><p>${escapeHtml(task.request)}</p><div class="cards">${cards}</div><p>Total team wall time ${formatDuration(task.comparison.wallMs)} · ${formatNumber(task.comparison.totalRequests)} model requests · ${formatNumber(task.comparison.totalInputTokens)} input tokens.</p></section>`;
   }).join("");
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BANTAM Team ${escapeHtml(team.id)}</title><style>:root{color-scheme:dark;--bg:#08100f;--panel:#12201e;--ink:#f5f7ed;--muted:#9db0aa;--line:#b6d8c32b;--accent:#a7ef72}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}.shell{width:min(1180px,calc(100% - 32px));margin:auto}header{padding:68px 0 30px}h1{font-size:clamp(42px,7vw,78px);line-height:.95;letter-spacing:-.05em;margin:10px 0}p{color:var(--muted)}section{margin:20px 0 40px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.cards article{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:16px;padding:18px}dl{display:grid;grid-template-columns:1fr 1fr}dt{color:var(--muted)}dd{text-align:right;margin:0}a{color:var(--accent)}</style></head><body><header><div class="shell"><small>EXPLICIT COLLABORATIVE SESSION</small><h1>Parallel scouts.<br>One accountable writer.</h1><p>Local when available maps the repository, Luna audits the contract, and Sol attacks edge cases in isolated copies. Terra receives their bounded evidence and alone integrates. The live workspace remains untouched until explicit verified apply.</p></div></header><main class="shell">${sections}</main></body></html>`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BANTAM Team ${escapeHtml(team.id)}</title><style>:root{color-scheme:dark;--bg:#08100f;--panel:#12201e;--ink:#f5f7ed;--muted:#9db0aa;--line:#b6d8c32b;--accent:#a7ef72}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}.shell{width:min(1180px,calc(100% - 32px));margin:auto}header{padding:68px 0 30px}h1{font-size:clamp(42px,7vw,78px);line-height:.95;letter-spacing:-.05em;margin:10px 0}p{color:var(--muted)}section{margin:20px 0 40px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.cards article{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:16px;padding:18px}dl{display:grid;grid-template-columns:1fr 1fr}dt{color:var(--muted)}dd{text-align:right;margin:0}a{color:var(--accent)}</style></head><body><header><div class="shell"><small>EXPLICIT COLLABORATIVE SESSION</small><h1>Parallel scouts.<br>One accountable writer.</h1><p>Local when available maps the repository, Luna audits the contract, and Sol attacks edge cases in isolated copies. The current Sol receives their bounded evidence and alone integrates. The live workspace remains untouched until explicit verified apply.</p></div></header><main class="shell">${sections}</main></body></html>`;
   writeTextAtomic(filePath, html);
 }
 
@@ -583,7 +587,7 @@ function roleFor(name) {
     local: "repository scout",
     luna: "contract scout",
     sol: "adversarial reviewer",
-    terra: "primary planner",
+    [PRIMARY]: "primary planner",
   }[name] ?? "specialist";
 }
 

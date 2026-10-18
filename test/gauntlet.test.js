@@ -23,11 +23,11 @@ import { runContractGrader } from "../src/contract-grader.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("gauntlet creates a normalized same-task local/Sol/Terra experiment", () => {
+test("gauntlet creates a normalized same-task local/Sol/Luna experiment", () => {
   const spec = createGauntletSpec({ root });
   const normalized = normalizeExperimentSpec(spec);
   assert.equal(normalized.fixtures.length, 7);
-  assert.deepEqual(normalized.arms.map((arm) => arm.name), ["local", "sol", "terra"]);
+  assert.deepEqual(normalized.arms.map((arm) => arm.name), ["local", "sol", "luna"]);
   assert.deepEqual(normalized.arms[1].model, {
     runtime: "codex",
     name: "gpt-6.1-sol",
@@ -71,7 +71,7 @@ test("Astra gauntlet selection is explicit and leaves the historical default ros
   assert.deepEqual(modelOptionsForGauntletArm(spec.arms[0].model), {
     apiUrl: null, apiKey: null, deepseek: false, codex: true, model: "gpt-6-astra", codexEffort: "medium",
   });
-  assert.deepEqual(createGauntletSpec({ root }).arms.map(arm => arm.name), ["local", "sol", "terra"]);
+  assert.deepEqual(createGauntletSpec({ root }).arms.map(arm => arm.name), ["local", "sol", "luna"]);
 });
 
 test("quick selection and per-arm routing remain explicit and credential-free", () => {

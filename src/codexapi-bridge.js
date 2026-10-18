@@ -17,9 +17,8 @@ export const DEFAULT_CODEXAPI_URL = "http://127.0.0.1:8787/v1";
 // Spark's server default is `high`; its point here is being dumb-fast.
 const RECOMMENDED = [
   { id: "gpt-5.3-codex-spark", short: "spark", effort: "low", role: "fastest" },
-  { id: "gpt-5.6-luna", short: "luna", effort: "medium", role: "fast" },
-  { id: "gpt-5.6-terra", short: "terra", effort: "medium", role: "everyday" },
-  { id: "gpt-5.6-sol", short: "sol", effort: "high", role: "hard" },
+  { id: "gpt-6-luna", short: "luna", effort: "medium", role: "fast" },
+  { id: "gpt-6.1-sol", short: "sol", effort: "high", role: "hard" },
   { id: "gpt-6-astra", short: "astra", effort: "medium", role: "frontier" },
 ];
 

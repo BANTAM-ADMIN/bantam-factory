@@ -82,6 +82,7 @@ import {
 } from "../src/model-usage-snapshot.js";
 import {
   codexModelOptions,
+  defaultCodexModel,
   resolveCodexModelAlias,
   resolveCodexReasoningEffort,
 } from "../src/codex-models.js";
@@ -3050,7 +3051,7 @@ async function gauntletCommand() {
 Run identical isolated coding fixtures through any selected local or live Codex models.
 
 Options:
-  --models local,sol,terra   arms to run (default: all three)
+  --models local,sol,luna    arms to run (default: all three)
   --fixtures <list>          built-in fixtures (default: all seven)
   --rounds <n>               balanced repeated rounds (default: 1)
   --effort <level>           Codex reasoning level (default: high)
@@ -3073,7 +3074,7 @@ Models (offline catalog): ${Object.keys(GAUNTLET_MODELS).join(", ")}`);
   let catalog = [];
   const catalogClient = new ModelClient({
     codex: true,
-    model: "gpt-5.6-terra",
+    model: defaultCodexModel().model,
     codexEffort: "medium",
   });
   try {
@@ -3084,7 +3085,7 @@ Models (offline catalog): ${Object.keys(GAUNTLET_MODELS).join(", ")}`);
     catalogClient.close?.();
   }
   const modelRegistry = gauntletModelRegistry(catalog);
-  const defaultModels = ["local", "sol", "terra"].filter((name) => modelRegistry[name]);
+  const defaultModels = ["local", "sol", "luna"].filter((name) => modelRegistry[name]);
   const models = parseGauntletList(args.models, defaultModels);
   const fixtures = parseGauntletList(args.fixtures, GAUNTLET_FIXTURES);
   const spec = createGauntletSpec({
@@ -3202,7 +3203,7 @@ async function trioCommand() {
     const sessionDir = args._[2] || args.session;
     const arm = typeof args.arm === "string" ? args.arm : args._[3];
     if (!sessionDir || !arm) {
-      process.stderr.write("trio apply requires <session-dir> --arm <local|sol|terra>\n");
+      process.stderr.write("trio apply requires <session-dir> --arm <local|sol|luna>\n");
       return 2;
     }
     if (!args.yes) {
@@ -3245,7 +3246,7 @@ async function trioCommand() {
   }
   let models;
   try {
-    models = parseGauntletList(args.models, ["local", "sol", "terra"]);
+    models = parseGauntletList(args.models, ["local", "sol", "luna"]);
   } catch (error) {
     process.stderr.write(`trio: ${error.message}\n`);
     return 2;
@@ -3387,7 +3388,7 @@ async function delegateCommand() {
     process.stderr.write(
       "Native CLI delegation is research-only: current same-task evidence found BANTAM-constrained "
       + "Codex faster and substantially lower in total token processing. "
-      + "Use normal :model codex-sol/codex-terra for ordinary work. "
+      + "Use normal :model codex-sol/codex-luna for ordinary work. "
       + "To authorize a measured native experiment, re-run delegate run with --yes.\n",
     );
     return 2;
@@ -3450,7 +3451,7 @@ function delegateUsage() {
 RESEARCH-ONLY: measured same-task evidence currently favors BANTAM-constrained
 Codex in elapsed time and total token processing. Native execution requires
 explicit --yes so it cannot be selected accidentally. For ordinary work, use
-:model codex-sol or :model codex-terra and remain inside the BANTAM harness.
+:model codex-sol or :model codex-luna and remain inside the BANTAM harness.
 
 When explicitly authorized, Codex or Claude Code runs as an independent coding
 delegate in an external isolated candidate. BANTAM freezes the baseline,
@@ -3462,7 +3463,7 @@ their pass status, turns, requests, token/cache accounting, reasoning, and time.
 Run options:
   --workspace <dir>       source workspace (default: .)
   --provider <name>       codex (default) or claude
-  --model <name>          Codex sol|terra; Claude opus|sonnet|fable or exact id
+  --model <name>          Codex sol|luna; Claude opus|sonnet|fable or exact id
   --effort <level>        provider reasoning effort (default: high)
   --permission-mode <m>   Claude acceptEdits (default) or auto
   --bypass-sandbox        Codex only: explicit host-sandbox bypass for broken bwrap
@@ -3526,7 +3527,7 @@ function trioUsage() {
   return `Usage:
   ./bin/run-dev.sh trio run --task "..." [options]
   ./bin/run-dev.sh trio show <session-dir>
-  ./bin/run-dev.sh trio apply <session-dir> --arm <local|sol|terra> --yes
+  ./bin/run-dev.sh trio apply <session-dir> --arm <local|sol|luna> --yes
 
 Run the ordinary BANTAM agent concurrently through isolated model workspaces.
 The source workspace remains unchanged until an explicit verified apply.
@@ -3534,7 +3535,7 @@ The source workspace remains unchanged until an explicit verified apply.
 Run options:
   --workspace <dir>          source workspace (default: .)
   --verify "<command>"       project verifier (auto-detected when omitted)
-  --models local,sol,terra   selected arms (default: all)
+  --models local,sol,luna    selected arms (default: all)
   --effort <level>           Codex reasoning effort (default: high)
   --max-turns <n>            per-arm turn limit (default: 30)
   --endpoint <url>           local-model endpoint
@@ -4122,13 +4123,17 @@ async function roosterCrow() {
 }
 
 // `:help` — what you can do inside the interactive session.
-function printReplHelp() {
-  console.log(renderReplHelp({
+function replHelpText() {
+  return renderReplHelp({
     cols: process.stdout.columns ?? 80,
     heading: (s) => paint(`1;${C.plume}`, s),
     command: (s) => paint(C.beak, s),
     description: (s) => paint(C.dim, s),
-  }));
+  });
+}
+
+function printReplHelp() {
+  console.log(replHelpText());
 }
 
 // A local llama.cpp slot reached through --api-url still has a KV cache to protect.
@@ -4543,7 +4548,12 @@ async function repl() {
     }
     // Help is a local command even while a worker is running. It must never
     // become an instruction to abandon the current assignment and answer help.
-    if (/^(?::help|\/help|:h|help|\?)$/i.test(String(s).trim())) { printReplHelp(); return; }
+    // At an idle prompt the line never reaches the main loop, so redraw the prompt.
+    if (/^(?::help|\/help|:h|help|\?)$/i.test(String(s).trim())) {
+      emit(replHelpText());
+      if (!running && resolveRequest) redrawInput(rl);
+      return;
+    }
     // Session settings are harness commands, never steering for either model.
     if (running && tty && handleMaxTurnsCommand(s)) return;
     if (running && tty) {                     // typed mid-run on a terminal -> steer
@@ -4745,7 +4755,7 @@ async function repl() {
     const clients = [];
     const next = new TrioSession({
       workspace,
-      arms: ["local", "sol", "terra"],
+      arms: ["local", "sol", "luna"],
       effort,
       verificationScript,
       maxTurns: args["max-turns"] ? Number(args["max-turns"]) : 30,
@@ -4780,7 +4790,7 @@ async function repl() {
     let catalog = [];
     try { catalog = await model.listCodexModels(); } catch { /* fallback catalog below */ }
     const registry = gauntletModelRegistry(catalog);
-    const missing = ["terra", "luna", "sol"].filter((name) => !registry[name]);
+    const missing = ["luna", "sol"].filter((name) => !registry[name]);
     if (missing.length) {
       throw new Error(`required Codex team model(s) unavailable: ${missing.join(", ")}`);
     }
@@ -4805,7 +4815,7 @@ async function repl() {
       thinkMode,
       preGate: !args["no-pregate"],
       modelFactory: async (arm) => {
-        const entry = registry[arm.name];
+        const entry = registry[arm.source ?? arm.name];
         if (!entry) throw new Error(`team model unavailable: ${arm.name}`);
         const modelSpec = {
           ...entry.model,
@@ -5358,11 +5368,11 @@ async function repl() {
       }
       if (operation === "help") {
         console.log([
-          "  :team on       explicitly start isolated Local-if-reachable/Luna/Sol/Terra lanes",
-          "                 each request runs parallel read-only scouts, then one Terra primary",
+          "  :team on       explicitly start isolated Local-if-reachable/Luna/Sol scouts",
+          "                 each request runs parallel read-only scouts, then one Sol primary",
           "  :team status   show the active team and whether Local joined",
           "  :team compare  print the latest specialist/primary usage comparison",
-          "  :team apply    verify and transactionally apply the Terra candidate",
+          "  :team apply    verify and transactionally apply the primary candidate",
           "  :team reset    close the team and freeze a new baseline",
           "  :team off      stop Team mode; evidence and private lanes remain",
           "  Team mode never starts automatically and never writes the live workspace before apply.",
@@ -5377,8 +5387,8 @@ async function repl() {
         try {
           const started = await startTeamSession();
           console.log([
-            `  Team mode enabled: ${started.includeLocal ? "Local, " : ""}Luna, Sol, and Terra.`,
-            "  Scouts run read-only in parallel; Terra is the sole integration writer.",
+            `  Team mode enabled: ${started.includeLocal ? "Local, Luna and Sol" : "Luna and Sol"} scouts, then a Sol primary.`,
+            "  Scouts run read-only in parallel; the Sol primary is the sole integration writer.",
             "  Every lane is isolated. The live workspace remains unchanged until :team apply.",
             "  Team mode is explicit-only and will not auto-fire.",
             `  Session: ${started.directory}`,
@@ -5434,7 +5444,7 @@ async function repl() {
           console.log("  Team apply requires a configured verifier.");
           continue;
         }
-        const answer = await wizardPrompt("Apply Terra primary? [y/N]");
+        const answer = await wizardPrompt("Apply the primary? [y/N]");
         if (!/^y(?:es)?$/i.test(String(answer ?? "").trim())) {
           console.log("  Team apply cancelled.");
           continue;
@@ -5447,7 +5457,7 @@ async function repl() {
           });
           teamSession.close();
           teamSession = null;
-          console.log(`  Applied Terra primary; live verifier ${applied.verification.status}. Team mode is now off.`);
+          console.log(`  Applied the primary; live verifier ${applied.verification.status}. Team mode is now off.`);
         } catch (error) {
           console.log(`  Team apply failed safely: ${error.message}`);
         }
@@ -5464,7 +5474,7 @@ async function repl() {
       }
       if (operation === "help") {
         console.log([
-          "  :trio on [effort]  freeze this workspace and start local/Sol/Terra lanes",
+          "  :trio on [effort]  freeze this workspace and start local/Sol/Luna lanes",
           "  :trio status       show the active session",
           "  :trio compare      print the latest objective comparison",
           "  :trio apply <arm>  verify and transactionally apply one whole arm",
@@ -5485,7 +5495,7 @@ async function repl() {
         try {
           const started = await startTrioSession(value || "high");
           console.log([
-            "  Trio mode enabled: local, Sol, and Terra.",
+            "  Trio mode enabled: local, Sol, and Luna.",
             "  Every ordinary request now runs concurrently in three isolated workspaces.",
             "  The live workspace remains unchanged until :trio apply <arm>.",
             `  Session: ${started.directory}`,
@@ -5536,8 +5546,8 @@ async function repl() {
         continue;
       }
       if (operation === "apply") {
-        if (!value || !["local", "sol", "terra"].includes(value.toLowerCase())) {
-          console.log("  Usage: :trio apply <local|sol|terra>");
+        if (!value || !["local", "sol", "luna"].includes(value.toLowerCase())) {
+          console.log("  Usage: :trio apply <local|sol|luna>");
           continue;
         }
         if (!verificationScript) {
@@ -6117,7 +6127,7 @@ async function repl() {
 
     if (teamOutcome) {
       console.log(`\n${formatTeamComparison(teamOutcome.comparison)}\n`);
-      console.log(`TERRA PRIMARY\n${teamOutcome.primary?.summary || teamOutcome.primary?.status || "no result"}\n`);
+      console.log(`PRIMARY\n${teamOutcome.primary?.summary || teamOutcome.primary?.status || "no result"}\n`);
       console.log(`report: ${path.join(teamSession.directory, "team-report", "index.html")}\n`);
       sessionLog.push({
         request,
@@ -6413,7 +6423,7 @@ async function collaborateCommand() {
       const trio = loadTrioTeacherArtifacts(path.resolve(sources[0]), {
         turn: typeof args.turn === "string" ? args.turn : "latest",
       });
-      artifacts = [trio.artifacts.local, trio.artifacts.sol, trio.artifacts.terra];
+      artifacts = Object.values(trio.artifacts);
       evidenceLabel = `trio ${trio.sessionId} turn ${trio.turn}`;
     } else {
       artifacts = sources.map((file) => JSON.parse(fs.readFileSync(path.resolve(file), "utf8")));
@@ -6508,7 +6518,7 @@ async function collaborateCommand() {
 function parseCollaborationGrades(value, parse) {
   if (value === undefined) return {};
   if (value === true || typeof value !== "string") {
-    throw new Error("--grades requires local=passed/tests,sol=passed/tests,terra=passed/tests");
+    throw new Error("--grades requires local=passed/tests,sol=passed/tests,luna=passed/tests");
   }
   const out = {};
   for (const assignment of value.split(",")) {
@@ -6522,9 +6532,9 @@ function parseCollaborationGrades(value, parse) {
 function collaborateUsage() {
   return `Usage:
   ./bin/run-dev.sh collaborate <trio-session-dir> [--turn latest|N] [options]
-  ./bin/run-dev.sh collaborate <local-run.json> <sol-run.json> <terra-run.json> [options]
+  ./bin/run-dev.sh collaborate <local-run.json> <sol-run.json> <luna-run.json> [options]
 
-Run an independent Sol/Terra teacher council over same-task BANTAM artifacts.
+Run an independent Sol/Luna teacher council over same-task BANTAM artifacts.
 Each teacher diagnoses the local harness and designs adversarial tests, then
 cross-reviews the other teacher. Cross-accepted hypotheses become durable,
 build-only candidates visible in \`:self-improve plan\`.
@@ -6533,8 +6543,8 @@ Options:
   --yes               authorize sending the bounded evidence packet to Codex
   --preview           compute deterministic trajectory evidence locally; no model calls
   --turn <latest|N>   select a completed trio turn (default: latest)
-  --grades <list>     external grades, e.g. local=3/10,sol=9/10,terra=10/10
-  --models <list>     Codex models (default: gpt-5.6-sol,gpt-5.6-terra)
+  --grades <list>     external grades, e.g. local=3/10,sol=9/10,luna=10/10
+  --models <list>     Codex models (default: current Sol and Luna)
   --effort <level>    reasoning effort for council calls (default: high)
   --proactive         consult despite no automatic local struggle signal
   --workspace <dir>   BANTAM checkout that stores the report (default: launcher)
@@ -6781,11 +6791,11 @@ bantam factory list|show|audit|report ...
 bantam eval [fixtureDir ...] [--save-run[=path]]
 bantam experiment spec.json [--output path] [--dry-run] [--yes for native CLI arms]
 bantam experiment spec.json --resume evidence-directory
-bantam gauntlet [--models local,sol,terra] [--quick] [--rounds N] [--faults]
+bantam gauntlet [--models local,sol,luna] [--quick] [--rounds N] [--faults]
                                   isolated same-task model comparison with hidden contracts and full usage metrics
-bantam trio run --task "..." [--workspace .] [--verify "npm test"] [--models local,sol,terra] [--effort high]
+bantam trio run --task "..." [--workspace .] [--verify "npm test"] [--models local,sol,luna] [--effort high]
 bantam trio show <session-dir>
-bantam trio apply <session-dir> --arm <local|sol|terra> --yes
+bantam trio apply <session-dir> --arm <local|sol|luna> --yes
                                   parallel isolated real-task comparison and explicit transactional adoption
 bantam delegate run --yes --provider codex|claude --task "..." [--model NAME] [--effort high] [--verify "npm test"]
 bantam delegate show <artifact-or-run-dir> [--json]
@@ -6793,7 +6803,7 @@ bantam delegate compare <evidence> <evidence> [...]
 bantam delegate apply <artifact-or-run-dir> --yes [--verify "npm test"]
                                   research-only native Codex control; constrained BANTAM remains the default
 bantam analyze [ledger.jsonl ...] [--json] [--all-runs]
-bantam collaborate <local.json> <sol.json> <terra.json> --yes [--grades local=3/10,sol=9/10,terra=10/10]
+bantam collaborate <local.json> <sol.json> <luna.json> --yes [--grades local=3/10,sol=9/10,luna=10/10]
 bantam hypothesize <subject.json> <reference.json> [...] [--json]
                                   turn saved trajectory gaps into model-free, falsifiable harness candidates
 bantam replay <run.json> --turn N [--inject "text"]

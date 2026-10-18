@@ -8,12 +8,12 @@ import { loadTrioTeacherArtifacts } from "../src/trio-evidence.js";
 
 const temporary = new Set();
 
-function makeSession() {
+function makeSession(third = "luna") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-trio-evidence-"));
   temporary.add(root);
   const turns = [1, 2].map((turn) => {
     const arms = {};
-    for (const arm of ["local", "sol", "terra"]) {
+    for (const arm of ["local", "sol", third]) {
       const relative = `runs/${arm}/turn-${turn}.json`;
       const file = path.join(root, relative);
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -47,8 +47,19 @@ afterEach(() => {
 });
 
 describe("trio teacher evidence resolver", () => {
-  it("selects the latest completed turn and returns Local/Sol/Terra in canonical roles", () => {
+  it("selects the latest completed turn and returns Local/Sol/Luna in canonical roles", () => {
     const session = makeSession();
+    const loaded = loadTrioTeacherArtifacts(session);
+
+    assert.equal(loaded.sessionId, "trio-test");
+    assert.equal(loaded.turn, 2);
+    assert.equal(loaded.task, "Task 2");
+    assert.deepEqual(Object.keys(loaded.artifacts), ["local", "sol", "luna"]);
+    assert.equal(loaded.artifacts.luna.runId, "luna-2");
+  });
+
+  it("still reads sessions recorded with a Terra lane", () => {
+    const session = makeSession("terra");
     const loaded = loadTrioTeacherArtifacts(session);
 
     assert.equal(loaded.sessionId, "trio-test");

@@ -1,15 +1,15 @@
 #!/bin/bash
-# Create GitHub release v2.0.4 using the gh CLI.
-# Requires: gh auth login, a release commit on main, and the v2.0.4 tag.
+# Create GitHub release v2.0.5 using the gh CLI.
+# Requires: gh auth login, a release commit on main, and the v2.0.5 tag.
 set -euo pipefail
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 git push origin main
-git push origin v2.0.4
-gh release create v2.0.4 \
+git push origin v2.0.5
+gh release create v2.0.5 \
   --verify-tag \
-  --title "Bantam Factory 2.0.4" \
-  --notes-file release-notes-2.0.4.md \
+  --title "Bantam Factory 2.0.5" \
+  --notes-file release-notes-2.0.5.md \
   --target main
 
-echo "Release v2.0.4 created successfully!"
+echo "Release v2.0.5 created successfully!"

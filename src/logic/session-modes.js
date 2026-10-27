@@ -5,7 +5,7 @@
 // different vocabularies (the banner said "context rebuild", the env var said
 // BANTAM_IMMUTABLE_HISTORY, and nothing connected them):
 //
-//   rebuild    — the default. Every prompt re-rendered, superseded file bodies
+//   rebuild    — every prompt re-rendered, superseded file bodies
 //                rewritten in place, the volatile <open_files> panel refreshed.
 //                Clean context, full reprefill. Measured better where it counts:
 //                on the preregistered compact-strictness family, rebuild 30/30
@@ -17,7 +17,7 @@
 //                churning, so a single-slot llama.cpp server reuses its KV cache
 //                instead of re-prefilling. The volatile panel still re-renders,
 //                so reuse plateaus rather than compounding.
-//   extension  — each prompt a byte-level extension of the last: frozen head, no
+//   extension  — the default. Each prompt a byte-level extension of the last: frozen head, no
 //                volatile tail, open files folded into the newest observation.
 //                92% slot reuse and under half the wall time — and the sharpest
 //                version of the pollution the operator described, since stale
@@ -36,7 +36,7 @@ const ALIASES = new Map([
   ["recalc", "rebuild"], ["fresh", "rebuild"], ["clean", "rebuild"], ["full", "rebuild"],
 ]);
 
-export const DEFAULT_CONTEXT_MODE = "rebuild";
+export const DEFAULT_CONTEXT_MODE = "extension";
 export const CONTEXT_MODES = ["rebuild", "immutable", "extension"];
 
 /** Map whatever the operator typed onto a canonical mode, or null. */
@@ -61,8 +61,10 @@ export function contextModeEnv(mode) {
 
 /** Read the dial back out of an environment — what a session is actually running. */
 export function contextModeFromEnv(env = process.env) {
-  if (String(env.BANTAM_PROMPT_TRAJECTORY ?? "").trim().toLowerCase() === "extension") return "extension";
-  return /^(1|true|yes|on)$/i.test(String(env.BANTAM_IMMUTABLE_HISTORY ?? "").trim()) ? "immutable" : "rebuild";
+  return resolveContextMode({
+    envTrajectory: env.BANTAM_PROMPT_TRAJECTORY,
+    envImmutable: env.BANTAM_IMMUTABLE_HISTORY,
+  }).mode;
 }
 
 function envIsSet(value) {
@@ -115,7 +117,9 @@ export function resolveContextMode({
 }
 
 /**
- * Pick the mode for ONE request. Measured 2026-08-24, same request, same local
+ * Pick the mode for ONE request. Extension is already the default; the legacy
+ * read-only optimization below only applies to a supplied rebuild default.
+ * Measured 2026-08-24, same request, same local
  * slot: rebuild 71.5 s of prefill (cache_n pinned at the head checkpoint),
  * extension 9-12 s. Extension's one cost — stale file bodies staying in
  * context — needs edits to exist, so for a request that is not change-shaped,
@@ -126,7 +130,7 @@ export function resolveContextMode({
 export function contextModeForRequest({ resolved, changeShaped = false, localSlot = false } = {}) {
   const mode = normalizeContextMode(resolved?.mode) ?? DEFAULT_CONTEXT_MODE;
   const source = String(resolved?.source ?? "default");
-  if (source !== "default") return { mode, applied: false, reason: source };
+  if (source !== "default" || mode === "extension") return { mode, applied: false, reason: source };
   if (!localSlot) return { mode, applied: false, reason: "default (remote provider)" };
   if (changeShaped) return { mode, applied: false, reason: "default (change-shaped request)" };
   return { mode: "extension", applied: true, reason: "auto: read-only request on a local slot" };
@@ -238,7 +242,7 @@ export const MODE_DEFAULTS = Object.freeze({
 });
 
 /** True when an entry sits at its default. Compares the value's leading word so
- *  `rebuild (default)` and `ON — via your Codex plan` classify correctly. */
+ *  `extension (default)` and `ON — via your Codex plan` classify correctly. */
 export function isDefaultMode(entry) {
   const def = MODE_DEFAULTS[entry?.key];
   if (def === undefined) return false;

@@ -42,11 +42,13 @@ test("mode names accept the words an operator actually types", () => {
   assert.equal(normalizeContextMode(""), null);
 });
 
-test("rebuild is the default, matching a bare run with neither variable set", () => {
+test("extension is the default, matching a first run with neither variable set", () => {
   const r = resolveContextMode({});
   assert.equal(r.mode, DEFAULT_CONTEXT_MODE);
-  assert.equal(r.mode, "rebuild");
+  assert.equal(r.mode, "extension");
   assert.match(r.source, /default/);
+  assert.equal(contextModeFromEnv({}), "extension");
+  assert.equal(contextModeFromEnv({ BANTAM_PROMPT_TRAJECTORY: "", BANTAM_IMMUTABLE_HISTORY: "" }), "extension");
   assert.deepEqual(CONTEXT_MODES, ["rebuild", "immutable", "extension"]);
 });
 
@@ -94,8 +96,12 @@ test("precedence runs flag > env > remembered > default, and names the source", 
   );
 });
 
+test("a remembered rebuild choice survives the new default", () => {
+  assert.deepEqual(resolveContextMode({ saved: "rebuild" }), { mode: "rebuild", source: "remembered" });
+});
+
 test("an unreadable remembered mode falls back instead of throwing", () => {
-  assert.equal(resolveContextMode({ saved: "gibberish" }).mode, "rebuild");
+  assert.equal(resolveContextMode({ saved: "gibberish" }).mode, "extension");
   assert.match(resolveContextMode({ saved: "gibberish" }).source, /default/);
 });
 
@@ -143,7 +149,7 @@ test("a chosen mode survives into the next session", () => {
 // switches, every time — wrapped into three rows of grey on an 80-column
 // terminal. The summary shows only what is off its default and never wraps.
 const allDefault = () => [
-  { key: "context", value: "rebuild (default)" }, { key: "stream", value: "off" },
+  { key: "context", value: "extension (default)" }, { key: "stream", value: "off" },
   { key: "deepresearch", value: "off" }, { key: "rooster", value: "on" },
   { key: "usage", value: "off" }, { key: "image", value: "off" }, { key: "eyes", value: "auto" },
 ];
@@ -170,7 +176,7 @@ test("the summary never wraps: it stops at an entry boundary and counts the rest
 });
 
 test("context is already a row in the card, so the summary can omit it", () => {
-  const e = [{ key: "context", value: "extension (flag)" }, { key: "stream", value: "off" }];
-  assert.equal(renderModeSummary(e, { cols: 80 }), "modes: context=extension (flag)");
+  const e = [{ key: "context", value: "rebuild (flag)" }, { key: "stream", value: "off" }];
+  assert.equal(renderModeSummary(e, { cols: 80 }), "modes: context=rebuild (flag)");
   assert.equal(renderModeSummary(e, { cols: 80, omit: ["context"] }), null);
 });

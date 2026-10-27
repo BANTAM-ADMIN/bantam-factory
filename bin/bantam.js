@@ -6870,9 +6870,9 @@ Chat transport: [--chat-transport] (or BANTAM_CHAT_TRANSPORT=1) — send turns a
 
 Context dial:  [--context-mode rebuild|immutable|extension] [--immutable-history] [--recompute]
                (or BANTAM_PROMPT_TRAJECTORY / BANTAM_IMMUTABLE_HISTORY); in chat use :context
-               rebuild   every prompt re-rendered - clean context, full reprefill (default)
+               rebuild   every prompt re-rendered - clean context, full reprefill
                immutable append-only history - a single-slot server reuses its KV cache
-               extension byte-extension prompts - fastest reuse, stale bodies never leave context
+               extension byte-extension prompts (default) - fastest reuse, stale bodies never leave context
                The choice is remembered across sessions; every session prints its modes at startup
                and :modes lists them. Reuse needs a single-slot server (bantam swap solo).
 

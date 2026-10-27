@@ -58,6 +58,7 @@ import {
   renderModeSummary,
   renderModeTable,
   resolveContextMode,
+  resolveStreamMode,
   resolveImageMode,
   describeImageMode,
   resolveImageProvider,
@@ -1737,7 +1738,7 @@ function startupModeEntries() {
   return sessionModeEntries({
     contextMode: contextModeState.mode,
     contextSource: contextModeState.source,
-    stream: process.env.BANTAM_STREAM === "1" || (process.env.BANTAM_STREAM !== "0" && settings.stream === true),
+    stream: resolveStreamMode({ env: process.env.BANTAM_STREAM, saved: settings.stream }).on,
     deepResearch: process.env.BANTAM_DEEPRESEARCH === "1",
     rooster: roosterOn,
     usage: usageDisplayEnabled,
@@ -4433,10 +4434,10 @@ async function repl() {
   // mechanical probe caught 0/2. Off by default: it spends one governed codex
   // errand per gapped question.
   let deepResearch = process.env.BANTAM_DEEPRESEARCH === "1";
-  // Live text streaming (operator order, 2026-08-19): OPTIONAL, default off.
+  // Live text streaming defaults on; explicit environment and saved choices win.
   // Delivery-only — the grammar constrains sampling server-side either way,
   // proven byte-identical by the stream-identity tests.
-  let streamMode = process.env.BANTAM_STREAM === "1" || (process.env.BANTAM_STREAM !== "0" && loadUserSettings().stream === true);
+  let streamMode = resolveStreamMode({ env: process.env.BANTAM_STREAM, saved: loadUserSettings().stream }).on;
   let previousAnswerText = "";  // the answer BEFORE this one — the memory the model cannot back-write
   let resolveRequest = null; // resolver for the idle "waiting for a request" promise
   let closed = false;

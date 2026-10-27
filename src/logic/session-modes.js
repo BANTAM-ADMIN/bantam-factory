@@ -164,6 +164,15 @@ export function renderModeTable(entries = []) {
   return lines;
 }
 
+export const DEFAULT_STREAM_MODE = "on";
+
+/** Resolve live text delivery consistently for the startup display and REPL. */
+export function resolveStreamMode({ env, saved } = {}) {
+  if (env === "1" || env === "0") return { on: env === "1", source: "BANTAM_STREAM" };
+  if (typeof saved === "boolean") return { on: saved, source: "remembered" };
+  return { on: DEFAULT_STREAM_MODE === "on", source: "default" };
+}
+
 // ---------------------------------------------------------------------------
 // Image generation (`generate_image`, brokered through the signed-in Codex
 // account). Deliberately independent of the task model — a local model can ask
@@ -237,7 +246,7 @@ export function describeImageProvider(provider) {
 // at 170 characters, wrapped into three lines of grey under the first-screen
 // card on an 80-column terminal. `:modes` still renders the whole table.
 export const MODE_DEFAULTS = Object.freeze({
-  context: DEFAULT_CONTEXT_MODE, stream: "off", deepresearch: "off", rooster: "on",
+  context: DEFAULT_CONTEXT_MODE, stream: DEFAULT_STREAM_MODE, deepresearch: "off", rooster: "on",
   usage: "off", image: "off", eyes: "auto",
 });
 

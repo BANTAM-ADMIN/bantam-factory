@@ -22,6 +22,7 @@ import {
   renderModeSummary,
   renderModeTable,
   resolveContextMode,
+  resolveStreamMode,
 } from "../src/logic/session-modes.js";
 import { loadUserSettings, saveUserSetting } from "../src/logic/user-settings.js";
 
@@ -149,7 +150,7 @@ test("a chosen mode survives into the next session", () => {
 // switches, every time — wrapped into three rows of grey on an 80-column
 // terminal. The summary shows only what is off its default and never wraps.
 const allDefault = () => [
-  { key: "context", value: "extension (default)" }, { key: "stream", value: "off" },
+  { key: "context", value: "extension (default)" }, { key: "stream", value: "on" },
   { key: "deepresearch", value: "off" }, { key: "rooster", value: "on" },
   { key: "usage", value: "off" }, { key: "image", value: "off" }, { key: "eyes", value: "auto" },
 ];
@@ -166,7 +167,7 @@ test("the startup summary lists only the modes that are off their default", () =
 
 test("the summary never wraps: it stops at an entry boundary and counts the rest", () => {
   const many = [
-    { key: "stream", value: "on" }, { key: "deepresearch", value: "on" }, { key: "usage", value: "on" },
+    { key: "stream", value: "off" }, { key: "deepresearch", value: "on" }, { key: "usage", value: "on" },
     { key: "image", value: "ON — via your Codex plan" }, { key: "eyes", value: "codex" },
   ];
   const line = renderModeSummary(many, { cols: 40 });
@@ -176,7 +177,35 @@ test("the summary never wraps: it stops at an entry boundary and counts the rest
 });
 
 test("context is already a row in the card, so the summary can omit it", () => {
-  const e = [{ key: "context", value: "rebuild (flag)" }, { key: "stream", value: "off" }];
+  const e = [{ key: "context", value: "rebuild (flag)" }, { key: "stream", value: "on" }];
   assert.equal(renderModeSummary(e, { cols: 80 }), "modes: context=rebuild (flag)");
   assert.equal(renderModeSummary(e, { cols: 80, omit: ["context"] }), null);
+});
+
+
+test("a fresh session streams by default and explicit choices take precedence", () => {
+  assert.deepEqual(resolveStreamMode(), { on: true, source: "default" });
+  for (const saved of [true, false]) {
+    assert.deepEqual(resolveStreamMode({ saved }), { on: saved, source: "remembered" });
+    assert.deepEqual(resolveStreamMode({ env: "0", saved }), { on: false, source: "BANTAM_STREAM" });
+    assert.deepEqual(resolveStreamMode({ env: "1", saved }), { on: true, source: "BANTAM_STREAM" });
+    assert.deepEqual(resolveStreamMode({ env: "", saved }), { on: saved, source: "remembered" });
+  }
+  for (const saved of [undefined, null, "bad setting"]) {
+    assert.deepEqual(resolveStreamMode({ saved }), { on: true, source: "default" });
+  }
+});
+
+test("turning streaming off is remembered across sessions", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bantam-stream-mode-"));
+  madeDirs.push(dir);
+  const file = path.join(dir, "settings.json");
+  assert.equal(resolveStreamMode({ saved: loadUserSettings(file).stream }).on, true);
+  saveUserSetting("stream", false, file);
+  assert.deepEqual(resolveStreamMode({ saved: loadUserSettings(file).stream }), { on: false, source: "remembered" });
+});
+
+test("the startup summary shows streaming off as a departure from the default", () => {
+  const entries = allDefault().map((e) => e.key === "stream" ? { ...e, value: "off" } : e);
+  assert.equal(renderModeSummary(entries, { cols: 80 }), "modes: stream=off");
 });
